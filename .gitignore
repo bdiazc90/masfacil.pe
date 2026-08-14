@@ -1,3 +1,6 @@
 # Artefactos preexistentes sin procedencia; se preservan, pero no son evidencia.
 /fetch-gis.mjs
 /gis-osinergmin.json
+
+# Originales reutilizables de Gate 0.2: caché local explícita, nunca versionada.
+/.local-cache/

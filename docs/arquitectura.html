@@ -286,11 +286,11 @@
       <div>
         <p class="eyebrow">Facilito UX Lab · mapa vigente</p>
         <h1>Del precio publicado a una decisión confiable</h1>
-        <p>Gate 0.1 confirmó el producto público y su frontera. Gate 0.2 debe demostrar procedencia, identidad, vigencia y cobertura antes de proponer el experimento de Capa 1.</p>
+        <p>Gate 0.2 confirmó fuentes oficiales, datos actuales e identificadores candidatos. Gate 0.3 debe decidir si sus límites permiten una experiencia independiente confiable y cuál sería el experimento mínimo de Capa 1.</p>
       </div>
       <div class="stamp" aria-label="Estado del proyecto">
-        <strong>Capa 0 · Gate 0.1 cerrado</strong>
-        <span>Siguiente: Gate 0.2 · FULL</span>
+        <strong>Capa 0 · Gate 0.2 cerrado</strong>
+        <span>Siguiente: Gate 0.3 · FULL</span>
       </div>
     </header>
 
@@ -301,64 +301,64 @@
       <span class="risk-color"><i class="dot"></i> Riesgo</span>
     </div>
 
-    <section class="metrics" aria-label="Métricas clave de Gate 0.1">
-      <article class="metric"><small>Producto público</small><strong>7/7</strong><p>journeys con oferta real en Lima / provincia Lima</p></article>
-      <article class="metric"><small>Universos observados</small><strong>42–726</strong><p>filas por journey, sin extrapolación nacional</p></article>
-      <article class="metric risk"><small>Frescura J7</small><strong>50,5 %</strong><p>de 444 filas con último reporte de más de un año</p></article>
-      <article class="metric risk"><small>Geografía</small><strong>24 ≠ 25</strong><p>mapa desktop sin Callao; select mobile con 25 territorios</p></article>
+    <section class="metrics" aria-label="Métricas clave de Gate 0.2">
+      <article class="metric"><small>Precios perfilados</small><strong>2.34 M</strong><p>filas completas en cuatro fuentes oficiales</p></article>
+      <article class="metric"><small>Frescura máxima</small><strong>1 día</strong><p>GLP, líquidos y DMIN llegan al 2026-08-13</p></article>
+      <article class="metric"><small>Join candidato</small><strong>93–99 %</strong><p>cobertura GIS ↔ Registro según actividad</p></article>
+      <article class="metric risk"><small>Identidad pública</small><strong>0 fuentes</strong><p>para nombre comercial del establecimiento</p></article>
     </section>
 
     <section class="map">
       <div class="lane">
-        <h2>Flujo observado</h2>
+        <h2>Mapa de datos observado</h2>
         <div class="flow">
+          <article class="node">
+            <span class="state">Observado</span>
+            <h3>Fuentes oficiales</h3>
+            <p>CSV de precios, Registro de Hidrocarburos, FeatureServer GIS y catálogo UBIGEO. PRICE publica funcionalmente en Facilito, pero el linaje técnico inmediato no está demostrado.</p>
+          </article>
+          <div class="arrow" aria-hidden="true">→</div>
+          <article class="node">
+            <span class="state">Observado</span>
+            <h3>Evidencia minimizada</h3>
+            <p>Adquisición sellada, originales fuera de Git, snapshots sin datos personales y perfiles reproducibles. Los joins exactos conservan no-matches y ambigüedad.</p>
+          </article>
+          <div class="arrow" aria-hidden="true">→</div>
           <article class="node partial">
             <span class="state">Parcial</span>
-            <h3>Operadores → PRICE</h3>
-            <p>Facilito afirma que los operadores reportan precios mediante PRICE. Fuente inmediata, timestamps y condiciones de reutilización aún no están demostrados.</p>
-          </article>
-          <div class="arrow" aria-hidden="true">→</div>
-          <article class="node">
-            <span class="state">Observado</span>
-            <h3>Facilito público</h3>
-            <p>Siete journeys por producto, tipo de vendedor y geografía administrativa. Sin ubicación actual ni distancia; J1–J6 no muestran fecha por precio.</p>
-          </article>
-          <div class="arrow" aria-hidden="true">→</div>
-          <article class="node">
-            <span class="state">Observado</span>
-            <h3>Persona que compara</h3>
-            <p>Recibe establecimiento, dirección, teléfono y precio. La marca aparece en GLP; la identidad legal domina otros resultados y la confianza temporal queda incompleta.</p>
+            <h3>Decisión del ciudadano</h3>
+            <p>Precio, fecha y coordenadas son candidatos utilizables. Nombre comercial del punto, J7 y confianza ante datos antiguos siguen sin resolverse.</p>
           </article>
         </div>
 
-        <div class="tech" aria-label="Frontera técnica observada">
-          <div><strong>Entradas JSP</strong><span>Mapas, selects y formularios públicos</span></div>
-          <div><strong>Actions `.do`</strong><span>POST con estado y token generado por la página</span></div>
-          <div><strong>HTML completo</strong><span>El resultset viaja con cada documento</span></div>
-          <div><strong>DataTables</strong><span>Búsqueda y paginación en cliente; sin API JSON observada</span></div>
+        <div class="tech" aria-label="Fuentes observadas">
+          <div><strong>Precios</strong><span>2,340,316 filas; GLP y líquidos actuales</span></div>
+          <div><strong>Autorizaciones</strong><span>17,742 filas en 10 actividades</span></div>
+          <div><strong>Geografía GIS</strong><span>11,215 puntos; IDs candidatos exactos</span></div>
+          <div><strong>UBIGEO INEI</strong><span>1,891 distritos; sin código común observado</span></div>
         </div>
       </div>
 
       <aside class="side-panel">
-        <h2>Lo que Gate 0.2 debe resolver</h2>
+        <h2>Lo que Gate 0.3 debe decidir</h2>
         <div class="stack">
-          <div class="next-card"><strong>01 · Procedencia y acceso</strong><p>Fuente oficial por journey, licencia, mecanismo soportado y frecuencia.</p></div>
-          <div class="next-card"><strong>02 · Identidad y semántica</strong><p>IDs estables para establecimiento, operador, producto y reporte; significado de timestamps.</p></div>
-          <div class="next-card"><strong>03 · Cobertura y calidad</strong><p>Muestra definida fuera de Lima: vigencia, faltantes, duplicados y casos especiales.</p></div>
-          <div class="risk-card"><strong>Riesgo P0 · Confianza</strong><p>Precio sin fecha en seis journeys; antigüedad material en J7.</p></div>
-          <div class="risk-card"><strong>Riesgo · Identidad</strong><p>Marca/nombre comercial todavía no tiene relación legítima y determinística con razón social.</p></div>
+          <div class="next-card"><strong>01 · Cadena utilizable</strong><p>Precio → autorización → coordenada, con cobertura, ambigüedad y frescura por journey.</p></div>
+          <div class="next-card"><strong>02 · Umbral de confianza</strong><p>Qué resultados pueden mostrarse, cuáles requieren advertencia y cuáles deben excluirse.</p></div>
+          <div class="next-card"><strong>03 · Experimento mínimo</strong><p>Elegir un solo alcance por evidencia y definir métricas antes de construir.</p></div>
+          <div class="risk-card"><strong>P0 · Identidad reconocible</strong><p>`MARCA` describe producto o envasadora; no el nombre comercial del punto.</p></div>
+          <div class="risk-card"><strong>P0 · Journey 7</strong><p>Sin fuente estructurada nominal ni geografía oficial observada.</p></div>
         </div>
       </aside>
 
       <div class="decision">
-        <span class="label">Condiciones aprobadas para una futura Capa 1</span>
-        <p><strong>Mobile-first</strong> y nombre reconocible para el público como identidad principal; razón social/RUC como trazabilidad secundaria. El experimento todavía no está definido y depende de la evidencia de Capa 0.</p>
+        <span class="label">Salida de Capa 0</span>
+        <p><strong>GO, GO con límites o NO-GO</strong>, acompañado —si corresponde— por un experimento mobile-first con alcance, fuentes, política de confianza y métricas explícitas. Todavía no existe arquitectura de producción.</p>
       </div>
     </section>
 
     <footer>
       <span>Proyecto independiente y no oficial.</span>
-      <span>Actualizado al cierre de Gate 0.1 · 2026-08-14</span>
+      <span>Actualizado al cierre de Gate 0.2 · 2026-08-14</span>
     </footer>
   </main>
 </body>

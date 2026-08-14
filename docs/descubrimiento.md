@@ -4,6 +4,8 @@
 >
 > Proyecto independiente y no oficial. No está afiliado, aprobado ni producido por Osinergmin, Facilito o el Estado peruano.
 
+Las fuentes oficiales, sus contratos y el modelo de datos observado se mantienen en [`docs/datos.md`](datos.md).
+
 ## Alcance y estado de la evidencia
 
 Este documento describe la superficie pública de `facilito.gob.pe` observada sin autenticación el **2026-08-14** desde macOS y Chromium. La reproducción principal usó viewport desktop efectivo de **1280×720**; las comprobaciones responsive usaron viewports efectivos de **800×885** para la entrada territorial y **559×931** para una tabla. También se hicieron solicitudes HTTP directas, breves y seriales, con cookies separadas por caso.
