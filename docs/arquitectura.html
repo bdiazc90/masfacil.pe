@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa vigente · Facilito UX Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #102536;
+      --muted: #567080;
+      --paper: #f5f8f9;
+      --panel: #ffffff;
+      --line: #c9d6dc;
+      --built: #147d64;
+      --built-soft: #e2f3ed;
+      --partial: #2c6d9f;
+      --partial-soft: #e6f0f7;
+      --next: #7957a6;
+      --next-soft: #eee8f6;
+      --risk: #ba4d36;
+      --risk-soft: #f9e8e4;
+      --road: #f0b429;
+      --radius: 10px;
+      --shadow: 0 12px 32px rgba(16, 37, 54, .08);
+      font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, transparent 0 49.65%, rgba(240, 180, 41, .12) 49.65% 50.35%, transparent 50.35%),
+        var(--paper);
+      color: var(--ink);
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: end;
+      padding-bottom: 22px;
+      border-bottom: 3px solid var(--ink);
+    }
+
+    .eyebrow,
+    .label,
+    .state,
+    .metric small {
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--partial);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(30px, 5vw, 58px);
+      line-height: .98;
+      letter-spacing: -.045em;
+    }
+
+    header p {
+      max-width: 700px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .stamp {
+      min-width: 176px;
+      padding: 12px 14px;
+      border: 1px solid var(--partial);
+      border-left: 5px solid var(--partial);
+      background: var(--partial-soft);
+      box-shadow: var(--shadow);
+    }
+
+    .stamp strong,
+    .stamp span { display: block; }
+    .stamp strong { font-size: 15px; }
+    .stamp span { margin-top: 3px; color: var(--muted); font-size: 12px; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin: 18px 0 26px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+    .built-color { color: var(--built); }
+    .partial-color { color: var(--partial); }
+    .next-color { color: var(--next); }
+    .risk-color { color: var(--risk); }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 26px;
+    }
+
+    .metric {
+      min-height: 116px;
+      padding: 16px;
+      border-top: 4px solid var(--built);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .metric.risk { border-color: var(--risk); }
+    .metric strong { display: block; margin: 8px 0 4px; font-size: clamp(24px, 4vw, 38px); line-height: 1; }
+    .metric small { color: var(--muted); font-size: 10px; }
+    .metric p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+    .map {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(310px, .85fr);
+      gap: 18px;
+    }
+
+    .lane,
+    .side-panel {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .92);
+      box-shadow: var(--shadow);
+    }
+
+    .lane { padding: 20px; }
+    .side-panel { padding: 18px; }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      letter-spacing: -.015em;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: 1fr 34px 1fr 34px 1fr;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .node {
+      position: relative;
+      min-height: 150px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-top: 5px solid var(--built);
+      border-radius: var(--radius);
+      background: var(--panel);
+    }
+
+    .node.partial { border-top-color: var(--partial); background: var(--partial-soft); }
+    .node.next { border-style: dashed; border-top-style: solid; border-top-color: var(--next); background: var(--next-soft); }
+    .node h3 { margin: 8px 0; font-size: 16px; }
+    .node p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .state {
+      color: var(--built);
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .partial .state { color: var(--partial); }
+    .next .state { color: var(--next); }
+
+    .arrow {
+      align-self: center;
+      color: var(--muted);
+      text-align: center;
+      font-size: 24px;
+    }
+
+    .tech {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .tech div {
+      padding: 10px;
+      border-left: 3px solid var(--built);
+      background: var(--built-soft);
+    }
+
+    .tech strong { display: block; font-size: 12px; }
+    .tech span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+
+    .stack { display: grid; gap: 12px; }
+
+    .risk-card,
+    .next-card {
+      padding: 13px 14px;
+      border-left: 4px solid var(--risk);
+      background: var(--risk-soft);
+    }
+
+    .next-card { border-color: var(--next); background: var(--next-soft); }
+    .risk-card strong,
+    .next-card strong { display: block; font-size: 13px; }
+    .risk-card p,
+    .next-card p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+
+    .decision {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 16px;
+      align-items: center;
+      margin-top: 18px;
+      padding: 17px 20px;
+      border: 1px dashed var(--next);
+      background: var(--next-soft);
+    }
+
+    .decision .label { color: var(--next); font-size: 10px; font-weight: 800; }
+    .decision p { margin: 0; font-size: 14px; line-height: 1.45; }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    @media (max-width: 900px) {
+      header,
+      .map { grid-template-columns: 1fr; }
+      .stamp { width: fit-content; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 650px) {
+      body { background: var(--paper); }
+      main { width: min(100% - 20px, 1180px); padding-top: 18px; }
+      header { gap: 16px; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .metric { min-height: 104px; padding: 13px; }
+      .flow { grid-template-columns: 1fr; gap: 8px; }
+      .arrow { transform: rotate(90deg); font-size: 20px; }
+      .tech { grid-template-columns: 1fr 1fr; }
+      .decision { grid-template-columns: 1fr; gap: 7px; }
+      footer { display: block; }
+      footer span { display: block; margin-top: 4px; }
+    }
+
+    @media (max-width: 480px) {
+      .metrics { grid-template-columns: 1fr; }
+      .metric { min-height: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Facilito UX Lab · mapa vigente</p>
+        <h1>Del precio publicado a una decisión confiable</h1>
+        <p>Gate 0.1 confirmó el producto público y su frontera. Gate 0.2 debe demostrar procedencia, identidad, vigencia y cobertura antes de proponer el experimento de Capa 1.</p>
+      </div>
+      <div class="stamp" aria-label="Estado del proyecto">
+        <strong>Capa 0 · Gate 0.1 cerrado</strong>
+        <span>Siguiente: Gate 0.2 · FULL</span>
+      </div>
+    </header>
+
+    <div class="legend" aria-label="Leyenda de estados">
+      <span class="built-color"><i class="dot"></i> Observado</span>
+      <span class="partial-color"><i class="dot"></i> Parcial / no confirmado</span>
+      <span class="next-color"><i class="dot"></i> Próximo</span>
+      <span class="risk-color"><i class="dot"></i> Riesgo</span>
+    </div>
+
+    <section class="metrics" aria-label="Métricas clave de Gate 0.1">
+      <article class="metric"><small>Producto público</small><strong>7/7</strong><p>journeys con oferta real en Lima / provincia Lima</p></article>
+      <article class="metric"><small>Universos observados</small><strong>42–726</strong><p>filas por journey, sin extrapolación nacional</p></article>
+      <article class="metric risk"><small>Frescura J7</small><strong>50,5 %</strong><p>de 444 filas con último reporte de más de un año</p></article>
+      <article class="metric risk"><small>Geografía</small><strong>24 ≠ 25</strong><p>mapa desktop sin Callao; select mobile con 25 territorios</p></article>
+    </section>
+
+    <section class="map">
+      <div class="lane">
+        <h2>Flujo observado</h2>
+        <div class="flow">
+          <article class="node partial">
+            <span class="state">Parcial</span>
+            <h3>Operadores → PRICE</h3>
+            <p>Facilito afirma que los operadores reportan precios mediante PRICE. Fuente inmediata, timestamps y condiciones de reutilización aún no están demostrados.</p>
+          </article>
+          <div class="arrow" aria-hidden="true">→</div>
+          <article class="node">
+            <span class="state">Observado</span>
+            <h3>Facilito público</h3>
+            <p>Siete journeys por producto, tipo de vendedor y geografía administrativa. Sin ubicación actual ni distancia; J1–J6 no muestran fecha por precio.</p>
+          </article>
+          <div class="arrow" aria-hidden="true">→</div>
+          <article class="node">
+            <span class="state">Observado</span>
+            <h3>Persona que compara</h3>
+            <p>Recibe establecimiento, dirección, teléfono y precio. La marca aparece en GLP; la identidad legal domina otros resultados y la confianza temporal queda incompleta.</p>
+          </article>
+        </div>
+
+        <div class="tech" aria-label="Frontera técnica observada">
+          <div><strong>Entradas JSP</strong><span>Mapas, selects y formularios públicos</span></div>
+          <div><strong>Actions `.do`</strong><span>POST con estado y token generado por la página</span></div>
+          <div><strong>HTML completo</strong><span>El resultset viaja con cada documento</span></div>
+          <div><strong>DataTables</strong><span>Búsqueda y paginación en cliente; sin API JSON observada</span></div>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <h2>Lo que Gate 0.2 debe resolver</h2>
+        <div class="stack">
+          <div class="next-card"><strong>01 · Procedencia y acceso</strong><p>Fuente oficial por journey, licencia, mecanismo soportado y frecuencia.</p></div>
+          <div class="next-card"><strong>02 · Identidad y semántica</strong><p>IDs estables para establecimiento, operador, producto y reporte; significado de timestamps.</p></div>
+          <div class="next-card"><strong>03 · Cobertura y calidad</strong><p>Muestra definida fuera de Lima: vigencia, faltantes, duplicados y casos especiales.</p></div>
+          <div class="risk-card"><strong>Riesgo P0 · Confianza</strong><p>Precio sin fecha en seis journeys; antigüedad material en J7.</p></div>
+          <div class="risk-card"><strong>Riesgo · Identidad</strong><p>Marca/nombre comercial todavía no tiene relación legítima y determinística con razón social.</p></div>
+        </div>
+      </aside>
+
+      <div class="decision">
+        <span class="label">Condiciones aprobadas para una futura Capa 1</span>
+        <p><strong>Mobile-first</strong> y nombre reconocible para el público como identidad principal; razón social/RUC como trazabilidad secundaria. El experimento todavía no está definido y depende de la evidencia de Capa 0.</p>
+      </div>
+    </section>
+
+    <footer>
+      <span>Proyecto independiente y no oficial.</span>
+      <span>Actualizado al cierre de Gate 0.1 · 2026-08-14</span>
+    </footer>
+  </main>
+</body>
+</html>
