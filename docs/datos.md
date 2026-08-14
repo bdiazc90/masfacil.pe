@@ -2,6 +2,8 @@
 
 Estado: conocimiento vigente de Gate 0.2, observado el 14 de agosto de 2026 (America/Lima). Caracteriza fuentes públicas y relaciones medidas; no diseña la aplicación futura ni demuestra que un CSV sea la fuente técnica inmediata de Facilito.
 
+La evaluación integrada y el veredicto vigente están en [Factibilidad medida de la Capa 0](factibilidad.md).
+
 ## Método, procedencia e integridad
 
 Las adquisiciones nuevas se hicieron sin autenticación, serialmente y con baja carga. `scripts/acquire-gate-0.2.mjs` transmite cada recurso una vez hacia `/.local-cache/`, rechaza sobrescrituras y registra durante la solicitud: URL y parámetros reales, tiempos de inicio/fin, cabeceras materiales, cadena HTTP, bytes y SHA-256. El log está fuera de `raw`, en `data/provenance/2026-08-14/acquisitions.jsonl`.
@@ -36,6 +38,29 @@ Ambos archivos aceptaron `Range: bytes=0-` y se descargaron completos una sola v
 
 HTTP 206 demuestra disponibilidad durante esta adquisición, no un SLA ni estabilidad futura. Los 403 de la primera pasada fueron fallos del cliente usado y no una propiedad de la fuente.
 
+## Evidencia externa verificada por el owner: EVPC retail
+
+**Clasificación:** `OWNER-VERIFIED / TRUSTED INPUT`. Investigación independiente previa, posteriormente auditada y entregada por el owner el 14 de agosto de 2026. Los conteos corresponden principalmente a un snapshot del **12 de agosto de 2026** y no se interpretan como valores permanentes. Sus artefactos no forman parte del pipeline reproducible de este repositorio; se usa como evidencia externa explícita, no como resultado de los scripts de Gate 0.2.
+
+El archivo oficial de Osinergmin `Ultimos-Precios-Registrados-EVPC.xlsx` contenía **17,472** filas y **5,685** `CODIGO_OSINERG` distintos. La unidad observada era aproximadamente establecimiento × producto × último precio reportado e incluía gasoholes, gasolinas, diésel, GLP y GNV.
+
+Frescura medida sobre las 17,472 filas: 330 dentro de la última hora; 9,540 (≈55 %) dentro de 24 horas; 15,924 (≈91 %) dentro de 7 días; 16,966 (≈97 %) dentro de 30 días; y 506 con más de 30 días. La regulación PRICE aportada con esta evidencia exige actualizar cuando cambia el precio y dispone que Facilito publique el último precio reportado por un máximo de 30 días calendario. Una fila raw de mayor antigüedad no se promueve automáticamente a resultado visible.
+
+Relaciones exactas verificadas, sin fuzzy matching:
+
+| Relación / alcance | Resultado |
+| --- | ---: |
+| `EVPC.CODIGO_OSINERG` ↔ Registro Hábil `CODIGO_OSINERGMIN` | 5,659/5,685 (99.54 %); 26 sin match |
+| `EVPC.NRO_REGISTRO` ↔ GIS `N` | 5,279/5,685 (92.86 %) |
+| Bridge adicional por Registro Hábil | 5,301/5,685 |
+| `SAFE GEO MATCH`, agregando geografía administrativa + dirección normalizada solo cuando era inequívoca | 5,345/5,685 (94.02 %) |
+| Excluyendo Grifos Flotantes y Grifos Rurales con cilindros | 5,345/5,440 (98.25 %) establecimientos; 16,728/16,994 (98.43 %) filas de precio |
+| Control Santiago de Surco | 28/28 establecimientos con coordenada segura |
+
+De los 340 establecimientos sin coordenada segura, 144 eran Grifos Flotantes y 101 Grifos Rurales con almacenamiento en cilindros. Por ello la geografía oficial no parece bloqueante para un alcance urbano/carretera que excluya explícitamente esas categorías; sí permanece incompleta para ellas. El nivel que usa dirección exacta no establece una regla general de identidad y no autoriza fuzzy matching del residual.
+
+La identidad comercial sigue abierta: `MARCA` estaba vacía en 17,472/17,472 filas EVPC y los padrones aportaban razón social, no necesariamente el nombre reconocible para el conductor. `PRODUCTO_ACTIVO` y `ULT_PRECIO_DIF_CERO` tampoco tienen semántica verificada de stock; no permiten afirmar “disponible ahora”. Esta evidencia no resuelve J7 ni demuestra por sí sola el linaje técnico inmediato del archivo hacia cada respuesta de Facilito.
+
 ## Perfil cuantitativo de precios
 
 Todos los universos se recorrieron completos. “Duplicados 0” se demuestra porque el ID de control de cada fila es no nulo y único; por ello una fila exacta duplicada no puede existir.
@@ -60,6 +85,8 @@ En GLP, `MARCA` está presente en 345,018/522,380 filas (66.047 %), con 188 valo
 El Registro minimizado conserva 17,742 autorizaciones de actividades 1, 2, 5, 6, 13, 15, 16, 20, 24 y 59. `REGISTRO` no es universalmente fila-única: hay 7 valores repetidos en actividad 1, 17 en 13, 1 en 16 y 78 en 24. RUC permanece descartado como identidad única del establecimiento: identifica al titular y su multiplicidad ya fue observada; además no se conserva en los snapshots.
 
 El FeatureServer observado publica 27 entradas de capa; los IDs saltan del 29 al 32. **La capa 31 no existe en ese servicio**, no está “rota”. Las capas perfiladas suman 11,215 features: 28=117, 34=5,663, 35=5,284 y 36=151; `OBJECTID` y geometría son completos/únicos dentro de cada capa, sin coordenadas fuera de la caja conservadora de Perú.
+
+El servicio declara `copyrightText: "OSINERGMIN"`, pero no expone una licencia explícita. Esto permite atribuir la fuente observada, no asumir permiso de reutilización pública.
 
 Campos de identidad medidos:
 
@@ -95,7 +122,9 @@ El stub oficial de 244 bytes contiene un `meta refresh` hacia `https://www.osine
 
 El navegador reprodujo `ERR_TIMED_OUT` tanto al stub como al destino, mientras HTTP directo respondió 200. Se separa disponibilidad HTTP del fallo del navegador; el timeout no invalida el contenido adquirido ni demuestra caída del sitio.
 
-La RCD 256-2021-OS/CD establece la relación funcional PRICE → publicación en Facilito, pero no prueba que estos CSV sean el linaje técnico inmediato de cada journey.
+La RCD 256-2021-OS/CD vincula funcionalmente PRICE, SCOP y la publicación en Facilito en su artículo 4, pero no prueba que estos CSV sean el linaje técnico inmediato de cada journey. Su artículo 18 fija hasta 30 días de publicación y no define el estado posterior: `>30 días` significa fuera de esa ventana, no precio necesariamente falso.
+
+**Evidencia externa de revisión, 2026-08-14:** ni el formulario RHO ni el schema público del Padrón Reducido SUNAT incluyen nombre comercial. La consulta SUNAT individual que puede exponerlo requiere CAPTCHA y queda fuera del acceso permitido; la identidad reconocible continúa ausente en las fuentes bulk legítimas observadas. La licencia ODC-By está confirmada para los catálogos de precios, mientras la reutilización de GIS y EVPC permanece ambigua.
 
 ## Modelo de entidades observado
 

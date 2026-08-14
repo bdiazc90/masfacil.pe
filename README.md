@@ -17,7 +17,7 @@ Principios ya aprobados:
 
 ## Estado
 
-**Capa 0 — descubrimiento y factibilidad.** Gate 0.1 estableció el producto público observado. Gate 0.2 confirmó fuentes oficiales, contratos, frescura e identificadores candidatos. Gate 0.3 medirá la factibilidad integrada y propondrá —solo si la evidencia lo permite— el experimento mínimo de Capa 1.
+**Capa 0 — cerrada.** El veredicto es **GO CON LÍMITES** únicamente para un experimento privado de Capa 1: J1 (combustible líquido) en Santiago de Surco, mobile-first y orientado a comparar precio, cercanía y frescura frente a Facilito. No autoriza publicación ni expansión del alcance.
 
 Hallazgos vigentes de Gate 0.1:
 
@@ -41,6 +41,16 @@ Hallazgos vigentes de Gate 0.2:
 
 El catálogo y modelo observado se mantienen en [docs/datos.md](docs/datos.md).
 
+Resultado vigente de Gate 0.3:
+
+- J1 conserva 12,954 ofertas con precio `<=30 días`, autorización exacta y coordenada segura en el snapshot reproducido;
+- la geografía sobre Registro exacto alcanza 94.29 %–99.29 % en J1–J6; el control externo de Surco cubrió 28/28 establecimientos;
+- ninguna fuente bulk oficial observada aporta el nombre comercial reconocible del establecimiento: el producto público continúa bloqueado por identidad y por permisos de reutilización aún ambiguos para GIS/EVPC;
+- J7 permanece excluido: la fuente estructurada observada no reproduce su oferta pública;
+- el experimento autorizado debe medir acciones, tiempo y comprensión antes de decidir cualquier arquitectura o producto.
+
+El veredicto, las políticas de confianza, los embudos y los umbrales del experimento están en [docs/factibilidad.md](docs/factibilidad.md).
+
 ## Reproducción disponible
 
 El snapshot agregado y sanitizado de J7 permite recalcular antigüedad y consistencia interna:
@@ -56,6 +66,12 @@ Gate 0.2 puede recalcularse y verificarse sin repetir descargas públicas:
 ```bash
 node scripts/profile-gate-0.2.mjs
 node scripts/verify-gate-0.2.mjs
+```
+
+La factibilidad integrada de Gate 0.3 se recalcula sobre los snapshots minimizados:
+
+```bash
+node scripts/analyze-gate-0.3.mjs
 ```
 
 ## Estructura actual
