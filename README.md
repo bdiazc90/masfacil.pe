@@ -17,7 +17,7 @@ Principios ya aprobados:
 
 ## Estado
 
-**Capa 0 — cerrada.** El veredicto es **GO CON LÍMITES** únicamente para un experimento privado de Capa 1: J1 (combustible líquido) en Santiago de Surco, mobile-first y orientado a comparar precio, cercanía y frescura frente a Facilito. No autoriza publicación ni expansión del alcance.
+**Capa 1 — vertical slice privado.** Gate 1.1 cerró el contrato experimental de J1 para Lima provincia: la ubicación actual —no el domicilio ni el distrito— es el origen de la decisión. El alcance continúa siendo privado y no autoriza publicación.
 
 Hallazgos vigentes de Gate 0.1:
 
@@ -51,6 +51,14 @@ Resultado vigente de Gate 0.3:
 
 El veredicto, las políticas de confianza, los embudos y los umbrales del experimento están en [docs/factibilidad.md](docs/factibilidad.md).
 
+Resultado vigente de Gate 1.1:
+
+- 741 ofertas de Gasohol Regular tenían precio válido `<=30 días`; 714 completaron Registro exacto, coordenada segura e identidad provisional: **96.356 %** en 42 distritos;
+- la medición previa de Surco permanece como población fallida separada: 26/30 (86.667 %), sin cambiar su denominador;
+- el contrato real con 714 ofertas permanece ignorado y con permisos privados; Git conserva schema, fixture sintético y evidencia agregada;
+- el protocolo compara ambas condiciones desde el mismo origen y permite todos los controles nativos de Facilito;
+- marca, descuentos y convenios quedan como hipótesis posterior; Gate 1.2 debe definir operativamente la distancia antes de instrumentarla.
+
 ## Reproducción disponible
 
 El snapshot agregado y sanitizado de J7 permite recalcular antigüedad y consistencia interna:
@@ -74,12 +82,20 @@ La factibilidad integrada de Gate 0.3 se recalcula sobre los snapshots minimizad
 node scripts/analyze-gate-0.3.mjs
 ```
 
+El contrato experimental privado de Gate 1.1 se reconstruye con la caché local sellada:
+
+```bash
+node scripts/build-gate-1.1.mjs
+```
+
 ## Estructura actual
 
 ```text
 docs/        conocimiento vigente y mapa visual
+contracts/   schemas de boundaries experimentales
 data/        snapshots minimizados, métricas y procedencia verificable
 evidence/    evidencia mínima sanitizada
-scripts/     research reproducible de Capa 0
+fixtures/    datos sintéticos para validar contratos sin propagar identidades
+scripts/     research y transformaciones reproducibles
 BITACORA.md  coordinación del gate activo
 ```

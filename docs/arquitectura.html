@@ -286,11 +286,11 @@
       <div>
         <p class="eyebrow">Facilito UX Lab · mapa vigente</p>
         <h1>Del precio publicado a una decisión confiable</h1>
-        <p>Capa 0 demostró una cadena oficial útil para precio, autorización y geografía. La salida es un experimento privado y medible; identidad comercial y permisos de reutilización aún bloquean un producto público.</p>
+        <p>Gate 1.1 convirtió la cadena oficial en un contrato privado para Lima provincia. El siguiente paso es un vertical slice mobile-first desde la ubicación actual, con distancia aún por definir operativamente.</p>
       </div>
       <div class="stamp" aria-label="Estado del proyecto">
-        <strong>Capa 0 · cerrada</strong>
-        <span>GO con límites · 2026-08-14</span>
+        <strong>Capa 1 · Gate 1.1 cerrado</strong>
+        <span>Siguiente: vertical slice privado</span>
       </div>
     </header>
 
@@ -301,65 +301,66 @@
       <span class="risk-color"><i class="dot"></i> Riesgo</span>
     </div>
 
-    <section class="metrics" aria-label="Métricas clave al cierre de Capa 0">
-      <article class="metric"><small>Cadena J1 · ≤30 días</small><strong>12,954</strong><p>ofertas con Registro exacto y coordenada segura</p></article>
-      <article class="metric"><small>Control Surco</small><strong>28/28</strong><p>establecimientos con geografía segura, owner-verified</p></article>
-      <article class="metric"><small>Geografía J1–J6</small><strong>94–99 %</strong><p>sobre Registro exacto, derivada por actividad</p></article>
+    <section class="metrics" aria-label="Métricas clave de Gate 1.1">
+      <article class="metric"><small>Contrato privado</small><strong>714</strong><p>ofertas listas para el experimento</p></article>
+      <article class="metric"><small>Cobertura completa</small><strong>96.36 %</strong><p>714 de 741 ofertas frescas de Lima provincia</p></article>
+      <article class="metric"><small>Territorio</small><strong>42</strong><p>distritos presentes sin selección favorable</p></article>
       <article class="metric risk"><small>Identidad pública</small><strong>0/7</strong><p>journeys con nombre comercial oficial disponible</p></article>
     </section>
 
     <section class="map">
       <div class="lane">
-        <h2>Cadena demostrada y frontera del experimento</h2>
+        <h2>Boundary privado listo para construir</h2>
         <div class="flow">
           <article class="node">
             <span class="state">Observado</span>
-            <h3>Precio oficial</h3>
-            <p>CSV vigentes y evidencia externa EVPC. La observación más reciente por oferta conserva fecha, unidad, conflictos y antigüedad; no demuestra stock.</p>
+            <h3>Fuentes selladas</h3>
+            <p>Precio oficial ≤30 días, Registro exacto y GIS por actividad. Los joins fallidos permanecen excluidos y medidos.</p>
           </article>
           <div class="arrow" aria-hidden="true">→</div>
           <article class="node">
             <span class="state">Observado</span>
-            <h3>Establecimiento + punto</h3>
-            <p>Registro y GIS se relacionan con IDs oficiales. La capa se deriva por actividad; no-matches, ambigüedad y categorías especiales permanecen visibles.</p>
+            <h3>Contrato validado</h3>
+            <p>714 ofertas con precio, fecha, coordenada e identidad provisional. El dataset real es local, ignorado y privado.</p>
           </article>
           <div class="arrow" aria-hidden="true">→</div>
           <article class="node next">
             <span class="state">Próximo</span>
-            <h3>Experimento privado</h3>
-            <p>J1 en Surco: comparar precio, cercanía y frescura desde celular. Razón social y dirección se rotulan como identidad provisional.</p>
+            <h3>Vertical slice</h3>
+            <p>Desde una ubicación actual real o simulada, comparar precio, distancia y frescura cruzando límites distritales.</p>
           </article>
         </div>
 
         <div class="tech" aria-label="Fuentes observadas">
-          <div><strong>Política temporal</strong><span>Mostrar solo ≤30 días; antigüedad siempre visible</span></div>
-          <div><strong>Cadena J1</strong><span>13,662 frescas → 13,287 Registro → 12,954 geo</span></div>
-          <div><strong>Scope</strong><span>Surco · J1 · privado · sin interacción conduciendo</span></div>
-          <div><strong>Sin inferencias</strong><span>No fuzzy, stock, marca comercial ni linaje supuesto</span></div>
+          <div><strong>Embudo Lima</strong><span>821 últimas → 741 frescas → 722 Registro → 714 GIS</span></div>
+          <div><strong>Boundary</strong><span>JSON local + schema + fixture sintético; solo lectura</span></div>
+          <div><strong>Origen</strong><span>Ubicación actual, misma en A/B, sin límite distrital</span></div>
+          <div><strong>Sin inferencias</strong><span>No fuzzy, stock, marca, descuentos ni scoring</span></div>
         </div>
       </div>
 
       <aside class="side-panel">
-        <h2>Condiciones para Capa 1</h2>
+        <h2>Condiciones para Gate 1.2</h2>
         <div class="stack">
-          <div class="next-card"><strong>01 · Tarea</strong><p>Persona estacionaria elige combustible con precio, distancia y edad del reporte.</p></div>
-          <div class="next-card"><strong>02 · Éxito</strong><p>≤2 acciones, ≥30 % menos tiempo y ≥80 % de comprensión en las tres dimensiones.</p></div>
-          <div class="next-card"><strong>03 · Datos</strong><p>≥95 % de cobertura elegible; abandonar por debajo de 90 %.</p></div>
+          <div class="next-card"><strong>01 · Definir distancia</strong><p>Congelar geodésica o de ruta antes de ordenar resultados e instrumentar cercanía.</p></div>
+          <div class="next-card"><strong>02 · Construir mínimo</strong><p>Solo la experiencia mobile necesaria para precio, distancia y frescura.</p></div>
+          <div class="next-card"><strong>03 · Instrumentar</strong><p>Acciones, tiempo y comprensión con el mismo origen en ambas condiciones.</p></div>
+          <div class="risk-card"><strong>Margen de datos</strong><p>96.36 %: 1.36 puntos sobre el éxito; 27 ofertas permanecen excluidas.</p></div>
           <div class="risk-card"><strong>P0 · Identidad reconocible</strong><p>Ausente en fuentes bulk legítimas; obligatoria antes de publicación.</p></div>
           <div class="risk-card"><strong>P0 · Reutilización</strong><p>GIS y EVPC sin licencia explícita verificada; investigación privada solamente.</p></div>
-          <div class="risk-card"><strong>Excluido · Journey 7</strong><p>La fuente estructurada observada no reproduce la oferta pública.</p></div>
+          <div class="risk-card"><strong>Hipótesis diferida</strong><p>Marca y descuentos pueden cambiar conveniencia, pero identidad no está resuelta.</p></div>
         </div>
       </aside>
 
       <div class="decision">
-        <span class="label">Salida de Capa 0</span>
-        <p><strong>GO CON LÍMITES.</strong> Construir solo el experimento privado J1/Surco. Un producto público sigue en NO-GO hasta resolver identidad comercial y permiso de reutilización; todavía no existe arquitectura de producción.</p>
+        <span class="label">Salida de Gate 1.1</span>
+        <p><strong>GO CON LÍMITES.</strong> Gate 1.2 puede construir el slice privado J1/Lima desde la ubicación actual. Producto público, identidad comercial y reutilización siguen fuera de alcance.</p>
       </div>
     </section>
 
     <footer>
       <span>Proyecto independiente y no oficial.</span>
-      <span>Actualizado al cierre de Gate 0.3 y Capa 0 · 2026-08-14</span>
+      <span>Actualizado al cierre de Gate 1.1 · 2026-08-16</span>
     </footer>
   </main>
 </body>

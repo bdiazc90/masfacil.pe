@@ -1,16 +1,17 @@
 # BITÁCORA
 
-> Estado temporal del trabajo activo. El conocimiento de Capa 0 vive en `README.md`, `docs/` y la evidencia reproducible.
+> Estado temporal del trabajo activo. El conocimiento cerrado vive en `README.md`, `docs/`, contratos, código y evidencia reproducible.
 
 ## Estado
 
-**Sin gate activo. Capa 0 cerrada el 2026-08-14.**
+**Sin gate activo. Gate 1.1 cerrado el 2026-08-16.**
 
-- Gate 0.3: **CERRADO — GO CON LÍMITES**.
-- Autorizado: un único experimento privado, mobile-first, J1 en Santiago de Surco, para comparar precio + cercanía + frescura frente a Facilito.
-- No autorizado: publicación, expansión a otros journeys, arquitectura productiva o presentar razón social/dirección como nombre comercial.
-- Bloqueos públicos vigentes: identidad comercial reconocible; licencia/reutilización de GIS y EVPC; J7 sin fuente estructurada demostrada.
+- Veredicto: **GO CON LÍMITES** para construir el vertical slice privado J1/Lima provincia desde una ubicación actual real o simulada.
+- Cobertura reproducida: 714/741 ofertas frescas (96.356 %) en 42 distritos.
+- Surco permanece como población fallida separada: 26/30 (86.667 %); no se cambió su denominador.
+- Actividad 24 permanece excluida: es un universo auxiliar y admitirla genera ambigüedad sin cambiar la decisión.
+- Producto público sigue bloqueado por identidad comercial y permiso de reutilización.
 
-## Próximo paso
+## Condición de entrada de Gate 1.2
 
-Codex A debe abrir y definir el primer gate de Capa 1 antes de encargar trabajo a Codex B. El contrato medible del experimento está en `docs/factibilidad.md`.
+Codex A debe definir operativamente la distancia —geodésica o de ruta— antes de ordenar resultados o instrumentar comprensión de cercanía. Marca, descuentos, convenios y scoring permanecen diferidos.

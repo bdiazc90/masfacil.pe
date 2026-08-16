@@ -1,10 +1,10 @@
-# Factibilidad medida de la Capa 0
+# Factibilidad medida y contrato experimental
 
-Estado: conocimiento vigente de Gate 0.3, medido el 14 de agosto de 2026 (America/Lima). Integra el [producto observado](descubrimiento.md) y las [fuentes oficiales](datos.md); especifica un experimento, pero no lo construye ni inicia Capa 1.
+Estado: conocimiento vigente de Capa 0 y contrato de Gate 1.1, medido el 14 de agosto de 2026 (America/Lima). Integra el [producto observado](descubrimiento.md) y las [fuentes oficiales](datos.md); define un experimento privado, pero no construye UI ni el vertical slice.
 
 ## Veredicto
 
-**GO CON LÍMITES únicamente para un experimento privado, mobile-first, de J1 en Santiago de Surco.** La evidencia permite probar si presentar conjuntamente precio, cercanía y frescura mejora una decisión frente a Facilito. No autoriza un producto público, publicación de datos, expansión a otros journeys ni elección de UI, framework, base de datos o pipeline.
+**GO CON LÍMITES únicamente para un experimento privado, mobile-first, de J1 en Lima provincia, desde una ubicación actual real o simulada.** La evidencia permite probar si presentar conjuntamente precio, distancia y frescura mejora una decisión frente a Facilito. No autoriza un producto público, publicación de datos, expansión a otros journeys ni elección de UI, framework, base de datos o pipeline.
 
 El norte público continúa bloqueado: **0/7 journeys** dispone de una fuente oficial y determinística para el nombre comercial reconocible del establecimiento. En el experimento privado, razón social y dirección pueden usarse como identidad provisional, siempre rotuladas como tales y nunca como nombre comercial. J7 permanece excluido porque el CSV GLP vigente no explica su oferta pública.
 
@@ -122,20 +122,64 @@ Criterios: frescura alta `>=80 %` a 30 días, limitada `50–<80 %`, insuficient
 | J6 | medio | limitada | alta | limitada | insuficiente | conflictos/frescura | no seleccionado |
 | J7 | alto | insuficiente | insuficiente | inexistente | insuficiente | fuente no demostrada | excluido |
 
-## Único experimento autorizado de Capa 1
+## Poblaciones reproducidas de Gate 1.1
+
+`node scripts/build-gate-1.1.mjs` aplica una lista cerrada: actividades 1/2/5/6 urbanas, `PRODUCTO=GASOHOL REGULAR`, `UNIDAD=Galones`, territorio literal departamento/provincia `LIMA/LIMA`, cualquier distrito, último precio por oferta y antigüedad `0..30 días`. Después exige `ACTIVIDAD→SOURCE_ACTIVITY + REGISTRO` con cardinalidad uno y `REGISTRO→GIS 35.N` con cardinalidad uno, coordenada segura y departamento, provincia y distrito exactos concordantes en precio, Registro y GIS. No normaliza texto, no usa fuzzy matching y excluye flotantes y rurales.
+
+Los granos permanecen separados: fila fuente = `ID3`; oferta = `Registro × actividad × producto × unidad` con máximo `FECHA_DE_REGISTRO`; establecimiento = `Registro`. La salida no expone esos identificadores: produce hashes estables distintos para fila, oferta y establecimiento.
+
+### Población fallida conservada: Santiago de Surco
+
+La medición anterior queda intacta: 33 ofertas últimas, 30 frescas, 28 con Registro exacto y 26 contract-ready. Su cobertura es **26/30 = 86.667 %**, con denominador 30 y umbral de abandono 90 %. Su decisión permanece **NO-GO para esa población**; no se reinterpreta como 26/28 ni se usa para calcular el resultado prospectivo.
+
+### Población prospectiva: Lima provincia
+
+| Etapa del snapshot reproducible | Ofertas | Establecimientos |
+| --- | ---: | ---: |
+| Último precio con territorio Lima provincia | 821 | 821 |
+| Precio válido `<=30 días` | 741 | 741 |
+| Registro exacto por actividad | 722 | 722 |
+| GIS 35 exacto y coordenada segura | 714 | 714 |
+| Contrato completo con identidad provisional | 714 | 714 |
+
+Excepciones: 80 ofertas últimas superaron 30 días; 19/741 no tuvieron Registro exacto y 8/722 no tuvieron GIS exacto. Hubo 0 ambiguos de Registro, 0 ambiguos GIS, 0 conflictos de último precio, 0 conflictos territoriales y 0 identidades provisionales faltantes entre las 714 filas finales. La cobertura de cadena completa es **714/741 (96.356 %)** sobre todas las ofertas frescas de Lima provincia. El contrato abarca 42 distritos y no selecciona distritos favorables.
+
+Con el umbral congelado `<90 % = abandono`, Lima provincia obtiene **GO CON LÍMITES** para continuar la evaluación privada. El control EVPC `OWNER-VERIFIED` de 2026-08-12 permanece separado: 28/28 con geografía segura mediante otro universo y reglas adicionales; no es denominador de ninguna de las dos poblaciones.
+
+### Contrato y privacidad
+
+El boundary consumible está en `contracts/gate-1.1-experiment-dataset.schema.json` y tiene un fixture sintético. Cada oferta contiene IDs experimentales, producto, PEN, `S/ por galón`, precio, fecha y edad, distrito observado, coordenada, fuente/corte y razón social/dirección dentro de un objeto rotulado literalmente `IDENTIDAD PROVISIONAL — razón social/dirección`. `additionalProperties: false` y los controles negativos rechazan marca, stock, RUC, nombre comercial inferido, descuentos, convenios, scoring, edad `>30` o cambio de rótulo.
+
+La salida real prospectiva vive solo en `.local-cache/gate-1.1/2026-08-14/experiment-dataset-lima-province.json`, ruta ignorada por Git y escrita con permisos `0600`. El repositorio conserva schema, fixture sintético y `evidence/gate-1.1-lima-province-2026-08-14.json`, que contiene métricas agregadas y la medición Surco preservada. Gate 1.2 puede leer este JSON local en modo solo lectura; el boundary no prescribe API, framework, database, proveedor de mapas ni red productiva.
+
+La semántica temporal es explícita aunque dos valores compartan instante: `price_reported_at` proviene de la fila; `cutoff_at` es el fin de adquisición usado para calcular edad; `acquisition_started_at` y `acquisition_completed_at` proceden del log real; `source_last_modified_at` procede de HTTP. No se deriva adquisición desde nombres de archivo.
+
+## Insight del owner para el modelo de conveniencia
+
+**OWNER-INPUT / HIPÓTESIS DE PRODUCTO, 2026-08-16.** La búsqueda relevante parte de la ubicación actual, no del domicilio ni del distrito administrativo donde se encuentra la persona. Una estación cercana o conveniente puede estar en un distrito aledaño; por tanto, el futuro producto no debe recortar alternativas por frontera distrital cuando dispone de coordenadas.
+
+Conveniencia personal tampoco equivale necesariamente al menor precio de lista. Convenios de marcas de estaciones con tarjetas, aseguradoras u otros programas pueden aplicar descuentos por galón y hacer preferible una marca aun con precio publicado ligeramente mayor o mayor distancia. Conceptualmente, la decisión futura deberá poder distinguir precio de lista, beneficio personal declarado, precio efectivo y costo/esfuerzo del desvío. Este insight proviene del owner y aún no está validado con participantes.
+
+No se incorpora al contrato actual: depende de resolver identidad comercial determinística y de modelar beneficios declarados sin inferirlos desde razón social o RUC. Se conserva para capas posteriores; Gate 1.1 continúa midiendo únicamente precio oficial, distancia y frescura.
+
+## Protocolo congelado del único experimento autorizado
 
 **Hipótesis falsable:** para una persona estacionaria que busca combustible antes de conducir, una experiencia privada mobile-first que muestra juntas precio, cercanía y frescura reduce el esfuerzo hasta una primera decisión confiable frente a Facilito, aun usando identidad provisional explícita.
 
-- Alcance: J1, Santiago de Surco, los 28 establecimientos owner-verified; mínimo 10 participantes, siempre fuera de conducción.
-- Inputs: ubicación con permiso o punto de origen equivalente y producto J1.
-- Output mínimo: ofertas comparables con precio/unidad, distancia, fecha y edad del reporte, razón social y dirección rotuladas “identidad provisional”, fuente y corte. No afirmar stock ni nombre comercial.
-- Datos: precio oficial vigente al corte de la prueba, Registro exacto y coordenada segura; excluir `>30 d`, no-matches, ambiguos, flotantes, rurales y J7. No usar fuzzy matching.
-- Baseline: Facilito J1 requiere 4 acciones y 3 inputs hasta la primera oferta útil en el caso observado; el control owner-verified tiene geografía 28/28.
-- Éxito de datos: `>=95 %` de establecimientos elegibles completa precio `<=30 d` + Registro + coordenada; 100 % de ofertas muestra edad, fuente, corte y advertencia de identidad.
-- Éxito de tarea: mediana `<=2` acciones hasta una decisión; tiempo mediano al menos 30 % menor que Facilito; `>=80 %` de participantes identifica correctamente la opción más barata, la más cercana y la más fresca entre las comparadas.
-- Abandono: cobertura de datos `<90 %`, cualquier identidad provisional presentada como nombre comercial, mejora de tiempo `<20 %`, comprensión `<80 %` en cualquiera de las tres dimensiones o necesidad de una fuente/licencia no autorizada.
+- **Tarea:** desde una ubicación actual real o simulada, idéntica en ambas condiciones y con la persona estacionaria, elegir una estación conveniente para Gasohol Regular y declarar su precio/unidad, distancia o cercanía, fecha o edad del reporte y razón de la decisión. “La interfaz no lo informa” es una respuesta válida y medible cuando corresponda.
+- **Condiciones comparables:** A comienza en Facilito J1 y permite todos sus controles nativos, incluido distrito; no se fuerza el sentinel sin distrito ni una secuencia de filtros. B recibe las 714 ofertas contract-ready de Lima provincia y puede considerar estaciones de distritos vecinos mediante coordenadas. Ambas condiciones usan exactamente el mismo origen. El baseline observado de 4 acciones/3 inputs queda solo como referencia histórica: la sesión vuelve a medir todas las acciones realmente usadas.
+- **Participantes y orden:** diseño intra-sujeto con mínimo 10 participantes. IDs impares usan A→B y pares B→A; la diferencia entre tamaños de grupo no puede exceder uno. Se usa el mismo origen por participante en ambas condiciones y no se cambia el enunciado. Así se contrabalancea el efecto de orden sin mezclar territorio ni producto.
+- **Seguridad y privacidad:** la persona debe estar sentada y fuera de conducción durante toda la sesión. Se aborta si inicia conducción. La ubicación se usa con permiso o se sustituye por un punto fijo; no se conserva ubicación personal, nombre, teléfono ni matrícula del participante.
+- **Cronometraje:** inicia cuando el enunciado y la condición están disponibles; termina cuando la persona anuncia la elección y responde las tres preguntas de comprensión. Pausas del facilitador e incidentes técnicos se registran y se excluyen del tiempo con razón explícita.
+- **Acciones:** cada tap, clic, envío o selección que cambia el estado de la interfaz cuenta una acción. Escritura dentro de un mismo campo cuenta una entrada; scroll y navegador/chrome no cuentan. Retrocesos y correcciones sí cuentan.
+- **Comprensión:** precio = importe y `S/ por galón` correctos; cercanía = distancia desde el origen común o reconocimiento correcto de que la condición no permite determinarla; frescura = fecha/edad correcta o reconocimiento correcto de que no está visible. Se puntúa 0/1 por dimensión contra lo mostrado en cada condición.
+- **Conveniencia observable:** se limita a precio, distancia desde el origen y frescura. No se implementan marca, descuento, convenio, precio efectivo personal ni scoring de conveniencia.
+- **Datos:** incluir todos los distritos de Lima provincia; excluir `>30 días`, no-matches, ambiguos, conflictos, flotantes, rurales y cualquier fila sin identidad provisional completa. No afirmar stock, marca ni nombre comercial.
+- **Éxito de datos:** `>=95 %` del universo fresco completa Registro + coordenada; 100 % de ofertas muestra edad, fuente, corte y advertencias.
+- **Éxito de tarea:** mediana B `<=2` acciones; tiempo mediano B al menos 30 % menor que A; `>=80 %` de participantes responde correctamente cada dimensión en B.
+- **Abandono:** cobertura completa `<90 %`, identidad provisional presentada como nombre comercial, mejora de tiempo `<20 %`, comprensión B `<80 %` en cualquier dimensión, necesidad de fuente/licencia no autorizada o cualquier uso durante conducción.
 
-El experimento es privado y medible. No autoriza publicación, diseño de UI en este gate ni expansión de alcance.
+Gate 1.1 congela el contrato y protocolo; no ejecuta el estudio ni autoriza publicación, diseño visual o expansión de alcance.
 
 ## Limitaciones abiertas
 
@@ -150,6 +194,7 @@ El experimento es privado y medible. No autoriza publicación, diseño de UI en 
 node scripts/verify-gate-0.2.mjs
 node scripts/analyze-gate-0.3.mjs
 node scripts/analyze-j7-snapshot.mjs
+node scripts/build-gate-1.1.mjs
 ```
 
-El análisis de Gate 0.3 debe terminar con 14 assertions semánticas/integridad exitosas. La verificación de Gate 0.2 reporta por separado 12 archivos, 9 adquisiciones y, cuando existe, 9 originales en caché.
+El análisis de Gate 0.3 debe terminar con 14 assertions semánticas/integridad exitosas. Gate 1.1 debe terminar con 24 assertions, reconstruir 714 ofertas contract-ready y dejar la salida real únicamente en la caché ignorada. La verificación de Gate 0.2 reporta por separado 12 archivos, 9 adquisiciones y, cuando existe, 9 originales en caché.
