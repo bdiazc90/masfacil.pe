@@ -15,3 +15,5 @@
 ## Condición de entrada de Gate 1.2
 
 Codex A debe definir operativamente la distancia —geodésica o de ruta— antes de ordenar resultados o instrumentar comprensión de cercanía. Marca, descuentos, convenios y scoring permanecen diferidos.
+
+Gate 1.2 debe aplicar el protocolo aprobado de tangibilidad: una hipótesis principal, un riesgo crítico y una experiencia local que el owner pueda usar. FAST por defecto; no abrir research separado ni robustecer para producción antes de probar el slice.

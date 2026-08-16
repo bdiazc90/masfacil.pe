@@ -10,10 +10,23 @@ Permitir que una persona encuentre desde el celular, en segundos, un establecimi
 
 Principios ya aprobados:
 
+- **Tangibilidad primero:** pocas hipótesis, un slice que se pueda usar, validación rápida e incorporación únicamente de lo que demuestre valor.
 - **Mobile-first real:** priorizar el contexto de consulta desde un celular, sin incentivar interacción mientras se conduce.
 - **Identidad reconocible:** marca y/o nombre comercial como etiqueta principal; razón social y RUC como trazabilidad secundaria. La relación debe provenir de una fuente legítima y determinística, nunca de fuzzy matching.
 - **Incertidumbre visible:** frescura, cobertura y límites deben formar parte de la experiencia, no quedar ocultos.
-- **Evidencia antes que arquitectura:** no elegir aplicación, framework, base de datos o proveedor antes de demostrar necesidad y factibilidad.
+- **Evidencia proporcional:** un prototipo privado puede ser manual, local y descartable; publicar exige resolver permisos, privacidad, identidad, frescura y operación.
+
+## Forma de trabajo
+
+**Construir para aprender. Investigar solo lo que bloquea el siguiente artefacto tangible.**
+
+Cada gate posterior al descubrimiento debe declarar una hipótesis principal, como máximo un riesgo crítico y algo ejecutable o directamente consumible. El ciclo preferido es:
+
+```text
+hipótesis pequeña → artefacto tangible → prueba rápida → incorporar, corregir o eliminar
+```
+
+FAST es el loop predeterminado. El research aislado y FULL requieren un bloqueo concreto de seguridad, acceso legítimo, publicación o decisión difícil de revertir. No se exige infraestructura productiva para aprender con un experimento privado y honesto.
 
 ## Estado
 

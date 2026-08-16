@@ -14,7 +14,15 @@ La prioridad no es "rediseñar una web", sino entender el problema real del usua
 
 ## 2. Principio rector
 
-**Descubrir antes de diseñar. Verificar antes de asumir.**
+**Construir para aprender. Investigar solo lo que bloquea el siguiente artefacto tangible.**
+
+El proyecto debe llegar pronto a algo que una persona pueda ejecutar, ver, usar o evaluar: una UI, CLI, script, skill determinista, dataset consultable o prueba instrumentada.
+
+No se exige certeza de producción para construir un experimento privado, reversible y honestamente rotulado. Sí se exige evidencia suficiente para no causar daño, no presentar inferencias como hechos y saber qué aprendizaje busca el artefacto.
+
+Flujo preferido:
+
+**pocas hipótesis → slice tangible → validación rápida → incorporar, corregir o eliminar → robustecer solo lo que demostró valor.**
 
 No asumir que:
 
@@ -25,7 +33,7 @@ No asumir que:
 - una experiencia visualmente más moderna es una mejor experiencia;
 - investigaciones anteriores existen.
 
-Cada agente debe poder reproducir sus conclusiones con evidencia.
+Cada agente debe poder reproducir sus conclusiones materiales con evidencia proporcional a la decisión. La investigación acumulativa sin una decisión o artefacto inmediato no constituye progreso.
 
 ---
 
@@ -62,6 +70,9 @@ Responsabilidades:
 - consolidar conocimiento permanente;
 - limpiar `BITACORA.md`;
 - realizar el commit que cierra cada gate.
+- proteger una cadencia de valor tangible: cada gate debe identificar primero qué podrá probar una persona;
+- limitar research a incertidumbres que bloquean seguridad, acceso legítimo o aprendizaje del slice inmediato;
+- distinguir deuda aceptable de experimento privado frente a bloqueos reales de publicación.
 
 Codex A normalmente **no implementa funcionalidades**.
 
@@ -94,6 +105,9 @@ Responsabilidades:
 - responder a observaciones de Claude;
 - corregir cuando corresponda;
 - reportar resultados en `BITACORA.md`.
+- entregar primero la versión mínima ejecutable o consumible definida por el gate;
+- investigar durante la construcción solo cuando una incertidumbre impida continuar de forma segura y reversible;
+- evitar convertir el prototipo en infraestructura de producción antes de validar valor.
 
 Dentro del alcance definido por A:
 
@@ -223,59 +237,64 @@ Los gates deben ser suficientemente grandes para producir progreso real y sufici
 
 No convertir gates en tickets.
 
+Por defecto, un gate posterior a Capa 0 debe producir o mejorar un artefacto tangible. Un gate exclusivamente de research requiere que Codex A documente el bloqueo concreto que impide construir; no se abre para “entender mejor” de forma general.
+
 ---
 
-# 10. Progressive Protocol
+# 10. Protocolo de tangibilidad progresiva
 
-La complejidad del proceso debe disminuir conforme disminuye la incertidumbre del proyecto.
+**El protocolo es un medio para producir aprendizaje usable, no un producto ni una garantía de certeza total.**
 
-**El protocolo es un medio de control, no un producto.**
+## 10.1 Unidad de avance
 
-Existen dos modos.
+Cada gate debe congelar antes de trabajar:
 
-## FULL LOOP
+1. **una hipótesis principal de valor**;
+2. como máximo **un riesgo crítico** que pueda invalidarla;
+3. **un artefacto tangible** y cómo se ejecutará o probará;
+4. una señal rápida para incorporar, corregir o eliminar.
 
-Usar cuando:
+Insights adicionales se conservan como hipótesis diferidas; no amplían el gate activo.
 
-- existe incertidumbre significativa;
-- se introduce arquitectura nueva;
-- se incorpora una nueva fuente de datos;
-- cambia un contrato importante;
-- se toman decisiones difíciles de revertir;
-- el gate tiene riesgo considerable.
+## 10.2 Umbrales proporcionales
 
-Flujo:
+### Experimento privado
 
-Codex A
-→ Codex B
-→ Claude
-→ Codex B
-→ Codex A
+Puede usar snapshots, caché local, pasos manuales, fixtures, identidad provisional y arquitectura descartable cuando estén visibles y sean seguros. Debe ser reversible, medible y no publicarse como producto terminado.
 
-Puede existir una segunda ronda B ↔ Claude si la corrección es sustancial.
+### Producto público
 
-Máximo recomendado: 2 rondas B ↔ Claude antes de que A resuelva directamente.
+Exige resolver en el nivel necesario licencias, privacidad, identidad, frescura, cobertura, seguridad, operación y comunicación de incertidumbre. Una deuda tolerable en privado puede bloquear publicación.
 
-## FAST LOOP
+No aplicar exigencias de producción a un prototipo privado si no afectan el aprendizaje buscado.
 
-Usar cuando:
+## 10.3 FAST LOOP — predeterminado
 
-- la arquitectura ya está establecida;
-- se utilizan patrones ya probados;
-- no cambian contratos centrales;
-- la tarea es fácilmente reversible;
-- la incertidumbre es baja.
+Usar para slices privados, decisiones reversibles, UI/CLI local, instrumentación y patrones que puedan corregirse barato, incluso si contienen arquitectura experimental nueva.
 
 Flujo:
 
-Codex A
-→ Codex B
-→ Claude
-→ Codex A
+Codex A → Codex B → Claude → Codex A
 
-Si Claude encuentra un bloqueante, A puede devolver el trabajo a B.
+Si Claude demuestra un bloqueante que invalida el aprendizaje o introduce riesgo real, A devuelve una corrección acotada a B. Una sola revisión adversarial es el objetivo.
 
-Codex A declara FULL o FAST al abrir cada gate.
+## 10.4 FULL LOOP — excepcional
+
+Usar solo cuando exista una razón concreta, como:
+
+- publicación o despliegue externo;
+- datos personales, seguridad o permisos de reutilización con riesgo material;
+- migración o contrato difícil de revertir;
+- nueva fuente externa indispensable cuya semántica o acceso no estén demostrados;
+- cambio que pueda corromper datos o comprometer usuarios.
+
+Flujo:
+
+Codex A → Codex B → Claude → Codex B → Codex A
+
+Una segunda ronda requiere un bloqueante nuevo o una corrección sustancial. “Más confianza” o mejoras opcionales no justifican prolongar el loop.
+
+Codex A declara FAST o FULL y la razón concreta al abrir cada gate.
 
 ---
 
@@ -386,6 +405,14 @@ Orden aproximado:
 
 # 14. Investigación
 
+La investigación debe responder una pregunta que cambie una decisión del slice inmediato. Antes de iniciarla, registrar:
+
+- qué decisión desbloquea;
+- qué evidencia mínima bastará;
+- qué artefacto tangible continuará después.
+
+Detener el research cuando esa decisión ya pueda tomarse. No abrir búsquedas amplias por completitud ni validar hipótesis que no afectan el gate actual.
+
 Al estudiar Facilito:
 
 - pensar en journeys y decisiones del ciudadano;
@@ -454,6 +481,8 @@ Preferir:
 
 Evitar infraestructura prematura.
 
+No confundir infraestructura prematura con software tangible: una web local, CLI o herramienta determinista pequeña puede ser la forma más barata de aprender. Elegir la tecnología mínima necesaria cuando el gate la necesite; no posponer el artefacto esperando una arquitectura definitiva.
+
 No introducir sin necesidad concreta:
 
 - database;
@@ -471,6 +500,8 @@ No introducir sin necesidad concreta:
 
 Optimizar para el trabajo real del usuario, no para preservar la arquitectura de información existente.
 
+Preferir una interacción imperfecta pero usable y claramente limitada sobre una especificación exhaustiva que nadie pueda probar. El conocimiento nuevo debe incorporarse al artefacto tangible o permanecer diferido.
+
 Para una capacidad importante preguntar:
 
 - ¿quién intenta hacer qué?
@@ -487,6 +518,8 @@ No agregar funcionalidades solo porque los datos permiten implementarlas.
 # 18. UX medible
 
 No afirmar "mejor UX", "más intuitivo" o "más limpio" sin evidencia.
+
+Medir sobre el artefacto tan pronto como exista. No esperar cobertura funcional o arquitectura de producción para observar una tarea privada y segura.
 
 Preferir métricas como:
 
@@ -555,6 +588,9 @@ Antes de aceptar un gate, Codex A debe comprobar:
 - ausencia de grasa evidente;
 - ausencia de secretos;
 - diff revisado.
+- artefacto tangible ejecutable o consumible cuando el gate lo prometía;
+- instrucciones mínimas para que el owner pueda probarlo sin reconstruir el proceso mental de los agentes;
+- ausencia de research o robustecimiento que no cambie el aprendizaje del gate.
 
 Un gate puede cerrarse con deuda conocida únicamente si está identificada y A considera que no invalida el objetivo.
 
@@ -562,10 +598,10 @@ Un gate puede cerrarse con deuda conocida únicamente si está identificada y A 
 
 # 21. Regla final
 
-El objetivo del sistema multiagente no es generar más artefactos ni más discusión.
+El objetivo del sistema multiagente no es generar más documentación, research ni discusión.
 
-Es producir mejores decisiones con menos errores.
+Es poner pronto una hipótesis pequeña frente a una persona, aprender y convertir únicamente lo valioso en producto.
 
-Cuando la evidencia sea suficiente:
+Cuando sea seguro y reversible:
 
-**decidir, construir y avanzar.**
+**construir, observar, decidir y avanzar.**
