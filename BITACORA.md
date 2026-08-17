@@ -4,16 +4,17 @@
 
 ## Estado
 
-**Sin gate activo. Gate 1.1 cerrado el 2026-08-16.**
+**Sin gate activo. Gate 1.2 cerrado el 2026-08-16.**
 
-- Veredicto: **GO CON LÍMITES** para construir el vertical slice privado J1/Lima provincia desde una ubicación actual real o simulada.
-- Cobertura reproducida: 714/741 ofertas frescas (96.356 %) en 42 distritos.
-- Surco permanece como población fallida separada: 26/30 (86.667 %); no se cambió su denominador.
-- Actividad 24 permanece excluida: es un universo auxiliar y admitirla genera ambigüedad sin cambiar la decisión.
-- Producto público sigue bloqueado por identidad comercial y permiso de reutilización.
+- Veredicto: **ACEPTAR**; owner y Claude Challenger aprobaron la web local sin bloqueantes.
+- El contrato privado conserva 714 ofertas; cada origen forma un pool estable de las 20 más cercanas y muestra 6 por cercanía, precio o frescura.
+- En el origen simulado, el pool quedó entre 0.478 y 2.030 km; precio y frescura ya no introducen estaciones remotas.
+- La UI normal oculta protocolo e instrumentación; `?debug=1` habilita medición sanitizada sin coordenadas ni identidad.
+- El rótulo “distancias en línea recta” permanece en la comparación, donde se decide. No se repite en la confirmación para evitar densidad redundante.
+- El artefacto sigue siendo privado. Identidad comercial y permiso de reutilización continúan bloqueando publicación.
 
-## Condición de entrada de Gate 1.2
+## Condición de entrada de Gate 1.3
 
-Codex A debe definir operativamente la distancia —geodésica o de ruta— antes de ordenar resultados o instrumentar comprensión de cercanía. Marca, descuentos, convenios y scoring permanecen diferidos.
+Gate 1.3 debe probar rápidamente la experiencia tangible contra Facilito desde el mismo origen y medir tiempo, acciones y comprensión de precio, frescura y cercanía. El pool siempre contiene 20 vecinos, pero su radio físico varía con la densidad; esa propiedad debe declararse antes de analizar resultados.
 
-Gate 1.2 debe aplicar el protocolo aprobado de tangibilidad: una hipótesis principal, un riesgo crítico y una experiencia local que el owner pueda usar. FAST por defecto; no abrir research separado ni robustecer para producción antes de probar el slice.
+La investigación paralela sobre identidad comercial que entregue Claude B es input externo pendiente de revisión de Codex A; no modifica por sí sola el estado del producto.

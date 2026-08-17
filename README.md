@@ -30,7 +30,7 @@ FAST es el loop predeterminado. El research aislado y FULL requieren un bloqueo 
 
 ## Estado
 
-**Capa 1 — vertical slice privado.** Gate 1.1 cerró el contrato experimental de J1 para Lima provincia: la ubicación actual —no el domicilio ni el distrito— es el origen de la decisión. El alcance continúa siendo privado y no autoriza publicación.
+**Capa 1 — vertical slice privado.** Gate 1.2 cerró una web mobile-first utilizable con ubicación actual, comparación local y medición opcional. El alcance continúa siendo privado y no autoriza publicación.
 
 Hallazgos vigentes de Gate 0.1:
 
@@ -70,7 +70,16 @@ Resultado vigente de Gate 1.1:
 - la medición previa de Surco permanece como población fallida separada: 26/30 (86.667 %), sin cambiar su denominador;
 - el contrato real con 714 ofertas permanece ignorado y con permisos privados; Git conserva schema, fixture sintético y evidencia agregada;
 - el protocolo compara ambas condiciones desde el mismo origen y permite todos los controles nativos de Facilito;
-- marca, descuentos y convenios quedan como hipótesis posterior; Gate 1.2 debe definir operativamente la distancia antes de instrumentarla.
+- marca, descuentos y convenios quedan como hipótesis posterior.
+
+Resultado vigente de Gate 1.2:
+
+- la web local funciona con el dataset privado de 714 ofertas o con 4 alternativas sintéticas, sin dependencias ni llamadas externas;
+- desde el origen se forma primero un pool estable de las 20 estaciones más cercanas y se muestran 6 por cercanía, precio o frescura;
+- en el control simulado, el pool quedó entre 0.478 y 2.030 km; ordenar por precio o frescura ya no introduce estaciones remotas;
+- Haversine se presenta como distancia en línea recta, nunca como ruta o tiempo de viaje;
+- la UI normal oculta el protocolo; `?debug=1` habilita medición sanitizada sin coordenadas personales ni identidad del establecimiento;
+- el owner validó la utilidad y limpieza de la experiencia; Claude Challenger la aceptó sin bloqueantes. Identidad comercial y permiso de reutilización continúan bloqueando un producto público.
 
 ## Reproducción disponible
 
@@ -101,6 +110,16 @@ El contrato experimental privado de Gate 1.1 se reconstruye con la caché local 
 node scripts/build-gate-1.1.mjs
 ```
 
+## Probar la web local de Gate 1.2
+
+El modo normal usa el dataset privado validado cuando existe y, si está ausente, inicia con el fixture sintético. No realiza llamadas externas y escucha únicamente en `127.0.0.1`:
+
+```bash
+npm start
+```
+
+Abrir `http://127.0.0.1:4173`. Para forzar una demostración sin datos reales: `npm run demo`. El recorrido normal es: elegir ubicación real o simulada → comparar por cercanía, precio o frescura → elegir una estación. La ubicación real permanece solo en memoria. Para habilitar los controles de investigación y copiar la medición sanitizada, agregar `?debug=1` a la URL.
+
 ## Estructura actual
 
 ```text
@@ -110,5 +129,7 @@ data/        snapshots minimizados, métricas y procedencia verificable
 evidence/    evidencia mínima sanitizada
 fixtures/    datos sintéticos para validar contratos sin propagar identidades
 scripts/     research y transformaciones reproducibles
+app/         web local privada y servidor sin dependencias
+tests/       invariantes del vertical slice
 BITACORA.md  coordinación del gate activo
 ```

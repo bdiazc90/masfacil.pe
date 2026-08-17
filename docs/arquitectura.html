@@ -286,11 +286,11 @@
       <div>
         <p class="eyebrow">Facilito UX Lab · mapa vigente</p>
         <h1>Del precio publicado a una decisión confiable</h1>
-        <p>Gate 1.1 convirtió la cadena oficial en un contrato privado para Lima provincia. El siguiente paso es un vertical slice mobile-first desde la ubicación actual, con distancia aún por definir operativamente.</p>
+        <p>Gate 1.2 convirtió el contrato privado en una web mobile-first utilizable: ubicación actual, alternativas locales y comparación explícita sin filtros distritales.</p>
       </div>
       <div class="stamp" aria-label="Estado del proyecto">
-        <strong>Capa 1 · Gate 1.1 cerrado</strong>
-        <span>Siguiente: vertical slice privado</span>
+        <strong>Capa 1 · Gate 1.2 cerrado</strong>
+        <span>Siguiente: prueba rápida A/B</span>
       </div>
     </header>
 
@@ -301,16 +301,16 @@
       <span class="risk-color"><i class="dot"></i> Riesgo</span>
     </div>
 
-    <section class="metrics" aria-label="Métricas clave de Gate 1.1">
-      <article class="metric"><small>Contrato privado</small><strong>714</strong><p>ofertas listas para el experimento</p></article>
-      <article class="metric"><small>Cobertura completa</small><strong>96.36 %</strong><p>714 de 741 ofertas frescas de Lima provincia</p></article>
-      <article class="metric"><small>Territorio</small><strong>42</strong><p>distritos presentes sin selección favorable</p></article>
+    <section class="metrics" aria-label="Métricas clave de Gate 1.2">
+      <article class="metric"><small>Universo privado</small><strong>714</strong><p>ofertas validadas de Lima provincia</p></article>
+      <article class="metric"><small>Pool local</small><strong>20</strong><p>vecinos estables antes de ordenar</p></article>
+      <article class="metric"><small>Decisión mobile</small><strong>6</strong><p>alternativas visibles y comparables</p></article>
       <article class="metric risk"><small>Identidad pública</small><strong>0/7</strong><p>journeys con nombre comercial oficial disponible</p></article>
     </section>
 
     <section class="map">
       <div class="lane">
-        <h2>Boundary privado listo para construir</h2>
+        <h2>Vertical slice privado construido</h2>
         <div class="flow">
           <article class="node">
             <span class="state">Observado</span>
@@ -324,28 +324,28 @@
             <p>714 ofertas con precio, fecha, coordenada e identidad provisional. El dataset real es local, ignorado y privado.</p>
           </article>
           <div class="arrow" aria-hidden="true">→</div>
-          <article class="node next">
-            <span class="state">Próximo</span>
-            <h3>Vertical slice</h3>
-            <p>Desde una ubicación actual real o simulada, comparar precio, distancia y frescura cruzando límites distritales.</p>
+          <article class="node">
+            <span class="state">Construido</span>
+            <h3>Web local</h3>
+            <p>Ubicación real o simulada, pool de 20 vecinos y 6 opciones ordenables por cercanía, precio o frescura.</p>
           </article>
         </div>
 
         <div class="tech" aria-label="Fuentes observadas">
           <div><strong>Embudo Lima</strong><span>821 últimas → 741 frescas → 722 Registro → 714 GIS</span></div>
-          <div><strong>Boundary</strong><span>JSON local + schema + fixture sintético; solo lectura</span></div>
-          <div><strong>Origen</strong><span>Ubicación actual, misma en A/B, sin límite distrital</span></div>
-          <div><strong>Sin inferencias</strong><span>No fuzzy, stock, marca, descuentos ni scoring</span></div>
+          <div><strong>Distancia</strong><span>Haversine WGS84, siempre presentada como línea recta</span></div>
+          <div><strong>Producto</strong><span>UI limpia; protocolo visible solo con <code>?debug=1</code></span></div>
+          <div><strong>Privacidad</strong><span>Loopback, ubicación efímera y medición sanitizada</span></div>
         </div>
       </div>
 
       <aside class="side-panel">
-        <h2>Condiciones para Gate 1.2</h2>
+        <h2>Condiciones para Gate 1.3</h2>
         <div class="stack">
-          <div class="next-card"><strong>01 · Definir distancia</strong><p>Congelar geodésica o de ruta antes de ordenar resultados e instrumentar cercanía.</p></div>
-          <div class="next-card"><strong>02 · Construir mínimo</strong><p>Solo la experiencia mobile necesaria para precio, distancia y frescura.</p></div>
-          <div class="next-card"><strong>03 · Instrumentar</strong><p>Acciones, tiempo y comprensión con el mismo origen en ambas condiciones.</p></div>
-          <div class="risk-card"><strong>Margen de datos</strong><p>96.36 %: 1.36 puntos sobre el éxito; 27 ofertas permanecen excluidas.</p></div>
+          <div class="next-card"><strong>01 · Probar el artefacto</strong><p>Misma tarea y mismo origen en Facilito y en la web local.</p></div>
+          <div class="next-card"><strong>02 · Medir lo mínimo</strong><p>Tiempo, acciones, elección y comprensión de cercanía y frescura.</p></div>
+          <div class="next-card"><strong>03 · Decidir</strong><p>Incorporar, corregir o eliminar según evidencia observable.</p></div>
+          <div class="risk-card"><strong>Radio variable</strong><p>El pool siempre contiene 20 vecinos; su alcance físico depende de la densidad.</p></div>
           <div class="risk-card"><strong>P0 · Identidad reconocible</strong><p>Ausente en fuentes bulk legítimas; obligatoria antes de publicación.</p></div>
           <div class="risk-card"><strong>P0 · Reutilización</strong><p>GIS y EVPC sin licencia explícita verificada; investigación privada solamente.</p></div>
           <div class="risk-card"><strong>Hipótesis diferida</strong><p>Marca y descuentos pueden cambiar conveniencia, pero identidad no está resuelta.</p></div>
@@ -353,14 +353,14 @@
       </aside>
 
       <div class="decision">
-        <span class="label">Salida de Gate 1.1</span>
-        <p><strong>GO CON LÍMITES.</strong> Gate 1.2 puede construir el slice privado J1/Lima desde la ubicación actual. Producto público, identidad comercial y reutilización siguen fuera de alcance.</p>
+        <span class="label">Salida de Gate 1.2</span>
+        <p><strong>ACEPTAR.</strong> El slice privado es tangible, mobile-first y útil para una prueba rápida. Producto público, identidad comercial y reutilización siguen fuera de alcance.</p>
       </div>
     </section>
 
     <footer>
       <span>Proyecto independiente y no oficial.</span>
-      <span>Actualizado al cierre de Gate 1.1 · 2026-08-16</span>
+      <span>Actualizado al cierre de Gate 1.2 · 2026-08-16</span>
     </footer>
   </main>
 </body>

@@ -57,6 +57,81 @@
         "El precio reportado no demuestra stock.",
         "Uso exclusivo del experimento privado; no publicar."
       ]
+    },
+    {
+      "experimental_id": "offer_444444444444444444444444",
+      "establishment_id": "est_555555555555555555555555",
+      "source_row_id": "row_666666666666666666666666",
+      "product": "Gasohol Regular",
+      "currency": "PEN",
+      "unit": "galón",
+      "display_unit": "S/ por galón",
+      "price": 18.2,
+      "price_reported_at": "2026-08-14T10:32:44.301Z",
+      "age_days_at_cutoff": 0.25,
+      "territory": { "department": "LIMA", "province": "LIMA", "district": "SAN ISIDRO" },
+      "coordinate": { "longitude": -77.036, "latitude": -12.097, "classification": "coordenada oficial exacta; reutilización pública no autorizada" },
+      "provisional_identity": {
+        "label": "IDENTIDAD PROVISIONAL — razón social/dirección",
+        "legal_name": "ENERGÍA SINTÉTICA DEL CENTRO S.A.C.",
+        "address": "AVENIDA DE PRUEBA 456, SAN ISIDRO"
+      },
+      "source": { "dataset_id": "liquid-current", "snapshot_date": "2026-08-14", "acquired_at": "2026-08-14T16:32:44.301Z", "cutoff_at": "2026-08-14T16:32:44.301Z" },
+      "warnings": [
+        "IDENTIDAD PROVISIONAL: la razón social y la dirección no equivalen a nombre comercial.",
+        "El precio reportado no demuestra stock.",
+        "Uso exclusivo del experimento privado; no publicar."
+      ]
+    },
+    {
+      "experimental_id": "offer_777777777777777777777777",
+      "establishment_id": "est_888888888888888888888888",
+      "source_row_id": "row_999999999999999999999999",
+      "product": "Gasohol Regular",
+      "currency": "PEN",
+      "unit": "galón",
+      "display_unit": "S/ por galón",
+      "price": 17.8,
+      "price_reported_at": "2026-08-09T16:32:44.301Z",
+      "age_days_at_cutoff": 5,
+      "territory": { "department": "LIMA", "province": "LIMA", "district": "MIRAFLORES" },
+      "coordinate": { "longitude": -77.03, "latitude": -12.121, "classification": "coordenada oficial exacta; reutilización pública no autorizada" },
+      "provisional_identity": {
+        "label": "IDENTIDAD PROVISIONAL — razón social/dirección",
+        "legal_name": "COMBUSTIBLES DEMO PACÍFICO S.A.C.",
+        "address": "CALLE DE DEMOSTRACIÓN 789, MIRAFLORES"
+      },
+      "source": { "dataset_id": "liquid-current", "snapshot_date": "2026-08-14", "acquired_at": "2026-08-14T16:32:44.301Z", "cutoff_at": "2026-08-14T16:32:44.301Z" },
+      "warnings": [
+        "IDENTIDAD PROVISIONAL: la razón social y la dirección no equivalen a nombre comercial.",
+        "El precio reportado no demuestra stock.",
+        "Uso exclusivo del experimento privado; no publicar."
+      ]
+    },
+    {
+      "experimental_id": "offer_aaaaaaaaaaaaaaaaaaaaaaaa",
+      "establishment_id": "est_bbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_row_id": "row_cccccccccccccccccccccccc",
+      "product": "Gasohol Regular",
+      "currency": "PEN",
+      "unit": "galón",
+      "display_unit": "S/ por galón",
+      "price": 16.9,
+      "price_reported_at": "2026-07-25T16:32:44.301Z",
+      "age_days_at_cutoff": 20,
+      "territory": { "department": "LIMA", "province": "LIMA", "district": "SAN BORJA" },
+      "coordinate": { "longitude": -76.998, "latitude": -12.105, "classification": "coordenada oficial exacta; reutilización pública no autorizada" },
+      "provisional_identity": {
+        "label": "IDENTIDAD PROVISIONAL — razón social/dirección",
+        "legal_name": "SERVICIOS CONTROLADOS DE LIMA S.A.C.",
+        "address": "JIRÓN DEL FIXTURE 321, SAN BORJA"
+      },
+      "source": { "dataset_id": "liquid-current", "snapshot_date": "2026-08-14", "acquired_at": "2026-08-14T16:32:44.301Z", "cutoff_at": "2026-08-14T16:32:44.301Z" },
+      "warnings": [
+        "IDENTIDAD PROVISIONAL: la razón social y la dirección no equivalen a nombre comercial.",
+        "El precio reportado no demuestra stock.",
+        "Uso exclusivo del experimento privado; no publicar."
+      ]
     }
   ]
 }

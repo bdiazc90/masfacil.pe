@@ -1,0 +1,10 @@
+{
+  "name": "facilito-ux-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node app/server.mjs",
+    "demo": "node app/server.mjs --demo",
+    "test": "node --test tests/gate-1.2.test.mjs"
+  }
+}
