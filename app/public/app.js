@@ -1,4 +1,5 @@
 import { haversineKm, nearestPool, visibleOffers } from './haversine.js';
+import { safeGoogleMapsDirectionsUrl } from './directions.js';
 import { buildSanitizedMeasurement } from './measurement.js';
 
 const SIMULATED_ORIGIN = Object.freeze({ latitude: -12.1211, longitude: -77.0297 });
@@ -12,7 +13,7 @@ document.documentElement.classList.toggle('debug', DEBUG);
 const elements = Object.fromEntries([
   'start-step', 'compare-step', 'choose-step', 'fatal-state', 'fatal-message', 'use-location', 'use-simulated',
   'location-status', 'dataset-badge', 'result-count', 'offers', 'source-content', 'choice-summary', 'change-origin',
-  'back-to-results', 'copy-measurement', 'restart-task', 'copy-status', 'measurement-fallback', 'retry-load',
+  'open-directions', 'back-to-results', 'copy-measurement', 'restart-task', 'copy-status', 'measurement-fallback', 'retry-load',
 ].map((id) => [id, document.getElementById(id)]));
 
 function ensureSession() {
@@ -131,6 +132,14 @@ function selectOffer(id, rank) {
       <span>${escapeHtml(offer.address)} · ${escapeHtml(offer.district)}</span>
       <span>${escapeHtml(formatPrice(offer.price))} · ${escapeHtml(formatDistance(offer.distance_km))} · ${escapeHtml(formatAge(offer.age_days))}</span>
     </div>`;
+  const directionsUrl = safeGoogleMapsDirectionsUrl({ latitude: offer.latitude, longitude: offer.longitude });
+  if (directionsUrl) {
+    elements['open-directions'].href = directionsUrl;
+    elements['open-directions'].hidden = false;
+  } else {
+    elements['open-directions'].removeAttribute('href');
+    elements['open-directions'].hidden = true;
+  }
   elements['compare-step'].hidden = true;
   elements['choose-step'].hidden = false;
   elements['copy-status'].textContent = '';
@@ -212,6 +221,7 @@ elements['use-simulated'].addEventListener('click', () => {
 });
 elements['change-origin'].addEventListener('click', restart);
 elements['back-to-results'].addEventListener('click', backToResults);
+elements['open-directions'].addEventListener('click', () => recordAction('directions_opened'));
 elements.offers.addEventListener('click', (event) => {
   const button = event.target.closest('[data-choose]');
   if (button) selectOffer(button.dataset.choose, Number(button.dataset.rank));

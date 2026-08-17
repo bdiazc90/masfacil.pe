@@ -3,365 +3,293 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mapa vigente · Facilito UX Lab</title>
+  <meta name="color-scheme" content="light">
+  <title>Estado del proyecto · Facilito UX Lab</title>
   <style>
     :root {
-      color-scheme: light;
-      --ink: #102536;
-      --muted: #567080;
-      --paper: #f5f8f9;
-      --panel: #ffffff;
-      --line: #c9d6dc;
-      --built: #147d64;
-      --built-soft: #e2f3ed;
-      --partial: #2c6d9f;
-      --partial-soft: #e6f0f7;
-      --next: #7957a6;
-      --next-soft: #eee8f6;
-      --risk: #ba4d36;
-      --risk-soft: #f9e8e4;
-      --road: #f0b429;
-      --radius: 10px;
-      --shadow: 0 12px 32px rgba(16, 37, 54, .08);
-      font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+      --ink: #17211c;
+      --muted: #65716a;
+      --line: #d9e0dc;
+      --paper: #f7f9f8;
+      --surface: #fff;
+      --done: #167653;
+      --current: #2368c4;
+      --next: #ad6419;
+      --risk: #a53b32;
     }
 
     * { box-sizing: border-box; }
+    html { background: var(--paper); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; }
+    main { margin: 0 auto; max-width: 1180px; padding: 28px 24px 48px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: clamp(1.7rem, 4vw, 2.35rem); letter-spacing: -.035em; line-height: 1.05; margin-bottom: 8px; }
+    h2 { font-size: 1.05rem; margin-bottom: 5px; }
+    h3 { font-size: .95rem; margin-bottom: 5px; }
+    p, li { line-height: 1.45; }
+    ul { margin: 0; padding-left: 18px; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
 
-    body {
-      margin: 0;
-      background:
-        linear-gradient(90deg, transparent 0 49.65%, rgba(240, 180, 41, .12) 49.65% 50.35%, transparent 50.35%),
-        var(--paper);
-      color: var(--ink);
-    }
-
-    main {
-      width: min(1180px, calc(100% - 32px));
-      margin: 0 auto;
-      padding: 32px 0 48px;
-    }
-
-    header {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 24px;
+    .topbar {
       align-items: end;
-      padding-bottom: 22px;
-      border-bottom: 3px solid var(--ink);
-    }
-
-    .eyebrow,
-    .label,
-    .state,
-    .metric small {
-      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-      text-transform: uppercase;
-      letter-spacing: .09em;
-    }
-
-    .eyebrow {
-      margin: 0 0 8px;
-      color: var(--partial);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    h1 {
-      max-width: 760px;
-      margin: 0;
-      font-size: clamp(30px, 5vw, 58px);
-      line-height: .98;
-      letter-spacing: -.045em;
-    }
-
-    header p {
-      max-width: 700px;
-      margin: 14px 0 0;
-      color: var(--muted);
-      font-size: 16px;
-      line-height: 1.5;
-    }
-
-    .stamp {
-      min-width: 176px;
-      padding: 12px 14px;
-      border: 1px solid var(--partial);
-      border-left: 5px solid var(--partial);
-      background: var(--partial-soft);
-      box-shadow: var(--shadow);
-    }
-
-    .stamp strong,
-    .stamp span { display: block; }
-    .stamp strong { font-size: 15px; }
-    .stamp span { margin-top: 3px; color: var(--muted); font-size: 12px; }
-
-    .legend {
+      border-bottom: 1px solid var(--line);
       display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin: 18px 0 26px;
-      color: var(--muted);
-      font-size: 12px;
+      gap: 24px;
+      justify-content: space-between;
+      padding-bottom: 20px;
     }
+    .topbar p { color: var(--muted); margin: 0; max-width: 720px; }
+    .stamp { flex: 0 0 auto; text-align: right; }
+    .stamp strong, .stamp span { display: block; }
+    .stamp strong { color: var(--done); font-size: .86rem; }
+    .stamp span { color: var(--muted); font-size: .76rem; margin-top: 3px; }
 
-    .legend span { display: inline-flex; align-items: center; gap: 6px; }
-    .dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
-    .built-color { color: var(--built); }
-    .partial-color { color: var(--partial); }
-    .next-color { color: var(--next); }
-    .risk-color { color: var(--risk); }
+    section { margin-top: 30px; }
+    .section-head { align-items: end; display: flex; gap: 18px; justify-content: space-between; margin-bottom: 12px; }
+    .section-head p { color: var(--muted); font-size: .86rem; margin: 0; }
 
-    .metrics {
+    .layers {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 26px;
+      gap: 8px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
     }
-
-    .metric {
-      min-height: 116px;
-      padding: 16px;
-      border-top: 4px solid var(--built);
-      background: var(--panel);
-      box-shadow: var(--shadow);
-    }
-
-    .metric.risk { border-color: var(--risk); }
-    .metric strong { display: block; margin: 8px 0 4px; font-size: clamp(24px, 4vw, 38px); line-height: 1; }
-    .metric small { color: var(--muted); font-size: 10px; }
-    .metric p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
-
-    .map {
-      position: relative;
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(310px, .85fr);
-      gap: 18px;
-    }
-
-    .lane,
-    .side-panel {
+    .layer {
+      background: var(--surface);
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, .92);
-      box-shadow: var(--shadow);
+      border-top: 4px solid var(--line);
+      min-height: 155px;
+      padding: 14px;
     }
-
-    .lane { padding: 20px; }
-    .side-panel { padding: 18px; }
-
-    h2 {
-      margin: 0 0 14px;
-      font-size: 18px;
-      letter-spacing: -.015em;
-    }
+    .layer.done { border-top-color: var(--done); }
+    .layer.current { border-top-color: var(--current); }
+    .layer.future { border-top-color: var(--next); }
+    .layer small { color: var(--muted); display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; margin-bottom: 9px; text-transform: uppercase; }
+    .layer p { color: var(--muted); font-size: .82rem; margin: 0; }
+    .layer .status { color: var(--done); font-weight: 700; }
+    .layer.current .status { color: var(--current); }
+    .layer.future .status { color: var(--next); }
 
     .flow {
-      display: grid;
-      grid-template-columns: 1fr 34px 1fr 34px 1fr;
       align-items: stretch;
-      gap: 0;
+      display: grid;
+      gap: 6px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      margin-top: 10px;
     }
-
-    .node {
-      position: relative;
-      min-height: 150px;
-      padding: 15px;
+    .flow div {
+      background: #eef3f0;
       border: 1px solid var(--line);
-      border-top: 5px solid var(--built);
-      border-radius: var(--radius);
-      background: var(--panel);
-    }
-
-    .node.partial { border-top-color: var(--partial); background: var(--partial-soft); }
-    .node.next { border-style: dashed; border-top-style: solid; border-top-color: var(--next); background: var(--next-soft); }
-    .node h3 { margin: 8px 0; font-size: 16px; }
-    .node p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
-
-    .state {
-      color: var(--built);
-      font-size: 9px;
-      font-weight: 800;
-    }
-
-    .partial .state { color: var(--partial); }
-    .next .state { color: var(--next); }
-
-    .arrow {
-      align-self: center;
-      color: var(--muted);
-      text-align: center;
-      font-size: 24px;
-    }
-
-    .tech {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid var(--line);
-    }
-
-    .tech div {
+      font-size: .76rem;
       padding: 10px;
-      border-left: 3px solid var(--built);
-      background: var(--built-soft);
+      position: relative;
     }
+    .flow div:not(:last-child)::after { color: var(--muted); content: "→"; position: absolute; right: -7px; top: 50%; transform: translateY(-50%); z-index: 1; }
+    .flow strong { display: block; font-size: .78rem; margin-bottom: 3px; }
 
-    .tech strong { display: block; font-size: 12px; }
-    .tech span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .table-wrap { background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--line); padding: 13px 14px; text-align: left; vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    th { background: #eef3f0; color: var(--muted); font-size: .7rem; letter-spacing: .04em; text-transform: uppercase; }
+    td { font-size: .82rem; }
+    td:first-child { color: var(--current); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; white-space: nowrap; width: 74px; }
+    td ul { display: grid; gap: 3px; }
 
-    .stack { display: grid; gap: 12px; }
-
-    .risk-card,
-    .next-card {
-      padding: 13px 14px;
-      border-left: 4px solid var(--risk);
-      background: var(--risk-soft);
+    .next-gates { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .gate {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      padding: 16px;
     }
+    .gate.next { border-top: 4px solid var(--current); }
+    .gate.tentative { border-top: 4px solid var(--next); }
+    .gate .tag { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+    .gate h3 { font-size: 1rem; margin: 7px 0 10px; }
+    .gate-points { display: grid; gap: 9px; list-style: none; padding: 0; }
+    .gate-points li { font-size: .82rem; line-height: 1.4; }
+    .gate-points strong { color: var(--muted); display: block; font-size: .7rem; margin-bottom: 2px; text-transform: uppercase; }
 
-    .next-card { border-color: var(--next); background: var(--next-soft); }
-    .risk-card strong,
-    .next-card strong { display: block; font-size: 13px; }
-    .risk-card p,
-    .next-card p { margin: 5px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
-
-    .decision {
-      grid-column: 1 / -1;
-      display: grid;
-      grid-template-columns: 160px 1fr;
-      gap: 16px;
-      align-items: center;
-      margin-top: 18px;
-      padding: 17px 20px;
-      border: 1px dashed var(--next);
-      background: var(--next-soft);
-    }
-
-    .decision .label { color: var(--next); font-size: 10px; font-weight: 800; }
-    .decision p { margin: 0; font-size: 14px; line-height: 1.45; }
-
-    footer {
-      display: flex;
-      justify-content: space-between;
-      gap: 20px;
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
-      font-size: 11px;
-    }
+    .risks { border-left: 4px solid var(--risk); color: var(--muted); font-size: .82rem; padding: 2px 0 2px 12px; }
+    footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .72rem; margin-top: 30px; padding-top: 12px; }
 
     @media (max-width: 900px) {
-      header,
-      .map { grid-template-columns: 1fr; }
-      .stamp { width: fit-content; }
-      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .layers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .flow div::after { display: none; }
+      .next-gates { grid-template-columns: 1fr; }
     }
 
-    @media (max-width: 650px) {
-      body { background: var(--paper); }
-      main { width: min(100% - 20px, 1180px); padding-top: 18px; }
-      header { gap: 16px; }
-      .metrics { grid-template-columns: 1fr 1fr; }
-      .metric { min-height: 104px; padding: 13px; }
-      .flow { grid-template-columns: 1fr; gap: 8px; }
-      .arrow { transform: rotate(90deg); font-size: 20px; }
-      .tech { grid-template-columns: 1fr 1fr; }
-      .decision { grid-template-columns: 1fr; gap: 7px; }
-      footer { display: block; }
-      footer span { display: block; margin-top: 4px; }
-    }
-
-    @media (max-width: 480px) {
-      .metrics { grid-template-columns: 1fr; }
-      .metric { min-height: 0; }
+    @media (max-width: 680px) {
+      main { padding: 20px 14px 36px; }
+      .topbar, .section-head { align-items: start; display: block; }
+      .stamp { margin-top: 14px; text-align: left; }
+      .layers, .flow { grid-template-columns: 1fr; }
+      .layer { min-height: 0; }
+      .table-wrap { background: transparent; border: 0; overflow: visible; }
+      thead { display: none; }
+      table, tbody, tr, td { display: block; width: 100%; }
+      tr { background: var(--surface); border: 1px solid var(--line); margin-bottom: 9px; padding: 10px 12px; }
+      td { border: 0; padding: 4px 0 4px 92px; position: relative; }
+      td::before { color: var(--muted); content: attr(data-label); font-size: .66rem; font-weight: 800; left: 0; position: absolute; text-transform: uppercase; top: 6px; width: 80px; }
+      td:first-child { padding-left: 92px; width: 100%; }
     }
   </style>
 </head>
 <body>
   <main>
-    <header>
+    <header class="topbar">
       <div>
-        <p class="eyebrow">Facilito UX Lab · mapa vigente</p>
-        <h1>Del precio publicado a una decisión confiable</h1>
-        <p>Gate 1.2 convirtió el contrato privado en una web mobile-first utilizable: ubicación actual, alternativas locales y comparación explícita sin filtros distritales.</p>
+        <h1>Estado del proyecto</h1>
+        <p>La web privada ya completa el recorrido: ubicación → comparación cercana → elección → destino en Google Maps. La siguiente capa busca identidad comercial y conveniencia personal.</p>
       </div>
-      <div class="stamp" aria-label="Estado del proyecto">
-        <strong>Capa 1 · Gate 1.2 cerrado</strong>
-        <span>Siguiente: prueba rápida A/B</span>
+      <div class="stamp">
+        <strong>Capa 1 completa · v0.1.0 privada</strong>
+        <span>Actualizado: 16 ago. 2026</span>
       </div>
     </header>
 
-    <div class="legend" aria-label="Leyenda de estados">
-      <span class="built-color"><i class="dot"></i> Observado</span>
-      <span class="partial-color"><i class="dot"></i> Parcial / no confirmado</span>
-      <span class="next-color"><i class="dot"></i> Próximo</span>
-      <span class="risk-color"><i class="dot"></i> Riesgo</span>
-    </div>
-
-    <section class="metrics" aria-label="Métricas clave de Gate 1.2">
-      <article class="metric"><small>Universo privado</small><strong>714</strong><p>ofertas validadas de Lima provincia</p></article>
-      <article class="metric"><small>Pool local</small><strong>20</strong><p>vecinos estables antes de ordenar</p></article>
-      <article class="metric"><small>Decisión mobile</small><strong>6</strong><p>alternativas visibles y comparables</p></article>
-      <article class="metric risk"><small>Identidad pública</small><strong>0/7</strong><p>journeys con nombre comercial oficial disponible</p></article>
-    </section>
-
-    <section class="map">
-      <div class="lane">
-        <h2>Vertical slice privado construido</h2>
-        <div class="flow">
-          <article class="node">
-            <span class="state">Observado</span>
-            <h3>Fuentes selladas</h3>
-            <p>Precio oficial ≤30 días, Registro exacto y GIS por actividad. Los joins fallidos permanecen excluidos y medidos.</p>
-          </article>
-          <div class="arrow" aria-hidden="true">→</div>
-          <article class="node">
-            <span class="state">Observado</span>
-            <h3>Contrato validado</h3>
-            <p>714 ofertas con precio, fecha, coordenada e identidad provisional. El dataset real es local, ignorado y privado.</p>
-          </article>
-          <div class="arrow" aria-hidden="true">→</div>
-          <article class="node">
-            <span class="state">Construido</span>
-            <h3>Web local</h3>
-            <p>Ubicación real o simulada, pool de 20 vecinos y 6 opciones ordenables por cercanía, precio o frescura.</p>
-          </article>
-        </div>
-
-        <div class="tech" aria-label="Fuentes observadas">
-          <div><strong>Embudo Lima</strong><span>821 últimas → 741 frescas → 722 Registro → 714 GIS</span></div>
-          <div><strong>Distancia</strong><span>Haversine WGS84, siempre presentada como línea recta</span></div>
-          <div><strong>Producto</strong><span>UI limpia; protocolo visible solo con <code>?debug=1</code></span></div>
-          <div><strong>Privacidad</strong><span>Loopback, ubicación efímera y medición sanitizada</span></div>
+    <section aria-labelledby="layers-title">
+      <div class="section-head">
+        <div>
+          <h2 id="layers-title">Arquitectura por capas</h2>
+          <p>Una salida útil por capa; lo futuro sigue deliberadamente abierto.</p>
         </div>
       </div>
+      <div class="layers">
+        <article class="layer done">
+          <small>Capa 0 · completa</small>
+          <h3>Entender</h3>
+          <p>Producto público, fuentes oficiales, joins, cobertura, frescura y límites.</p>
+        </article>
+        <article class="layer done">
+          <small>Capa 1 · completa</small>
+          <h3>Comparar y actuar</h3>
+          <p>Contrato privado + web mobile + handoff seguro a Google Maps.</p>
+        </article>
+        <article class="layer current">
+          <small>Capa 2 · siguiente</small>
+          <h3>Personalizar</h3>
+          <p>Identidad confirmada y precio efectivo según beneficios del usuario.</p>
+        </article>
+        <article class="layer future">
+          <small>Capa 3 · posterior</small>
+          <h3>Operar</h3>
+          <p>Actualización reproducible, consultas, almacenamiento y más cobertura.</p>
+        </article>
+        <article class="layer future">
+          <small>Capa 4 · posterior</small>
+          <h3>Primera versión pública</h3>
+          <p>Publicación únicamente con identidad, permisos y operación resueltos.</p>
+        </article>
+      </div>
 
-      <aside class="side-panel">
-        <h2>Condiciones para Gate 1.3</h2>
-        <div class="stack">
-          <div class="next-card"><strong>01 · Probar el artefacto</strong><p>Misma tarea y mismo origen en Facilito y en la web local.</p></div>
-          <div class="next-card"><strong>02 · Medir lo mínimo</strong><p>Tiempo, acciones, elección y comprensión de cercanía y frescura.</p></div>
-          <div class="next-card"><strong>03 · Decidir</strong><p>Incorporar, corregir o eliminar según evidencia observable.</p></div>
-          <div class="risk-card"><strong>Radio variable</strong><p>El pool siempre contiene 20 vecinos; su alcance físico depende de la densidad.</p></div>
-          <div class="risk-card"><strong>P0 · Identidad reconocible</strong><p>Ausente en fuentes bulk legítimas; obligatoria antes de publicación.</p></div>
-          <div class="risk-card"><strong>P0 · Reutilización</strong><p>GIS y EVPC sin licencia explícita verificada; investigación privada solamente.</p></div>
-          <div class="risk-card"><strong>Hipótesis diferida</strong><p>Marca y descuentos pueden cambiar conveniencia, pero identidad no está resuelta.</p></div>
-        </div>
-      </aside>
-
-      <div class="decision">
-        <span class="label">Salida de Gate 1.2</span>
-        <p><strong>ACEPTAR.</strong> El slice privado es tangible, mobile-first y útil para una prueba rápida. Producto público, identidad comercial y reutilización siguen fuera de alcance.</p>
+      <div class="flow" aria-label="Flujo construido">
+        <div><strong>Precio oficial</strong>EVPC / líquidos</div>
+        <div><strong>Establecimiento</strong>Registro exacto</div>
+        <div><strong>Ubicación</strong>GIS oficial</div>
+        <div><strong>Contrato privado</strong>714 ofertas</div>
+        <div><strong>UI mobile</strong>20 vecinos → 6 opciones</div>
+        <div><strong>Handoff</strong>Destino en Google Maps</div>
       </div>
     </section>
 
-    <footer>
-      <span>Proyecto independiente y no oficial.</span>
-      <span>Actualizado al cierre de Gate 1.2 · 2026-08-16</span>
-    </footer>
+    <section aria-labelledby="history-title">
+      <div class="section-head">
+        <div>
+          <h2 id="history-title">Qué logró cada gate</h2>
+          <p>Solo objetivo, trabajo y resultado vigente.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Gate</th><th>Objetivo</th><th>Qué se hizo</th><th>Qué logramos</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-label="Gate">0.1</td>
+              <td data-label="Objetivo"><ul><li>Entender Facilito como producto.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>7 journeys, mobile, desktop y red.</li></ul></td>
+              <td data-label="Resultado"><ul><li>Ofertas reales y fricciones observadas.</li><li>Frescura e identidad quedaron como riesgos.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">0.2</td>
+              <td data-label="Objetivo"><ul><li>Encontrar fuentes y relaciones oficiales.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>2.34 M precios + Registro, GIS y UBIGEO.</li></ul></td>
+              <td data-label="Resultado"><ul><li>IDs y geografía exactos para J1–J6.</li><li>Identidad comercial y J7 no resueltos.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">0.3</td>
+              <td data-label="Objetivo"><ul><li>Decidir si valía la pena construir.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Embudo de frescura, joins y cobertura.</li></ul></td>
+              <td data-label="Resultado"><ul><li>GO con límites para Gasohol Regular.</li><li>Producto público todavía bloqueado.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">1.1</td>
+              <td data-label="Objetivo"><ul><li>Crear un boundary consumible.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Schema, fixture y dataset privado.</li></ul></td>
+              <td data-label="Resultado"><ul><li>714/741 ofertas (96.36 %) en 42 distritos.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">1.2</td>
+              <td data-label="Objetivo"><ul><li>Entregar utilidad tangible en mobile.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Geolocalización, Haversine, pool local y UI.</li></ul></td>
+              <td data-label="Resultado"><ul><li>20 vecinos → 6 opciones comparables.</li><li>Owner y Challenger aceptaron; 9/9 tests.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">1.3</td>
+              <td data-label="Objetivo"><ul><li>Completar el trabajo después de elegir.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Handoff explícito y seguro a Google Maps.</li></ul></td>
+              <td data-label="Resultado"><ul><li>Solo comparte el destino tras el tap.</li><li>Owner y Challenger aceptaron; 13/13 tests.</li></ul></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="next-title">
+      <div class="section-head">
+        <div>
+          <h2 id="next-title">Siguientes 3 gates</h2>
+          <p>Dirección propuesta para Capa 2; ningún gate está abierto todavía.</p>
+        </div>
+      </div>
+      <div class="next-gates">
+        <article class="gate next">
+          <span class="tag">Siguiente · Gate 2.1</span>
+          <h3>Identidad comercial</h3>
+          <ul class="gate-points">
+            <li><strong>Pregunta</strong>¿Podemos mostrar marca y nombre de sede confirmados?</li>
+            <li><strong>Tangible</strong>Piloto first-party Repsol/Primax anclado a código Osinergmin.</li>
+            <li><strong>Salida</strong>Cobertura, conflictos y permiso medidos; cero inferencias.</li>
+          </ul>
+        </article>
+        <article class="gate tentative">
+          <span class="tag">Tentativo · Gate 2.2</span>
+          <h3>Beneficio personal</h3>
+          <ul class="gate-points">
+            <li><strong>Pregunta</strong>¿Cómo declara el usuario un descuento sin crear una cuenta?</li>
+            <li><strong>Tangible</strong>Preferencia local por marca y regla de descuento simple.</li>
+            <li><strong>Salida</strong>Precio efectivo visible, reversible y sin tracking.</li>
+          </ul>
+        </article>
+        <article class="gate tentative">
+          <span class="tag">Tentativo · Gate 2.3</span>
+          <h3>Conveniencia personal</h3>
+          <ul class="gate-points">
+            <li><strong>Pregunta</strong>¿Qué cambia al combinar cercanía, lista y beneficio?</li>
+            <li><strong>Tangible</strong>Comparación que explica precio efectivo y desvío.</li>
+            <li><strong>Salida</strong>Elección comprensible, sin scoring opaco.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="risks" aria-label="Bloqueos vigentes">
+      <strong>Bloqueos para publicar:</strong> cobertura de identidad comercial, permiso de reutilización y operación de actualizaciones. No se afirma stock, descuento ni nombre comercial inferido.
+    </section>
+
+    <footer>Vista interna del owner · conocimiento vigente, no historial exhaustivo.</footer>
   </main>
 </body>
 </html>

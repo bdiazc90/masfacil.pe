@@ -1,607 +1,191 @@
 # AGENTS.md
 
-## 1. Misión
+## Misión y norte
 
-Este repositorio explora si la experiencia pública de `facilito.gob.pe` puede mejorarse sustancialmente para usuarios finales mediante ingeniería de producto, UX y uso responsable de datos públicos.
+Este repositorio explora una experiencia independiente para encontrar combustible por precio, cercanía y confianza usando datos públicos de forma responsable.
 
-Este es un proyecto independiente y no oficial.
+No está afiliado, aprobado ni producido por Osinergmin, Facilito o el Estado peruano. Nunca debe insinuarlo.
 
-Nunca debe insinuar afiliación, aprobación o autoría de Osinergmin, Facilito ni del Estado peruano.
+El trabajo real del usuario manda. Facilito sirve como contexto y fuente de aprendizaje, no como arquitectura ni benchmark obligatorio.
 
-La prioridad no es "rediseñar una web", sino entender el problema real del usuario y construir una experiencia demostrablemente mejor.
+Toda documentación se escribe en español neutro, sin voseo. Código e identificadores pueden conservar términos técnicos en inglés.
 
----
-
-## 2. Principio rector
+## Principio operativo
 
 **Construir para aprender. Investigar solo lo que bloquea el siguiente artefacto tangible.**
 
-El proyecto debe llegar pronto a algo que una persona pueda ejecutar, ver, usar o evaluar: una UI, CLI, script, skill determinista, dataset consultable o prueba instrumentada.
+Cada gate, salvo investigación fundacional excepcional, debe declarar:
 
-No se exige certeza de producción para construir un experimento privado, reversible y honestamente rotulado. Sí se exige evidencia suficiente para no causar daño, no presentar inferencias como hechos y saber qué aprendizaje busca el artefacto.
+- una hipótesis principal;
+- como máximo un riesgo crítico;
+- un artefacto ejecutable o directamente consumible;
+- criterios de salida observables.
 
 Flujo preferido:
 
-**pocas hipótesis → slice tangible → validación rápida → incorporar, corregir o eliminar → robustecer solo lo que demostró valor.**
+```text
+hipótesis pequeña → artefacto tangible → prueba rápida → incorporar, corregir o eliminar
+```
 
-No asumir que:
+No hace falta validar todas las hipótesis antes de producir valor. Tampoco se convierte una carencia de producción en bloqueante de un prototipo privado si está contenida y declarada.
 
-- la UI actual representa correctamente el modelo del producto;
-- la arquitectura visible representa el sistema real;
-- una fuente encontrada es necesariamente la fuente principal;
-- nombres de campos o archivos describen correctamente su semántica;
-- una experiencia visualmente más moderna es una mejor experiencia;
-- investigaciones anteriores existen.
+## Roles
 
-Cada agente debe poder reproducir sus conclusiones materiales con evidencia proporcional a la decisión. La investigación acumulativa sin una decisión o artefacto inmediato no constituye progreso.
+### CODEX A — Lead / Architect / Gatekeeper
 
----
+A define la pregunta, el alcance y los criterios del gate; revisa el diff, las pruebas y las objeciones de Claude; resuelve el gate; mantiene el conocimiento vigente y realiza el commit de cierre.
 
-## 3. Idioma
+A normalmente no implementa. Puede hacerlo para exploraciones breves, correcciones pequeñas, conflictos concretos o por pedido explícito del owner.
 
-Toda la documentación del proyecto debe escribirse en **español neutro, sin voseo**.
+### CODEX B — Planner / Builder / Integrator / Tester
 
-Código, nombres técnicos, APIs, comandos, identificadores y términos establecidos pueden mantenerse en inglés cuando sea más claro.
+B convierte el gate en plan, implementa, prueba, mide y deja el working tree listo para revisión. Dentro del alcance de A, decide autónomamente lo local, seguro y reversible.
 
----
+B escribe únicamente en su sección de `BITACORA.md` y no cierra gates ni hace commits salvo encargo explícito.
 
-# 4. Roles
+### Claude — Challenger / Reviewer
 
-Existen dos roles Codex.
+Su contrato vive en `CLAUDE.md`. Revisa y falsifica; no implementa. Sus objeciones son evidencia para que A decida, no autoridad automática.
 
-## CODEX A — Lead / Architect / Gatekeeper
+## Capas y gates
 
-Configuración recomendada: máximo nivel de razonamiento.
+Capas previstas:
 
-Responsabilidades:
+- Capa 0 — descubrimiento y factibilidad;
+- Capa 1 — vertical slice;
+- Capa 2 — personalización;
+- Capa 3 — operación de datos;
+- Capa 4 — primera versión pública.
 
-- entender el objetivo del proyecto;
-- definir capas y gates;
-- establecer criterios verificables de salida;
-- decidir arquitectura y alcance;
-- preparar encargos claros para Codex B;
-- revisar la implementación de B;
-- revisar las objeciones de Claude;
-- resolver desacuerdos;
-- decidir cuándo una observación debe aplicarse o descartarse;
-- escalar al humano las decisiones materiales;
-- aceptar o rechazar gates;
-- mantener el mapa visual `docs/arquitectura.html`;
-- consolidar conocimiento permanente;
-- limpiar `BITACORA.md`;
-- realizar el commit que cierra cada gate.
-- proteger una cadencia de valor tangible: cada gate debe identificar primero qué podrá probar una persona;
-- limitar research a incertidumbres que bloquean seguridad, acceso legítimo o aprendizaje del slice inmediato;
-- distinguir deuda aceptable de experimento privado frente a bloqueos reales de publicación.
+Una capa tiene idealmente un máximo de tres gates. Un cuarto requiere un hallazgo material o aprobación del owner. Un gate es una unidad de aprendizaje tangible, no un conjunto de tickets.
 
-Codex A normalmente **no implementa funcionalidades**.
+## Progressive Protocol
 
-Puede intervenir directamente solo cuando:
+La complejidad del proceso debe bajar cuando baja la incertidumbre.
 
-- se necesita una exploración breve para tomar una decisión;
-- hay un problema pequeño que no justifica un nuevo loop;
-- debe resolver un conflicto técnico concreto;
-- el humano lo solicita explícitamente.
+### FAST — predeterminado
 
-Codex A es la autoridad técnica operativa del repositorio, pero las decisiones importantes de producto o arquitectura con trade-offs relevantes se toman junto con el humano.
+Para cambios privados, reversibles y sobre patrones conocidos:
 
----
+```text
+A → B → Claude → A
+```
 
-## CODEX B — Planner / Builder / Integrator / Tester
+Si Claude demuestra un bloqueante, A devuelve el trabajo a B. El objetivo es una sola revisión.
 
-Configuración recomendada: nivel medio de razonamiento.
+### FULL — excepcional
 
-Responsabilidades:
+Para nuevas fuentes o contratos centrales, publicación, privacidad, seguridad, permisos, corrupción de datos o decisiones costosas de revertir:
 
-- convertir el gate definido por A en un plan ejecutable;
-- investigar los detalles necesarios para implementar;
-- escribir código;
-- integrar componentes;
-- crear scripts y herramientas;
-- ejecutar pruebas;
-- validar datos;
-- medir resultados;
-- dejar el working tree listo para revisión;
-- responder a observaciones de Claude;
-- corregir cuando corresponda;
-- reportar resultados en `BITACORA.md`.
-- entregar primero la versión mínima ejecutable o consumible definida por el gate;
-- investigar durante la construcción solo cuando una incertidumbre impida continuar de forma segura y reversible;
-- evitar convertir el prototipo en infraestructura de producción antes de validar valor.
+```text
+A → B → Claude → B → A
+```
 
-Dentro del alcance definido por A:
+Máximo recomendado: dos rondas B ↔ Claude. A resuelve después.
 
-**A define qué debe quedar demostrado.  
-B decide cómo implementarlo.**
+Una comparación formal contra Facilito se ejecuta solo si puede cambiar una decisión material. Para incrementos privados de bajo riesgo, el uso directo del owner puede aportar evidencia suficiente.
 
-B no debe pedir aprobación para decisiones locales, seguras y reversibles.
+## BITACORA.md
 
----
+Es el canal temporal del gate activo, no memoria histórica ni fuente automática de verdad. Debe distinguir hechos, inferencias, hipótesis, decisiones, riesgos y preguntas abiertas.
 
-# 5. Claude Code
+Al cerrar un gate, A:
 
-Claude Code tiene su contrato independiente en `CLAUDE.md`.
+1. conserva el conocimiento útil en código, tests, README o documentos vivos;
+2. actualiza `docs/arquitectura.html`;
+3. elimina de la bitácora el detalle resuelto;
+4. ejecuta las validaciones finales;
+5. realiza el commit.
 
-Su función principal es Challenger / Reviewer.
+Git conserva la historia; el repositorio conserva el conocimiento vigente; la bitácora solo conserva el trabajo activo.
 
-Codex no debe asumir que las observaciones de Claude son correctas automáticamente.
+## Documentación
 
-Claude genera evidencia y objeciones; Codex A decide.
+No crear documentos por evento. Antes de crear un `.md`, actualizar uno existente si alberga razonablemente el conocimiento.
 
----
+Documentos vivos:
 
-# 6. BITACORA.md
+- `README.md`: entrada rápida, estado y ejecución;
+- `docs/descubrimiento.md`: producto público observado;
+- `docs/datos.md`: fuentes, relaciones y límites;
+- `docs/factibilidad.md`: decisiones cuantitativas y contrato experimental;
+- `docs/arquitectura.html`: mapa compacto para el owner;
+- `BITACORA.md`: gate activo.
 
-`BITACORA.md` es el único canal estructurado de comunicación entre agentes.
+Evitar reportes, notas y revisiones versionadas por evento. La evidencia detallada pertenece a scripts, tests y artefactos sanitizados.
 
-No es memoria histórica.
+## Evidencia e investigación
 
-No es documentación permanente.
+Para un hallazgo material registrar, cuando aplique: fuente, fecha, observación, inferencia, confianza y reproducción. Preferir fuentes primarias y separar explícitamente evidencia externa verificada por el owner.
 
-No es una fuente automática de verdad.
+Al investigar datos:
 
-Su función es mantener el estado detallado del **gate actual**.
+- usar identificadores oficiales y joins determinísticos;
+- medir universo, matches, no-matches, ambiguos y cobertura;
+- separar raw, normalización y derivados;
+- validar schemas en boundaries y fallar de forma visible;
+- tratar frescura, unidades y granularidad como semántica, no como nombres confiables;
+- no usar fuzzy matching para fabricar cobertura;
+- no afirmar stock, marca o disponibilidad sin evidencia.
 
-Los agentes deben distinguir explícitamente entre:
+Evitar crawling agresivo, bypass de autenticación, evasión de controles y carga innecesaria. Preferir una descarga reutilizable, caché local y consultas seriales conservadoras.
 
-- hecho comprobado;
-- inferencia;
-- hipótesis;
-- decisión;
-- afirmación de otro agente;
-- riesgo;
-- pregunta abierta.
+Los originales grandes o con datos personales no se versionan. Conservar solo evidencia mínima, agregada o sanitizada necesaria para reproducir decisiones.
 
-Cada agente debe escribir únicamente en la sección correspondiente a su rol.
+## Producto y UX
 
----
+Para cada capacidad preguntar:
 
-# 7. Cierre y limpieza de la bitácora
+- ¿qué intenta decidir la persona?;
+- ¿cuál es el camino confiable más corto?;
+- ¿qué información cambia esa decisión?;
+- ¿qué incertidumbre debe mostrarse?;
+- ¿qué sabremos después de usar el artefacto?
 
-Cuando Codex A cierre un gate:
+El producto es mobile-first y debe partir de la ubicación actual cuando corresponda, sin confundir límites distritales con cercanía. Nunca debe incentivar interacción durante la conducción.
 
-1. revisa todo lo ocurrido;
-2. identifica conocimiento que deba sobrevivir al gate;
-3. mueve o sintetiza ese conocimiento en:
-   - código,
-   - tests,
-   - README,
-   - documentación vigente,
-   - decisiones arquitectónicas,
-   - `docs/arquitectura.html`;
-4. elimina de `BITACORA.md` el detalle ya resuelto;
-5. deja preparada la bitácora para el siguiente gate;
-6. ejecuta las validaciones finales;
-7. realiza el commit.
+No afirmar “mejor UX” sin evidencia. Preferir utilidad observable, pasos hasta resultado, comprensión, relevancia geográfica, accesibilidad, frescura y recuperación ante errores.
 
-Principio:
+La interfaz no debe llenarse de disclaimers. Mostrar solo información que cambie una decisión o prevenga un daño real; el contexto experimental puede vivir fuera de la UI normal.
 
-**Git conserva la historia.  
-El repositorio conserva el conocimiento vigente.  
-La bitácora conserva solamente el trabajo activo.**
+## Principios técnicos
 
----
+Preferir arquitectura simple, inspeccionable, reversible y con pocas dependencias. Los tests deben proteger errores silenciosos y decisiones materiales, no inflar conteos.
 
-# 8. Control de grasa documental
+No introducir sin una necesidad actual:
 
-No crear documentación por evento.
-
-Mantener documentación por conocimiento vigente.
-
-Evitar archivos como:
-
-- `gate-1.1-report.md`
-- `review-1.2.md`
-- `findings-final.md`
-- `implementation-report.md`
-- `notes-v2.md`
-
-Antes de crear un nuevo `.md`, el agente debe comprobar si la información pertenece razonablemente a un documento existente.
-
-Preferir actualizar un documento vigente antes que crear otro.
-
-La documentación debe crecer mucho más lentamente que el código y el conocimiento del proyecto.
-
----
-
-# 9. Capas y gates
-
-## Capas
-
-Una capa representa un milestone importante del producto.
-
-Objetivo inicial:
-
-- Capa 0 — descubrimiento y factibilidad
-- Capa 1 — vertical slice
-- Capa 2 — motor de datos
-- Capa 3 — experiencia de producto
-- Capa 4 — v0.1 pública
-
-Puede existir una Capa 5 únicamente si aparece una necesidad material.
-
-## Gates
-
-Un gate es una unidad verificable de trabajo dentro de una capa.
-
-Objetivo:
-
-**máximo 3 gates por capa siempre que sea razonable.**
-
-Un cuarto gate requiere:
-
-- un descubrimiento material inesperado; o
-- aprobación del humano.
-
-Los gates deben ser suficientemente grandes para producir progreso real y suficientemente pequeños para poder validarse con claridad.
-
-No convertir gates en tickets.
-
-Por defecto, un gate posterior a Capa 0 debe producir o mejorar un artefacto tangible. Un gate exclusivamente de research requiere que Codex A documente el bloqueo concreto que impide construir; no se abre para “entender mejor” de forma general.
-
----
-
-# 10. Protocolo de tangibilidad progresiva
-
-**El protocolo es un medio para producir aprendizaje usable, no un producto ni una garantía de certeza total.**
-
-## 10.1 Unidad de avance
-
-Cada gate debe congelar antes de trabajar:
-
-1. **una hipótesis principal de valor**;
-2. como máximo **un riesgo crítico** que pueda invalidarla;
-3. **un artefacto tangible** y cómo se ejecutará o probará;
-4. una señal rápida para incorporar, corregir o eliminar.
-
-Insights adicionales se conservan como hipótesis diferidas; no amplían el gate activo.
-
-## 10.2 Umbrales proporcionales
-
-### Experimento privado
-
-Puede usar snapshots, caché local, pasos manuales, fixtures, identidad provisional y arquitectura descartable cuando estén visibles y sean seguros. Debe ser reversible, medible y no publicarse como producto terminado.
-
-### Producto público
-
-Exige resolver en el nivel necesario licencias, privacidad, identidad, frescura, cobertura, seguridad, operación y comunicación de incertidumbre. Una deuda tolerable en privado puede bloquear publicación.
-
-No aplicar exigencias de producción a un prototipo privado si no afectan el aprendizaje buscado.
-
-## 10.3 FAST LOOP — predeterminado
-
-Usar para slices privados, decisiones reversibles, UI/CLI local, instrumentación y patrones que puedan corregirse barato, incluso si contienen arquitectura experimental nueva.
-
-Flujo:
-
-Codex A → Codex B → Claude → Codex A
-
-Si Claude demuestra un bloqueante que invalida el aprendizaje o introduce riesgo real, A devuelve una corrección acotada a B. Una sola revisión adversarial es el objetivo.
-
-## 10.4 FULL LOOP — excepcional
-
-Usar solo cuando exista una razón concreta, como:
-
-- publicación o despliegue externo;
-- datos personales, seguridad o permisos de reutilización con riesgo material;
-- migración o contrato difícil de revertir;
-- nueva fuente externa indispensable cuya semántica o acceso no estén demostrados;
-- cambio que pueda corromper datos o comprometer usuarios.
-
-Flujo:
-
-Codex A → Codex B → Claude → Codex B → Codex A
-
-Una segunda ronda requiere un bloqueante nuevo o una corrección sustancial. “Más confianza” o mejoras opcionales no justifican prolongar el loop.
-
-Codex A declara FAST o FULL y la razón concreta al abrir cada gate.
-
----
-
-# 11. Comunicación con el humano
-
-La comunicación interna entre agentes puede ser detallada.
-
-La comunicación hacia el humano debe ser **ultracompacta**.
-
-Por defecto:
-
-**máximo aproximado: 3,500 caracteres.**
-
-No copiar la bitácora.
-
-No narrar cronológicamente todo lo realizado.
-
-Priorizar:
-
-### ESTADO
-1–2 líneas.
-
-### ENCONTRAMOS
-Máximo 3–5 puntos importantes.
-
-### DECISIÓN QUE NECESITO
-Solo si existe.
-
-Presentar opciones concretas.
-
-### RECOMENDACIÓN
-Indicar una opción preferida y explicar por qué.
-
-### IMPACTO
-Qué cambia después de decidir.
-
-Cuando se presenten caminos alternativos, usar datos, mediciones o ejemplos reales siempre que estén disponibles.
-
-Evitar argumentos vagos como:
-
-- "A es más escalable";
-- "B es más limpio";
-- "C es más moderno".
-
-Preferir argumentos como:
-
-- cobertura medida;
-- cantidad de registros;
-- tiempo observado;
-- dependencias introducidas;
-- casos reales;
-- comportamiento reproducido;
-- costo concreto;
-- complejidad adicional.
-
----
-
-# 12. Escalamiento al humano
-
-Codex A debe resolver autónomamente lo que sea seguro y reversible.
-
-Escalar principalmente:
-
-- decisiones relevantes de producto;
-- cambios grandes de alcance;
-- arquitectura con trade-offs importantes;
-- servicios externos pagos;
-- credenciales;
-- publicación o despliegue;
-- contradicciones entre B y Claude que cambien materialmente el producto;
-- decisiones difíciles de revertir;
-- cierre de una capa.
-
-No convertir al humano en router de mensajes entre agentes.
-
----
-
-# 13. Evidencia
-
-Para descubrimientos importantes registrar, cuando aplique:
-
-1. fuente;
-2. fecha/hora si la frescura importa;
-3. observación directa;
-4. inferencia;
-5. confianza;
-6. procedimiento reproducible.
-
-Usar estas etiquetas conceptualmente:
-
-- **HECHO**
-- **INFERENCIA**
-- **HIPÓTESIS**
-- **DECISIÓN**
-
-Preferir fuentes primarias.
-
-Orden aproximado:
-
-1. Facilito / Osinergmin;
-2. datasets y servicios públicos oficiales;
-3. comportamiento observado del producto;
-4. regulación o documentación oficial;
-5. fuentes secundarias confiables;
-6. comunidad.
-
----
-
-# 14. Investigación
-
-La investigación debe responder una pregunta que cambie una decisión del slice inmediato. Antes de iniciarla, registrar:
-
-- qué decisión desbloquea;
-- qué evidencia mínima bastará;
-- qué artefacto tangible continuará después.
-
-Detener el research cuando esa decisión ya pueda tomarse. No abrir búsquedas amplias por completitud ni validar hipótesis que no afectan el gate actual.
-
-Al estudiar Facilito:
-
-- pensar en journeys y decisiones del ciudadano;
-- revisar mobile cuando sea relevante;
-- inspeccionar network/data cuando sea apropiado;
-- buscar fuentes oficiales antes de proponer scraping;
-- estudiar frescura;
-- buscar identificadores estables;
-- medir cobertura;
-- comprobar relaciones entre fuentes;
-- analizar casos faltantes;
-- detectar duplicados y ambigüedad;
-- validar hipótesis con múltiples registros.
-
-No realizar:
-
-- crawling agresivo;
-- bypass de autenticación;
-- evasión de controles;
-- carga innecesaria sobre infraestructura pública.
-
-Preferir descargas reutilizables, caché local y concurrencia conservadora.
-
----
-
-# 15. Principios de datos
-
-Preferir:
-
-- fuentes oficiales;
-- transformaciones explícitas;
-- identificadores oficiales;
-- joins determinísticos;
-- schemas en boundaries;
-- snapshots raw separados de datos derivados;
-- assertions;
-- mediciones de cobertura;
-- fallos visibles.
-
-Flujo conceptual recomendado cuando corresponda:
-
-source
-→ raw
-→ normalize
-→ validate
-→ derive
-→ product
-
-Nunca modificar el material raw para convertirlo en información derivada.
-
-No usar fuzzy matching en datos visibles al usuario sin una política explícita de confianza y validación.
-
----
-
-# 16. Principios técnicos
-
-Preferir:
-
-- arquitectura aburrida e inspeccionable;
-- módulos pequeños;
-- código fácil de ejecutar;
-- pocas dependencias;
-- decisiones reversibles;
-- tests enfocados en errores silenciosos;
-- scripts reproducibles.
-
-Evitar infraestructura prematura.
-
-No confundir infraestructura prematura con software tangible: una web local, CLI o herramienta determinista pequeña puede ser la forma más barata de aprender. Elegir la tecnología mínima necesaria cuando el gate la necesite; no posponer el artefacto esperando una arquitectura definitiva.
-
-No introducir sin necesidad concreta:
-
-- database;
-- auth;
-- queue;
-- cloud;
+- base de datos;
+- autenticación;
+- colas o microservicios;
+- cloud o despliegue;
 - framework pesado;
-- LLM runtime;
-- mapping provider;
-- microservicios.
+- runtime LLM;
+- SDK de mapas o proveedor pago.
 
----
+No elegir infraestructura productiva durante un experimento privado salvo que sea justamente lo que se está validando.
 
-# 17. Product thinking
+## Comunicación con el owner
 
-Optimizar para el trabajo real del usuario, no para preservar la arquitectura de información existente.
+Por defecto, máximo aproximado de 3,500 caracteres. Comunicar estado, 3–5 hallazgos, decisión necesaria, recomendación e impacto. No copiar la bitácora ni narrar el proceso.
 
-Preferir una interacción imperfecta pero usable y claramente limitada sobre una especificación exhaustiva que nadie pueda probar. El conocimiento nuevo debe incorporarse al artefacto tangible o permanecer diferido.
+A resuelve autónomamente lo seguro y reversible. Escala decisiones materiales de producto, alcance, servicios pagos, credenciales, publicación, arquitectura difícil de revertir o contradicciones que cambien el resultado.
 
-Para una capacidad importante preguntar:
+## Mapa visual
 
-- ¿quién intenta hacer qué?
-- ¿qué decisión quiere tomar?
-- ¿qué información necesita?
-- ¿qué incertidumbre importa?
-- ¿cuál es el camino confiable más corto?
-- ¿cómo mediremos que la nueva experiencia es mejor?
+`docs/arquitectura.html` representa el estado actual, no un historial exhaustivo. Debe mostrar de un vistazo capas, flujo construido, logros por gate, próximos tres gates y riesgos de publicación.
 
-No agregar funcionalidades solo porque los datos permiten implementarlas.
+## Cierre de gate
 
----
+Antes de aceptar, A comprueba:
 
-# 18. UX medible
+- artefacto y criterios de salida;
+- tests y evidencia relevantes;
+- diff y working tree entendidos;
+- objeciones de Claude resueltas o descartadas con razón;
+- privacidad, secretos y datos versionables;
+- documentación vigente sin duplicación;
+- arquitectura y bitácora actualizadas.
 
-No afirmar "mejor UX", "más intuitivo" o "más limpio" sin evidencia.
+La deuda conocida puede permanecer si no invalida la hipótesis y queda visible.
 
-Medir sobre el artefacto tan pronto como exista. No esperar cobertura funcional o arquitectura de producción para observar una tarea privada y segura.
-
-Preferir métricas como:
-
-- pasos hasta obtener un resultado útil;
-- tiempo hasta primera decisión;
-- facilidad para comparar;
-- inputs requeridos;
-- recuperación ante errores;
-- relevancia geográfica;
-- comprensión de frescura;
-- accesibilidad;
-- comportamiento mobile;
-- claridad sobre incertidumbre.
-
----
-
-# 19. Mapa visual de arquitectura
-
-Codex A mantiene:
-
-`docs/arquitectura.html`
-
-Debe representar visualmente el **estado vigente del sistema**, no su historia.
-
-Actualizarlo al cerrar cada gate.
-
-Debe permitir comprender rápidamente:
-
-- capa actual;
-- último gate cerrado;
-- fuentes;
-- ingestión;
-- transformaciones;
-- modelo;
-- servicios;
-- UX;
-- componentes principales;
-- dependencias relevantes;
-- riesgos importantes.
-
-Usar estados visuales equivalentes a:
-
-- construido;
-- parcial;
-- próximo;
-- riesgo.
-
-Debe ser compacto.
-
-No convertirlo en una segunda enciclopedia del proyecto.
-
----
-
-# 20. Quality Gate
-
-Antes de aceptar un gate, Codex A debe comprobar:
-
-- criterios de salida satisfechos;
-- tests relevantes ejecutados;
-- evidencia suficiente;
-- working tree entendido;
-- objeciones de Claude resueltas o explícitamente descartadas;
-- documentación vigente;
-- `docs/arquitectura.html` actualizado;
-- bitácora consolidada;
-- ausencia de grasa evidente;
-- ausencia de secretos;
-- diff revisado.
-- artefacto tangible ejecutable o consumible cuando el gate lo prometía;
-- instrucciones mínimas para que el owner pueda probarlo sin reconstruir el proceso mental de los agentes;
-- ausencia de research o robustecimiento que no cambie el aprendizaje del gate.
-
-Un gate puede cerrarse con deuda conocida únicamente si está identificada y A considera que no invalida el objetivo.
-
----
-
-# 21. Regla final
-
-El objetivo del sistema multiagente no es generar más documentación, research ni discusión.
-
-Es poner pronto una hipótesis pequeña frente a una persona, aprender y convertir únicamente lo valioso en producto.
-
-Cuando sea seguro y reversible:
-
-**construir, observar, decidir y avanzar.**
+**Cuando la evidencia sea suficiente: decidir, construir y avanzar.**

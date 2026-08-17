@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { loadValidatedDataset, toClientDataset, validateDataset } from '../app/contract.mjs';
+import { buildGoogleMapsDirectionsUrl, safeGoogleMapsDirectionsUrl } from '../app/public/directions.js';
 import { haversineKm, nearestPool, orderOffers, visibleOffers } from '../app/public/haversine.js';
 import { buildSanitizedMeasurement } from '../app/public/measurement.js';
 
@@ -12,6 +13,7 @@ const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.sch
 const fixturePath = path.join(root, 'fixtures', 'gate-1.1', 'experiment-dataset.synthetic.json');
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
+const html = fs.readFileSync(path.join(root, 'app', 'public', 'index.html'), 'utf8');
 
 test('Haversine devuelve cero para el mismo punto y una distancia conocida', () => {
   assert.equal(haversineKm({ latitude: -12.1, longitude: -77.03 }, { latitude: -12.1, longitude: -77.03 }), 0);
@@ -102,4 +104,45 @@ test('la medición conserva acciones y elección sin coordenadas ni identidad', 
   assert.equal(measurement.choice.offer_id, 'offer_demo');
   assert.equal(JSON.stringify(measurement).includes('-12.1'), false);
   assert.equal(JSON.stringify(measurement).includes('NO EXPORTAR'), false);
+});
+
+test('Google Maps Directions recibe solo destino sintético y modo conducción', () => {
+  const href = buildGoogleMapsDirectionsUrl({ latitude: -12.345678, longitude: -76.987654 });
+  const url = new URL(href);
+  assert.equal(url.origin, 'https://www.google.com');
+  assert.equal(url.pathname, '/maps/dir/');
+  assert.deepEqual([...url.searchParams.keys()], ['api', 'destination', 'travelmode']);
+  assert.equal(url.searchParams.get('api'), '1');
+  assert.equal(url.searchParams.get('destination'), '-12.345678,-76.987654');
+  assert.equal(url.searchParams.get('travelmode'), 'driving');
+  assert.equal(url.searchParams.has('origin'), false);
+});
+
+test('Google Maps Directions rechaza valores no finitos y rangos inválidos', () => {
+  for (const destination of [
+    { latitude: Number.NaN, longitude: -77 },
+    { latitude: -12, longitude: Number.POSITIVE_INFINITY },
+    { latitude: 90.000001, longitude: 0 },
+    { latitude: 0, longitude: -180.000001 },
+  ]) {
+    assert.throws(() => buildGoogleMapsDirectionsUrl(destination), /destino|rango/);
+    assert.equal(safeGoogleMapsDirectionsUrl(destination), null);
+  }
+});
+
+test('el CTA externo nace oculto y declara un contexto nuevo seguro', () => {
+  assert.match(html, /<a id="open-directions"[^>]*target="_blank"[^>]*rel="noopener noreferrer"[^>]*hidden>Abrir en Google Maps<\/a>/);
+});
+
+test('directions_opened permanece sanitizado en la medición debug', () => {
+  const measurement = buildSanitizedMeasurement({
+    dataset: { mode: 'demo', dataset_id: 'dataset-synthetic' },
+    session: { startedAt: 100, originKind: 'simulated', actions: [{ at_ms: 500, type: 'directions_opened' }] },
+    selected: { completedAt: 900, rank: 1, sort: 'distance', offer: { id: 'offer_synthetic' } },
+  });
+  assert.deepEqual(measurement.actions[0], { at_ms: 500, type: 'directions_opened' });
+  assert.equal(JSON.stringify(measurement.actions).includes('google'), false);
+  assert.equal(JSON.stringify(measurement.actions).includes('latitude'), false);
+  assert.equal(JSON.stringify(measurement.actions).includes('longitude'), false);
+  assert.equal(JSON.stringify(measurement.actions).includes('url'), false);
 });

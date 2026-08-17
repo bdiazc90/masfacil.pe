@@ -316,7 +316,7 @@ assert('j2-controlled-unit-mix', JSON.stringify(journeys.J2.controlled_lima_prov
 const identityClassification = Object.fromEntries(Object.entries(journeys).map(([id, item]) => [id, item.summary.funnel.recognizable_establishment_identity]));
 assert('identity-stage-explicitly-unmeasured', Object.values(identityClassification).every((item) => item.measured === false && item.offers === 0 && item.classification.startsWith('CONSTANTE DE POLÍTICA')), identityClassification);
 if (facilitoContrast) {
-  const discoveryRows = Object.fromEntries(fs.readFileSync(path.join(root, 'docs', 'descubrimiento.md'), 'utf8').split('\n').map((line) => line.match(/^\| (J[1-7]) \|.*\| ([\d,]+) filas \|/)).filter(Boolean).map((match) => [match[1], Number(match[2].replace(/,/g, ''))]));
+  const discoveryRows = Object.fromEntries(fs.readFileSync(path.join(root, 'docs', 'descubrimiento.md'), 'utf8').split('\n').map((line) => line.match(/^\| (J[1-7]) \|[^|]+\|[^|]+\| ([\d,]+) \|[^|]+\|$/)).filter(Boolean).map((match) => [match[1], Number(match[2].replace(/,/g, ''))]));
   const publicObserved = Object.fromEntries(facilitoContrast.public_observation.cases.map((item) => [item.journey, item.public_rows]));
   assert('facilito-public-baseline-complete', Object.keys(publicObserved).length === 7 && JSON.stringify(publicObserved) === JSON.stringify(discoveryRows), { artifact: publicObserved, discovery: discoveryRows });
   const observed = facilitoContrast.repo_reconstruction.cases.map((item) => {

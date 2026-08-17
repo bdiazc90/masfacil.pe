@@ -31,9 +31,12 @@ button { touch-action: manipulation; }
 html.debug .debug-only { display: block !important; }
 
 .skip-link {
+  align-items: center;
   background: var(--ink);
   color: #fff;
+  display: flex;
   left: 12px;
+  min-height: 44px;
   padding: 10px 14px;
   position: fixed;
   top: 10px;
@@ -82,6 +85,7 @@ h1:focus, h2:focus, main:focus { outline: none; }
   min-height: 48px;
   padding: 11px 15px;
   text-align: center;
+  text-decoration: none;
   width: 100%;
 }
 .button--primary { background: var(--orange); color: #27150c; min-height: 54px; }
@@ -147,6 +151,7 @@ h1:focus, h2:focus, main:focus { outline: none; }
 .choice-card { background: var(--mist); border-radius: 12px; margin: 18px 0; padding: 14px; text-align: left; }
 .choice-card strong, .choice-card span { display: block; overflow-wrap: anywhere; }
 .choice-card span { color: var(--ink-soft); font-size: 0.86rem; margin-top: 5px; }
+.confirmation__actions { display: grid; gap: 6px; }
 .debug-tools { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; text-align: left; }
 .debug-tools .button { margin-top: 8px; }
 .measurement-fallback { min-height: 180px; margin-top: 12px; max-width: 100%; width: 100%; }

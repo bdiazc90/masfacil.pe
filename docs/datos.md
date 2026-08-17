@@ -1,165 +1,114 @@
-# Fuentes oficiales y modelo de datos observado
+# Fuentes y modelo de datos observado
 
-Estado: conocimiento vigente de Gate 0.2, observado el 14 de agosto de 2026 (America/Lima). Caracteriza fuentes públicas y relaciones medidas; no diseña la aplicación futura ni demuestra que un CSV sea la fuente técnica inmediata de Facilito.
+Conocimiento vigente medido principalmente el **14 de agosto de 2026**. Caracteriza fuentes oficiales y relaciones exactas; no demuestra el linaje técnico inmediato hacia cada pantalla de Facilito.
 
-La evaluación integrada y el veredicto vigente están en [Factibilidad medida de la Capa 0](factibilidad.md).
+## Fuentes de precio reproducidas
 
-## Método, procedencia e integridad
+Las fichas de los cuatro datasets declaran ODC-By. Los archivos y sus catálogos son recursos distintos.
 
-Las adquisiciones nuevas se hicieron sin autenticación, serialmente y con baja carga. `scripts/acquire-gate-0.2.mjs` transmite cada recurso una vez hacia `/.local-cache/`, rechaza sobrescrituras y registra durante la solicitud: URL y parámetros reales, tiempos de inicio/fin, cabeceras materiales, cadena HTTP, bytes y SHA-256. El log está fuera de `raw`, en `data/provenance/2026-08-14/acquisitions.jsonl`.
-
-Los originales reutilizables —incluidos los CSV grandes y exports con datos personales— permanecen solo en la caché local ignorada. `scripts/minimize-gate-0.2.mjs` produjo snapshots **derivados/minimizados**: conserva campos necesarios para métricas y joins exactos, pero elimina RUC, razón social, dirección, representante, teléfono, correo y placa. Los CSV minimizados se comprimen con `gzip -n`; las 2,340,316 filas de precio siguen presentes.
-
-`scripts/profile-gate-0.2.mjs` solo lee snapshots minimizados y nunca escribe procedencia. `scripts/verify-gate-0.2.mjs` compara una lista previa exacta de 12 archivos contra `data/provenance/2026-08-14/integrity-manifest.json`: falla ante archivos alterados, nuevos, ausentes o con checksum/tamaño distinto. Con la caché presente también verifica los nueve originales adquiridos. El manifiesto se creó una sola vez con `--seal` y el script rechaza regenerarlo.
-
-Límite explícito: las fuentes pequeñas heredadas de la primera pasada —DMIN, serie anonimizada, Registro y GIS— no tenían procedencia de request confiable. Antes de retirar `raw`, la corrección registró sus hashes observados en `transformations.json`, con clasificación `legacy_no_verificable`; no se inventaron URL solicitada ni timestamps retroactivos. Las nueve adquisiciones nuevas sí tienen procedencia completa.
-
-## Catálogo oficial frente a recurso real
-
-La ficha del catálogo y el archivo de datos son recursos distintos. La licencia corresponde a la ficha; no se deriva de la URL del CSV.
-
-| Dataset | Catálogo oficial | URL realmente solicitada para datos | Acceso y licencia declarada |
-| --- | --- | --- | --- |
-| DMIN | [package `20921426…`](https://www.datosabiertos.gob.pe/api/3/action/package_show?id=20921426-6c40-4b86-af69-802066bd55ea) | [CL-Registro-precios-DMIN.csv](https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario/CL-Registro-precios-DMIN.csv) | Ficha pública; ODC-By |
-| Serie diaria anonimizada | [package `288e1362…`](https://www.datosabiertos.gob.pe/api/3/action/package_show?id=288e1362-0bf8-448f-8665-45058674ec5f) | [precios_combustibles_anonimizados_20260301_part1.csv](https://www.datosabiertos.gob.pe/sites/default/files/precios_combustibles_anonimizados_20260301_part1.csv) | Ficha pública; ODC-By |
-| GLP vigente | [package `a5326a6b…`](https://www.datosabiertos.gob.pe/api/3/action/package_show?id=a5326a6b-7064-4cec-a78f-6f3680e9eee2) | [GLP-Registro-precios-PIC-PE-V.csv](https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario/GLP-Registro-precios-PIC-PE-V.csv) | Ficha pública; ODC-By |
-| Líquidos vigentes | [package `35e929b0…`](https://www.datosabiertos.gob.pe/api/3/action/package_show?id=35e929b0-085a-47a3-86a4-483da58fda25) | [CL-Registro-precios-DMA-V-CCA-CCE.csv](https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario/CL-Registro-precios-DMA-V-CCA-CCE.csv) | Ficha pública; ODC-By |
-
-Los cuatro JSON de catálogo devolvieron `private: true`, aunque sus fichas visibles declaran acceso público. Se registra como contradicción de metadatos, no como restricción efectiva.
-
-## Adquisición de los CSV vigentes
-
-Ambos archivos aceptaron `Range: bytes=0-` y se descargaron completos una sola vez, en serie:
-
-| Dataset | HTTP | Bytes | `Content-Range` | `Last-Modified` | SHA-256 |
-| --- | ---: | ---: | --- | --- | --- |
-| GLP | 206 | 504,023,467 | `0-504023466/504023467` | 2026-08-14 12:27:11 GMT | `9c48b851…d2929` |
-| Líquidos | 206 | 1,053,746,146 | `0-1053746145/1053746146` | 2026-08-14 12:28:52 GMT | `0ce68cd7…1906b` |
-
-HTTP 206 demuestra disponibilidad durante esta adquisición, no un SLA ni estabilidad futura. Los 403 de la primera pasada fueron fallos del cliente usado y no una propiedad de la fuente.
-
-## Evidencia externa verificada por el owner: EVPC retail
-
-**Clasificación:** `OWNER-VERIFIED / TRUSTED INPUT`. Investigación independiente previa, posteriormente auditada y entregada por el owner el 14 de agosto de 2026. Los conteos corresponden principalmente a un snapshot del **12 de agosto de 2026** y no se interpretan como valores permanentes. Sus artefactos no forman parte del pipeline reproducible de este repositorio; se usa como evidencia externa explícita, no como resultado de los scripts de Gate 0.2.
-
-El archivo oficial de Osinergmin `Ultimos-Precios-Registrados-EVPC.xlsx` contenía **17,472** filas y **5,685** `CODIGO_OSINERG` distintos. La unidad observada era aproximadamente establecimiento × producto × último precio reportado e incluía gasoholes, gasolinas, diésel, GLP y GNV.
-
-Frescura medida sobre las 17,472 filas: 330 dentro de la última hora; 9,540 (≈55 %) dentro de 24 horas; 15,924 (≈91 %) dentro de 7 días; 16,966 (≈97 %) dentro de 30 días; y 506 con más de 30 días. La regulación PRICE aportada con esta evidencia exige actualizar cuando cambia el precio y dispone que Facilito publique el último precio reportado por un máximo de 30 días calendario. Una fila raw de mayor antigüedad no se promueve automáticamente a resultado visible.
-
-Relaciones exactas verificadas, sin fuzzy matching:
-
-| Relación / alcance | Resultado |
-| --- | ---: |
-| `EVPC.CODIGO_OSINERG` ↔ Registro Hábil `CODIGO_OSINERGMIN` | 5,659/5,685 (99.54 %); 26 sin match |
-| `EVPC.NRO_REGISTRO` ↔ GIS `N` | 5,279/5,685 (92.86 %) |
-| Bridge adicional por Registro Hábil | 5,301/5,685 |
-| `SAFE GEO MATCH`, agregando geografía administrativa + dirección normalizada solo cuando era inequívoca | 5,345/5,685 (94.02 %) |
-| Excluyendo Grifos Flotantes y Grifos Rurales con cilindros | 5,345/5,440 (98.25 %) establecimientos; 16,728/16,994 (98.43 %) filas de precio |
-| Control Santiago de Surco | 28/28 establecimientos con coordenada segura |
-
-De los 340 establecimientos sin coordenada segura, 144 eran Grifos Flotantes y 101 Grifos Rurales con almacenamiento en cilindros. Por ello la geografía oficial no parece bloqueante para un alcance urbano/carretera que excluya explícitamente esas categorías; sí permanece incompleta para ellas. El nivel que usa dirección exacta no establece una regla general de identidad y no autoriza fuzzy matching del residual.
-
-La identidad comercial sigue abierta: `MARCA` estaba vacía en 17,472/17,472 filas EVPC y los padrones aportaban razón social, no necesariamente el nombre reconocible para el conductor. `PRODUCTO_ACTIVO` y `ULT_PRECIO_DIF_CERO` tampoco tienen semántica verificada de stock; no permiten afirmar “disponible ahora”. Esta evidencia no resuelve J7 ni demuestra por sí sola el linaje técnico inmediato del archivo hacia cada respuesta de Facilito.
-
-## Perfil cuantitativo de precios
-
-Todos los universos se recorrieron completos. “Duplicados 0” se demuestra porque el ID de control de cada fila es no nulo y único; por ello una fila exacta duplicada no puede existir.
-
-| Dataset | Filas × columnas minimizadas | ID / Registro | Producto y territorio | Fecha máxima | Calidad material |
-| --- | --- | --- | --- | --- | --- |
-| DMIN | 858 × 13 | `ID1` 858/858 único; 83 Registros | 9 productos; 2 actividades; 19 dep., 35 prov., 57 dist. | 2026-08-13 | 0 anchos inválidos, 0 nulos, 0 duplicados; precios S/10.17–38 |
-| Serie anonimizada | 497,156 × 11 | `id` único; 8,825 locales anónimos | Sin identidad ni territorio público | `FE_EVAL` 2026-02-28; corte/emisión 2026-03-01 | 0 anchos inválidos y 0 duplicados; nulos estructurales por producto; 4 valores líquidos >S/100, 3 >S/1,000; GLP-E tiene 49 >S/100 |
-| GLP vigente | 522,380 × 12 | `ID4` único; 5,955 Registros | 6 productos; 16 actividades; 25 dep., 174 prov., 754 dist. | 2026-08-13 | 0 anchos inválidos; solo `MARCA` tiene nulos; precio S/1.59–525; 76,920 >S/100 |
-| Líquidos vigentes | 1,319,922 × 10 | `ID3` único; 6,588 Registros | 29 productos; 14 actividades; 25 dep., 187 prov., 902 dist. | 2026-08-13 | 0 anchos inválidos o nulos; precio S/0.01–4,500; 8 >S/100 y 5 >S/1,000 |
-
-Los extremos se conservan como anomalías observadas; no se corrigen ni califican de error sin semántica adicional. GLP mezcla cilindros y granel/unidades, por lo que un umbral único no implica comparabilidad.
-
-### `MARCA`
-
-El diccionario define `MARCA` como **nombre comercial del producto o envasadora**. No es el nombre comercial del establecimiento y no resuelve la identidad reconocible del punto de venta.
-
-En GLP, `MARCA` está presente en 345,018/522,380 filas (66.047 %), con 188 valores distintos; falta en 177,362. Aparece en 4,465 Registros: 3,237 tienen una marca y 1,228 tienen entre 2 y 11. Esto mide cobertura/cardinalidad dentro del snapshot, pero no demuestra un catálogo canónico ni estabilidad temporal.
-
-## Registro y GIS
-
-El Registro minimizado conserva 17,742 autorizaciones de actividades 1, 2, 5, 6, 13, 15, 16, 20, 24 y 59. `REGISTRO` no es universalmente fila-única: hay 7 valores repetidos en actividad 1, 17 en 13, 1 en 16 y 78 en 24. RUC permanece descartado como identidad única del establecimiento: identifica al titular y su multiplicidad ya fue observada; además no se conserva en los snapshots.
-
-El FeatureServer observado publica 27 entradas de capa; los IDs saltan del 29 al 32. **La capa 31 no existe en ese servicio**, no está “rota”. Las capas perfiladas suman 11,215 features: 28=117, 34=5,663, 35=5,284 y 36=151; `OBJECTID` y geometría son completos/únicos dentro de cada capa, sin coordenadas fuera de la caja conservadora de Perú.
-
-El servicio declara `copyrightText: "OSINERGMIN"`, pero no expone una licencia explícita. Esto permite atribuir la fuente observada, no asumir permiso de reutilización pública.
-
-Campos de identidad medidos:
-
-- GIS 34/35/36: `N` tiene 0 nulos y es único en 5,663/5,284/151 filas.
-- GIS 28: `COD_OSINERGMIN` y `CODIGO_DGH` tienen 0 nulos y 117/117 valores únicos cada uno.
-- `OBJECTID` sigue siendo técnico de capa; no se eleva a identidad transversal.
-
-## Relaciones exactas candidatas
-
-Los solapamientos se recalcularon desde los snapshots minimizados, sin fuzzy matching ni normalización textual:
-
-| Join exacto | Cobertura izquierda | Cardinalidad entre claves coincidentes | Estado |
+| Fuente | Filas | Alcance / corte material | Límite principal |
 | --- | ---: | --- | --- |
-| GIS 34 `N` ↔ Registro act. 16 `REGISTRO` | 5,611/5,663 (99.082 %); 52 sin match | 5,610 uno-a-uno; 1 uno-a-muchos | CANDIDATA |
-| GIS 35 `N` ↔ Registro act. 1+2+5+6 | 5,198/5,284 (98.372 %); 86 sin match | 5,191 uno-a-uno; 7 uno-a-muchos | CANDIDATA |
-| GIS 36 `N` ↔ Registro act. 5+6+15+59 | 142/151 (94.040 %); 9 sin match | 142 uno-a-uno | CANDIDATA |
-| GIS 28 `COD_OSINERGMIN` ↔ Registro act. 20 | 109/117 (93.162 %); 8 sin match | 109 uno-a-uno | CANDIDATA |
-| Control negativo: GIS 34 `N` ↔ Registro act. 13 | 0/5,663 | 0 claves | DESCARTADA para ese par |
+| DMIN | 858 | 9 productos; fecha máx. 2026-08-13 | universo pequeño |
+| Serie diaria anonimizada | 497,156 | corte 2026-03-01 | sin identidad ni territorio |
+| GLP vigente | 522,380 | 6 productos; fecha máx. 2026-08-13 | mezcla unidades y actividades |
+| Líquidos vigentes | 1,319,922 | 29 productos; fecha máx. 2026-08-13 | contiene historia y extremos |
 
-La alta cobertura demuestra equivalencia de valores en este snapshot, no identidad semántica universal ni estabilidad entre snapshots. Los no-matches y siete casos uno-a-muchos impiden elevar la relación general a DEMOSTRADA.
+Total perfilado: **2,340,316 filas**. Los extremos se conservan como anomalías; no se corrigen sin semántica. En GLP, `MARCA` aparece en 345,018/522,380 filas (66.047 %), pero su diccionario la define como producto o envasadora, no nombre comercial del establecimiento.
 
-## UBIGEO oficial
+Los CSV vigentes de GLP y líquidos estuvieron disponibles por HTTP 206. Los fallos 403 previos fueron del cliente, no un límite de la fuente. Una adquisición completa observada transfirió 1.56 GB; no se demostró API incremental, SLA ni respuesta 304.
 
-El [catálogo UBIGEO del INEI](https://www.datosabiertos.gob.pe/api/3/action/package_show?id=fd98ecaf-c53c-44ed-be1c-a37b7afc6f3e) declara licencia ODbL y publica `UBIGEO 2022_1891 distritos.xlsx`. Se adquirieron 109,193 bytes por HTTP 206 (SHA-256 `42707940…d77e`) y se conservaron 1,891 distritos.
+## Evidencia externa verificada por el owner: EVPC
 
-Schema: `IDDIST`, `NOMBDEP`, `NOMBPROV`, `NOMBDIST`, `NOM_CAPITAL_LEGAL`, `COD_REG_NAT`, `REGION_NATURAL`. `IDDIST` es no nulo y único 1,891/1,891; existen 25 departamentos y 196 pares departamento/provincia.
+`OWNER-VERIFIED / TRUSTED INPUT`, snapshot aproximado **12 de agosto de 2026**. Sus artefactos no viven en este repo y sus números no son permanentes.
 
-Las fuentes de precio, Registro y GIS observadas expresan territorio como texto y no contienen un campo UBIGEO numérico. La relación es semánticamente candidata, pero la cobertura por código exacto es todavía 0 campos compatibles. No se ejecutó join textual ni fuzzy.
+`Ultimos-Precios-Registrados-EVPC.xlsx` contenía **17,472 filas** y **5,685 `CODIGO_OSINERG` únicos**, aproximadamente establecimiento × producto × último precio. Frescura:
 
-## PRICE y frontera pública
+- 330 dentro de una hora;
+- 9,540 (≈55 %) dentro de 24 horas;
+- 15,924 (≈91 %) dentro de 7 días;
+- 16,966 (≈97 %) dentro de 30 días;
+- 506 por encima de 30 días.
 
-El stub oficial de 244 bytes contiene un `meta refresh` hacia `https://www.osinergmin.gob.pe/empresas/hidrocarburos/scop/documentos-scop`. El destino real respondió 200 por HTTP directo: 738,520 bytes, 1,479 `href` (1,439 distintos), 1,337 enlaces a PDF/XLS/XLSX/ZIP, **0 enlaces CSV** y **0 rutas `Reporte-Diario`**. Es una biblioteca documental, no una interfaz estructurada de precios observada.
+La regulación PRICE aportada por el owner indica actualización cuando cambia el precio y publicación en Facilito hasta por 30 días. Por política conservadora, una fila raw más antigua no se muestra automáticamente.
 
-El navegador reprodujo `ERR_TIMED_OUT` tanto al stub como al destino, mientras HTTP directo respondió 200. Se separa disponibilidad HTTP del fallo del navegador; el timeout no invalida el contenido adquirido ni demuestra caída del sitio.
+## Registro, GIS y geografía
 
-La RCD 256-2021-OS/CD vincula funcionalmente PRICE, SCOP y la publicación en Facilito en su artículo 4, pero no prueba que estos CSV sean el linaje técnico inmediato de cada journey. Su artículo 18 fija hasta 30 días de publicación y no define el estado posterior: `>30 días` significa fuera de esa ventana, no precio necesariamente falso.
+El snapshot minimizado del Registro contiene 17,742 autorizaciones de diez actividades. `REGISTRO` no siempre es fila-única; RUC identifica al titular, no a una sede, y no se conserva en derivados.
 
-**Evidencia externa de revisión, 2026-08-14:** ni el formulario RHO ni el schema público del Padrón Reducido SUNAT incluyen nombre comercial. La consulta SUNAT individual que puede exponerlo requiere CAPTCHA y queda fuera del acceso permitido; la identidad reconocible continúa ausente en las fuentes bulk legítimas observadas. La licencia ODC-By está confirmada para los catálogos de precios, mientras la reutilización de GIS y EVPC permanece ambigua.
+Las capas GIS perfiladas suman 11,215 features:
 
-## Modelo de entidades observado
+- capa 28: 117;
+- capa 34: 5,663;
+- capa 35: 5,284;
+- capa 36: 151.
 
-| Entidad | Atributos materiales | Identidad y límite |
-| --- | --- | --- |
-| Operador legal | RUC, razón social | RUC identifica titular, no establecimiento; descartado como clave única |
-| Autorización/actividad | Registro, código Osinergmin, actividad | `REGISTRO`/`N` y códigos GIS son candidatos medidos; existen repeticiones/no-matches |
-| Observación de precio | ID de control, Registro, producto, precio, unidad, fecha, tipo de cliente, a veces marca | `ID1/ID3/ID4/id` es único en el snapshot; estabilidad futura desconocida |
-| Establecimiento | autorización, territorio y dirección en originales | No se observó un ID universal independiente de la autorización |
-| Marca de producto/envasadora | `MARCA` | No equivale a establecimiento ni garantiza catálogo canónico |
-| Feature geográfica | `OBJECTID`, `N`/códigos y geometría | `OBJECTID` solo dentro de capa; `N`/códigos son candidatos exactos |
-| Local anonimizado | `ANON_CO_LOCAL_VENTA` | Sirve para serie interna; no permite identificar/ubicar oferta |
-| Distrito INEI | `IDDIST` y nombres oficiales | Catálogo oficial exacto; aún sin campo código compatible en fuentes observadas |
+`N` es completo y único en las capas 34/35/36. La capa 31 no existe en el servicio observado. Las geometrías son válidas y están dentro de una caja conservadora de Perú. El servicio atribuye copyright a Osinergmin, pero no expone licencia explícita.
 
-## Correspondencia con journeys
+Solapamientos exactos del snapshot, sin fuzzy matching:
 
-| Journey | Precio candidato | Identidad/geografía | Estado y brecha |
-| --- | --- | --- | --- |
-| J1 Diesel/gasolinas | Líquidos vigentes | Registro 1/2/5/6 + GIS 35 | Contrato y datos disponibles; linaje técnico a Facilito no demostrado |
-| J2 GNV | Líquidos incluye productos GNV; serie para historia | Registro 5/6/59/15 + GIS 36 | Cobertura por producto/actividad requiere partición semántica; no se asume equivalencia de todo el archivo |
-| J3 GLP automotor | GLP `GLP - G` | Registro 2/6/15 + GIS 36 | Fuente candidata con filas actuales; linaje no demostrado |
-| J4 Locales de venta | GLP en cilindros | Registro 16 + GIS 34 | `N↔REGISTRO` cubre 99.082 %; marca es producto/envasadora |
-| J5 Estaciones | GLP en cilindros | Registro 1/2/6 + GIS 35 | Fuente candidata; clasificación exacta pendiente |
-| J6 Plantas envasadoras | GLP en cilindros | Registro 20 + GIS 28 | Código cubre 93.162 %; marca/planta no son equivalentes demostrados |
-| J7 Distribuidores en cilindros | Ninguna fuente nominal demostrada | Registro 13; sin capa 31 | **Brecha P0 real:** no se reprodujo una fuente estructurada que explique distribuidor, marca, fecha y rangos visibles |
+| Join | Match | Estado |
+| --- | ---: | --- |
+| GIS 34 `N` ↔ Registro actividad 16 | 5,611/5,663 (99.082 %) | 1 uno-a-muchos |
+| GIS 35 `N` ↔ Registro actividades 1/2/5/6 | 5,198/5,284 (98.372 %) | 7 uno-a-muchos |
+| GIS 36 `N` ↔ Registro actividades 5/6/15/59 | 142/151 (94.040 %) | uno-a-uno en matches |
+| GIS 28 `COD_OSINERGMIN` ↔ Registro actividad 20 | 109/117 (93.162 %) | uno-a-uno en matches |
 
-Los CSV vigentes eliminan el antiguo P0 de “inaccesibilidad”. **J7 permanece como P0**: el archivo GLP incluye actividad distribuidor, pero su contrato de precio puntual no demuestra los rangos, fechas y filas nominales observados en J7, y el destino PRICE no ofrece descarga estructurada visible.
+Son relaciones candidatas del snapshot: los no-matches y la multiplicidad impiden declararlas universales.
 
-## Reproducción y límites
+La evidencia EVPC del owner verificó además:
 
-```sh
+- `CODIGO_OSINERG` ↔ Registro: 5,659/5,685 (**99.54 %**);
+- `NRO_REGISTRO` ↔ GIS `N`: 5,279/5,685 (**92.86 %**);
+- geografía segura con bridges estrictos: 5,345/5,685 (**94.02 %**);
+- excluyendo 144 grifos flotantes y 101 rurales: 5,345/5,440 (**98.25 %**);
+- control Santiago de Surco: 28/28 con coordenada segura.
+
+El catálogo UBIGEO INEI contiene 1,891 distritos e IDs únicos, bajo ODbL. Las fuentes observadas usan territorio textual y no ofrecen un campo UBIGEO compatible para join directo.
+
+## Identidad y disponibilidad
+
+La identidad comercial sigue sin resolverse:
+
+- EVPC tenía `MARCA` vacía en 17,472/17,472 filas;
+- el Registro aporta razón social y dirección, no garantiza nombre público de la sede;
+- el formulario RHO y el Padrón Reducido SUNAT no exponen nombre comercial;
+- la consulta individual SUNAT requiere CAPTCHA y no se evade.
+
+No se inventa marca desde razón social, RUC o dirección. Tampoco se interpreta `PRODUCTO_ACTIVO`, `ULT_PRECIO_DIF_CERO` u otros campos como stock sin semántica demostrada.
+
+## PRICE y J7
+
+El enlace PRICE visible en Facilito redirige a una biblioteca documental. En la página observada había 1,337 enlaces a PDF/XLS/XLSX/ZIP, pero cero CSV y cero rutas `Reporte-Diario`. Esto no contradice que el archivo EVPC sea material para precios retail; indica que ese enlace concreto no ofrece una interfaz estructurada visible.
+
+J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique distribuidor, marca, fecha y rangos de sus 444 filas públicas. La capa GIS 31 que se suponía asociada tampoco existe.
+
+## Modelo útil
+
+```text
+observación de precio
+  → autorización / código Osinergmin
+  → establecimiento provisional (razón social + dirección)
+  → feature GIS
+  → oferta con precio, fecha, unidad y coordenada
+```
+
+Granos que no deben mezclarse:
+
+- fila histórica de precio;
+- última oferta por establecimiento/producto/unidad;
+- autorización de una actividad;
+- establecimiento físico;
+- operador legal;
+- marca de producto/envasadora;
+- nombre comercial de sede.
+
+## Procedencia, privacidad y reproducción
+
+Los originales grandes o con datos personales viven solo en `.local-cache/`. Los snapshots versionados eliminan RUC, razón social, dirección, representante, teléfono, correo y placa. Un manifiesto previo sella lista, tamaño y SHA-256; la verificación falla ante archivos nuevos, alterados o ausentes.
+
+```bash
 node scripts/profile-gate-0.2.mjs
 node scripts/verify-gate-0.2.mjs
 ```
 
-El primer comando recalcula métricas desde snapshots minimizados; el segundo verifica manifiesto previo, lista exacta, hashes, fuentes, caché disponible y privacidad. La adquisición/minimización no debe repetirse si ya existen sus registros.
-
-Quedan abiertas: estabilidad temporal de claves; explicación de no-matches y casos uno-a-muchos; semántica de extremos de precio; linaje CSV→Facilito; y fuente estructurada de J7. No se eligieron framework, base de datos, arquitectura de producción ni joins fuzzy.
+Riesgos abiertos: estabilidad temporal de claves, no-matches, semántica de extremos, permiso de reutilización GIS/EVPC, mecanismo incremental y linaje CSV→Facilito.
