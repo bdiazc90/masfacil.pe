@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
+import { CANONICAL_SOURCE_URLS } from '../app/source-catalog.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const snapshot = '2026-08-14';
@@ -14,15 +15,14 @@ const cacheRoot = path.join(root, '.local-cache', 'gate-0.2', snapshot, 'acquire
 const provenanceRoot = path.join(root, 'data', 'provenance', snapshot);
 const acquisitionLog = path.join(provenanceRoot, 'acquisitions.jsonl');
 const userAgent = 'Mozilla/5.0 (compatible; facilito-ux-lab/0.2; public-data-research)';
-const reportBase = 'https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario';
 
 const sources = {
   'glp-current': {
-    url: `${reportBase}/GLP-Registro-precios-PIC-PE-V.csv`,
+    url: CANONICAL_SOURCE_URLS.glp_current,
     output: 'price-glp/GLP-Registro-precios-PIC-PE-V.csv',
   },
   'liquid-current': {
-    url: `${reportBase}/CL-Registro-precios-DMA-V-CCA-CCE.csv`,
+    url: CANONICAL_SOURCE_URLS.liquid_current,
     output: 'price-liquid/CL-Registro-precios-DMA-V-CCA-CCE.csv',
   },
   'ubigeo-catalog': {

@@ -13,7 +13,8 @@ Ya se puede:
 - ordenar por cercanía, precio o frescura sin introducir estaciones remotas;
 - elegir una estación y abrir su destino en Google Maps;
 - mostrar marca y nombre de sede cuando existe una identidad comercial verificada y publicable; conservar razón social/dirección provisional en cualquier otro caso;
-- recalcular la antigüedad real al usar la app y ocultar ofertas futuras, inválidas o mayores de 30 días.
+- recalcular la antigüedad real al usar la app y ocultar ofertas futuras, inválidas o mayores de 30 días;
+- detectar mediante validadores HTTP si existe un CSV nuevo sin descargar su cuerpo.
 
 El slice usa Gasohol Regular en Lima provincia. El contrato contiene 714 de 741 ofertas frescas elegibles (**96.356 %**) en 42 distritos. La ubicación personal vive solo en memoria y no se envía a Google; el handoff comparte únicamente las coordenadas del destino tras un tap explícito.
 
@@ -63,6 +64,7 @@ node scripts/verify-gate-0.2.mjs
 node scripts/analyze-gate-0.3.mjs
 node scripts/build-gate-1.1.mjs
 node scripts/verify-gate-3.1.mjs
+npm run probe:gate-3.2 -- liquid-current
 ```
 
 Los originales grandes o identificables permanecen en `.local-cache/`, ignorada por Git. El repositorio conserva schemas, fixtures, métricas y evidencia sanitizada.

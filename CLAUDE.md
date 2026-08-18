@@ -167,7 +167,7 @@ No afirmar “mejor UX” sin evidencia. Observar, según el gate:
 - **Capa 0 — cerrada:** producto, fuentes y factibilidad.
 - **Capa 1 — cerrada:** vertical slice privado mobile-first con 714 ofertas contractuales de Lima, ubicación, comparación y handoff a Google Maps.
 - **Capa 2 — cerrada:** overlay de identidad comercial verificado y permiso de publicación medido campo por campo. Resultado: no hay subconjunto publicable útil, por permisos y no por datos.
-- **Capa 3 — activa:** Gate 3.1 cerrado; siguen detección barata de cambios y refresco seguro de snapshots.
+- **Capa 3 — activa:** Gates 3.1 y 3.2 cerrados; sigue refresco seguro de snapshots.
 - **Capa 4 — posterior:** app pública sobre el producto de datos estabilizado; una PWA moderna es la hipótesis preferida, con stack por decidir.
 - **Capa 5 — opcional:** solo necesidades demostradas por usuarios reales; descuentos no están aprobados.
 
@@ -175,14 +175,15 @@ No afirmar “mejor UX” sin evidencia. Observar, según el gate:
 
 - Capas 0, 1 y 2 cerradas.
 - Gate 3.1 cerrado: edad recalculada desde `reported_at`, ventana inclusiva `0..30 días`, filtrado previo al pool y degradación visible sin precios recientes.
-- Verificación vigente: 47/47 tests, Gate 1.1 en 714/741 ofertas y 42 distritos con 24/24 assertions, 714/714 ofertas vigentes al instante fijo del 18/08/2026.
-- Próximo gate tentativo: comprobar si `ETag`/`Last-Modified` permiten detectar cambios sin descargar el CSV de líquidos completo.
+- Gate 3.2 cerrado: detector `unchanged|changed|unverifiable`; un `HEAD` real detectó ETag y Last-Modified nuevos con 0 bytes de cuerpo y sin descargar ni promover el CSV.
+- Verificación vigente: 54/54 tests, Gate 1.1 en 714/741 ofertas y 42 distritos con 24/24 assertions, 714/714 ofertas vigentes al instante fijo del 18/08/2026.
+- Próximo gate tentativo: staging, validación completa y promoción atómica del snapshot nuevo, preservando el último bueno ante cualquier fallo.
 - El mapa vivo de fuentes está en `docs/arquitectura.html`; la app no scrapea Facilito y consume un snapshot local derivado.
 - `docs/competencia.md` continúa como input externo no consolidado; no adoptar features por imitación.
 
 ## 11. Primera tarea del siguiente ciclo
 
-Definir Gate 3.2 con una hipótesis única, límite estricto de transferencia y tres resultados explícitos: `unchanged`, `changed` o `unknown`. No descargar ni promover un snapshot nuevo hasta demostrar primero el mecanismo barato de detección.
+Definir Gate 3.3 con una hipótesis única: el pipeline puede descargar a staging, validar contrato y métricas materiales, y promover atómicamente solo un snapshot aceptable. Un fallo de red, schema o calidad debe conservar el último snapshot bueno y dejar evidencia reproducible.
 
 ## 12. Cierre de gate
 

@@ -6,9 +6,10 @@
 
 **Sin gate activo.**
 
-- Gate 3.1, frescura real y visible, cerrado por Codex A el 18 de agosto de 2026.
-- Resultado: la app recalcula la edad desde `reported_at`, conserva ofertas de `0..30 días`, filtra antes del pool y declara de forma visible cuando no quedan precios recientes.
-- Verificación: 47/47 tests, Gate 1.1 intacto (24/24 assertions), 714/714 ofertas vigentes al instante fijo del 18/08/2026 y recorrido mobile normal/vencido comprobado.
-- Próximo gate tentativo: comprobar si `ETag`/`Last-Modified` permiten detectar cambios sin descargar nuevamente el CSV completo.
+- Gate 3.2, detección barata de cambios, cerrado por Codex A el 18 de agosto de 2026.
+- Resultado: una petición `HEAD` detectó un snapshot nuevo mediante ETag y Last-Modified, con 0 bytes de cuerpo consumidos y sin descargar ni promover el CSV.
+- Contrato: `unchanged`, `changed` o `unverifiable`; la ambigüedad nunca degrada a “sin cambios”. El fallback `GET Range` cancela el cuerpo al recibir headers y no se ejecuta ante errores HTTP definitivos.
+- Verificación: 54/54 tests. El probe real cambió ETag `...,234 → ...,238` y Last-Modified del 14 al 18 de agosto.
+- Próximo gate tentativo: Gate 3.3, descarga en staging, validación completa y promoción atómica conservando el último snapshot bueno.
 
 Decisión vigente del owner: una ambigüedad de licencia o permiso se registra como área gris y no bloquea el avance. Solo una infracción explícita y material, privacidad, seguridad, corrupción/pérdida de datos o una afirmación dañina justifican detenerse.

@@ -1,0 +1,29 @@
+{
+  "source_id": "liquid-current",
+  "snapshot_date": "2026-08-14",
+  "canonical_url": "https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario/CL-Registro-precios-DMA-V-CCA-CCE.csv",
+  "status": "changed",
+  "checked_at": "2026-08-18T19:51:26.843Z",
+  "url": "https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario/CL-Registro-precios-DMA-V-CCA-CCE.csv",
+  "local_validators": {
+    "etag": "\"{FE76AA7F-4385-420E-8CBD-64AD7572DE90},234\"",
+    "last_modified": "Fri, 14 Aug 2026 12:28:52 GMT"
+  },
+  "attempts": [
+    {
+      "method": "HEAD",
+      "url": "https://www.osinergmin.gob.pe/seccion/centro_documental/hidrocarburos/SCOP/SCOP-DOCS/Reporte-Diario/CL-Registro-precios-DMA-V-CCA-CCE.csv",
+      "status": 200,
+      "request_headers": {
+        "If-None-Match": "\"{FE76AA7F-4385-420E-8CBD-64AD7572DE90},234\"",
+        "If-Modified-Since": "Fri, 14 Aug 2026 12:28:52 GMT"
+      },
+      "response_validators": {
+        "etag": "\"{FE76AA7F-4385-420E-8CBD-64AD7572DE90},238\"",
+        "last_modified": "Tue, 18 Aug 2026 12:28:58 GMT"
+      },
+      "bytes_consumed": 0
+    }
+  ],
+  "bytes_consumed": 0
+}

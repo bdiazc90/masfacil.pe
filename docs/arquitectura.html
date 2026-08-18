@@ -83,7 +83,7 @@
       align-items: stretch;
       display: grid;
       gap: 6px;
-      grid-template-columns: repeat(9, minmax(0, 1fr));
+      grid-template-columns: repeat(10, minmax(0, 1fr));
     }
     .flow div {
       background: #eef3f0;
@@ -211,7 +211,7 @@
     td:first-child { color: var(--current); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; white-space: nowrap; width: 74px; }
     td ul { display: grid; gap: 3px; }
 
-    .next-gates { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .next-gates { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .gate {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -274,10 +274,10 @@
     <header class="topbar">
       <div>
         <h1>Estado del proyecto</h1>
-        <p>Las Capas 0–3 están convirtiendo fuentes públicas en un producto de datos confiable y una experiencia de referencia. Gate 3.1 ya evita mostrar precios vencidos; siguen detección barata de cambios y refresco seguro antes de construir la app pública.</p>
+        <p>Las Capas 0–3 están convirtiendo fuentes públicas en un producto de datos confiable y una experiencia de referencia. Ya evitamos precios vencidos y detectamos snapshots nuevos sin descargar 1.05 GB; falta promoverlos de forma segura antes de construir la app pública.</p>
       </div>
       <div class="stamp">
-        <strong>Capa 3 activa · Gate 3.1 cerrado</strong>
+        <strong>Capa 3 activa · Gates 3.1–3.2 cerrados</strong>
         <span>Actualizado: 18 ago. 2026</span>
       </div>
     </header>
@@ -307,7 +307,7 @@
           <div class="label">subconjunto publicable útil (identidad + ubicación)</div>
         </div>
         <div class="stat">
-          <div class="value">47<small>/47</small></div>
+          <div class="value">54<small>/54</small></div>
           <div class="label">tests automáticos pasando</div>
         </div>
       </div>
@@ -344,7 +344,7 @@
               <span class="source-chip warn">1.05 GB</span>
             </div>
             <h4>Osinergmin SCOP · Líquidos vigentes</h4>
-            <p>Descarga directa, no endpoint JSON. Aporta precio, fecha, producto, unidad, territorio y <code>REGISTRO</code>. Snapshot actual: 14/08/2026. Tiene ETag y Last-Modified; la respuesta condicional todavía no fue verificada.</p>
+            <p>Descarga directa, no endpoint JSON. Aporta precio, fecha, producto, unidad, territorio y <code>REGISTRO</code>. Snapshot local: 14/08/2026. Un HEAD detectó ETag y Last-Modified nuevos el 18/08 con 0 bytes de cuerpo; todavía no se promovió el CSV nuevo.</p>
           </article>
 
           <article class="source-card feeds">
@@ -387,11 +387,12 @@
             <h4>Pipeline principal</h4>
             <p>Scripts locales, sin base de datos ni servicio externo intermedio.</p>
             <div class="source-steps">
-              <span><b>01</b>Descargar y sellar hash</span>
-              <span><b>02</b>Minimizar datos sensibles</span>
-              <span><b>03</b>Elegir última oferta ≤30 días</span>
-              <span><b>04</b>Joins exactos Precio → Registro → GIS</span>
-              <span><b>05</b>Validar schema y cobertura</span>
+              <span><b>01</b>Detectar cambio por validadores HTTP</span>
+              <span><b>02</b>Descargar y sellar hash</span>
+              <span><b>03</b>Minimizar datos sensibles</span>
+              <span><b>04</b>Elegir última oferta ≤30 días</span>
+              <span><b>05</b>Joins exactos Precio → Registro → GIS</span>
+              <span><b>06</b>Validar schema y cobertura</span>
             </div>
           </article>
           <article class="source-stage overlay">
@@ -495,7 +496,7 @@
           <div class="body">
             <small>Capa 3 · activa</small>
             <h3>Operar</h3>
-            <p>Frescura real cerrada; siguen detección de cambios y promoción segura de snapshots.</p>
+            <p>Frescura y detección barata cerradas; sigue promoción segura de snapshots.</p>
           </div>
         </article>
         <article class="step">
@@ -508,7 +509,7 @@
         </article>
       </div>
 
-      <p class="flow-title">Flujo construido en 9 pasos</p>
+      <p class="flow-title">Flujo construido en 10 pasos</p>
       <div class="flow" aria-label="Flujo construido">
         <div><span class="num">1</span><strong>Precio oficial</strong>CSV de líquidos</div>
         <div><span class="num">2</span><strong>Establecimiento</strong>Registro exacto</div>
@@ -519,6 +520,7 @@
         <div><span class="num">7</span><strong>Identidad</strong>11 Repsol, preview privado</div>
         <div><span class="num">8</span><strong>Permiso</strong>Publicable: 0 útil</div>
         <div><span class="num">9</span><strong>Frescura real</strong>0–30 días al usar</div>
+        <div><span class="num">10</span><strong>Cambio remoto</strong>HEAD sin cuerpo</div>
       </div>
 
       <p class="flow-title">De dónde salen las 714 ofertas — embudo de Gate 1.1</p>
@@ -654,9 +656,11 @@
           </div>
         </div>
         <div class="tl-group">
-          <div class="tl-title">Capa 3 · 1 de 3 gates</div>
+          <div class="tl-title">Capa 3 · 2 de 3 gates</div>
           <div class="tl-nodes">
             <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">3.1</span></div>
+            <span class="rule"></span>
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">3.2</span></div>
           </div>
         </div>
       </div>
@@ -721,6 +725,12 @@
               <td data-label="Qué se hizo"><ul><li>Edad en runtime, filtro 0–30 días y estado vacío.</li></ul></td>
               <td data-label="Resultado"><ul><li>714/714 vigentes al 18/08/2026.</li><li>Recorrido normal y vencido verificados; 47/47 tests.</li></ul></td>
             </tr>
+            <tr>
+              <td data-label="Gate">3.2</td>
+              <td data-label="Objetivo"><ul><li>Detectar un snapshot nuevo sin descargar 1.05 GB.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Comparación opaca de validadores y probe HEAD/Range conservador.</li></ul></td>
+              <td data-label="Resultado"><ul><li>HEAD detectó cambio de ETag y Last-Modified con 0 bytes de cuerpo.</li><li>Ambigüedad → unverifiable; 54/54 tests.</li></ul></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -735,21 +745,30 @@
       </div>
       <div class="next-gates">
         <article class="gate next">
-          <span class="tag">Siguiente · Gate 3.2</span>
-          <h3>Detectar cambios barato</h3>
-          <ul class="gate-points">
-            <li><strong>Hipótesis</strong>ETag/Last-Modified evitan descargar 1.05 GB cuando nada cambió.</li>
-            <li><strong>Tangible</strong>Comando limitado en bytes: unchanged, changed o unknown.</li>
-            <li><strong>Salida</strong>Respuesta condicional demostrada sin alterar el snapshot.</li>
-          </ul>
-        </article>
-        <article class="gate tentative">
-          <span class="tag">Después · Gate 3.3</span>
+          <span class="tag">Siguiente · Gate 3.3</span>
           <h3>Refrescar sin perder el último bueno</h3>
           <ul class="gate-points">
             <li><strong>Hipótesis</strong>Staging + validación + promoción atómica bastan sin infraestructura nueva.</li>
             <li><strong>Tangible</strong>Refresco manual reproducible con rollback.</li>
             <li><strong>Salida</strong>Fallo de red/schema conserva el snapshot vigente.</li>
+          </ul>
+        </article>
+        <article class="gate tentative">
+          <span class="tag">Posterior · Gate 4.1</span>
+          <h3>Convertir el slice en PWA</h3>
+          <ul class="gate-points">
+            <li><strong>Hipótesis</strong>El contrato estable permite una experiencia instalable mobile-first sin backend nuevo.</li>
+            <li><strong>Tangible</strong>PWA candidate con shell offline y corte de datos visible.</li>
+            <li><strong>Salida</strong>Flujo principal instalable y recuperable en móvil.</li>
+          </ul>
+        </article>
+        <article class="gate tentative">
+          <span class="tag">Tentativo · Gate 4.2</span>
+          <h3>Publicar y medir utilidad</h3>
+          <ul class="gate-points">
+            <li><strong>Hipótesis</strong>Una versión estrecha puede ayudar sin ocultar procedencia ni incertidumbre.</li>
+            <li><strong>Tangible</strong>Release público reversible con medición mínima y privacidad revisada.</li>
+            <li><strong>Salida</strong>Uso real suficiente para decidir qué conservar, corregir o eliminar.</li>
           </ul>
         </article>
       </div>
