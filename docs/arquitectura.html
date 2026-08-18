@@ -13,9 +13,13 @@
       --paper: #f7f9f8;
       --surface: #fff;
       --done: #167653;
+      --done-bg: #e5f4ee;
       --current: #2368c4;
+      --current-bg: #e7f0fb;
       --next: #ad6419;
+      --next-bg: #fbeee0;
       --risk: #a53b32;
+      --risk-bg: #f8e8e6;
     }
 
     * { box-sizing: border-box; }
@@ -29,6 +33,7 @@
     p, li { line-height: 1.45; }
     ul { margin: 0; padding-left: 18px; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+    svg { display: block; flex-shrink: 0; }
 
     .topbar {
       align-items: end;
@@ -48,43 +53,154 @@
     .section-head { align-items: end; display: flex; gap: 18px; justify-content: space-between; margin-bottom: 12px; }
     .section-head p { color: var(--muted); font-size: .86rem; margin: 0; }
 
-    .layers {
-      display: grid;
-      gap: 8px;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-    .layer {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-top: 4px solid var(--line);
-      min-height: 155px;
-      padding: 14px;
-    }
-    .layer.done { border-top-color: var(--done); }
-    .layer.current { border-top-color: var(--current); }
-    .layer.future { border-top-color: var(--next); }
-    .layer small { color: var(--muted); display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .7rem; margin-bottom: 9px; text-transform: uppercase; }
-    .layer p { color: var(--muted); font-size: .82rem; margin: 0; }
-    .layer .status { color: var(--done); font-weight: 700; }
-    .layer.current .status { color: var(--current); }
-    .layer.future .status { color: var(--next); }
+    /* Cifras clave */
+    .stats { display: grid; gap: 8px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .stat { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--current); padding: 14px 12px; }
+    .stat .value { color: var(--ink); font-size: clamp(1.25rem, 3.4vw, 1.65rem); font-weight: 800; letter-spacing: -.02em; line-height: 1; }
+    .stat .value small { color: var(--muted); font-size: .58em; font-weight: 700; margin-left: 3px; }
+    .stat .label { color: var(--muted); font-size: .74rem; line-height: 1.3; margin-top: 6px; }
 
+    /* Stepper de capas */
+    .stepper { display: grid; gap: 10px; grid-template-columns: repeat(5, minmax(0, 1fr)); position: relative; }
+    .stepper::before { background: var(--line); content: ""; height: 2px; left: 24px; position: absolute; right: 24px; top: 15px; z-index: 0; }
+    .step { position: relative; z-index: 1; }
+    .step .dot {
+      align-items: center; background: var(--surface); border: 2px solid var(--next); border-radius: 50%;
+      color: var(--next); display: flex; height: 30px; justify-content: center; width: 30px;
+    }
+    .step.done .dot { background: var(--done); border-color: var(--done); color: #fff; }
+    .step.current .dot { background: var(--current); border-color: var(--current); color: #fff; }
+    .step .dot span { font-size: .78rem; font-weight: 800; }
+    .step .body { background: var(--surface); border: 1px solid var(--line); border-top: 0; margin-top: 8px; min-height: 138px; padding: 12px; }
+    .step small { color: var(--muted); display: block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem; margin-bottom: 7px; text-transform: uppercase; }
+    .step .body p { color: var(--muted); font-size: .82rem; margin: 0; }
+    .step.done small { color: var(--done); }
+    .step.current small { color: var(--current); }
+    .step:not(.done) small { color: var(--next); }
+
+    .flow-title { color: var(--muted); font-size: .8rem; font-weight: 700; letter-spacing: .02em; margin: 26px 0 8px; text-transform: uppercase; }
     .flow {
       align-items: stretch;
       display: grid;
       gap: 6px;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      margin-top: 10px;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
     }
     .flow div {
       background: #eef3f0;
       border: 1px solid var(--line);
       font-size: .76rem;
-      padding: 10px;
+      padding: 10px 10px 10px 26px;
       position: relative;
     }
     .flow div:not(:last-child)::after { color: var(--muted); content: "→"; position: absolute; right: -7px; top: 50%; transform: translateY(-50%); z-index: 1; }
+    .flow .num { color: var(--current); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem; font-weight: 800; left: 8px; position: absolute; top: 10px; }
     .flow strong { display: block; font-size: .78rem; margin-bottom: 3px; }
+
+    /* Mapa de fuentes */
+    .source-answer {
+      align-items: center; background: var(--current-bg); border: 1px solid #bfd3ef; border-left: 4px solid var(--current);
+      display: flex; flex-wrap: wrap; gap: 7px 18px; margin-bottom: 12px; padding: 12px 14px;
+    }
+    .source-answer strong { color: var(--current); font-size: .88rem; }
+    .source-answer p { color: var(--ink); flex: 1 1 420px; font-size: .84rem; margin: 0; }
+    .source-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 0 0 12px; }
+    .source-legend span { align-items: center; color: var(--muted); display: inline-flex; font-size: .7rem; gap: 5px; }
+    .source-legend i { border-radius: 50%; display: inline-block; height: 8px; width: 8px; }
+    .source-legend .feeds { background: var(--done); }
+    .source-legend .private { background: var(--current); }
+    .source-legend .support { background: var(--next); }
+    .source-legend .excluded { background: var(--muted); }
+
+    .source-map {
+      align-items: stretch; display: grid; gap: 10px; grid-template-columns: minmax(0, 1.25fr) 36px minmax(0, .9fr) 36px minmax(0, .9fr);
+    }
+    .source-column { display: grid; gap: 8px; }
+    .source-column > h3 { color: var(--muted); font-size: .7rem; letter-spacing: .05em; margin: 0 0 1px; text-transform: uppercase; }
+    .source-card, .source-stage {
+      background: var(--surface); border: 1px solid var(--line); min-width: 0; padding: 12px;
+    }
+    .source-card { border-left: 4px solid var(--muted); }
+    .source-card.feeds { border-left-color: var(--done); }
+    .source-card.private { border-left-color: var(--current); }
+    .source-card.support { border-left-color: var(--next); }
+    .source-card h4, .source-stage h4 { font-size: .84rem; line-height: 1.25; margin: 0 0 4px; }
+    .source-card p, .source-stage p { color: var(--muted); font-size: .74rem; margin: 0; }
+    .source-card code, .source-stage code { overflow-wrap: anywhere; }
+    .source-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
+    .source-chip { background: #eef3f0; color: var(--ink); font-size: .64rem; font-weight: 800; letter-spacing: .02em; padding: 3px 6px; text-transform: uppercase; }
+    .source-chip.ok { background: var(--done-bg); color: var(--done); }
+    .source-chip.private { background: var(--current-bg); color: var(--current); }
+    .source-chip.warn { background: var(--next-bg); color: var(--next); }
+    .source-chip.risk { background: var(--risk-bg); color: var(--risk); }
+    .source-rail { align-items: center; color: var(--muted); display: flex; font-size: 1.35rem; justify-content: center; position: relative; }
+    .source-rail::before { background: var(--line); content: ""; height: 2px; left: 0; position: absolute; right: 0; top: 50%; }
+    .source-rail span { background: var(--paper); line-height: 1; padding: 3px; position: relative; z-index: 1; }
+    .source-stage { align-content: center; display: grid; }
+    .source-stage.pipeline { border-top: 4px solid var(--done); }
+    .source-stage.overlay { border-top: 4px solid var(--current); }
+    .source-stage.output { border-top: 4px solid var(--ink); }
+    .source-steps { display: grid; gap: 5px; margin-top: 9px; }
+    .source-steps span { background: var(--paper); border: 1px solid var(--line); color: var(--ink); font-size: .7rem; padding: 6px 7px; }
+    .source-steps b { color: var(--current); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-right: 5px; }
+    .source-output-list { display: grid; gap: 7px; list-style: none; margin-top: 9px; padding: 0; }
+    .source-output-list li { border-top: 1px solid var(--line); font-size: .74rem; padding-top: 7px; }
+    .source-output-list strong { display: block; }
+    .source-output-list span { color: var(--muted); }
+
+    .source-context-title { color: var(--muted); font-size: .78rem; font-weight: 800; letter-spacing: .03em; margin: 18px 0 8px; text-transform: uppercase; }
+    .source-context { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .source-context .source-card { min-height: 132px; }
+    .source-note { color: var(--muted); font-size: .74rem; margin: 9px 0 0; }
+
+    /* Embudo Gate 1.1 */
+    .funnel-panel { margin-bottom: 18px; }
+    .funnel-panel .panel-title { color: var(--ink); font-size: .84rem; font-weight: 700; margin-bottom: 8px; }
+    .funnel-bars { display: grid; gap: 7px; }
+    .funnel-row { align-items: center; display: grid; gap: 10px; grid-template-columns: 150px 1fr 92px; }
+    .funnel-row .fr-label { color: var(--muted); font-size: .78rem; }
+    .funnel-track { background: var(--paper); border: 1px solid var(--line); height: 22px; position: relative; }
+    .funnel-fill { background: var(--current); height: 100%; }
+    .funnel-panel:nth-of-type(2) .funnel-fill { background: var(--done); }
+    .funnel-row .fr-value { color: var(--ink); font-size: .8rem; font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+    .funnel-delta { color: var(--muted); font-size: .72rem; grid-column: 2 / 3; margin: -2px 0 2px; }
+
+    /* Matriz de permiso por campo */
+    .matrix { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .verdict { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--muted); padding: 13px; }
+    .verdict.publishable { border-top-color: var(--done); }
+    .verdict.not-publishable { border-top-color: var(--risk); }
+    .verdict.unknown { border-top-color: var(--next); }
+    .verdict.governed { border-top-color: var(--current); }
+    .verdict h3 { align-items: center; display: flex; font-size: .86rem; gap: 7px; margin-bottom: 3px; }
+    .verdict .icon { border-radius: 50%; display: inline-flex; height: 22px; padding: 4px; width: 22px; }
+    .verdict.publishable .icon { background: var(--done-bg); color: var(--done); }
+    .verdict.not-publishable .icon { background: var(--risk-bg); color: var(--risk); }
+    .verdict.unknown .icon { background: var(--next-bg); color: var(--next); }
+    .verdict.governed .icon { background: var(--current-bg); color: var(--current); }
+    .verdict .count { color: var(--muted); font-size: .72rem; margin-bottom: 10px; }
+    .verdict ul { display: grid; gap: 8px; list-style: none; padding: 0; }
+    .verdict li { border-top: 1px solid var(--line); font-size: .82rem; padding-top: 8px; }
+    .verdict li:first-child { border-top: 0; padding-top: 0; }
+    .verdict li strong { display: block; }
+    .verdict li span { color: var(--muted); display: block; font-size: .74rem; margin-top: 1px; }
+
+    .finding {
+      align-items: center; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--risk);
+      display: flex; flex-wrap: wrap; font-size: .84rem; gap: 8px 18px; margin-top: 10px; padding: 12px 14px;
+    }
+    .finding .fig { color: var(--risk); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.05rem; font-weight: 800; }
+    .finding p { color: var(--muted); flex: 1 1 260px; margin: 0; }
+
+    /* Historial de gates */
+    .timeline { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 14px; }
+    .tl-group { background: var(--surface); border: 1px solid var(--line); padding: 10px 12px; }
+    .tl-group .tl-title { color: var(--muted); font-size: .7rem; font-weight: 800; letter-spacing: .04em; margin-bottom: 8px; text-transform: uppercase; }
+    .tl-nodes { align-items: center; display: flex; gap: 4px; }
+    .tl-node { align-items: center; display: flex; flex: 1; gap: 4px; }
+    .tl-node .dot { align-items: center; background: var(--done); border-radius: 50%; color: #fff; display: flex; flex: 0 0 auto; height: 20px; justify-content: center; width: 20px; }
+    .tl-node .dot svg { height: 11px; width: 11px; }
+    .tl-node .gate-id { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .68rem; font-weight: 700; }
+    .tl-node .rule { background: var(--line); flex: 1; height: 2px; }
 
     .table-wrap { background: var(--surface); border: 1px solid var(--line); overflow: hidden; }
     table { border-collapse: collapse; width: 100%; }
@@ -95,7 +211,7 @@
     td:first-child { color: var(--current); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; white-space: nowrap; width: 74px; }
     td ul { display: grid; gap: 3px; }
 
-    .next-gates { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .next-gates { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .gate {
       background: var(--surface);
       border: 1px solid var(--line);
@@ -109,13 +225,23 @@
     .gate-points li { font-size: .82rem; line-height: 1.4; }
     .gate-points strong { color: var(--muted); display: block; font-size: .7rem; margin-bottom: 2px; text-transform: uppercase; }
 
-    .risks { border-left: 4px solid var(--risk); color: var(--muted); font-size: .82rem; padding: 2px 0 2px 12px; }
+    .risks { border-left: 4px solid var(--risk); padding: 2px 0 2px 12px; }
+    .risks h2 { color: var(--risk); font-size: .95rem; }
+    .risks p { color: var(--muted); font-size: .82rem; margin: 0; }
     footer { border-top: 1px solid var(--line); color: var(--muted); font-size: .72rem; margin-top: 30px; padding-top: 12px; }
 
     @media (max-width: 900px) {
-      .layers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stepper::before { display: none; }
+      .flow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .flow div::after { display: none; }
+      .source-map { grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); }
+      .source-map .source-output-column { grid-column: 1 / -1; }
+      .source-map .source-rail:last-of-type { display: none; }
+      .source-context { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .matrix { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .timeline { grid-template-columns: 1fr; }
       .next-gates { grid-template-columns: 1fr; }
     }
 
@@ -123,8 +249,12 @@
       main { padding: 20px 14px 36px; }
       .topbar, .section-head { align-items: start; display: block; }
       .stamp { margin-top: 14px; text-align: left; }
-      .layers, .flow { grid-template-columns: 1fr; }
-      .layer { min-height: 0; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stepper, .flow, .matrix, .source-map, .source-context { grid-template-columns: 1fr; }
+      .source-rail { min-height: 24px; transform: rotate(90deg); }
+      .source-map .source-output-column { grid-column: auto; }
+      .step .body { min-height: 0; }
+      .funnel-row { grid-template-columns: 108px 1fr 74px; }
       .table-wrap { background: transparent; border: 0; overflow: visible; }
       thead { display: none; }
       table, tbody, tr, td { display: block; width: 100%; }
@@ -133,6 +263,10 @@
       td::before { color: var(--muted); content: attr(data-label); font-size: .66rem; font-weight: 800; left: 0; position: absolute; text-transform: uppercase; top: 6px; width: 80px; }
       td:first-child { padding-left: 92px; width: 100%; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -140,13 +274,188 @@
     <header class="topbar">
       <div>
         <h1>Estado del proyecto</h1>
-        <p>La web privada ya completa el recorrido: ubicación → comparación cercana → elección → destino en Google Maps. La siguiente capa busca identidad comercial y conveniencia personal.</p>
+        <p>Las Capas 0–3 están convirtiendo fuentes públicas en un producto de datos confiable y una experiencia de referencia. Gate 3.1 ya evita mostrar precios vencidos; siguen detección barata de cambios y refresco seguro antes de construir la app pública.</p>
       </div>
       <div class="stamp">
-        <strong>Capa 1 completa · v0.1.0 privada</strong>
-        <span>Actualizado: 16 ago. 2026</span>
+        <strong>Capa 3 activa · Gate 3.1 cerrado</strong>
+        <span>Actualizado: 18 ago. 2026</span>
       </div>
     </header>
+
+    <section aria-labelledby="stats-title">
+      <div class="section-head">
+        <div>
+          <h2 id="stats-title">Cifras clave</h2>
+          <p>Todas medidas y reproducibles; ninguna estimada.</p>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="value">714<small>/741</small></div>
+          <div class="label">ofertas frescas en contrato (96.36 %)</div>
+        </div>
+        <div class="stat">
+          <div class="value">42</div>
+          <div class="label">distritos con oferta contractual</div>
+        </div>
+        <div class="stat">
+          <div class="value">11<small>/14</small></div>
+          <div class="label">identidades Repsol verificadas (3 sin match)</div>
+        </div>
+        <div class="stat">
+          <div class="value">0<small>/714</small></div>
+          <div class="label">subconjunto publicable útil (identidad + ubicación)</div>
+        </div>
+        <div class="stat">
+          <div class="value">47<small>/47</small></div>
+          <div class="label">tests automáticos pasando</div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="sources-title">
+      <div class="section-head">
+        <div>
+          <h2 id="sources-title">Mapa de fuentes de datos</h2>
+          <p>Qué se descarga, qué se transforma y qué termina realmente en la experiencia.</p>
+        </div>
+      </div>
+
+      <div class="source-answer">
+        <strong>Respuesta corta</strong>
+        <p>La app no scrapea Facilito. El precio viene de un <strong>CSV descargable de Osinergmin</strong>; Registro y GIS completan establecimiento y coordenada; un PDF first-party alimenta el piloto privado de identidad. El navegador consume después un endpoint local derivado: <code>/api/dataset</code>.</p>
+      </div>
+
+      <div class="source-legend" aria-label="Leyenda del estado de las fuentes">
+        <span><i class="feeds"></i>Alimenta el dataset</span>
+        <span><i class="private"></i>Solo preview privado</span>
+        <span><i class="support"></i>Soporte o contraste</span>
+        <span><i class="excluded"></i>Explorada, no incorporada</span>
+      </div>
+
+      <div class="source-map" aria-label="Diagrama desde las fuentes operativas hasta la aplicación local">
+        <div class="source-column">
+          <h3>1 · Fuentes que sí entran</h3>
+
+          <article class="source-card feeds">
+            <div class="source-meta">
+              <span class="source-chip ok">Activa</span>
+              <span class="source-chip">HTTP · CSV</span>
+              <span class="source-chip warn">1.05 GB</span>
+            </div>
+            <h4>Osinergmin SCOP · Líquidos vigentes</h4>
+            <p>Descarga directa, no endpoint JSON. Aporta precio, fecha, producto, unidad, territorio y <code>REGISTRO</code>. Snapshot actual: 14/08/2026. Tiene ETag y Last-Modified; la respuesta condicional todavía no fue verificada.</p>
+          </article>
+
+          <article class="source-card feeds">
+            <div class="source-meta">
+              <span class="source-chip ok">Activa</span>
+              <span class="source-chip">HTML tabular</span>
+              <span class="source-chip warn">Proveniencia legacy</span>
+            </div>
+            <h4>Registro de Hidrocarburos · Osinergmin</h4>
+            <p>Exportaciones por actividad guardadas como <code>.xls.html</code>. Aportan autorización, razón social y dirección para el join exacto. Snapshot minimizado: 17,742 autorizaciones; originales privados y permiso de publicación aún ambiguo.</p>
+          </article>
+
+          <article class="source-card feeds">
+            <div class="source-meta">
+              <span class="source-chip ok">Activa</span>
+              <span class="source-chip">ArcGIS REST · GeoJSON</span>
+              <span class="source-chip risk">No publicable hoy</span>
+            </div>
+            <h4>Servicio GIS · Osinergmin</h4>
+            <p>Consultas paginadas a capas oficiales; el producto usa la capa 35 mediante <code>REGISTRO ↔ N</code>. Aporta coordenadas y control territorial. El servicio muestra copyright, pero no una licencia explícita; la adquisición original tiene proveniencia legacy.</p>
+          </article>
+
+          <article class="source-card private">
+            <div class="source-meta">
+              <span class="source-chip private">Preview privado</span>
+              <span class="source-chip">PDF first-party</span>
+              <span class="source-chip warn">Stale · permiso unknown</span>
+            </div>
+            <h4>Repsol You · relación de estaciones</h4>
+            <p>PDF corporativo usado para vincular dirección exacta con nombre público de sede. Resultado: 11/14 candidatos verificados; 3 sin match. Vive como overlay separado y ninguna entrada es publicable hoy.</p>
+          </article>
+        </div>
+
+        <div class="source-rail" aria-hidden="true"><span>→</span></div>
+
+        <div class="source-column">
+          <h3>2 · Construcción local</h3>
+          <article class="source-stage pipeline">
+            <div class="source-meta"><span class="source-chip ok">Reproducible</span></div>
+            <h4>Pipeline principal</h4>
+            <p>Scripts locales, sin base de datos ni servicio externo intermedio.</p>
+            <div class="source-steps">
+              <span><b>01</b>Descargar y sellar hash</span>
+              <span><b>02</b>Minimizar datos sensibles</span>
+              <span><b>03</b>Elegir última oferta ≤30 días</span>
+              <span><b>04</b>Joins exactos Precio → Registro → GIS</span>
+              <span><b>05</b>Validar schema y cobertura</span>
+            </div>
+          </article>
+          <article class="source-stage overlay">
+            <div class="source-meta"><span class="source-chip private">Separado</span></div>
+            <h4>Overlay comercial</h4>
+            <p>Se ancla al establecimiento oficial sin sobrescribirlo. Proyecta marca/sede solo cuando la política de identidad lo permite.</p>
+          </article>
+        </div>
+
+        <div class="source-rail" aria-hidden="true"><span>→</span></div>
+
+        <div class="source-column source-output-column">
+          <h3>3 · Lo que consume la app</h3>
+          <article class="source-stage output">
+            <div class="source-meta">
+              <span class="source-chip private">Local privado</span>
+              <span class="source-chip ok">714 ofertas</span>
+            </div>
+            <h4>Dataset contractual</h4>
+            <p>JSON validado en <code>.local-cache/gate-1.1/</code>, ignorado por Git y con permisos <code>0600</code>.</p>
+            <ul class="source-output-list">
+              <li><strong>Servidor local</strong><span>Lee el JSON y aplica políticas de identidad/publicación.</span></li>
+              <li><strong><code>GET /api/dataset</code></strong><span>Endpoint local derivado; no consulta Osinergmin en vivo.</span></li>
+              <li><strong>Web mobile</strong><span>Calcula cercanía en el navegador y entrega el destino a Google Maps tras un tap.</span></li>
+            </ul>
+          </article>
+        </div>
+      </div>
+
+      <p class="source-context-title">Fuentes estudiadas o de soporte que no alimentan el dataset actual</p>
+      <div class="source-context">
+        <article class="source-card support">
+          <div class="source-meta"><span class="source-chip warn">Metadatos</span><span class="source-chip">CKAN · JSON</span></div>
+          <h4>Catálogo Datos Abiertos Perú</h4>
+          <p>Endpoints JSON de fichas para líquidos, GLP, DMIN, serie diaria y UBIGEO. Confirman recursos, formatos y licencias; no entregan las 714 ofertas.</p>
+        </article>
+        <article class="source-card">
+          <div class="source-meta"><span class="source-chip">Explorada</span><span class="source-chip">HTTP · CSV</span></div>
+          <h4>GLP vigente</h4>
+          <p>CSV directo de 504 MB, 522,380 filas. Fue descargado y perfilado para otros journeys; no participa en Gasohol Regular.</p>
+        </article>
+        <article class="source-card">
+          <div class="source-meta"><span class="source-chip">Exploradas</span><span class="source-chip">CSV</span></div>
+          <h4>DMIN + serie diaria anonimizada</h4>
+          <p>858 y 497,156 filas respectivamente. Sirvieron para entender cobertura y granularidad; no construyen el producto vigente.</p>
+        </article>
+        <article class="source-card support">
+          <div class="source-meta"><span class="source-chip warn">Control externo</span><span class="source-chip">Excel · XLSX</span></div>
+          <h4>EVPC · últimos precios registrados</h4>
+          <p>Archivo aportado y verificado por el owner: 17,472 filas. Se usó como contraste de cobertura/frescura; no vive en el repo ni es denominador del dataset.</p>
+        </article>
+        <article class="source-card">
+          <div class="source-meta"><span class="source-chip">Explorada</span><span class="source-chip">Excel · XLSX</span></div>
+          <h4>UBIGEO INEI</h4>
+          <p>1,891 distritos bajo ODbL. Fue descargado y validado, pero no existe un código común confiable para incorporarlo al join actual.</p>
+        </article>
+        <article class="source-card">
+          <div class="source-meta"><span class="source-chip">Observación</span><span class="source-chip risk">No es fuente del producto</span></div>
+          <h4>Web de Facilito + biblioteca PRICE</h4>
+          <p>Se observaron pantallas, red y HTML para entender journeys. La biblioteca tenía enlaces documentales, no el CSV estructurado usado por la app. No hay scraping periódico ni dependencia runtime.</p>
+        </article>
+      </div>
+      <p class="source-note">Estado vigente al 18/08/2026. “Activa” significa que la fuente participa en el dataset privado actual; no implica actualización automática ni permiso de publicación.</p>
+    </section>
 
     <section aria-labelledby="layers-title">
       <div class="section-head">
@@ -155,41 +464,155 @@
           <p>Una salida útil por capa; lo futuro sigue deliberadamente abierto.</p>
         </div>
       </div>
-      <div class="layers">
-        <article class="layer done">
-          <small>Capa 0 · completa</small>
-          <h3>Entender</h3>
-          <p>Producto público, fuentes oficiales, joins, cobertura, frescura y límites.</p>
+
+      <div class="stepper">
+        <article class="step done">
+          <div class="dot"><span>0</span></div>
+          <div class="body">
+            <small>Capa 0 · completa</small>
+            <h3>Entender</h3>
+            <p>Producto público, fuentes oficiales, joins, cobertura, frescura y límites.</p>
+          </div>
         </article>
-        <article class="layer done">
-          <small>Capa 1 · completa</small>
-          <h3>Comparar y actuar</h3>
-          <p>Contrato privado + web mobile + handoff seguro a Google Maps.</p>
+        <article class="step done">
+          <div class="dot"><span>1</span></div>
+          <div class="body">
+            <small>Capa 1 · completa</small>
+            <h3>Comparar y actuar</h3>
+            <p>Contrato privado + web mobile + handoff seguro a Google Maps.</p>
+          </div>
         </article>
-        <article class="layer current">
-          <small>Capa 2 · siguiente</small>
-          <h3>Personalizar</h3>
-          <p>Identidad confirmada y precio efectivo según beneficios del usuario.</p>
+        <article class="step done">
+          <div class="dot"><span>2</span></div>
+          <div class="body">
+            <small>Capa 2 · completa</small>
+            <h3>Identidad y confianza</h3>
+            <p>Overlay comercial verificado y permiso de publicación medido campo por campo.</p>
+          </div>
         </article>
-        <article class="layer future">
-          <small>Capa 3 · posterior</small>
-          <h3>Operar</h3>
-          <p>Actualización reproducible, consultas, almacenamiento y más cobertura.</p>
+        <article class="step current">
+          <div class="dot"><span>3</span></div>
+          <div class="body">
+            <small>Capa 3 · activa</small>
+            <h3>Operar</h3>
+            <p>Frescura real cerrada; siguen detección de cambios y promoción segura de snapshots.</p>
+          </div>
         </article>
-        <article class="layer future">
-          <small>Capa 4 · posterior</small>
-          <h3>Primera versión pública</h3>
-          <p>Publicación únicamente con identidad, permisos y operación resueltos.</p>
+        <article class="step">
+          <div class="dot"><span>4</span></div>
+          <div class="body">
+            <small>Capa 4 · posterior</small>
+            <h3>Primera versión pública</h3>
+            <p>PWA moderna sobre una interfaz de datos estable; stack final todavía por decidir.</p>
+          </div>
         </article>
       </div>
 
+      <p class="flow-title">Flujo construido en 9 pasos</p>
       <div class="flow" aria-label="Flujo construido">
-        <div><strong>Precio oficial</strong>EVPC / líquidos</div>
-        <div><strong>Establecimiento</strong>Registro exacto</div>
-        <div><strong>Ubicación</strong>GIS oficial</div>
-        <div><strong>Contrato privado</strong>714 ofertas</div>
-        <div><strong>UI mobile</strong>20 vecinos → 6 opciones</div>
-        <div><strong>Handoff</strong>Destino en Google Maps</div>
+        <div><span class="num">1</span><strong>Precio oficial</strong>CSV de líquidos</div>
+        <div><span class="num">2</span><strong>Establecimiento</strong>Registro exacto</div>
+        <div><span class="num">3</span><strong>Ubicación</strong>GIS oficial</div>
+        <div><span class="num">4</span><strong>Contrato privado</strong>714 ofertas</div>
+        <div><span class="num">5</span><strong>UI mobile</strong>20 vecinos → 6 opciones</div>
+        <div><span class="num">6</span><strong>Handoff</strong>Destino en Google Maps</div>
+        <div><span class="num">7</span><strong>Identidad</strong>11 Repsol, preview privado</div>
+        <div><span class="num">8</span><strong>Permiso</strong>Publicable: 0 útil</div>
+        <div><span class="num">9</span><strong>Frescura real</strong>0–30 días al usar</div>
+      </div>
+
+      <p class="flow-title">De dónde salen las 714 ofertas — embudo de Gate 1.1</p>
+      <div class="funnel-panel">
+        <p class="panel-title">1. Del universo nacional a la última oferta por establecimiento</p>
+        <div class="funnel-bars">
+          <div class="funnel-row">
+            <span class="fr-label">Filas fuente</span>
+            <div class="funnel-track"><div class="funnel-fill" style="width:100%"></div></div>
+            <span class="fr-value">5,336</span>
+          </div>
+          <div class="funnel-delta">−4,515 al quedarse con Lima provincia, actividades urbanas y Gasohol Regular</div>
+          <div class="funnel-row">
+            <span class="fr-label">Últimas ofertas</span>
+            <div class="funnel-track"><div class="funnel-fill" style="width:15.39%"></div></div>
+            <span class="fr-value">821</span>
+          </div>
+        </div>
+      </div>
+      <div class="funnel-panel">
+        <p class="panel-title">2. De la última oferta al contrato final (escala propia, 821 = 100 %)</p>
+        <div class="funnel-bars">
+          <div class="funnel-row">
+            <span class="fr-label">Últimas ofertas</span>
+            <div class="funnel-track"><div class="funnel-fill" style="width:100%"></div></div>
+            <span class="fr-value">821</span>
+          </div>
+          <div class="funnel-delta">−80 por frescura fuera de 0–30 días</div>
+          <div class="funnel-row">
+            <span class="fr-label">Frescas ≤30 días</span>
+            <div class="funnel-track"><div class="funnel-fill" style="width:90.26%"></div></div>
+            <span class="fr-value">741</span>
+          </div>
+          <div class="funnel-delta">−19 sin Registro exacto</div>
+          <div class="funnel-row">
+            <span class="fr-label">Con Registro exacto</span>
+            <div class="funnel-track"><div class="funnel-fill" style="width:87.94%"></div></div>
+            <span class="fr-value">722</span>
+          </div>
+          <div class="funnel-delta">−8 sin GIS seguro</div>
+          <div class="funnel-row">
+            <span class="fr-label">Con GIS seguro (contrato)</span>
+            <div class="funnel-track"><div class="funnel-fill" style="width:86.97%"></div></div>
+            <span class="fr-value">714</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="matrix-title">
+      <div class="section-head">
+        <div>
+          <h2 id="matrix-title">Permiso de publicación por campo</h2>
+          <p>Gate 2.2 — 9 campos de la oferta, cada uno contra la licencia real de su fuente.</p>
+        </div>
+      </div>
+      <div class="matrix">
+        <article class="verdict publishable">
+          <h3><span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span>Publicable</h3>
+          <p class="count">4 campos · ODC-By declarado en la ficha del dataset</p>
+          <ul>
+            <li><strong>Precio</strong></li>
+            <li><strong>Fecha de reporte</strong></li>
+            <li><strong>Frescura</strong><span>hereda el permiso de fecha de reporte</span></li>
+            <li><strong>Distrito</strong></li>
+          </ul>
+        </article>
+        <article class="verdict not-publishable">
+          <h3><span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>No publicable</h3>
+          <p class="count">2 campos · GIS de Osinergmin sin licencia explícita</p>
+          <ul>
+            <li><strong>Coordenada</strong></li>
+            <li><strong>Distancia derivada</strong><span>hereda el veredicto de coordenada</span></li>
+          </ul>
+        </article>
+        <article class="verdict unknown">
+          <h3><span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14"><text x="8" y="12" text-anchor="middle" font-size="12" font-weight="800" fill="currentColor">?</text></svg></span>Desconocido</h3>
+          <p class="count">2 campos · ODC-By no cubre columnas de identidad</p>
+          <ul>
+            <li><strong>Razón social</strong></li>
+            <li><strong>Dirección</strong></li>
+          </ul>
+        </article>
+        <article class="verdict governed">
+          <h3><span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h9M8 4l4 4-4 4"/></svg></span>Gobernado por Gate 2.1</h3>
+          <p class="count">1 campo · verificación + publicación entrada por entrada</p>
+          <ul>
+            <li><strong>Identidad comercial</strong><span>hoy ninguna entrada real es public_safe</span></li>
+          </ul>
+        </article>
+      </div>
+      <div class="finding">
+        <span class="fig">714 → 0</span>
+        <p>Ninguna oferta conserva identidad y ubicación a la vez bajo publicación estricta: <code>decision_ready</code> es 0 sobre 714. Es una cifra estructural, congelada por el veredicto de coordenada — no responde a más datos, solo a un cambio de permiso.</p>
       </div>
     </section>
 
@@ -200,10 +623,48 @@
           <p>Solo objetivo, trabajo y resultado vigente.</p>
         </div>
       </div>
+
+      <div class="timeline" aria-hidden="true">
+        <div class="tl-group">
+          <div class="tl-title">Capa 0 · 3 gates</div>
+          <div class="tl-nodes">
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">0.1</span></div>
+            <span class="rule"></span>
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">0.2</span></div>
+            <span class="rule"></span>
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">0.3</span></div>
+          </div>
+        </div>
+        <div class="tl-group">
+          <div class="tl-title">Capa 1 · 3 gates</div>
+          <div class="tl-nodes">
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">1.1</span></div>
+            <span class="rule"></span>
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">1.2</span></div>
+            <span class="rule"></span>
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">1.3</span></div>
+          </div>
+        </div>
+        <div class="tl-group">
+          <div class="tl-title">Capa 2 · 2 gates</div>
+          <div class="tl-nodes">
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">2.1</span></div>
+            <span class="rule"></span>
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">2.2</span></div>
+          </div>
+        </div>
+        <div class="tl-group">
+          <div class="tl-title">Capa 3 · 1 de 3 gates</div>
+          <div class="tl-nodes">
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">3.1</span></div>
+          </div>
+        </div>
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Gate</th><th>Objetivo</th><th>Qué se hizo</th><th>Qué logramos</th></tr>
+            <tr><th scope="col">Gate</th><th scope="col">Objetivo</th><th scope="col">Qué se hizo</th><th scope="col">Qué logramos</th></tr>
           </thead>
           <tbody>
             <tr>
@@ -222,7 +683,7 @@
               <td data-label="Gate">0.3</td>
               <td data-label="Objetivo"><ul><li>Decidir si valía la pena construir.</li></ul></td>
               <td data-label="Qué se hizo"><ul><li>Embudo de frescura, joins y cobertura.</li></ul></td>
-              <td data-label="Resultado"><ul><li>GO con límites para Gasohol Regular.</li><li>Producto público todavía bloqueado.</li></ul></td>
+              <td data-label="Resultado"><ul><li>GO con límites para Gasohol Regular.</li><li>Producto público todavía no preparado.</li></ul></td>
             </tr>
             <tr>
               <td data-label="Gate">1.1</td>
@@ -242,6 +703,24 @@
               <td data-label="Qué se hizo"><ul><li>Handoff explícito y seguro a Google Maps.</li></ul></td>
               <td data-label="Resultado"><ul><li>Solo comparte el destino tras el tap.</li><li>Owner y Challenger aceptaron; 13/13 tests.</li></ul></td>
             </tr>
+            <tr>
+              <td data-label="Gate">2.1</td>
+              <td data-label="Objetivo"><ul><li>Mostrar marca y nombre de sede confirmados.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Overlay separado, anclado al Registro; políticas public_safe/private_preview.</li></ul></td>
+              <td data-label="Resultado"><ul><li>11/14 candidatos Repsol verificados, publicación desconocida.</li><li>0 Primax; fallback a identidad provisional intacto; 28/28 tests.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">2.2</td>
+              <td data-label="Objetivo"><ul><li>Saber qué se puede mostrar públicamente.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Matriz de permiso por campo, aplicada a toda la proyección.</li></ul></td>
+              <td data-label="Resultado"><ul><li>Precio, fecha, frescura y distrito publicables; coordenada no.</li><li>Subconjunto útil publicable = 0, por permisos y no por datos; 41/41 tests.</li></ul></td>
+            </tr>
+            <tr>
+              <td data-label="Gate">3.1</td>
+              <td data-label="Objetivo"><ul><li>Evitar que el snapshot envejezca en silencio.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Edad en runtime, filtro 0–30 días y estado vacío.</li></ul></td>
+              <td data-label="Resultado"><ul><li>714/714 vigentes al 18/08/2026.</li><li>Recorrido normal y vencido verificados; 47/47 tests.</li></ul></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -250,43 +729,35 @@
     <section aria-labelledby="next-title">
       <div class="section-head">
         <div>
-          <h2 id="next-title">Siguientes 3 gates</h2>
-          <p>Dirección propuesta para Capa 2; ningún gate está abierto todavía.</p>
+          <h2 id="next-title">Lo que sigue</h2>
+          <p>Capa 3 convierte el snapshot reproducible en un producto de datos actualizable y recuperable.</p>
         </div>
       </div>
       <div class="next-gates">
         <article class="gate next">
-          <span class="tag">Siguiente · Gate 2.1</span>
-          <h3>Identidad comercial</h3>
+          <span class="tag">Siguiente · Gate 3.2</span>
+          <h3>Detectar cambios barato</h3>
           <ul class="gate-points">
-            <li><strong>Pregunta</strong>¿Podemos mostrar marca y nombre de sede confirmados?</li>
-            <li><strong>Tangible</strong>Piloto first-party Repsol/Primax anclado a código Osinergmin.</li>
-            <li><strong>Salida</strong>Cobertura, conflictos y permiso medidos; cero inferencias.</li>
+            <li><strong>Hipótesis</strong>ETag/Last-Modified evitan descargar 1.05 GB cuando nada cambió.</li>
+            <li><strong>Tangible</strong>Comando limitado en bytes: unchanged, changed o unknown.</li>
+            <li><strong>Salida</strong>Respuesta condicional demostrada sin alterar el snapshot.</li>
           </ul>
         </article>
         <article class="gate tentative">
-          <span class="tag">Tentativo · Gate 2.2</span>
-          <h3>Beneficio personal</h3>
+          <span class="tag">Después · Gate 3.3</span>
+          <h3>Refrescar sin perder el último bueno</h3>
           <ul class="gate-points">
-            <li><strong>Pregunta</strong>¿Cómo declara el usuario un descuento sin crear una cuenta?</li>
-            <li><strong>Tangible</strong>Preferencia local por marca y regla de descuento simple.</li>
-            <li><strong>Salida</strong>Precio efectivo visible, reversible y sin tracking.</li>
-          </ul>
-        </article>
-        <article class="gate tentative">
-          <span class="tag">Tentativo · Gate 2.3</span>
-          <h3>Conveniencia personal</h3>
-          <ul class="gate-points">
-            <li><strong>Pregunta</strong>¿Qué cambia al combinar cercanía, lista y beneficio?</li>
-            <li><strong>Tangible</strong>Comparación que explica precio efectivo y desvío.</li>
-            <li><strong>Salida</strong>Elección comprensible, sin scoring opaco.</li>
+            <li><strong>Hipótesis</strong>Staging + validación + promoción atómica bastan sin infraestructura nueva.</li>
+            <li><strong>Tangible</strong>Refresco manual reproducible con rollback.</li>
+            <li><strong>Salida</strong>Fallo de red/schema conserva el snapshot vigente.</li>
           </ul>
         </article>
       </div>
     </section>
 
-    <section class="risks" aria-label="Bloqueos vigentes">
-      <strong>Bloqueos para publicar:</strong> cobertura de identidad comercial, permiso de reutilización y operación de actualizaciones. No se afirma stock, descuento ni nombre comercial inferido.
+    <section class="risks">
+      <h2>Área gris documentada, no bloqueo</h2>
+      <p>La coordenada GIS no tiene licencia explícita demostrada y la identidad comercial sigue con publicación desconocida. Se conserva procedencia y capacidad de sustituir fuentes, pero el avance solo se detiene ante una infracción explícita y material. No se afirma stock, descuento ni nombre comercial inferido.</p>
     </section>
 
     <footer>Vista interna del owner · conocimiento vigente, no historial exhaustivo.</footer>

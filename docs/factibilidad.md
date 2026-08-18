@@ -75,13 +75,36 @@ Para avanzar se necesita:
 
 Estas hipótesis no autorizan inferir marca desde razón social ni afirmar convenios todavía.
 
+## Permiso de publicación por campo
+
+Medido en Gate 2.2. El permiso no es uniforme: se evalúa campo por campo, contra la licencia real de su fuente.
+
+| Campo | Veredicto | Base |
+| --- | --- | --- |
+| Precio, fecha de reporte, frescura, distrito | publicable | ODC-By declarado en las fichas de los datasets de precio |
+| Coordenada | no publicable | GIS sin licencia explícita; el contrato de Gate 1.1 la clasifica de forma congelada como reutilización pública no autorizada |
+| Distancia derivada | no publicable | depende por completo de la coordenada; no hay permiso independiente demostrado |
+| Razón social, dirección | desconocido | la declaración ODC-By observada describe los datasets de precio, no columnas de identidad |
+| Identidad comercial | gobernada por Gate 2.1 | entrada por entrada; hoy ninguna es `public_safe` |
+
+Consecuencia: **no existe hoy un subconjunto publicable útil.** Bajo publicación estricta quedan precio, fecha, frescura y distrito, pero ninguna oferta conserva identidad y ubicación a la vez.
+
+Esa cifra es determinística, no empírica. La coordenada tiene veredicto congelado, de modo que ninguna cantidad de datos adicionales la mueve; solo un cambio de permiso puede hacerlo. Un control con 714 ofertas artificialmente completas y publicables confirma que el resultado no varía. La única métrica sensible a los datos es cuántas identidades comerciales superan la política de Gate 2.1.
+
+La matriz vive congelada en `app/publication-matrix.mjs`, con la evidencia citada por fila, y se aplica con `node app/server.mjs --public-strict`. Reproducir la medición:
+
+```bash
+node scripts/measure-gate-2.2-public-subset.mjs
+```
+
 ## Validación y límites
 
 El protocolo formal A/B contra Facilito permanece disponible, pero no es una puerta entre incrementos. Se ejecutará solo si puede cambiar una decisión material. Para cambios privados, seguros y reversibles, el uso directo del owner puede bastar.
 
 Límites vigentes:
 
-- identidad comercial no demostrada;
+- permisos de publicación con áreas grises documentadas; no bloquean el avance salvo infracción explícita y material;
+- identidad comercial demostrada solo en un piloto de 11 sedes, con publicación desconocida;
 - 27/741 ofertas frescas excluidas por joins exactos;
 - categorías rurales/flotantes con menor cobertura;
 - licencia pública GIS/EVPC ambigua;

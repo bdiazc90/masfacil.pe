@@ -15,7 +15,7 @@ Las fichas de los cuatro datasets declaran ODC-By. Los archivos y sus catálogos
 
 Total perfilado: **2,340,316 filas**. Los extremos se conservan como anomalías; no se corrigen sin semántica. En GLP, `MARCA` aparece en 345,018/522,380 filas (66.047 %), pero su diccionario la define como producto o envasadora, no nombre comercial del establecimiento.
 
-Los CSV vigentes de GLP y líquidos estuvieron disponibles por HTTP 206. Los fallos 403 previos fueron del cliente, no un límite de la fuente. Una adquisición completa observada transfirió 1.56 GB; no se demostró API incremental, SLA ni respuesta 304.
+Los CSV vigentes de GLP y líquidos estuvieron disponibles por HTTP 206. Los fallos 403 previos fueron del cliente, no un límite de la fuente. Una adquisición completa observada transfirió 1.56 GB. La fuente expone `ETag`, `Last-Modified` y `Accept-Ranges`; todavía no se demostró respuesta 304, API incremental ni SLA.
 
 ## Evidencia externa verificada por el owner: EVPC
 
@@ -67,7 +67,7 @@ El catálogo UBIGEO INEI contiene 1,891 distritos e IDs únicos, bajo ODbL. Las 
 
 ## Identidad y disponibilidad
 
-La identidad comercial sigue sin resolverse:
+Ninguna fuente bulk oficial expone identidad comercial:
 
 - EVPC tenía `MARCA` vacía en 17,472/17,472 filas;
 - el Registro aporta razón social y dirección, no garantiza nombre público de la sede;
@@ -75,6 +75,21 @@ La identidad comercial sigue sin resolverse:
 - la consulta individual SUNAT requiere CAPTCHA y no se evade.
 
 No se inventa marca desde razón social, RUC o dirección. Tampoco se interpreta `PRODUCTO_ACTIVO`, `ULT_PRECIO_DIF_CERO` u otros campos como stock sin semántica demostrada.
+
+### Piloto de identidad comercial (Gate 2.1)
+
+Un golden set privado, construido por un research scout independiente y verificado el **17 de agosto de 2026**, vinculó identidad comercial fuera de las fuentes bulk oficiales:
+
+- universo predefinido de 64 ofertas (Surco + 3 distritos aledaños) del dataset Gate 1.1;
+- 14 candidatos con razón social corporativa Repsol exacta; 11 vinculados por dirección normalizada exacta a una fuente first-party (PDF "Relación de Estaciones – Repsol You"), 3 sin contraparte (unmatched, no forzado);
+- 0 vínculos Primax: sin directorio first-party con nombre de sede accesible sin evadir controles ni renderizar JS;
+- método en dos pasos deterministas, sin fuzzy matching: igualdad exacta de razón social corporativa, luego dirección normalizada exacta con candidato único;
+- caso probado de coordenada compartida entre dos establecimientos con razón social distinta (COESTI vs. Repsol): confirma que coordenada exacta no puede usarse sola como anchor de identidad;
+- caso probado de abanderamiento (marca operando sobre razón social de tercero): correctamente excluido como conflicto, no verificado;
+- fuente con antigüedad declarada (~4 años, Last-Modified 2022-11-02): las 11 entradas quedan `identity_freshness=stale`, sin inferir vigencia desde esa fecha;
+- permiso de publicación de las 11 identidades: `unknown`. No hay licencia ni prohibición explícita en la fuente; robots.txt permisivo autoriza rastreo, no reutilización de contenido.
+
+El overlay separa siempre exactitud del vínculo (`verification_status`) de permiso de publicación (`publication_status`), y nunca deriva frescura desde la fecha de acceso o de modificación de la fuente. Vive únicamente en `.local-cache/gate-2.1/`, con permisos `0600`, ignorado por Git; el repositorio conserva solo schema, fixtures sintéticos y evidencia agregada sin identidades reales.
 
 ## PRICE y J7
 

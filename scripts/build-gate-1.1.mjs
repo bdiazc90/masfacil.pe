@@ -7,6 +7,7 @@ import { createGunzip } from 'node:zlib';
 import { Transform } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const snapshot = '2026-08-14';
@@ -356,7 +357,7 @@ const dataset = {
   temporal_context: temporalContext,
   offers: contractReady.map((item) => ({
     experimental_id: `offer_${stableHash('offer', item.key)}`,
-    establishment_id: `est_${stableHash('establishment', item.registro)}`,
+    establishment_id: officialAnchorFromRegistration(item.registro),
     source_row_id: `row_${stableHash('source-row', item.selected.id)}`,
     product: target.product,
     currency: 'PEN',

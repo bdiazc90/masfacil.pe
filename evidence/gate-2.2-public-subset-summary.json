@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "generated_by": "scripts/measure-gate-2.2-public-subset.mjs",
+  "classification": "AGREGADO SANITIZADO — SIN COORDENADAS, RAZÓN SOCIAL NI DIRECCIÓN REALES",
+  "input": {
+    "dataset_source": "real (.local-cache/gate-1.1)",
+    "overlay_source": "golden set privado",
+    "total_offers": 714
+  },
+  "field_publication_matrix": [
+    {
+      "field": "precio",
+      "source": "liquid-current — ficha \"Líquidos vigentes\", una de las cuatro fichas de datasets de precio",
+      "permission": "ODC-By declarado en la ficha del dataset",
+      "verdict": "publishable",
+      "evidence": "docs/datos.md § Fuentes de precio reproducidas: \"Las fichas de los cuatro datasets de precio declaran ODC-By.\""
+    },
+    {
+      "field": "fecha_de_reporte",
+      "source": "liquid-current — misma ficha ODC-By que precio (columna FECHA_DE_REGISTRO)",
+      "permission": "ODC-By declarado en la ficha del dataset",
+      "verdict": "publishable",
+      "evidence": "docs/datos.md § Fuentes de precio reproducidas"
+    },
+    {
+      "field": "frescura",
+      "source": "derivado de fecha_de_reporte y del corte interno de adquisición (cutoff_at); no proviene de una fuente externa distinta",
+      "permission": "hereda el permiso de fecha_de_reporte; el cálculo no reutiliza ningún dato adicional con licencia propia",
+      "verdict": "publishable",
+      "evidence": "app/contract.mjs (age_days_at_cutoff se deriva de price_reported_at y temporal_context.cutoff_at)"
+    },
+    {
+      "field": "coordenada",
+      "source": "servicio GIS de Osinergmin, capa 35 (N ↔ REGISTRO exacto)",
+      "permission": "servicio con copyright de Osinergmin sin licencia explícita; además, el contrato de Gate 1.1 clasifica el campo de forma congelada como \"coordenada oficial exacta; reutilización pública no autorizada\"",
+      "verdict": "not_publishable",
+      "evidence": "docs/datos.md § Registro, GIS y geografía; contracts/gate-1.1-experiment-dataset.schema.json → offer.coordinate.classification (const)"
+    },
+    {
+      "field": "distancia_derivada",
+      "source": "calculada en el cliente (Haversine) a partir de coordenada oficial exacta y del origen del usuario",
+      "permission": "sin fuente ni licencia propia: depende por completo de coordenada, cuya reutilización pública no está autorizada",
+      "verdict": "not_publishable",
+      "evidence": "hereda el veredicto de coordenada; no hay evidencia de un permiso independiente para exponer la distancia sin exponer la coordenada que la origina"
+    },
+    {
+      "field": "razon_social",
+      "source": "extracto crudo de Líquidos vigentes con RAZON_SOCIAL/DIRECCION (vive solo en .local-cache; nunca versionado)",
+      "permission": "la declaración ODC-By observada describe \"los datasets de precio\"; no hay evidencia de que cubra columnas de identidad/dirección de esa misma ficha. El propio contrato Gate 1.1 la rotula IDENTIDAD PROVISIONAL con advertencia explícita de que no equivale a nombre comercial, y scope.usage congela \"experimento privado; no publicar\" para todo el dataset",
+      "verdict": "unknown",
+      "evidence": "docs/datos.md § Fuentes de precio reproducidas; contracts/gate-1.1-experiment-dataset.schema.json → scope.usage y offer.provisional_identity.label (const)"
+    },
+    {
+      "field": "direccion",
+      "source": "mismo extracto crudo que razón social (columna DIRECCION)",
+      "permission": "mismo razonamiento que razón social",
+      "verdict": "unknown",
+      "evidence": "docs/datos.md § Fuentes de precio reproducidas; contracts/gate-1.1-experiment-dataset.schema.json → scope.usage y offer.provisional_identity.label (const)"
+    },
+    {
+      "field": "distrito",
+      "source": "liquid-current — misma ficha ODC-By que precio (columna DISTRITO de la fila de precio seleccionada)",
+      "permission": "ODC-By declarado en la ficha del dataset",
+      "verdict": "publishable",
+      "evidence": "docs/datos.md § Fuentes de precio reproducidas"
+    },
+    {
+      "field": "identidad_comercial",
+      "source": "overlay de identidad comercial (Gate 2.1), evaluado entrada por entrada",
+      "permission": "ya gobernado campo-por-entrada por verification_status + identity_freshness + publication_status; esta matriz no reevalúa ni sobrescribe ese veredicto",
+      "verdict": "governed_upstream",
+      "evidence": "app/commercial-overlay.mjs → buildCommercialIdentityIndex; ya aplica public_safe/private_preview antes de llegar aquí"
+    }
+  ],
+  "today_private_experiment": {
+    "total": 714,
+    "with_price": 714,
+    "identifiable": 714,
+    "locatable": 714,
+    "decision_ready": 714
+  },
+  "public_strict_projection": {
+    "total": 714,
+    "with_price": 714,
+    "identifiable": 0,
+    "locatable": 0,
+    "decision_ready": 0
+  },
+  "determinism": {
+    "note": "No todas estas cifras son mediciones sobre los datos. Distinguir antes de usarlas para decidir.",
+    "data_dependent": [
+      "identifiable"
+    ],
+    "structurally_fixed": [
+      "locatable",
+      "decision_ready"
+    ],
+    "explanation": "La coordenada tiene veredicto not_publishable congelado, de modo que bajo public_safe locatable es 0 para cualquier dataset, y decision_ready lo hereda. Verificado con un control: 714 ofertas con todos los campos presentes y una identidad comercial publicable siguen dando locatable=0 y decision_ready=0. Solo identifiable responde a los datos: refleja cuántas identidades comerciales superan hoy la política de Gate 2.1. Adquirir más o mejores datos no mueve estas cifras; solo un cambio de permiso puede hacerlo.",
+    "today_private_experiment_caveat": "Bajo private_experiment no se suprime ningún campo, de modo que las tres cifras igualan el total. Eso describe ausencia de supresión, no publicabilidad demostrada."
+  },
+  "finding": "Bajo publicación estricta, el subconjunto listo para decidir (identidad + ubicación publicables a la vez) es 0. La coordenada exacta no tiene permiso de reutilización pública demostrado, y ninguna identidad comercial real es hoy public_safe (ver Gate 2.1); precio, fecha, frescura y distrito sí son publicables de forma aislada. Este 0 es consecuencia determinística de la matriz, no un resultado empírico: ver el bloque determinism."
+}

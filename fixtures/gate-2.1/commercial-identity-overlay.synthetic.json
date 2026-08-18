@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.1.0",
+  "overlay_id": "commercial-identity-overlay-synthetic-demo",
+  "official_dataset_id": "gate-1.1-lima-province-gasohol-regular-2026-08-14",
+  "anchor_scheme": "gate-1.1-establishment-id-v1",
+  "entries": [
+    {
+      "official_anchor": "est_222222222222222222222222",
+      "brand": "MARCA SINTÉTICA NORTE",
+      "public_site_name": "SEDE DEMOSTRACIÓN SUR",
+      "source": {
+        "kind": "first_party_web",
+        "url": "https://identity.example.invalid/synthetic-site-one"
+      },
+      "observed_at": "2026-08-16T15:00:00.000Z",
+      "source_last_modified_at": "2026-08-15T12:00:00.000Z",
+      "discovery_method": "normalized_address_exact",
+      "integration_method": "official_anchor_exact",
+      "identity_freshness": "current",
+      "verification_status": "verified",
+      "publication_status": "publishable"
+    },
+    {
+      "official_anchor": "est_888888888888888888888888",
+      "brand": "MARCA SINTÉTICA NO VERIFICADA",
+      "public_site_name": "SEDE QUE NO DEBE MOSTRARSE",
+      "source": {
+        "kind": "first_party_document",
+        "url": "https://identity.example.invalid/synthetic-unverified"
+      },
+      "observed_at": "2026-08-16T15:05:00.000Z",
+      "source_last_modified_at": null,
+      "discovery_method": "normalized_address_exact",
+      "integration_method": "official_anchor_exact",
+      "identity_freshness": "unknown",
+      "verification_status": "unverified",
+      "publication_status": "publishable"
+    },
+    {
+      "official_anchor": "est_bbbbbbbbbbbbbbbbbbbbbbbb",
+      "brand": "MARCA SINTÉTICA PREVIEW",
+      "public_site_name": "SEDE ANTIGUA DE PREVIEW",
+      "source": {
+        "kind": "owner_verified",
+        "url": "https://identity.example.invalid/synthetic-not-publishable"
+      },
+      "observed_at": "2026-08-16T15:10:00.000Z",
+      "source_last_modified_at": "2023-01-15T12:00:00.000Z",
+      "discovery_method": "normalized_address_exact",
+      "integration_method": "official_anchor_exact",
+      "identity_freshness": "stale",
+      "verification_status": "verified",
+      "publication_status": "unknown"
+    }
+  ]
+}

@@ -68,9 +68,10 @@ export function loadValidatedDataset(datasetPath, schemaPath) {
   return dataset;
 }
 
-export function toClientDataset(dataset, mode) {
+export function toClientDataset(dataset, mode, commercialIdentityByAnchor = new Map(), identityPolicy = 'public_safe') {
   return {
     mode,
+    identity_policy: identityPolicy,
     dataset_id: dataset.dataset_id,
     product: dataset.scope.product,
     display_unit: dataset.scope.display_unit,
@@ -89,6 +90,7 @@ export function toClientDataset(dataset, mode) {
       identity_label: offer.provisional_identity.label,
       legal_name: offer.provisional_identity.legal_name,
       address: offer.provisional_identity.address,
+      commercial_identity: commercialIdentityByAnchor.get(offer.establishment_id) ?? null,
     })),
   };
 }

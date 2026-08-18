@@ -89,7 +89,7 @@ test('la proyección al navegador expone solo campos requeridos', () => {
   const dataset = loadValidatedDataset(fixturePath, schemaPath);
   const client = toClientDataset(dataset, 'demo');
   assert.equal(client.mode, 'demo');
-  assert.deepEqual(Object.keys(client.offers[0]).sort(), ['address','age_days','district','id','identity_label','latitude','legal_name','longitude','price','reported_at'].sort());
+  assert.deepEqual(Object.keys(client.offers[0]).sort(), ['address','age_days','commercial_identity','district','id','identity_label','latitude','legal_name','longitude','price','reported_at'].sort());
   assert.equal(JSON.stringify(client).includes('source_row_id'), false);
   assert.equal(JSON.stringify(client).includes('establishment_id'), false);
 });

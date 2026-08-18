@@ -23,6 +23,10 @@
       <p class="privacy-note">Tu ubicación se usa solo en esta pestaña y no se guarda.</p>
       <p id="location-status" class="status" role="status" aria-live="polite"></p>
       <p id="dataset-badge" class="debug-only debug-line" aria-live="polite">Cargando datos…</p>
+      <div class="debug-only debug-tools">
+        <button id="debug-identity-probe" class="button button--quiet" type="button" disabled>Simular cerca de una identidad comercial (debug)</button>
+        <p id="debug-identity-probe-status" class="status debug-line" role="status" aria-live="polite"></p>
+      </div>
     </section>
 
     <section id="compare-step" class="results" aria-labelledby="compare-title" hidden>
@@ -34,15 +38,19 @@
         <button id="change-origin" class="button button--text button--compact" type="button">Cambiar ubicación</button>
       </header>
 
+      <p id="publication-notice" class="policy-notice" role="status" hidden></p>
+
       <div class="segmented" role="group" aria-label="Ordenar opciones">
         <button type="button" data-sort="distance" aria-pressed="true">Cercanía</button>
         <button type="button" data-sort="price" aria-pressed="false">Precio</button>
         <button type="button" data-sort="freshness" aria-pressed="false">Reciente</button>
       </div>
-      <p class="distance-note">Distancias en línea recta</p>
+      <p id="distance-note" class="distance-note">Distancias en línea recta</p>
+      <p id="freshness-summary" class="freshness-summary" role="status" aria-live="polite"></p>
       <p id="result-count" class="debug-only debug-line" role="status"></p>
 
       <ol id="offers" class="offer-list"></ol>
+      <p id="empty-state" class="empty-state" role="status" hidden>No quedan ofertas dentro de los últimos 30 días. No se muestran alternativas antiguas.</p>
 
       <details class="about-data">
         <summary>Sobre los datos</summary>

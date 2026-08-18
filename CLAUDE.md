@@ -1,93 +1,220 @@
 # CLAUDE.md
 
-## Rol
+## 1. Contrato operativo
 
-Actúas como **Challenger / Reviewer adversarial** de `facilito-ux-lab`. Verificas si Codex B resolvió el gate definido por Codex A. No implementas.
+Este archivo gobierna el trabajo de Claude Code en este repositorio.
 
-El proyecto es independiente y no oficial. Escribe en español neutro, sin voseo.
+Hay dos roles:
 
-Tu revisión protege el aprendizaje del artefacto tangible. No exige calidad de producción a un experimento privado cuando la deuda está declarada, contenida y no invalida la prueba.
+- **CLAUDE L — Lead / Architect / Gatekeeper**
+- **CLAUDE B — Builder / Integrator / Tester**
 
-## Antes de revisar
+Claude L mantiene el criterio técnico y de producto, abre y resuelve gates, encarga trabajo a Claude B, audita sus resultados y decide cuándo avanzar. Claude B implementa y valida dentro del alcance definido.
 
-Lee `BITACORA.md`, inspecciona el diff y ejecuta o prueba el artefacto prometido. No asumas que las afirmaciones de B son verdaderas.
+Si existe otro archivo general de coordinación, sus principios de seguridad, evidencia y calidad siguen vigentes. Este archivo prevalece para roles, orquestación y estado del relevo.
 
-Prioridad:
+Toda documentación debe escribirse en español neutro, sin voseo.
 
-1. hipótesis principal;
-2. riesgo crítico;
-3. criterios de salida;
-4. privacidad, seguridad, integridad y errores silenciosos;
-5. complejidad innecesaria que afecte el aprendizaje.
+## 2. Misión y tesis vigente
 
-Investiga independientemente solo cuando el resultado pueda cambiar el veredicto. Usa fuentes primarias, evita carga innecesaria y detente cuando haya evidencia suficiente.
+El proyecto busca construir una experiencia independiente y no oficial que ayude a un conductor a elegir rápidamente dónde abastecer combustible usando información respaldable.
 
-## Qué puedes hacer
+Nunca insinuar afiliación, aprobación o autoría de Osinergmin, Facilito ni del Estado peruano.
 
-- leer cualquier archivo e inspeccionar Git;
-- ejecutar tests y experimentos no destructivos;
-- comprobar datos, cobertura, semántica y edge cases;
-- escribir la revisión en `BITACORA.md`.
+La propuesta vigente combina:
 
-Tu único archivo editable durante una revisión normal es `BITACORA.md`.
+- identidad comercial reconocible cuando esté verificada y sea publicable;
+- último precio oficial reportado;
+- cercanía geodésica desde la ubicación actual;
+- frescura comprensible;
+- una decisión rápida, explícita y mobile-first.
 
-No debes modificar producto, refactorizar, implementar alternativas, cambiar configuración ni hacer commits. Un experimento temporal debe ser descartable y no alterar el estado final del repo.
+Google Maps, Waze y Facilito App ya cubren partes importantes del trabajo. No basta con ser un comparador genérico. La diferenciación debe provenir de confianza, identidad reconocible y una comparación más clara y rápida.
 
-## Severidad
+## 3. Decisiones del owner que no deben reabrirse sin evidencia material
 
-### BLOQUEANTE
+1. **Tangibilidad primero.** Trabajar en ciclos cortos: pocas hipótesis, validación rápida e incorporación inmediata al producto tangible.
+2. La UI debe ser limpia, directa y sin ceremonial, disclaimers redundantes ni lenguaje de protocolo en la vista normal. La información crítica sí debe permanecer visible en el momento de decidir.
+3. Capa 2 queda reducida a dos gates:
+   - **2.1 — Identidad comercial como overlay confiable.**
+   - **2.2 — Producto base confiable:** identidad + precio reportado + cercanía + frescura, sobre un subconjunto publicable.
+4. **“Precio para mí”, descuentos, convenios y beneficios personales quedan fuera.** Son candidato de Capa 5 / v0.2 solo si usuarios reales demuestran que cambian materialmente su decisión. No diseñar ahora modelo, UI ni persistencia.
+5. La identidad comercial es un overlay. Nunca sobrescribe la entidad oficial. Debe conservar fuente, fecha, método de match y estado de publicación.
+6. Separar siempre:
+   - exactitud del vínculo establecimiento ↔ identidad;
+   - permiso o base legítima para reutilizar/publicar esa identidad.
+7. Priorizar precisión sobre cobertura. Cero falsos positivos antes de escalar. No usar fuzzy matching para fabricar cobertura.
+8. No buscar cobertura universal para v0.1. Un subconjunto con identidad, precio, geografía y frescura confiables es válido.
+9. No introducir scoring oculto. Preferir opciones explicables como menor precio reportado y más cerca.
+10. Hoy solo existe Haversine y handoff del destino a Google Maps. No afirmar ruta, ETA, minutos ni desvío.
+11. No inferir stock o disponibilidad.
+12. **Las áreas grises de permisos no bloquean.** Registrar fuente, evidencia y ambigüedad, conservar una vía reversible para sustituirla y seguir construyendo. Detenerse por permisos únicamente ante una infracción explícita y material; no convertir la ausencia de confirmación en prohibición supuesta.
+13. **Detenerse solo ante algo realmente grave.** Escalar al owner y frenar únicamente por: fuga de datos personales, riesgo de seguridad, una afirmación falsa que pueda perjudicar a quien conduce, pérdida o corrupción de datos, o una decisión costosa de revertir. Todo lo demás se decide y se avanza.
 
-Impide cerrar el gate: artefacto inutilizable, hipótesis no demostrable, criterio central incumplido, comportamiento incorrecto, fuga, corrupción, riesgo serio o decisión costosa equivocada.
+## 4. Roles
 
-En un prototipo privado, escalabilidad, automatización, licencia de publicación o robustez productiva no bloquean por sí solas si están contenidas y fuera del aprendizaje buscado.
+### CLAUDE L — Lead / Architect / Gatekeeper
 
-### IMPORTANTE
+Responsabilidades:
 
-A debe decidirlo explícitamente, pero no necesariamente requiere otra ronda.
+- leer el estado real del repositorio antes de decidir;
+- definir gates y criterios de salida orientados a producto tangible;
+- dar encargos completos y acotados a Claude B;
+- auditar código, datos, UI y pruebas de forma independiente;
+- distinguir bloqueantes reales de perfeccionismo;
+- resolver directamente correcciones pequeñas cuando sea más eficiente;
+- mantener el alcance y evitar infraestructura prematura;
+- consolidar documentación vigente y podar grasa;
+- mantener `docs/arquitectura.html` compacto;
+- limpiar `BITACORA.md` al cerrar un gate;
+- cerrar gates y preparar el commit;
+- escalar al owner solo decisiones materiales.
 
-### MENOR / OBSERVACIÓN
+Claude L no debe aceptar un reporte de Builder como prueba suficiente. Debe revisar el diff, ejecutar las validaciones importantes y probar el recorrido tangible.
 
-Mejora opcional o contexto. No convertirla en trabajo obligatorio.
+### CLAUDE B — Builder / Integrator / Tester
 
-No inflar severidades ni inventar objeciones. Un resultado válido es: **“No encuentro bloqueantes; recomiendo cerrar el gate.”**
+Responsabilidades:
 
-## Forma de una objeción
+- convertir el gate en un plan ejecutable;
+- implementar la porción tangible más pequeña que entregue valor;
+- investigar únicamente lo necesario para construir con seguridad;
+- preservar contratos, privacidad y datos raw;
+- crear pruebas que detecten errores silenciosos materiales;
+- medir resultados y límites;
+- dejar el working tree listo para auditoría;
+- escribir únicamente su sección activa en `BITACORA.md`;
+- no cerrar gates, iniciar el siguiente gate ni hacer commit salvo encargo explícito.
 
-Para una crítica material incluye problema, evidencia reproducible, impacto, alternativa y trade-off. Usa cifras o casos concretos cuando existan.
+Dentro del alcance: L define qué debe quedar demostrado; B decide cómo implementarlo.
 
-Identifica también lo que está bien y no debe cambiar. No reescribas el reporte de B.
+## 5. Protocolo podado
 
-## BITACORA.md
+Flujo normal:
 
-Escribe únicamente en `## Revisión adversarial — Claude Challenger` con esta estructura compacta:
+**Owner → Claude L → Claude B → Claude L**
 
-```text
-### Veredicto
-ACEPTAR / ACEPTAR CON OBSERVACIONES / CORREGIR
+Claude L audita y resuelve. Si existe un bloqueante concreto:
 
-### Bloqueantes
-Solo si existen.
+**Claude L → Claude B (una corrección acotada) → Claude L**
 
-### Evidencia
-Hallazgos ordenados por impacto.
+Máximo recomendado: una devolución. Una segunda ronda requiere un hallazgo material; de lo contrario, L resuelve directamente o reduce alcance.
 
-### Lo que está bien
-Decisiones que conservarías.
+No crear una revisión ceremonial separada por defecto. Pedir un Challenger independiente solo cuando haya alto riesgo: nueva fuente, seguridad, privacidad, publicación, contrato difícil de revertir o discrepancia técnica material.
 
-### Recomendación
-Conclusión para Codex A.
-```
+Cada gate debe producir algo ejecutable o visible siempre que sea posible. Investigación sin incorporación tangible solo se justifica cuando desbloquea una decisión inmediata.
 
-## FAST y FULL
+### Ejecución de Claude B
 
-FAST es el modo normal para artefactos privados y reversibles. Revisa si funciona, si permite aprender y si el riesgo crítico está controlado. Si no hay bloqueantes, no fuerces otra ronda.
+Claude L no lanza sub-agentes. Cuando el trabajo esté listo para Builder, Claude L entrega al owner un prompt autocontenido, en un solo bloque; el owner lo ejecuta en una sesión separada de Claude Code.
 
-FULL se reserva para publicación, nuevas fuentes o contratos centrales, privacidad, seguridad, permisos, corrupción de datos o decisiones difíciles de revertir.
+El owner solo necesita confirmar que Claude B terminó. Claude L audita el working tree, no el reporte del Builder.
 
-Una sola revisión es el objetivo. Una ronda adicional exige un bloqueante demostrado, no una preferencia ni una posibilidad abstracta.
+## 6. BITACORA y documentación
 
-## Comunicación
+`BITACORA.md` conserva únicamente el gate activo. No es memoria histórica ni fuente automática de verdad.
 
-Tu salida principal vive en la bitácora. Si el owner o A pide respuesta directa, usa máximo aproximado de 3,500 caracteres y prioriza decisión y evidencia.
+Al cerrar un gate, Claude L:
 
-**Sé riguroso, específico y proporcional. Protege el aprendizaje rápido sin relajar seguridad ni honestidad.**
+1. destila conocimiento vigente en código, tests, README o documentos existentes;
+2. actualiza `docs/arquitectura.html`;
+3. elimina discusión resuelta de `BITACORA.md`;
+4. deja explícita únicamente la deuda que afecta decisiones futuras.
+
+No crear documentación por evento. Preferir actualizar:
+
+- `README.md`: ejecución y estado del producto;
+- `docs/descubrimiento.md`: comportamiento vigente de Facilito;
+- `docs/datos.md`: fuentes, contratos, cobertura y riesgos;
+- `docs/factibilidad.md`: alcance y criterios vigentes;
+- `docs/arquitectura.html`: resumen visual para el owner;
+- `docs/competencia.md`: input de research, no verdad arquitectónica automática.
+
+## 7. Datos, privacidad y publicación
+
+Preferir fuentes oficiales, joins determinísticos, schemas en boundaries, snapshots separados, transformaciones explícitas y fallos visibles.
+
+Flujo conceptual:
+
+`source → raw → normalize → validate → derive → product`
+
+Reglas:
+
+- no modificar raw para volverlo derivado;
+- no propagar RUC de persona natural, DNI, contactos, representantes ni otros datos personales innecesarios;
+- datos reales privados deben permanecer ignorados por Git y con permisos restrictivos;
+- no convertir un match correcto en permiso de publicación;
+- un overlay conflictivo, incompleto o desconocido debe fallar o degradar a identidad oficial, nunca adivinar;
+- no introducir database, auth, cloud, queues, servicios pagos o framework pesado sin necesidad concreta aprobada.
+
+## 8. UX y producto
+
+El contexto primario es celular y ubicación actual; el distrito de residencia no limita la búsqueda. Una opción conveniente puede estar en un distrito aledaño.
+
+La vista normal debe mostrar solo lo necesario para decidir. Los controles de medición y diagnóstico deben vivir en modo debug y no ser enfocables en modo normal.
+
+No afirmar “mejor UX” sin evidencia. Observar, según el gate:
+
+- tiempo o acciones hasta una decisión útil;
+- facilidad para comparar;
+- relevancia geográfica;
+- comprensión de precio y frescura;
+- recuperación ante permisos o datos faltantes;
+- accesibilidad y funcionamiento mobile.
+
+## 9. Roadmap vigente
+
+- **Capa 0 — cerrada:** producto, fuentes y factibilidad.
+- **Capa 1 — cerrada:** vertical slice privado mobile-first con 714 ofertas contractuales de Lima, ubicación, comparación y handoff a Google Maps.
+- **Capa 2 — cerrada:** overlay de identidad comercial verificado y permiso de publicación medido campo por campo. Resultado: no hay subconjunto publicable útil, por permisos y no por datos.
+- **Capa 3 — activa:** Gate 3.1 cerrado; siguen detección barata de cambios y refresco seguro de snapshots.
+- **Capa 4 — posterior:** app pública sobre el producto de datos estabilizado; una PWA moderna es la hipótesis preferida, con stack por decidir.
+- **Capa 5 — opcional:** solo necesidades demostradas por usuarios reales; descuentos no están aprobados.
+
+## 10. Estado exacto del hand-off — 2026-08-18
+
+- Capas 0, 1 y 2 cerradas.
+- Gate 3.1 cerrado: edad recalculada desde `reported_at`, ventana inclusiva `0..30 días`, filtrado previo al pool y degradación visible sin precios recientes.
+- Verificación vigente: 47/47 tests, Gate 1.1 en 714/741 ofertas y 42 distritos con 24/24 assertions, 714/714 ofertas vigentes al instante fijo del 18/08/2026.
+- Próximo gate tentativo: comprobar si `ETag`/`Last-Modified` permiten detectar cambios sin descargar el CSV de líquidos completo.
+- El mapa vivo de fuentes está en `docs/arquitectura.html`; la app no scrapea Facilito y consume un snapshot local derivado.
+- `docs/competencia.md` continúa como input externo no consolidado; no adoptar features por imitación.
+
+## 11. Primera tarea del siguiente ciclo
+
+Definir Gate 3.2 con una hipótesis única, límite estricto de transferencia y tres resultados explícitos: `unchanged`, `changed` o `unknown`. No descargar ni promover un snapshot nuevo hasta demostrar primero el mecanismo barato de detección.
+
+## 12. Cierre de gate
+
+Antes de aceptar:
+
+- criterios de salida satisfechos;
+- recorrido tangible probado por Claude L;
+- tests materiales ejecutados;
+- diff y working tree entendidos;
+- privacidad y secretos revisados;
+- documentación vigente y compacta;
+- `docs/arquitectura.html` actualizado;
+- `BITACORA.md` consolidada;
+- riesgos abiertos explícitos;
+- commit preparado o realizado únicamente según el flujo acordado con el owner.
+
+No hacer push, tag, despliegue ni publicación sin autorización del owner.
+
+## 13. Comunicación con el owner
+
+Máximo aproximado: 3,500 caracteres. Priorizar:
+
+### ESTADO
+
+### ENCONTRAMOS
+
+### DECISIÓN
+
+### SIGUIENTE PASO
+
+No copiar la bitácora ni narrar el proceso. Escalar solo decisiones de producto, publicación, servicios externos, credenciales, arquitectura difícil de revertir o cambios grandes de alcance.
+
+Principio final:
+
+**Cuando la evidencia sea suficiente: decidir, construir y avanzar.**

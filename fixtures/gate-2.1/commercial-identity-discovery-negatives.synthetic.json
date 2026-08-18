@@ -1,0 +1,29 @@
+{
+  "classification": "FIXTURE SINTÉTICO — NO CONTIENE IDENTIDADES REALES",
+  "cases": [
+    {
+      "case_id": "shared-coordinate-only",
+      "normalized_address_exact": false,
+      "normalized_address_candidate_count": 0,
+      "legal_entity_consistent": false,
+      "coordinate_match": true,
+      "expected": { "accepted": false, "reason": "coordinate_only_not_allowed" }
+    },
+    {
+      "case_id": "different-legal-entity-branding",
+      "normalized_address_exact": true,
+      "normalized_address_candidate_count": 1,
+      "legal_entity_consistent": false,
+      "coordinate_match": true,
+      "expected": { "accepted": false, "reason": "legal_entity_mismatch" }
+    },
+    {
+      "case_id": "shared-ambiguous-address",
+      "normalized_address_exact": true,
+      "normalized_address_candidate_count": 2,
+      "legal_entity_consistent": true,
+      "coordinate_match": true,
+      "expected": { "accepted": false, "reason": "normalized_address_ambiguous" }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "classification": "AGREGADO SANITIZADO — SIN NOMBRES, DIRECCIONES NI ANCHORS REALES",
+  "provenance": "Reporte de Research Scout contrastado y aceptado con límites por Codex A",
+  "universe": {
+    "total_establishments": 64,
+    "repsol_legal_name_candidates": 14,
+    "accepted_private_preview_candidates": 11,
+    "unmatched_candidates": 3,
+    "primax_verifiable_public_site_names": 0,
+    "publication_unknown": 11
+  },
+  "coverage": {
+    "total": { "numerator": 11, "denominator": 64, "percent": 17.188 },
+    "corporate_subset": { "numerator": 11, "denominator": 14, "percent": 78.571 }
+  },
+  "quality": {
+    "false_positive_candidate": 0,
+    "status": "accepted_with_limitations",
+    "conclusion": "No se observaron falsos positivos candidatos en esta muestra; no generalizar fuera del alcance verificado"
+  },
+  "hard_negatives": [
+    "shared_coordinate_only",
+    "different_legal_entity_branding",
+    "shared_or_ambiguous_normalized_address"
+  ]
+}

@@ -130,8 +130,11 @@ h1:focus, h2:focus, main:focus { outline: none; }
 }
 .segmented button[aria-pressed="true"] { background: var(--ink); color: #fff; }
 .distance-note { color: var(--ink-soft); font-size: 0.78rem; margin: 9px 2px 14px; }
+.freshness-summary { color: var(--ink-soft); font-size: 0.82rem; line-height: 1.45; margin: 8px 2px 14px; }
+.policy-notice { background: var(--mist); border-radius: 10px; color: var(--ink); font-size: 0.82rem; font-weight: 700; line-height: 1.4; margin: 0 0 14px; padding: 10px 12px; }
 
 .offer-list { display: grid; gap: 10px; list-style: none; margin: 0; padding: 0; }
+.empty-state { background: var(--mist); border-radius: 12px; color: var(--ink); line-height: 1.5; margin: 0; padding: 16px; }
 .offer-card { border: 1px solid var(--line); border-radius: 14px; min-width: 0; padding: 16px; }
 .offer-card__metrics { align-items: baseline; display: flex; flex-wrap: wrap; gap: 6px 9px; margin: 0 0 10px; }
 .offer-card__metrics strong { color: var(--ink); font-size: 1.24rem; letter-spacing: -0.02em; }
