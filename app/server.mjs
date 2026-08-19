@@ -7,11 +7,11 @@ import { fileURLToPath } from 'node:url';
 import { buildCommercialIdentityIndex, emptyCommercialOverlay, loadValidatedCommercialOverlay } from './commercial-overlay.mjs';
 import { loadValidatedDataset, toClientDataset } from './contract.mjs';
 import { applyFieldPublicationPolicy } from './publication-matrix.mjs';
+import { resolveActiveSnapshot } from './snapshot-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicRoot = path.join(root, 'app', 'public');
 const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.schema.json');
-const realPath = path.join(root, '.local-cache', 'gate-1.1', '2026-08-14', 'experiment-dataset-lima-province.json');
 const demoPath = path.join(root, 'fixtures', 'gate-1.1', 'experiment-dataset.synthetic.json');
 const overlaySchemaPath = path.join(root, 'contracts', 'gate-2.1-commercial-identity-overlay.schema.json');
 const demoOverlayPath = path.join(root, 'fixtures', 'gate-2.1', 'commercial-identity-overlay.synthetic.json');
@@ -36,7 +36,14 @@ function parseOptions(argv) {
 }
 
 const options = parseOptions(process.argv.slice(2));
-const useDemo = options.demo || !fs.existsSync(realPath);
+let activeSnapshot = null;
+let activeSnapshotWarning = null;
+if (!options.demo) {
+  try { activeSnapshot = resolveActiveSnapshot(root); }
+  catch (error) { activeSnapshotWarning = `pointer inválido; se usa fixture sintético: ${error.message}`; }
+}
+const realPath = activeSnapshot?.dataset_absolute_path ?? null;
+const useDemo = options.demo || !realPath || !fs.existsSync(realPath);
 const datasetPath = useDemo ? demoPath : realPath;
 const dataset = loadValidatedDataset(datasetPath, schemaPath);
 let overlay;
@@ -44,10 +51,17 @@ let overlaySource;
 if (useDemo) {
   overlay = loadValidatedCommercialOverlay(demoOverlayPath, overlaySchemaPath);
   overlaySource = 'fixture sintético';
-} else if (fs.existsSync(realOverlayPath)) {
-  if ((fs.statSync(realOverlayPath).mode & 0o077) !== 0) throw new Error('El golden set comercial privado debe tener permisos 0600');
-  overlay = loadValidatedCommercialOverlay(realOverlayPath, overlaySchemaPath);
-  overlaySource = 'golden set privado';
+} else if (activeSnapshot?.overlay_path || fs.existsSync(realOverlayPath)) {
+  const selectedOverlayPath = activeSnapshot?.overlay_path ? path.join(root, activeSnapshot.overlay_path) : realOverlayPath;
+  if ((fs.statSync(selectedOverlayPath).mode & 0o077) !== 0) throw new Error('El golden set comercial privado debe tener permisos 0600');
+  const candidateOverlay = loadValidatedCommercialOverlay(selectedOverlayPath, overlaySchemaPath);
+  if (candidateOverlay.official_dataset_id !== dataset.dataset_id) {
+    overlay = emptyCommercialOverlay(dataset.dataset_id);
+    overlaySource = `golden set privado incompatible con ${dataset.dataset_id}; ignorado de forma conservadora`;
+  } else {
+    overlay = candidateOverlay;
+    overlaySource = 'golden set privado';
+  }
 } else {
   overlay = emptyCommercialOverlay(dataset.dataset_id);
   overlaySource = 'golden set privado ausente';
@@ -109,6 +123,7 @@ server.on('error', (error) => {
 });
 
 server.listen(options.port, host, () => {
+  if (activeSnapshotWarning) process.stderr.write(`Advertencia: ${activeSnapshotWarning}\n`);
   process.stdout.write(`Facilito UX Lab — modo ${useDemo ? 'demo' : 'real'} (${dataset.offers.length} ofertas)\n`);
   process.stdout.write(`Overlay comercial — ${overlaySource}: ${commercial.metrics.projected}/${commercial.metrics.entries} identidades proyectables · política ${identityPolicy}\n`);
   const subset = clientDatasetObject.publication_subset;

@@ -1,0 +1,23 @@
+{
+  "schema_version": 3,
+  "gate": "3.3",
+  "source_id": "liquid-current",
+  "observed_at": "2026-08-19",
+  "previous_snapshot": "2026-08-14",
+  "promoted_snapshot": "2026-08-18-20260819T003213952Z-7928-71e6ba",
+  "invalid_prior_snapshots": [
+    "2026-08-18-20260818T204705075Z-93677-827fd5",
+    "2026-08-18-20260818T234703982Z-1670-0f27d8"
+  ],
+  "detection": { "status": "changed", "method": "HEAD", "status_code": 200, "bytes_consumed": 0, "remote_etag": "\"{FE76AA7F-4385-420E-8CBD-64AD7572DE90},238", "remote_last_modified": "Tue, 18 Aug 2026 12:28:58 GMT" },
+  "raw": { "bytes": 1078782427, "sha256": "9404f2910141efb2a4199ac446f547f43c5dad912958b33fdcc711ee5df18a55", "reused_local_raw": true, "validators_matched_acquisition_exactly": true },
+  "minimized": { "sha256": "231f3969613af4f357df0fc44c8e404089c9c5bf7d76792e8b0f114d25c3f89e", "rows": 1351248, "source_max_reported_at": "2026-08-18T04:59:36.000Z", "header_validated": true, "single_header_verified": true },
+  "dataset": { "offers": 714, "snapshot_date": "2026-08-18", "source_max_reported_at": "2026-08-18T04:59:36.000Z", "source_last_modified_at": "2026-08-18T12:28:58.000Z", "acquired_at": "2026-08-18T20:48:25.837Z" },
+  "previous_metrics": { "fresh_offers": 741, "coverage_percent": 96.356 },
+  "candidate_metrics": { "fresh_offers": 740, "contract_ready": 714, "coverage_percent": 96.486, "material_conflicts": 0 },
+  "reference_inputs": { "registry_gis_snapshot_date": "2026-08-14", "overlay_entries": 11, "overlay_reanchored": 11 },
+  "idempotence": { "second_run": "unchanged", "second_run_bytes": 0, "second_run_promoted": false },
+  "rollback_verified": true,
+  "cache_path_verified_after_promotion": true,
+  "decision": "promoted_after_rebuild_from_verified_local_raw_and_2026-08-14_registry_gis"
+}

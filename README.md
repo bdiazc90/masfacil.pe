@@ -4,7 +4,7 @@ Experimento independiente y no oficial para encontrar combustible desde el celul
 
 ## Estado
 
-**Capas 1 y 2 completas · Capa 3 en curso · vertical slice privado.**
+**Capas 1, 2 y 3 completas · Capa 4 por iniciar · vertical slice privado.**
 
 Ya se puede:
 
@@ -14,9 +14,10 @@ Ya se puede:
 - elegir una estación y abrir su destino en Google Maps;
 - mostrar marca y nombre de sede cuando existe una identidad comercial verificada y publicable; conservar razón social/dirección provisional en cualquier otro caso;
 - recalcular la antigüedad real al usar la app y ocultar ofertas futuras, inválidas o mayores de 30 días;
-- detectar mediante validadores HTTP si existe un CSV nuevo sin descargar su cuerpo.
+- detectar mediante validadores HTTP si existe un CSV nuevo sin descargar su cuerpo;
+- refrescar manualmente el snapshot: detectar, descargar a staging, validar, comparar calidad y promover atómicamente; el pointer permite rollback sin borrar el anterior.
 
-El slice usa Gasohol Regular en Lima provincia. El contrato contiene 714 de 741 ofertas frescas elegibles (**96.356 %**) en 42 distritos. La ubicación personal vive solo en memoria y no se envía a Google; el handoff comparte únicamente las coordenadas del destino tras un tap explícito.
+El slice usa Gasohol Regular en Lima provincia. El snapshot activo del 18/08/2026 contiene 714 de 740 ofertas frescas elegibles (**96.486 %**) en 42 distritos. La ubicación personal vive solo en memoria y no se envía a Google; el handoff comparte únicamente las coordenadas del destino tras un tap explícito.
 
 El permiso de publicación se midió campo por campo: precio, fecha, frescura y distrito tienen permiso demostrado; coordenada, razón social, dirección e identidad comercial conservan límites o áreas grises documentadas. Esas ambigüedades no frenan el experimento: se preservan procedencia y capacidad de sustituir fuentes. Ver [factibilidad](docs/factibilidad.md).
 
@@ -65,7 +66,11 @@ node scripts/analyze-gate-0.3.mjs
 node scripts/build-gate-1.1.mjs
 node scripts/verify-gate-3.1.mjs
 npm run probe:gate-3.2 -- liquid-current
+npm run refresh:gate-3.3 -- liquid-current
+npm run rollback:gate-3.3 -- <snapshot-id>
 ```
+
+El refresco usa `.local-cache/gate-3.3/active.json` como pointer y conserva snapshots inmutables y el last-known-good. `unchanged` no descarga; `unverifiable` rechaza de forma visible; una degradación material queda en `needs_review`. Registro y GIS se reutilizan como inputs fijados y fechados, no se declaran refrescados. Los CSV originales, derivados identificables y caches grandes permanecen ignorados por Git.
 
 Los originales grandes o identificables permanecen en `.local-cache/`, ignorada por Git. El repositorio conserva schemas, fixtures, métricas y evidencia sanitizada.
 

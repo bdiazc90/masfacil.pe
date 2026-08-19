@@ -10,11 +10,11 @@ import { fileURLToPath } from 'node:url';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const snapshot = '2026-08-14';
-const minimizedRoot = path.join(root, 'data', 'minimized', snapshot);
-const provenanceRoot = path.join(root, 'data', 'provenance', snapshot);
-const localOutput = path.join(root, '.local-cache', 'gate-1.1', snapshot, 'experiment-dataset-lima-province.json');
-const evidenceOutput = path.join(root, 'evidence', `gate-1.1-lima-province-${snapshot}.json`);
+const snapshot = process.env.GATE_SNAPSHOT_DATE ?? '2026-08-14';
+const minimizedRoot = process.env.GATE_MINIMIZED_ROOT ? path.resolve(root, process.env.GATE_MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', snapshot);
+const provenanceRoot = process.env.GATE_PROVENANCE_ROOT ? path.resolve(root, process.env.GATE_PROVENANCE_ROOT) : path.join(root, 'data', 'provenance', snapshot);
+const localOutput = process.env.GATE_LOCAL_OUTPUT ? path.resolve(root, process.env.GATE_LOCAL_OUTPUT) : path.join(root, '.local-cache', 'gate-1.1', snapshot, 'experiment-dataset-lima-province.json');
+const evidenceOutput = process.env.GATE_EVIDENCE_OUTPUT ? path.resolve(root, process.env.GATE_EVIDENCE_OUTPUT) : path.join(root, 'evidence', `gate-1.1-lima-province-${snapshot}.json`);
 const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.schema.json');
 const fixturePath = path.join(root, 'fixtures', 'gate-1.1', 'experiment-dataset.synthetic.json');
 const sep = '\u001f';
@@ -173,7 +173,7 @@ function selectedOffer(item, cutoff) {
   };
 }
 
-function validateDataset(dataset) {
+function validateDataset(dataset, expectedSnapshot = snapshot) {
   const errors = [];
   const rootKeys = ['schema_version','dataset_id','scope','temporal_context','offers'];
   const scopeKeys = ['journey','department','province','population','origin_policy','product','display_unit','usage'];
@@ -220,7 +220,7 @@ function validateDataset(dataset) {
     if (!exactKeys(offer.provisional_identity, ['label','legal_name','address'])) errors.push(`${prefix}-identity-keys`);
     if (offer.provisional_identity?.label !== 'IDENTIDAD PROVISIONAL — razón social/dirección' || !clean(offer.provisional_identity?.legal_name) || !clean(offer.provisional_identity?.address)) errors.push(`${prefix}-identity`);
     if (!exactKeys(offer.source, ['dataset_id','snapshot_date','acquired_at','cutoff_at'])) errors.push(`${prefix}-source-keys`);
-    if (offer.source?.dataset_id !== 'liquid-current' || offer.source?.snapshot_date !== snapshot || !isIso(offer.source?.acquired_at) || !isIso(offer.source?.cutoff_at)) errors.push(`${prefix}-source`);
+    if (offer.source?.dataset_id !== 'liquid-current' || offer.source?.snapshot_date !== expectedSnapshot || !isIso(offer.source?.acquired_at) || !isIso(offer.source?.cutoff_at)) errors.push(`${prefix}-source`);
     if (offer.source?.acquired_at !== dataset.temporal_context?.acquisition_completed_at || offer.source?.cutoff_at !== dataset.temporal_context?.cutoff_at) errors.push(`${prefix}-source-temporal-context`);
     if (JSON.stringify(offer.warnings) !== JSON.stringify(warnings)) errors.push(`${prefix}-warnings`);
   }
@@ -347,7 +347,7 @@ const temporalContext = {
   source_max_reported_at: sourceMaxReportedAt.toISOString(),
   cutoff_at: cutoff.toISOString(),
   acquisition_started_at: new Date(acquisition.requested_at).toISOString(),
-  acquisition_completed_at: cutoff.toISOString(),
+  acquisition_completed_at: new Date(acquisition.completed_at).toISOString(),
   source_last_modified_at: new Date(acquisition.response_headers['last-modified']).toISOString(),
 };
 const dataset = {
@@ -369,7 +369,7 @@ const dataset = {
     territory: { department: item.selected.department, province: item.selected.province, district: item.selected.district },
     coordinate: { longitude: item.longitude, latitude: item.latitude, classification: 'coordenada oficial exacta; reutilización pública no autorizada' },
     provisional_identity: { label: 'IDENTIDAD PROVISIONAL — razón social/dirección', legal_name: item.identity.legalName, address: item.identity.address },
-    source: { dataset_id: 'liquid-current', snapshot_date: snapshot, acquired_at: cutoff.toISOString(), cutoff_at: cutoff.toISOString() },
+    source: { dataset_id: 'liquid-current', snapshot_date: snapshot, acquired_at: temporalContext.acquisition_completed_at, cutoff_at: temporalContext.cutoff_at },
     warnings,
   })).sort((left, right) => left.experimental_id.localeCompare(right.experimental_id)),
 };
@@ -495,13 +495,13 @@ assert('joins-exact-and-unambiguous', geospatiallyEligible.every((item) => item.
 assert('territory-agrees-in-three-sources', geospatiallyEligible.every((item) => isPopulationTerritory(item.selected) && sameTerritory(item.selected, item.registryMatches[0]) && sameTerritory(item.selected, item.gisMatches[0])), { eligible: geospatiallyEligible.length });
 assert('population-is-not-district-filtered', metrics.territory.fresh_districts > 1 && metrics.territory.contract_ready_districts > 1 && contractReady.every((item) => isPopulationTerritory(item.selected)), metrics.territory);
 assert('raw-identity-row-reconciles-with-selected-source-row', contractReady.every((item) => item.rawIdentityRows.length === 1 && item.identity.id === item.selected.id && item.identity.activity === item.selected.activity && item.identity.registro === item.registro && item.identity.product === target.sourceProduct && item.identity.unit === target.sourceUnit && parseTimestamp(item.identity.reportedAt)?.getTime() === item.selected.time && Number(item.identity.price.replace(',', '.')) === item.selected.price && isPopulationTerritory(item.identity) && sameTerritory(item.identity, item.selected)), { selected: geospatiallyEligible.length, ready: contractReady.length });
-assert('real-dataset-contract-valid', validateDataset(dataset).length === 0, validateDataset(dataset));
-assert('synthetic-fixture-contract-valid', validateDataset(fixture).length === 0, validateDataset(fixture));
+assert('real-dataset-contract-valid', validateDataset(dataset, snapshot).length === 0, validateDataset(dataset, snapshot));
+assert('synthetic-fixture-contract-valid', validateDataset(fixture, '2026-08-14').length === 0, validateDataset(fixture, '2026-08-14'));
 const negativeStock = structuredClone(fixture); negativeStock.offers[0].stock = true;
 const negativeIdentity = structuredClone(fixture); negativeIdentity.offers[0].provisional_identity.label = 'Nombre comercial';
 const negativeAge = structuredClone(fixture); negativeAge.offers[0].age_days_at_cutoff = 31;
 const negativeTime = structuredClone(fixture); negativeTime.offers[0].price_reported_at = negativeTime.temporal_context.cutoff_at;
-assert('contract-negative-controls', validateDataset(negativeStock).includes('offer-0-keys') && validateDataset(negativeIdentity).includes('offer-0-identity') && validateDataset(negativeAge).includes('offer-0-age') && validateDataset(negativeTime).includes('offer-0-age-consistency'), { stock: validateDataset(negativeStock), identity: validateDataset(negativeIdentity), age: validateDataset(negativeAge), time: validateDataset(negativeTime) });
+assert('contract-negative-controls', validateDataset(negativeStock, '2026-08-14').includes('offer-0-keys') && validateDataset(negativeIdentity, '2026-08-14').includes('offer-0-identity') && validateDataset(negativeAge, '2026-08-14').includes('offer-0-age') && validateDataset(negativeTime, '2026-08-14').includes('offer-0-age-consistency'), { stock: validateDataset(negativeStock, '2026-08-14'), identity: validateDataset(negativeIdentity, '2026-08-14'), age: validateDataset(negativeAge, '2026-08-14'), time: validateDataset(negativeTime, '2026-08-14') });
 const schemaOfferProperties = Object.keys(schema.$defs.offer.properties);
 const forbiddenBoundaryFields = ['RUC','ruc','REGISTRO','registro','MARCA','marca','brand','stock','nombre_comercial','commercial_name','discount','descuento','convenio','score','convenience_score'];
 assert('boundary-excludes-identity-stock-and-convenience-inference', forbiddenBoundaryFields.every((field) => !schemaOfferProperties.includes(field)) && schema.$defs.offer.additionalProperties === false, schemaOfferProperties);
@@ -532,7 +532,7 @@ const snapshotRegression = {
   decision: prospectiveDecision,
 };
 const expectedSnapshotRegression = { exact_scope_source_rows: 386447, latest_lima_province: 821, within_30_days: 741, registry_exact: 722, gis_exact: 714, contract_ready: 714, registry_no_match: 19, registry_ambiguous: 0, gis_no_match: 8, latest_price_conflicts: 0, coverage_percent: 96.356, contract_ready_districts: 42, decision: 'GO CON LÍMITES' };
-assert('sealed-snapshot-regression', JSON.stringify(snapshotRegression) === JSON.stringify(expectedSnapshotRegression), snapshotRegression);
+assert('sealed-snapshot-regression', snapshot !== '2026-08-14' || JSON.stringify(snapshotRegression) === JSON.stringify(expectedSnapshotRegression), snapshotRegression);
 
 const evidence = { ...evidenceBase, assertions, assertion_summary: { passed: assertions.filter((item) => item.pass).length, failed: assertions.filter((item) => !item.pass).length } };
 writeAtomic(evidenceOutput, `${JSON.stringify(evidence, null, 2)}\n`);

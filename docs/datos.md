@@ -25,6 +25,16 @@ Ejecución real única del **18/08/2026** sobre el snapshot local del **14/08/20
 
 Conclusión aceptada: **B — viable con fallback seguro**. La detección de cambio es barata y reproducible; los tests prueban `unchanged` tanto por 304 como por HEAD 200 con validadores idénticos. Falta observar un ciclo real sin cambios para caracterizar cuál de esas respuestas usa la fuente.
 
+### Gate 3.3 — refresco seguro y promoción atómica
+
+El refresco manual reproducible es `npm run refresh:gate-3.3 -- liquid-current`. Resuelve la fuente desde `app/source-catalog.mjs`, compara validadores, descarga solo si el estado es `changed`, escribe en un staging único, sella bytes y SHA-256, ejecuta el builder y sus contratos/joins, compara cobertura y excepciones contra el snapshot activo y solo entonces mueve el staging a `.local-cache/gate-3.3/snapshots/<snapshot-id>/`. El pointer pequeño `.local-cache/gate-3.3/active.json` se actualiza con escritura + rename atómico; `npm run rollback:gate-3.3 -- <snapshot-id>` cambia únicamente ese pointer.
+
+El refresco correctivo real restauró primero `2026-08-14`, tomó ETag/Last-Modified del probe, encontró una adquisición local con esos validators exactos y verificó sus bytes y SHA-256 antes de reutilizarla. El raw tiene **1,078,782,427 bytes**, SHA-256 `9404f2910141efb2a4199ac446f547f43c5dad912958b33fdcc711ee5df18a55`; el CSV minimizado quedó con SHA-256 `231f3969613af4f357df0fc44c8e404089c9c5bf7d76792e8b0f114d25c3f89e`, **1,351,248 filas** y `source_max_reported_at=2026-08-18T04:59:36Z`. El snapshot promovido es `2026-08-18-20260819T003213952Z-7928-71e6ba`; su `source_last_modified_at` es `2026-08-18T12:28:58Z` y su `acquired_at` `2026-08-18T20:48:25.837Z`. La detección consumió 0 bytes y no hubo redescarga.
+
+El candidato produjo **740** ofertas frescas, **714** listas para contrato y **96.486 %** de cobertura, frente a **741**, **714** y **96.356 %**. Registro y GIS siguieron fijados al **14/08/2026**. Los 11 anchors de Gate 2.1 fueron revalidados y reanclados al nuevo `dataset_id`; `--private-preview` proyecta 11/11. Los dos candidatos supersedidos permanecen inactivos y no son elegibles para rollback. Una segunda ejecución fue `unchanged`, sin descarga ni promoción. La reutilización es genérica: si cambian los validators, el raw anterior no coincide y no se reutiliza.
+
+Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026**; no fueron refrescados ni se afirma lo contrario. Los originales y derivados grandes viven solo en `.local-cache/`; la evidencia agregada queda en `evidence/gate-3.3-refresh-2026-08-18.json`.
+
 ## Evidencia externa verificada por el owner: EVPC
 
 `OWNER-VERIFIED / TRUSTED INPUT`, snapshot aproximado **12 de agosto de 2026**. Sus artefactos no viven en este repo y sus números no son permanentes.

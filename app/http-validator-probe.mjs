@@ -1,4 +1,5 @@
 import { compareSnapshotValidators } from './validator-comparison.mjs';
+import { nativeFetch } from './native-http.mjs';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_MAX_REDIRECTS = 3;
@@ -69,7 +70,7 @@ function outcomeForResponse(response, local, attempt) {
   return compareSnapshotValidators(local, attempt.response_validators);
 }
 
-export async function probeSnapshotValidators({ url, local, fetchImpl = fetch, now = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = DEFAULT_MAX_REDIRECTS } = {}) {
+export async function probeSnapshotValidators({ url, local, fetchImpl = nativeFetch, now = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = DEFAULT_MAX_REDIRECTS } = {}) {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new TypeError('La URL canónica debe usar HTTP(S)');
   if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl debe ser una función');
   const startedAt = new Date(now()).toISOString();
