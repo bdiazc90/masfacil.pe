@@ -274,10 +274,10 @@
     <header class="topbar">
       <div>
         <h1>Estado del proyecto</h1>
-        <p>Las Capas 0–3 convirtieron fuentes públicas en un producto de datos trazable, actualizable y recuperable. Gate 4.1 añadió una PWA static-first sobre un JSON público mínimo e inmutable; el siguiente paso es preparar el repositorio para publicación.</p>
+        <p>Las Capas 0–3 convirtieron fuentes públicas en un producto de datos trazable, actualizable y recuperable. Gate 4.1 añadió una PWA static-first; Gate 4.2 resolvió licencia, atribución, método y saneamiento previo a publicación.</p>
       </div>
       <div class="stamp">
-        <strong>Capa 4 en curso · Gate 4.1 cerrado</strong>
+        <strong>Capa 4 en curso · Gates 4.1 y 4.2 cerrados</strong>
         <span>Actualizado: 19 ago. 2026</span>
       </div>
     </header>
@@ -307,7 +307,7 @@
           <div class="label">ofertas públicas con coordenadas aprobadas</div>
         </div>
         <div class="stat">
-          <div class="value">75<small>/75</small></div>
+          <div class="value">77<small>/77</small></div>
           <div class="label">tests automáticos pasando</div>
         </div>
       </div>
@@ -503,9 +503,9 @@
         <article class="step current">
           <div class="dot"><span>4</span></div>
           <div class="body">
-            <small>Capa 4 · 1/3 gates cerrado</small>
+            <small>Capa 4 · 2/3 cerrados</small>
             <h3>Primera versión pública</h3>
-            <p>PWA static-first sobre JSON público inmutable; publicación y automatización quedan para 4.3.</p>
+            <p>PWA static-first, atribución, licencia Apache-2.0, método y saneamiento cerrados; publicación y automatización siguen en 4.3.</p>
           </div>
         </article>
       </div>
@@ -747,6 +747,12 @@
               <td data-label="Qué se hizo"><ul><li>Contrato público, snapshot inmutable, manifest atómico y caché offline coherente.</li></ul></td>
               <td data-label="Resultado"><ul><li>714 ofertas en 42 distritos; JSON de 127,293 bytes sin identidad privada.</li><li>Primera carga online → recarga offline verificada; Challenger aceptó y 75/75 tests pasan.</li></ul></td>
             </tr>
+            <tr>
+              <td data-label="Gate">4.2</td>
+              <td data-label="Objetivo"><ul><li>Preparar un repositorio público atribuible y verificable.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Apache-2.0, NOTICE, método multiagente, auditoría exacta y poda de artefactos.</li></ul></td>
+              <td data-label="Resultado"><ul><li>Índice sin hallazgos; historial saneado de 13 paths prohibidos.</li><li>77/77 tests y reproducción limpia sin datos privados.</li></ul></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -756,7 +762,7 @@
       <div class="section-head">
         <div>
           <h2 id="next-title">Lo que sigue</h2>
-          <p>Gate 4.1 está cerrado. Gate 4.2 prepara el repositorio público y Gate 4.3 realizará publicación y automatización.</p>
+          <p>Gates 4.1 y 4.2 están cerrados. Gate 4.3 realizará publicación, automatización y verificación del sistema visual entregado por el owner.</p>
         </div>
       </div>
       <div class="next-gates">
@@ -769,8 +775,8 @@
             <li><strong>Salida</strong>Flujo principal instalable; fallback solo al último bundle validado.</li>
           </ul>
         </article>
-        <article class="gate tentative">
-          <span class="tag">Siguiente · Gate 4.2</span>
+        <article class="gate next">
+          <span class="tag">Cerrado · Gate 4.2</span>
           <h3>Orden, licencias, atribución y método</h3>
           <ul class="gate-points">
             <li><strong>Hipótesis</strong>Un contrato público mínimo puede quedar listo para publicación con atribución y método explícitos.</li>
@@ -779,7 +785,7 @@
           </ul>
         </article>
         <article class="gate tentative">
-          <span class="tag">Tentativo · Gate 4.3</span>
+          <span class="tag">Siguiente · Gate 4.3</span>
           <h3>Publicar, automatizar y probar</h3>
           <ul class="gate-points">
             <li><strong>Hipótesis</strong>Una versión estrecha puede ayudar sin ocultar procedencia ni incertidumbre.</li>

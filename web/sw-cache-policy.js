@@ -1,4 +1,4 @@
-export const SHELL_CACHE = 'facilito-shell-v3';
+export const SHELL_CACHE = 'facilito-shell-v4';
 export const DATA_CACHE = 'facilito-data-v1';
 export async function cacheFirst({ request, cache, fetchImpl }) {
   const cached = await cache.match(request); if (cached) return { response: cached, source: 'cache' };

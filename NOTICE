@@ -1,0 +1,21 @@
+# NOTICE — atribución, procedencia y licencias
+
+## Proyecto independiente
+
+Facilito UX Lab es un proyecto independiente. No está afiliado, aprobado ni producido por Osinergmin, Facilito ni el Estado peruano. Los nombres de esas entidades se usan solo para describir fuentes y contexto observado.
+
+## Fuentes de datos
+
+- **Osinergmin — Líquidos vigentes:** fuente de precio, fecha de reporte, producto y distrito. La ficha observada declara ODC-By; ver `docs/datos.md` para alcance, fecha y reproducción.
+- **Osinergmin — GIS, capa 35:** fuente de coordenadas unidas de forma determinística mediante Registro/N. El servicio observado muestra copyright y no una licencia explícita. La publicación downstream de coordenadas fue aprobada por el owner de este proyecto; esa aprobación no es una licencia otorgada por Osinergmin ni implica respaldo oficial.
+- **Datos Abiertos Perú / INEI — UBIGEO:** fuente de referencia territorial observada bajo ODbL. No se distribuye una copia en este repositorio.
+
+El JSON público generado se atribuye como: **“Datos de precios y coordenadas: Osinergmin.”** No se versiona en Git; cada artefacto incluye corte, procedencia y hash verificable.
+
+## Qué cubre este repositorio
+
+Copyright 2026 Bruno Diaz.
+
+El código, documentación e iconos originales de este repositorio se distribuyen bajo Apache License 2.0; ver `LICENSE`.
+
+La licencia del proyecto no relicencia fuentes, evidencia ni datos de terceros. Esos materiales conservan sus propios términos, procedencia y límites. Los nombres y marcas de Osinergmin, Facilito y otras entidades pertenecen a sus respectivos titulares; Apache-2.0 no concede derechos sobre ellos.

@@ -108,7 +108,7 @@ Límites vigentes:
 - identidad comercial demostrada solo en un piloto de 11 sedes, con publicación desconocida;
 - 27/741 ofertas frescas excluidas por joins exactos;
 - categorías rurales/flotantes con menor cobertura;
-- licencia pública GIS/EVPC ambigua;
+- licencia y términos propios del proyecto pendientes de decisión del owner; la procedencia GIS queda registrada en `NOTICE` y la aprobación de coordenadas está cerrada;
 - sin stock, mecanismo incremental, SLA ni linaje CSV→Facilito demostrado;
 - datos reales y servidor restringidos a uso local privado.
 

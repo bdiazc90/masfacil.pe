@@ -8,6 +8,7 @@ import { loadValidatedDataset, toClientDataset } from '../app/contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const datasetPath = path.join(root, '.local-cache', 'gate-1.1', '2026-08-14', 'experiment-dataset-lima-province.json');
+const hasPrivateSnapshot = fs.existsSync(datasetPath);
 const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.schema.json');
 const appSource = fs.readFileSync(path.join(root, 'app', 'public', 'app.js'), 'utf8');
 const indexSource = fs.readFileSync(path.join(root, 'app', 'public', 'index.html'), 'utf8');
@@ -56,7 +57,7 @@ test('el estado vacío y la frescura visible están cableados en la interfaz', (
   assert.match(appSource, /DEBUG_ALL_EXPIRED/);
 });
 
-test('la medición fija del snapshot real conserva el contrato y sobrevive con reloj 2026-08-18', () => {
+test('la medición fija del snapshot real conserva el contrato y sobrevive con reloj 2026-08-18', { skip: !hasPrivateSnapshot }, () => {
   const dataset = loadValidatedDataset(datasetPath, schemaPath);
   const client = toClientDataset(dataset, 'real');
   const result = filterFreshOffers(client.offers, { now: () => fixedNow, cutoffAt: client.cutoff_at });

@@ -2,6 +2,17 @@
 
 Conocimiento vigente medido principalmente el **14 de agosto de 2026**. Caracteriza fuentes oficiales y relaciones exactas; no demuestra el linaje técnico inmediato hacia cada pantalla de Facilito.
 
+## Evidencia conservada y reproducción
+
+`evidence/` conserva solo resultados agregados o sanitizados que sostienen decisiones vigentes. No contiene raw, RUC, razón social, dirección, overlay comercial privado, caches, JSON público generado ni credenciales. Cada archivo conserva, cuando aplica, fuente/fecha, observación, inferencia, confianza y el script que permite reproducirla con inputs locales autorizados.
+
+- `feasibility-2026-08-14.json`, `gate-1.1-lima-province-2026-08-14.json` y `j7-lima-10kg-2026-08-14.json`: perfiles y métricas agregadas de factibilidad; no prueban disponibilidad actual ni identidad comercial.
+- `gate-2.1-commercial-identity-summary.json` y `gate-2.2-public-subset-summary.json`: cobertura y políticas agregadas; no contienen el golden set privado ni autorizan reutilizar contenido de terceros.
+- `gate-3.2-http-probe-2026-08-18.json` y `gate-3.3-refresh-2026-08-18.json`: resultado de detección/refresco, hashes y decisiones operativas; no sustituyen los raws locales.
+- `facilito-contrast-2026-08-14.json`: observación acotada del producto público; no prueba arquitectura, afiliación ni equivalencia.
+
+Los scripts indicados junto a cada gate reproducen las transformaciones cuando existen los inputs autorizados en `.local-cache/`. Un clon limpio puede ejecutar tests y demo sintética, pero no puede reconstruir un snapshot real ni presentar un fixture como tal.
+
 ## Fuentes de precio reproducidas
 
 Las fichas de los cuatro datasets declaran ODC-By. Los archivos y sus catálogos son recursos distintos.
@@ -144,4 +155,4 @@ node scripts/profile-gate-0.2.mjs
 node scripts/verify-gate-0.2.mjs
 ```
 
-Riesgos abiertos: estabilidad temporal de claves, no-matches, semántica de extremos, permiso de reutilización GIS/EVPC, mecanismo incremental y linaje CSV→Facilito.
+Riesgos abiertos: estabilidad temporal de claves, no-matches, semántica de extremos, mecanismo incremental y linaje CSV→Facilito. La publicación downstream de coordenadas GIS fue aprobada por el owner; se conserva procedencia y atribución, pero no se trata como permiso pendiente ni prohibición.
