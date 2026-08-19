@@ -4,3 +4,6 @@
 
 # Originales reutilizables de Gate 0.2: caché local explícita, nunca versionada.
 /.local-cache/
+
+# Gate 4.1: proyección pública generada desde el pointer local; nunca se versiona.
+/web/data/

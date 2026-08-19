@@ -6,7 +6,7 @@ Decisión vigente construida con el [producto observado](descubrimiento.md), las
 
 **GO CON LÍMITES para un vertical slice privado de Gasohol Regular en Lima provincia.**
 
-La cadena precio → Registro → GIS permite comparar precio, cercanía y frescura. No autoriza publicación: faltan identidad comercial verificable, permisos claros para GIS/EVPC y una operación sostenible de actualización. J7 queda excluido.
+La cadena precio → Registro → GIS permite comparar precio, cercanía y frescura. La publicación de coordenadas GIS y distancia derivada fue aprobada explícitamente por el owner para Gate 4.1; la identidad comercial sigue fuera del JSON público y la operación sostenible de actualización queda para publicación posterior. J7 queda excluido.
 
 ## Política de oferta
 
@@ -82,19 +82,20 @@ Medido en Gate 2.2. El permiso no es uniforme: se evalúa campo por campo, contr
 | Campo | Veredicto | Base |
 | --- | --- | --- |
 | Precio, fecha de reporte, frescura, distrito | publicable | ODC-By declarado en las fichas de los datasets de precio |
-| Coordenada | no publicable | GIS sin licencia explícita; el contrato de Gate 1.1 la clasifica de forma congelada como reutilización pública no autorizada |
-| Distancia derivada | no publicable | depende por completo de la coordenada; no hay permiso independiente demostrado |
+| Coordenada | publicable | aprobación explícita del owner para el contrato público downstream; se conserva procedencia y atribución a Osinergmin |
+| Distancia derivada | publicable | Haversine local a partir de coordenada cuya publicación fue aprobada |
 | Razón social, dirección | desconocido | la declaración ODC-By observada describe los datasets de precio, no columnas de identidad |
 | Identidad comercial | gobernada por Gate 2.1 | entrada por entrada; hoy ninguna es `public_safe` |
 
-Consecuencia: **no existe hoy un subconjunto publicable útil.** Bajo publicación estricta quedan precio, fecha, frescura y distrito, pero ninguna oferta conserva identidad y ubicación a la vez.
+Consecuencia: el JSON público Gate 4.1 contiene precio, fecha, distrito y coordenadas de las 714 ofertas contractuales; no contiene identidad, razón social ni dirección. La edad se recalcula en el navegador desde `reported_at`.
 
-Esa cifra es determinística, no empírica. La coordenada tiene veredicto congelado, de modo que ninguna cantidad de datos adicionales la mueve; solo un cambio de permiso puede hacerlo. Un control con 714 ofertas artificialmente completas y publicables confirma que el resultado no varía. La única métrica sensible a los datos es cuántas identidades comerciales superan la política de Gate 2.1.
+El contrato privado Gate 1.1 mantiene por compatibilidad su clasificación histórica; Gate 4.1 no la reescribe ni la propaga. El contrato público versionado es downstream, con allowlist y hash verificable.
 
-La matriz vive congelada en `app/publication-matrix.mjs`, con la evidencia citada por fila, y se aplica con `node app/server.mjs --public-strict`. Reproducir la medición:
+La matriz vive congelada en `app/publication-matrix.mjs`, con la evidencia citada por fila. La proyección pública se reproduce con:
 
 ```bash
-node scripts/measure-gate-2.2-public-subset.mjs
+npm run project:gate-4.1
+npm run verify:web
 ```
 
 ## Validación y límites
@@ -103,7 +104,7 @@ El protocolo formal A/B contra Facilito permanece disponible, pero no es una pue
 
 Límites vigentes:
 
-- permisos de publicación con áreas grises documentadas; no bloquean el avance salvo infracción explícita y material;
+- razón social, dirección e identidad comercial conservan límites de publicación documentados; las coordenadas GIS y la distancia derivada están aprobadas downstream;
 - identidad comercial demostrada solo en un piloto de 11 sedes, con publicación desconocida;
 - 27/741 ofertas frescas excluidas por joins exactos;
 - categorías rurales/flotantes con menor cobertura;

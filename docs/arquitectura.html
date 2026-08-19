@@ -274,11 +274,11 @@
     <header class="topbar">
       <div>
         <h1>Estado del proyecto</h1>
-        <p>Las Capas 0–3 ya convirtieron fuentes públicas en un producto de datos trazable, actualizable y recuperable. El snapshot de precios avanzó del 14 al 18 de agosto sin perder el último bueno; el siguiente paso es convertir el vertical slice en una PWA.</p>
+        <p>Las Capas 0–3 convirtieron fuentes públicas en un producto de datos trazable, actualizable y recuperable. Gate 4.1 añadió una PWA static-first sobre un JSON público mínimo e inmutable; el siguiente paso es preparar el repositorio para publicación.</p>
       </div>
       <div class="stamp">
-        <strong>Capa 3 completa · 3/3 gates cerrados</strong>
-        <span>Actualizado: 18 ago. 2026</span>
+        <strong>Capa 4 en curso · Gate 4.1 cerrado</strong>
+        <span>Actualizado: 19 ago. 2026</span>
       </div>
     </header>
 
@@ -303,11 +303,11 @@
           <div class="label">identidades Repsol verificadas (3 sin match)</div>
         </div>
         <div class="stat">
-          <div class="value">0<small>/714</small></div>
-          <div class="label">subconjunto publicable útil (identidad + ubicación)</div>
+          <div class="value">714<small>/714</small></div>
+          <div class="label">ofertas públicas con coordenadas aprobadas</div>
         </div>
         <div class="stat">
-          <div class="value">66<small>/66</small></div>
+          <div class="value">75<small>/75</small></div>
           <div class="label">tests automáticos pasando</div>
         </div>
       </div>
@@ -323,7 +323,7 @@
 
       <div class="source-answer">
         <strong>Respuesta corta</strong>
-        <p>La app no scrapea Facilito. El precio viene de un <strong>CSV descargable de Osinergmin</strong>; Registro y GIS completan establecimiento y coordenada; un PDF first-party alimenta el piloto privado de identidad. El navegador consume después un endpoint local derivado: <code>/api/dataset</code>.</p>
+        <p>La app no scrapea Facilito. El precio viene de un <strong>CSV descargable de Osinergmin</strong>; Registro y GIS completan establecimiento y coordenada; el navegador consume un JSON estático inmutable mediante <code>manifest.json</code>. <code>web/</code> es la raíz pública PWA.</p>
       </div>
 
       <div class="source-legend" aria-label="Leyenda del estado de las fuentes">
@@ -361,10 +361,10 @@
             <div class="source-meta">
               <span class="source-chip ok">Activa</span>
               <span class="source-chip">ArcGIS REST · GeoJSON</span>
-              <span class="source-chip risk">No publicable hoy</span>
+              <span class="source-chip active">Publicación aprobada por owner</span>
             </div>
             <h4>Servicio GIS · Osinergmin</h4>
-            <p>Consultas paginadas a capas oficiales; el producto usa la capa 35 mediante <code>REGISTRO ↔ N</code>. Aporta coordenadas y control territorial. El servicio muestra copyright, pero no una licencia explícita; la adquisición original tiene proveniencia legacy.</p>
+            <p>Consultas paginadas a capas oficiales; el producto usa la capa 35 mediante <code>REGISTRO ↔ N</code>. Aporta coordenadas y control territorial. El servicio muestra copyright y no licencia explícita; se conserva como procedencia. El owner aprobó publicar las coordenadas downstream con atribución a Osinergmin.</p>
           </article>
 
           <article class="source-card private">
@@ -415,9 +415,9 @@
             <h4>Dataset contractual</h4>
             <p>JSON activo mediante <code>.local-cache/gate-3.3/active.json</code>, ignorado por Git y con permisos privados.</p>
             <ul class="source-output-list">
-              <li><strong>Servidor local</strong><span>Lee el JSON y aplica políticas de identidad/publicación.</span></li>
-              <li><strong><code>GET /api/dataset</code></strong><span>Endpoint local derivado; no consulta Osinergmin en vivo.</span></li>
-              <li><strong>Web mobile</strong><span>Calcula cercanía en el navegador y entrega el destino a Google Maps tras un tap.</span></li>
+              <li><strong>Proyección pública</strong><span>Pointer validado → JSON inmutable + hash → manifest atómico.</span></li>
+              <li><strong><code>manifest.json</code></strong><span>Apunta al snapshot público inmutable y sellado por SHA-256.</span></li>
+              <li><strong>PWA static-first</strong><span>Calcula cercanía en el navegador, conserva último bundle validado y entrega el destino a Google Maps tras un tap.</span></li>
             </ul>
           </article>
         </div>
@@ -503,14 +503,14 @@
         <article class="step current">
           <div class="dot"><span>4</span></div>
           <div class="body">
-            <small>Capa 4 · siguiente</small>
+            <small>Capa 4 · 1/3 gates cerrado</small>
             <h3>Primera versión pública</h3>
-            <p>PWA moderna sobre una interfaz de datos estable; stack final todavía por decidir.</p>
+            <p>PWA static-first sobre JSON público inmutable; publicación y automatización quedan para 4.3.</p>
           </div>
         </article>
       </div>
 
-      <p class="flow-title">Flujo construido en 10 pasos</p>
+      <p class="flow-title">Flujo construido en 11 pasos</p>
       <div class="flow" aria-label="Flujo construido">
         <div><span class="num">1</span><strong>Precio oficial</strong>CSV de líquidos</div>
         <div><span class="num">2</span><strong>Establecimiento</strong>Registro exacto</div>
@@ -519,9 +519,10 @@
         <div><span class="num">5</span><strong>UI mobile</strong>20 vecinos → 6 opciones</div>
         <div><span class="num">6</span><strong>Handoff</strong>Destino en Google Maps</div>
         <div><span class="num">7</span><strong>Identidad</strong>11 Repsol, preview privado</div>
-        <div><span class="num">8</span><strong>Permiso</strong>Publicable: 0 útil</div>
+        <div><span class="num">8</span><strong>Permiso</strong>Coordenadas aprobadas downstream</div>
         <div><span class="num">9</span><strong>Frescura real</strong>0–30 días al usar</div>
         <div><span class="num">10</span><strong>Operación segura</strong>HEAD → staging → pointer</div>
+        <div><span class="num">11</span><strong>PWA pública</strong>JSON inmutable → manifest → offline</div>
       </div>
 
       <p class="flow-title">De dónde salen las 714 ofertas — embudo de Gate 1.1</p>
@@ -581,20 +582,14 @@
       <div class="matrix">
         <article class="verdict publishable">
           <h3><span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span>Publicable</h3>
-          <p class="count">4 campos · ODC-By declarado en la ficha del dataset</p>
+          <p class="count">6 campos · precio/fecha/distrito y coordenadas aprobadas</p>
           <ul>
             <li><strong>Precio</strong></li>
             <li><strong>Fecha de reporte</strong></li>
             <li><strong>Frescura</strong><span>hereda el permiso de fecha de reporte</span></li>
             <li><strong>Distrito</strong></li>
-          </ul>
-        </article>
-        <article class="verdict not-publishable">
-          <h3><span class="icon" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>No publicable</h3>
-          <p class="count">2 campos · GIS de Osinergmin sin licencia explícita</p>
-          <ul>
-            <li><strong>Coordenada</strong></li>
-            <li><strong>Distancia derivada</strong><span>hereda el veredicto de coordenada</span></li>
+            <li><strong>Coordenada</strong><span>aprobada por owner; atribución Osinergmin</span></li>
+            <li><strong>Distancia derivada</strong><span>Haversine local</span></li>
           </ul>
         </article>
         <article class="verdict unknown">
@@ -614,8 +609,8 @@
         </article>
       </div>
       <div class="finding">
-        <span class="fig">714 → 0</span>
-        <p>Ninguna oferta conserva identidad y ubicación a la vez bajo publicación estricta: <code>decision_ready</code> es 0 sobre 714. Es una cifra estructural, congelada por el veredicto de coordenada — no responde a más datos, solo a un cambio de permiso.</p>
+        <span class="fig">714 → 714</span>
+        <p>Las 714 ofertas contractuales conservan precio, fecha, distrito y coordenadas en el contrato público Gate 4.1. Razón social, dirección e identidad comercial no se exportan.</p>
       </div>
     </section>
 
@@ -664,6 +659,12 @@
             <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">3.2</span></div>
             <span class="rule"></span>
             <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">3.3</span></div>
+          </div>
+        </div>
+        <div class="tl-group">
+          <div class="tl-title">Capa 4 · 1 gate cerrado</div>
+          <div class="tl-nodes">
+            <div class="tl-node"><span class="dot"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3 3 7-7"/></svg></span><span class="gate-id">4.1</span></div>
           </div>
         </div>
       </div>
@@ -720,7 +721,7 @@
               <td data-label="Gate">2.2</td>
               <td data-label="Objetivo"><ul><li>Saber qué se puede mostrar públicamente.</li></ul></td>
               <td data-label="Qué se hizo"><ul><li>Matriz de permiso por campo, aplicada a toda la proyección.</li></ul></td>
-              <td data-label="Resultado"><ul><li>Precio, fecha, frescura y distrito publicables; coordenada no.</li><li>Subconjunto útil publicable = 0, por permisos y no por datos; 41/41 tests.</li></ul></td>
+              <td data-label="Resultado"><ul><li>Matriz creada; Gate 4.1 actualiza coordenada y distancia como aprobadas por el owner.</li><li>Razón social, dirección e identidad comercial siguen fuera del JSON público.</li></ul></td>
             </tr>
             <tr>
               <td data-label="Gate">3.1</td>
@@ -740,6 +741,12 @@
               <td data-label="Qué se hizo"><ul><li>Raw sellado, minimización en staging, guardrails, pointer atómico y rollback.</li></ul></td>
               <td data-label="Resultado"><ul><li>Precios 14→18/08; 714/740 ofertas (96.486 %), 674 cambiaron materialmente.</li><li>Segunda ejecución unchanged/0 bytes; app 714, overlay 11/11 y 66/66 tests.</li></ul></td>
             </tr>
+            <tr>
+              <td data-label="Gate">4.1</td>
+              <td data-label="Objetivo"><ul><li>Convertir el slice en una PWA static-first.</li></ul></td>
+              <td data-label="Qué se hizo"><ul><li>Contrato público, snapshot inmutable, manifest atómico y caché offline coherente.</li></ul></td>
+              <td data-label="Resultado"><ul><li>714 ofertas en 42 distritos; JSON de 127,293 bytes sin identidad privada.</li><li>Primera carga online → recarga offline verificada; Challenger aceptó y 75/75 tests pasan.</li></ul></td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -749,43 +756,43 @@
       <div class="section-head">
         <div>
           <h2 id="next-title">Lo que sigue</h2>
-          <p>Capa 3 está cerrada. Los siguientes gates son hipótesis de Capa 4; el stack productivo sigue abierto.</p>
+          <p>Gate 4.1 está cerrado. Gate 4.2 prepara el repositorio público y Gate 4.3 realizará publicación y automatización.</p>
         </div>
       </div>
       <div class="next-gates">
         <article class="gate next">
-          <span class="tag">Siguiente · Gate 4.1</span>
-          <h3>Convertir el slice en PWA</h3>
+          <span class="tag">Cerrado · Gate 4.1</span>
+          <h3>PWA static-first con JSON público</h3>
           <ul class="gate-points">
             <li><strong>Hipótesis</strong>El contrato estable permite una experiencia instalable mobile-first sin backend nuevo.</li>
-            <li><strong>Tangible</strong>PWA candidate con shell offline y corte de datos visible.</li>
-            <li><strong>Salida</strong>Flujo principal instalable y recuperable en móvil.</li>
+            <li><strong>Tangible</strong><code>web/</code>, snapshot inmutable, manifest atómico y shell offline.</li>
+            <li><strong>Salida</strong>Flujo principal instalable; fallback solo al último bundle validado.</li>
           </ul>
         </article>
         <article class="gate tentative">
-          <span class="tag">Posterior · Gate 4.2</span>
-          <h3>Resolver el boundary público</h3>
+          <span class="tag">Siguiente · Gate 4.2</span>
+          <h3>Orden, licencias, atribución y método</h3>
           <ul class="gate-points">
-            <li><strong>Hipótesis</strong>Una estrategia explícita de ubicación puede volver útil el modo público sin fabricar permisos.</li>
-            <li><strong>Tangible</strong>Fuente sustituida, permiso demostrado o experiencia pública honesta sin coordenadas.</li>
-            <li><strong>Salida</strong>Boundary public_safe útil y medido.</li>
+            <li><strong>Hipótesis</strong>Un contrato público mínimo puede quedar listo para publicación con atribución y método explícitos.</li>
+            <li><strong>Tangible</strong>Licencias/atribución resueltas, <code>docs/metodo.md</code> y poda del repo.</li>
+            <li><strong>Salida</strong>Material público ordenado y verificable.</li>
           </ul>
         </article>
         <article class="gate tentative">
           <span class="tag">Tentativo · Gate 4.3</span>
-          <h3>Publicar y medir utilidad</h3>
+          <h3>Publicar, automatizar y probar</h3>
           <ul class="gate-points">
             <li><strong>Hipótesis</strong>Una versión estrecha puede ayudar sin ocultar procedencia ni incertidumbre.</li>
-            <li><strong>Tangible</strong>Release público reversible con medición mínima y privacidad revisada.</li>
-            <li><strong>Salida</strong>Uso real suficiente para decidir qué conservar, corregir o eliminar.</li>
+            <li><strong>Tangible</strong>Cloudflare Pages, automatización de refresh/deploy y smoke test.</li>
+            <li><strong>Salida</strong>Release público reversible y verificado.</li>
           </ul>
         </article>
       </div>
     </section>
 
     <section class="risks">
-      <h2>Área gris documentada, no bloqueo</h2>
-      <p>La coordenada GIS no tiene licencia explícita demostrada y la identidad comercial sigue con publicación desconocida. Esto no bloquea Gate 4.1 privado, pero sí debe resolverse o diseñarse explícitamente antes de una versión pública útil. No se afirma stock, descuento ni nombre comercial inferido.</p>
+      <h2>Procedencia y límites vigentes</h2>
+      <p>La coordenada GIS se publica por aprobación explícita del owner, con atribución a Osinergmin; la ausencia de licencia explícita queda registrada como procedencia. Razón social, dirección e identidad comercial no se exportan. No se afirma stock, descuento ni nombre comercial inferido.</p>
     </section>
 
     <footer>Vista interna del owner · conocimiento vigente, no historial exhaustivo.</footer>

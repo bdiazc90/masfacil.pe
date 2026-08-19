@@ -1,0 +1,36 @@
+import { loadPublicDataset } from './data-client.js';
+import { haversineKm, nearestPool, orderOffers, visibleOffers } from './lib/haversine.js';
+import { filterFreshOffers } from './lib/freshness.js';
+import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
+
+const originDemo = Object.freeze({ latitude: -12.1211, longitude: -77.0297 }); const state = { dataset:null, freshness:null, origin:null, offers:[], pool:[], sort:'distance' };
+const $ = (id) => document.getElementById(id); const nodes = Object.fromEntries(['start-step','compare-step','choose-step','fatal-state','fatal-message','use-location','use-simulated','location-status','snapshot-cutoff','query-time','valid-count','connection-status','offline-note','offers','empty-state','source-content','choice-summary','open-directions','change-origin','back-to-results','retry-load'].map((id) => [id, $(id)]));
+const money = (number) => new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN',minimumFractionDigits:2}).format(number); const date = (value) => new Intl.DateTimeFormat('es-PE',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Lima'}).format(new Date(value)); const age = (value) => { if (value < 1) return `hace ${Math.max(1,Math.round(value*24))} h`; const days = Math.floor(value); return `hace ${days} ${days === 1 ? 'día' : 'días'}`; }; const distance = (value) => value < 1 ? `${Math.round(value*1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`; const escape = (value) => String(value).replace(/[&<>'"]/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+function showFatal(error) { nodes['start-step'].hidden=true; nodes['compare-step'].hidden=true; nodes['choose-step'].hidden=true; nodes['fatal-state'].hidden=false; nodes['fatal-message'].textContent=`${error.message}. No se muestran ofertas sin un snapshot válido.`; }
+function renderStatus(mode) { nodes['snapshot-cutoff'].textContent=date(state.dataset.cutoff_at); nodes['query-time'].textContent=date(state.freshness?.queried_at ?? new Date()); nodes['valid-count'].textContent=`${state.freshness?.fresh_offers ?? state.dataset.offers.length} de ${state.dataset.offers.length}`; const saved=mode==='saved'; nodes['connection-status'].textContent=saved?'Guardados (offline)':'En línea'; nodes['offline-note'].hidden=!saved; nodes['offline-note'].textContent=saved?`Sin conexión: usas datos guardados. Corte del snapshot: ${date(state.dataset.cutoff_at)}.`:''; }
+function renderOffers() { const visible=visibleOffers(state.offers,state.sort,20,6); nodes['empty-state'].hidden=state.offers.length>0; nodes.offers.innerHTML=visible.map((offer,index)=>`<li class="offer"><p class="metrics"><strong>${escape(money(offer.price))}</strong><span>${escape(distance(offer.distance_km))}</span><span>${escape(age(offer.age_days))}</span></p><h3>${escape(offer.district)}</h3><p>Precio reportado; no confirma stock.</p><button class="button quiet" type="button" data-choose="${offer.id}" data-rank="${index+1}">Elegir</button></li>`).join(''); }
+function compare(origin) { try { state.origin=origin; state.freshness=filterFreshOffers(state.dataset.offers,{now:()=>new Date(),cutoffAt:state.dataset.cutoff_at}); state.offers=state.freshness.offers.map((offer)=>({...offer,distance_km:haversineKm(origin,offer)})); state.pool=nearestPool(state.offers,20); state.sort='distance'; renderStatus(state.dataMode); renderOffers(); nodes['start-step'].hidden=true; nodes['choose-step'].hidden=true; nodes['compare-step'].hidden=false; $('compare-title').focus(); } catch(error){showFatal(error);} }
+function select(id) { const offer=state.pool.find((item)=>item.id===id); if(!offer)return; nodes['choice-summary'].innerHTML=`<div class="choice-card"><strong>${escape(offer.district)}</strong><span>${escape(money(offer.price))} · ${escape(distance(offer.distance_km))} · ${escape(age(offer.age_days))}</span></div>`; const url=safeGoogleMapsDirectionsUrl(offer); nodes['open-directions'].hidden=!url; if(url)nodes['open-directions'].href=url; nodes['compare-step'].hidden=true; nodes['choose-step'].hidden=false; $('choose-title').focus(); }
+function waitForActivation(registration) {
+  if (registration.active) return Promise.resolve();
+  const worker = registration.installing ?? registration.waiting;
+  if (!worker) return navigator.serviceWorker.ready.then(() => undefined);
+  return new Promise((resolve, reject) => worker.addEventListener('statechange', () => {
+    if (worker.state === 'activated') resolve();
+    else if (worker.state === 'redundant') reject(new Error('El service worker no pudo activarse'));
+  }));
+}
+async function prepareServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js', { type: 'module' });
+    await waitForActivation(registration);
+    if (!navigator.serviceWorker.controller) {
+      await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+    }
+  } catch {
+    // La experiencia online sigue disponible si el navegador rechaza el worker.
+  }
+}
+async function initialize() { try { await prepareServiceWorker(); const loaded=await loadPublicDataset(); state.dataset=loaded.dataset; state.dataMode=loaded.dataMode; state.freshness=filterFreshOffers(state.dataset.offers,{now:()=>new Date(),cutoffAt:state.dataset.cutoff_at}); renderStatus(loaded.dataMode); nodes['source-content'].innerHTML=`<p>${escape(state.dataset.provenance.attribution)} Corte: ${escape(date(state.dataset.cutoff_at))}.</p><ul><li>La distancia es geodésica en línea recta.</li><li>El precio reportado no confirma stock.</li><li>Proyecto independiente, sin afiliación ni aprobación de Osinergmin, Facilito o el Estado peruano.</li></ul>`; } catch(error) { showFatal(navigator.onLine ? error : new Error('No hay datos guardados todavía. Conéctate una vez para descargar un snapshot válido')); } }
+nodes['use-location'].addEventListener('click',()=>{ if(!navigator.geolocation){nodes['location-status'].textContent='Este navegador no ofrece geolocalización. Prueba con ubicación simulada.';return;} nodes['location-status'].textContent='Esperando permiso de ubicación…'; navigator.geolocation.getCurrentPosition((position)=>compare({latitude:position.coords.latitude,longitude:position.coords.longitude}),()=>{nodes['location-status'].textContent='No se pudo obtener una ubicación confiable. Prueba con ubicación simulada.';},{enableHighAccuracy:false,timeout:8000,maximumAge:60000}); }); nodes['use-simulated'].addEventListener('click',()=>compare(originDemo)); nodes.offers.addEventListener('click',(event)=>{const button=event.target.closest('[data-choose]');if(button)select(button.dataset.choose);}); document.querySelectorAll('[data-sort]').forEach((button)=>button.addEventListener('click',()=>{state.sort=button.dataset.sort;document.querySelectorAll('[data-sort]').forEach((item)=>item.setAttribute('aria-pressed',String(item===button)));renderOffers();})); nodes['change-origin'].addEventListener('click',()=>{nodes['compare-step'].hidden=true;nodes['start-step'].hidden=false;}); nodes['back-to-results'].addEventListener('click',()=>{nodes['choose-step'].hidden=true;nodes['compare-step'].hidden=false;}); nodes['retry-load'].addEventListener('click',()=>location.reload()); initialize();

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:facilito-ux-lab:gate-4.1:public-manifest:1.0.0",
+  "title": "Manifesto público estático de Gate 4.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "snapshot_id", "dataset_url", "sha256", "bytes", "cutoff_at", "generated_at"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "snapshot_id": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}-[A-Za-z0-9-]+$" },
+    "dataset_url": { "type": "string", "pattern": "^data/snapshots/[0-9]{4}-[0-9]{2}-[0-9]{2}-[A-Za-z0-9-]+\\.json$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bytes": { "type": "integer", "minimum": 1 },
+    "cutoff_at": { "type": "string", "format": "date-time" },
+    "generated_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -4,7 +4,7 @@ Experimento independiente y no oficial para encontrar combustible desde el celul
 
 ## Estado
 
-**Capas 1, 2 y 3 completas · Capa 4 por iniciar · vertical slice privado.**
+**Capas 1, 2 y 3 completas · Gate 4.1 cerrado · PWA static-first construida.**
 
 Ya se puede:
 
@@ -16,24 +16,24 @@ Ya se puede:
 - recalcular la antigüedad real al usar la app y ocultar ofertas futuras, inválidas o mayores de 30 días;
 - detectar mediante validadores HTTP si existe un CSV nuevo sin descargar su cuerpo;
 - refrescar manualmente el snapshot: detectar, descargar a staging, validar, comparar calidad y promover atómicamente; el pointer permite rollback sin borrar el anterior.
+- proyectar el snapshot activo a un contrato público mínimo e inmutable, servido desde `web/` con manifest, PWA instalable y fallback offline honesto.
 
 El slice usa Gasohol Regular en Lima provincia. El snapshot activo del 18/08/2026 contiene 714 de 740 ofertas frescas elegibles (**96.486 %**) en 42 distritos. La ubicación personal vive solo en memoria y no se envía a Google; el handoff comparte únicamente las coordenadas del destino tras un tap explícito.
 
-El permiso de publicación se midió campo por campo: precio, fecha, frescura y distrito tienen permiso demostrado; coordenada, razón social, dirección e identidad comercial conservan límites o áreas grises documentadas. Esas ambigüedades no frenan el experimento: se preservan procedencia y capacidad de sustituir fuentes. Ver [factibilidad](docs/factibilidad.md).
+El owner aprobó la publicación de coordenadas GIS y de la distancia derivada para el contrato público downstream. Precio, fecha, frescura, distrito y coordenadas se publican con procedencia y atribución a Osinergmin; razón social, dirección e identidad comercial no entran al JSON público. La ausencia de una licencia GIS explícita se conserva como hecho de procedencia, no como prohibición. Ver [factibilidad](docs/factibilidad.md).
 
 ## Probar
 
-Requiere Node.js y la caché privada para datos reales. Sin ella usa un fixture sintético.
+Requiere Node.js y la caché privada del snapshot activo. La PWA no sustituye un pointer inválido por un fixture sintético.
 
 ```bash
-npm start
+npm run project:gate-4.1
+npm run serve:web
 ```
 
-Abrir <http://127.0.0.1:4173>. Para forzar el fixture: `npm run demo`. El servidor escucha únicamente en loopback; un celular físico distinto no puede abrir esa URL.
+Abrir <http://127.0.0.1:4173>. `web/` es la raíz publicable; el navegador consume `data/manifest.json` y el snapshot estático señalado, nunca `/api/dataset`. Verifica el bundle con `npm run verify:web`. El servidor local escucha únicamente en loopback.
 
 Por defecto la identidad comercial usa la política `public_safe` (solo verificada + vigente + publicable). Para inspeccionar candidatos verificados con publicación desconocida: `node app/server.mjs --private-preview`. Con `?debug=1` en la URL aparece un control para simular el origen cerca de una oferta con identidad comercial proyectada, sin depender de la ubicación real ni de la simulada por defecto.
-
-Para ver el producto bajo publicación estricta, con cada campo filtrado por su permiso real: `node app/server.mjs --public-strict`. Las dos banderas son contradictorias y no pueden combinarse.
 
 ```bash
 npm test
@@ -77,7 +77,9 @@ Los originales grandes o identificables permanecen en `.local-cache/`, ignorada 
 ## Estructura
 
 ```text
-app/         web local privada
+web/         raíz pública PWA (shell, manifest, worker y datos generados ignorados)
+pipeline/    proyección del contrato privado hacia JSON público inmutable
+app/         utilidades y preview privado legado
 contracts/   schemas de boundaries
 data/        derivados minimizados y procedencia
 docs/        conocimiento vigente

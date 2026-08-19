@@ -60,7 +60,7 @@ Las capas GIS perfiladas suman 11,215 features:
 - capa 35: 5,284;
 - capa 36: 151.
 
-`N` es completo y único en las capas 34/35/36. La capa 31 no existe en el servicio observado. Las geometrías son válidas y están dentro de una caja conservadora de Perú. El servicio atribuye copyright a Osinergmin, pero no expone licencia explícita.
+`N` es completo y único en las capas 34/35/36. La capa 31 no existe en el servicio observado. Las geometrías son válidas y están dentro de una caja conservadora de Perú. El servicio atribuye copyright a Osinergmin, pero no expone licencia explícita. Ese es un hecho de procedencia; el owner aprobó expresamente publicar las coordenadas GIS en el contrato público downstream de Gate 4.1. La atribución pública resultante es “Datos de precios y coordenadas: Osinergmin.”
 
 Solapamientos exactos del snapshot, sin fuzzy matching:
 

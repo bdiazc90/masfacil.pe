@@ -4,12 +4,13 @@
 
 ## Estado
 
-**Sin gate activo.**
+**Sin gate activo. Gate 4.1 cerrado por Codex A el 19 de agosto de 2026.**
 
-- Gate 3.3 y Capa 3 cerrados por Codex A el 18 de agosto de 2026.
-- Resultado vigente: snapshot `2026-08-18-20260819T003213952Z-7928-71e6ba`, 714/740 ofertas contractuales (96.486 %), Registro/GIS fijados al 14/08 y overlay privado 11/11.
-- Operación: detección barata → raw verificado → staging/minimización → validación/guardrails → promoción atómica. `unchanged` consume 0 bytes y rollback conserva el último bueno.
-- Verificación de cierre: 66/66 tests, hashes y lineage reproducidos, header único, app real 714 y `--private-preview` 11/11. Los dos candidatos supersedidos quedaron fuera de rollback.
-- Próximo gate tentativo: Gate 4.1, PWA instalable mobile-first sobre el contrato estable, sin elegir todavía infraestructura productiva.
+- PWA static-first en `web/`: shell cache-first y bundle manifest+snapshot network-first con fallback offline validado.
+- Proyección pública `1.0.0`: 714 ofertas, 42 distritos y 127,293 bytes; allowlist exacta, SHA-256 y manifest promovido al final. Los generados permanecen fuera de Git.
+- El primer uso online controla el service worker antes de descargar datos; una recarga offline inmediata conserva el último bundle válido. Cold-offline falla de forma honesta.
+- Challenger FULL: dos bloqueantes detectados y corregidos — primera carga sin caché de datos y preview legado con módulos 404. Segunda revisión aceptada sin bloqueantes.
+- Cierre: 75/75 tests, proyección y verificación reales correctas, preview legado restaurado y `git diff --check` limpio.
+- Próximo gate: 4.2, orden, licencias, atribución, método multiagente, evidencia explicada y poda previa a publicación.
 
-Decisión vigente del owner: una ambigüedad de licencia o permiso se registra como área gris y no bloquea el avance. Solo una infracción explícita y material, privacidad, seguridad, corrupción/pérdida de datos o una afirmación dañina justifican detenerse.
+Decisión vigente del owner: las coordenadas GIS y la distancia derivada están aprobadas para publicación downstream con procedencia y atribución a Osinergmin; no son un riesgo abierto. Razón social, dirección e identidad comercial conservan sus políticas separadas.

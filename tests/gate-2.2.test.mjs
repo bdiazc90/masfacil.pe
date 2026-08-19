@@ -64,7 +64,7 @@ test('la matriz cubre exactamente los campos exigidos por el gate, congelada y c
 
 test('fieldVerdict resuelve por nombre y lanza ante un campo desconocido', () => {
   assert.equal(fieldVerdict('precio'), 'publishable');
-  assert.equal(fieldVerdict('coordenada'), 'not_publishable');
+  assert.equal(fieldVerdict('coordenada'), 'publishable');
   assert.equal(fieldVerdict('razon_social'), 'unknown');
   assert.throws(() => fieldVerdict('campo_inexistente'), /desconocido/);
 });
@@ -104,11 +104,11 @@ test('un campo con permiso explícito permanece visible bajo public_safe', () =>
   assert.equal(projected.district, 'SURQUILLO');
 });
 
-test('coordenada explícitamente prohibida se suprime siempre bajo public_safe', () => {
+test('coordenada y distancia derivada son publicables por decisión cerrada del owner', () => {
   const projected = projectClientOfferFields(sampleClientOffer(), 'public_safe');
-  assert.equal(projected.longitude, null);
-  assert.equal(projected.latitude, null);
-  assert.deepEqual(projected.suppressed_fields, ['address', 'latitude', 'legal_name', 'longitude'].sort());
+  assert.equal(projected.longitude, -77.01);
+  assert.equal(projected.latitude, -12.11);
+  assert.deepEqual(projected.suppressed_fields, ['address', 'legal_name']);
 });
 
 test('projectClientOfferFields y applyFieldPublicationPolicy lanzan ante una política desconocida', () => {
@@ -135,10 +135,10 @@ test('applyFieldPublicationPolicy proyecta todas las ofertas y reporta el tamañ
 
   assert.equal(strict.field_publication_policy, 'public_safe');
   assert.equal(strict.offers.length, client.offers.length);
-  assert.ok(strict.offers.every((offer) => offer.longitude === null && offer.latitude === null));
+  assert.ok(strict.offers.every((offer) => offer.longitude !== null && offer.latitude !== null));
   assert.ok(strict.offers.every((offer) => offer.legal_name === null && offer.address === null));
   assert.ok(strict.offers.every((offer) => offer.price !== null && offer.district !== null));
-  assert.equal(strict.publication_subset.locatable, 0);
+  assert.equal(strict.publication_subset.locatable, client.offers.length);
   assert.equal(strict.publication_subset.total, client.offers.length);
 
   const permissive = applyFieldPublicationPolicy(client, 'private_experiment');

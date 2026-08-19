@@ -3,11 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node app/server.mjs",
+    "start": "node scripts/serve-web.mjs",
     "demo": "node app/server.mjs --demo",
     "probe:gate-3.2": "node scripts/probe-gate-3.2.mjs",
     "refresh:gate-3.3": "node scripts/refresh-gate-3.3.mjs",
     "rollback:gate-3.3": "node scripts/rollback-gate-3.3.mjs",
+    "project:gate-4.1": "node pipeline/project.mjs",
+    "serve:web": "node scripts/serve-web.mjs",
+    "verify:web": "node scripts/verify-web.mjs",
     "test": "node --test tests/*.test.mjs"
   }
 }

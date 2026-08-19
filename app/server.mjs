@@ -11,6 +11,7 @@ import { resolveActiveSnapshot } from './snapshot-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const publicRoot = path.join(root, 'app', 'public');
+const sharedWebLibRoot = path.join(root, 'web', 'lib');
 const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.schema.json');
 const demoPath = path.join(root, 'fixtures', 'gate-1.1', 'experiment-dataset.synthetic.json');
 const overlaySchemaPath = path.join(root, 'contracts', 'gate-2.1-commercial-identity-overlay.schema.json');
@@ -108,9 +109,12 @@ const server = http.createServer((req, res) => {
     return;
   }
   const route = url.pathname === '/' ? '/index.html' : url.pathname;
-  const relative = path.posix.normalize(route).replace(/^\/+/, '');
-  const file = path.join(publicRoot, relative);
-  if (!file.startsWith(`${publicRoot}${path.sep}`) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+  const servesSharedWebLib = route.startsWith('/web/lib/');
+  const assetRoot = servesSharedWebLib ? sharedWebLibRoot : publicRoot;
+  const assetRoute = servesSharedWebLib ? route.slice('/web/lib'.length) : route;
+  const relative = path.posix.normalize(assetRoute).replace(/^\/+/, '');
+  const file = path.join(assetRoot, relative);
+  if (!file.startsWith(`${assetRoot}${path.sep}`) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     send(res, 404, 'No encontrado', 'text/plain; charset=utf-8');
     return;
   }
@@ -128,7 +132,7 @@ server.listen(options.port, host, () => {
   process.stdout.write(`Overlay comercial — ${overlaySource}: ${commercial.metrics.projected}/${commercial.metrics.entries} identidades proyectables · política ${identityPolicy}\n`);
   const subset = clientDatasetObject.publication_subset;
   process.stdout.write(fieldPolicy === 'public_safe'
-    ? `Publicación de campos — public_safe: ${subset.decision_ready}/${subset.total} ofertas con identidad y ubicación publicables (${subset.identifiable}/${subset.total} identificables, ${subset.locatable}/${subset.total} ubicables). Ubicables y listas para decidir son 0 por la matriz, no por los datos.\n`
+    ? `Publicación de campos — public_safe: ${subset.locatable}/${subset.total} ubicables, ${subset.identifiable}/${subset.total} identificables y ${subset.decision_ready}/${subset.total} con identidad y ubicación publicables.\n`
     : `Publicación de campos — private_experiment: sin supresión; ${subset.total} ofertas completas. No se evalúa publicabilidad en esta política.\n`);
   process.stdout.write(`http://${host}:${options.port}\n`);
   if (!options.demo && useDemo) process.stdout.write('Dataset privado ausente: se inició automáticamente con el fixture sintético.\n');

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12313b"><meta name="color-scheme" content="light">
+  <title>Gasohol regular cerca de ti</title><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Ir al contenido</a>
+  <main id="main" tabindex="-1">
+    <section id="start-step" class="card" aria-labelledby="start-title">
+      <p class="eyebrow">Gasohol Regular · Lima provincia</p><h1 id="start-title">Compara antes de salir</h1>
+      <p class="intro">Precio, cercanía y antigüedad del reporte. La ubicación se usa solo en esta pestaña.</p>
+      <dl class="data-status" aria-live="polite"><div><dt>Corte</dt><dd id="snapshot-cutoff">Cargando…</dd></div><div><dt>Consulta</dt><dd id="query-time">—</dd></div><div><dt>Vigentes</dt><dd id="valid-count">—</dd></div><div><dt>Datos</dt><dd id="connection-status">Verificando</dd></div></dl>
+      <div class="actions"><button id="use-location" class="button primary" type="button">Usar mi ubicación</button><button id="use-simulated" class="button text" type="button">Probar con ubicación simulada</button></div>
+      <p id="location-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+    <section id="compare-step" class="card" aria-labelledby="compare-title" hidden>
+      <header><div><p class="eyebrow">20 cercanas → 6 opciones</p><h2 id="compare-title" tabindex="-1">Opciones cercanas</h2></div><button id="change-origin" class="button text compact" type="button">Cambiar ubicación</button></header>
+      <p id="offline-note" class="offline-note" role="status" hidden></p><div class="segmented" role="group" aria-label="Ordenar opciones"><button data-sort="distance" aria-pressed="true" type="button">Cercanía</button><button data-sort="price" aria-pressed="false" type="button">Precio</button><button data-sort="freshness" aria-pressed="false" type="button">Reciente</button></div>
+      <p class="hint">Distancia en línea recta, no ruta ni tiempo de viaje.</p><ol id="offers" class="offers"></ol><p id="empty-state" class="empty" hidden>No quedan ofertas dentro de los últimos 30 días. No se muestran alternativas antiguas.</p>
+      <details><summary>Sobre estos datos</summary><div id="source-content"></div></details>
+    </section>
+    <section id="choose-step" class="card choice" aria-labelledby="choose-title" hidden><p class="check" aria-hidden="true">✓</p><h2 id="choose-title" tabindex="-1">Estación elegida</h2><div id="choice-summary"></div><a id="open-directions" class="button primary" href="" target="_blank" rel="noopener noreferrer" hidden>Abrir en Google Maps</a><button id="back-to-results" class="button text" type="button">Volver a comparar</button></section>
+    <section id="fatal-state" class="card error" aria-labelledby="fatal-title" hidden><h2 id="fatal-title">No se pudieron cargar las opciones</h2><p id="fatal-message"></p><button id="retry-load" class="button quiet" type="button">Reintentar</button></section>
+  </main><script type="module" src="/app.js"></script>
+</body>
+</html>
