@@ -149,6 +149,7 @@ No crear documentos por evento. Antes de crear un `.md`, actualizar uno existent
 Documentos vivos:
 
 - `README.md`: entrada rápida, estado y ejecución;
+- `DESIGN.md`: contrato de diseño de interfaz, común a todas las rutas;
 - `docs/descubrimiento.md`: producto público observado;
 - `docs/datos.md`: fuentes, relaciones y límites;
 - `docs/factibilidad.md`: decisiones cuantitativas y contrato experimental;
@@ -178,6 +179,8 @@ Evitar crawling agresivo, bypass de autenticación, evasión de controles y carg
 Los originales grandes o con datos personales no se versionan. Conservar solo evidencia mínima, agregada o sanitizada necesaria para reproducir decisiones.
 
 ## Producto y UX
+
+`DESIGN.md` es la fuente canónica del diseño de interfaz: anclajes, principios falsables, honestidad del dato, estados obligatorios, sistema visual, componentes y accesibilidad. Toda ruta se diseña contra ese contrato; una decisión de interfaz que lo contradiga se resuelve actualizándolo en el mismo commit, nunca en silencio.
 
 Para cada capacidad preguntar:
 
