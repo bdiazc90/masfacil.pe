@@ -9,6 +9,7 @@ import { publicationDecision } from '../app/gate-4.3-publication-policy.mjs';
 import { compareGasolinaQuality, validateRefreshState } from '../pipeline/refresh-state.mjs';
 import { verifyContrast } from '../web/contrast.mjs';
 import { GASOLINA_KEYS, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from '../pipeline/gasolina-contract.mjs';
+import { validateStaticShell } from '../scripts/static-shell.mjs';
 import { loadGasolinaProduct } from '../web/data-client.js';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -121,6 +122,16 @@ test('el bootstrap manual produce una raíz sellada cuando existe el bundle priv
   assert.equal(fs.existsSync(path.join(root, prepared.deploy_root, 'data', 'gasolina', 'manifest.json')), true);
 });
 
+test('la raíz pública incluye el cierre transitivo de módulos y precache', (t) => {
+  assert.deepEqual(validateStaticShell(path.join(root, 'web')), []);
+  const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-4.3-shell-'));
+  t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(fixture, 'index.html'), '<script type="module" src="/app.js"></script>');
+  fs.writeFileSync(path.join(fixture, 'app.js'), "import './missing.js';\n");
+  fs.writeFileSync(path.join(fixture, 'sw.js'), "const SHELL = ['/app.js', '/missing.js'];\n");
+  assert.deepEqual(validateStaticShell(fixture), ['falta módulo estático missing.js', 'sw.js SHELL: falta /missing.js']);
+});
+
 test('gasolina v2 separa LIMA/LIMA y ambos bundles inmutables sin producto por oferta', { skip: !fs.existsSync(path.join(root, 'web', 'data', 'gasolina', 'manifest.json')) }, () => {
   const data = path.join(root, 'web', 'data', 'gasolina'); const publicManifest = JSON.parse(fs.readFileSync(path.join(data, 'manifest.json'), 'utf8'));
   assert.deepEqual(validateGasolinaManifest(publicManifest), []); assert.deepEqual(Object.keys(publicManifest.products), GASOLINA_KEYS);
@@ -139,8 +150,8 @@ test('ruta, selectores y fallback Premium preservan estados separados', () => {
 });
 
 test('el tema es un toggle accesible de tres estados con iconos', () => {
-  const index = fs.readFileSync(path.join(root, 'web', 'index.html'), 'utf8'); const app = fs.readFileSync(path.join(root, 'web', 'app.js'), 'utf8'); const styles = fs.readFileSync(path.join(root, 'web', 'styles.css'), 'utf8');
-  assert.doesNotMatch(index, /theme-menu/); assert.deepEqual([...index.matchAll(/data-theme-choice="([^"]+)"/g)].map((match) => match[1]), ['light', 'system', 'dark']); assert.equal((index.match(/<svg /g) ?? []).length >= 3, true); assert.match(index, /aria-label="Tema claro"/); assert.match(index, /aria-label="Tema del sistema"/); assert.match(index, /aria-label="Tema oscuro"/); assert.match(app, /button\.dataset\.themeChoice === choice/); assert.match(styles, /\.theme-toggle/); assert.match(styles, /aria-pressed="true"/);
+  const index = fs.readFileSync(path.join(root, 'web', 'index.html'), 'utf8'); const theme = fs.readFileSync(path.join(root, 'web', 'theme.js'), 'utf8'); const styles = fs.readFileSync(path.join(root, 'web', 'styles.css'), 'utf8');
+  assert.doesNotMatch(index, /theme-menu/); assert.deepEqual([...index.matchAll(/data-theme-choice="([^"]+)"/g)].map((match) => match[1]), ['light', 'system', 'dark']); assert.equal((index.match(/<svg /g) ?? []).length >= 3, true); assert.match(index, /aria-label="Tema claro"/); assert.match(index, /aria-label="Tema del sistema"/); assert.match(index, /aria-label="Tema oscuro"/); assert.match(theme, /button\.dataset\.themeChoice === choice/); assert.match(styles, /\.theme-toggle/); assert.match(styles, /aria-pressed="true"/);
 });
 
 test('la simplificación UX concentra la selección, ubicación, distrito y resultados', () => {

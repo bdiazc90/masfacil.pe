@@ -1,4 +1,4 @@
-export const SHELL_CACHE = 'masfacil-shell-v9';
+export const SHELL_CACHE = 'masfacil-shell-v11';
 export const DATA_CACHE = 'masfacil-data-v2';
 export async function cacheFirst({ request, cache, fetchImpl }) {
   const cached = await cache.match(request); if (cached) return { response: cached, source: 'cache' };

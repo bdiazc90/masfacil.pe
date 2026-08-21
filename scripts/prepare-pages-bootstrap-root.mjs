@@ -26,6 +26,8 @@ try {
     fs.copyFileSync(source, target);
   }
   fs.cpSync(sourceData, path.join(temporary, 'data'), { recursive: true });
+  const candidate = spawnSync(process.execPath, ['scripts/verify-first-pages-bootstrap.mjs', '--web-root', path.relative(root, temporary)], { cwd: root, encoding: 'utf8' });
+  if (candidate.status !== 0) throw new Error(candidate.stderr || candidate.stdout || 'Raíz sellada de Pages inválida');
   fs.rmSync(destination, { recursive: true, force: true });
   fs.renameSync(temporary, destination);
 } catch (error) {

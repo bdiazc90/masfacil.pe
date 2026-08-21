@@ -1,7 +1,7 @@
 import { SHELL_CACHE, DATA_CACHE, cacheFirst } from './sw-cache-policy.js';
 import { GASOLINA_KEYS, validGasolinaBundle, validateGasolinaManifest } from './gasolina-contract.js';
 
-const SHELL = ['/', '/gasolina/', '/gasolina/regular/', '/gasolina/premium/', '/index.html', '/styles.css', '/app.js', '/selector.js', '/service-worker-ready.js', '/data-client.js', '/gasolina-contract.js', '/district-list.js', '/offer-card.js', '/sw-cache-policy.js', '/lib/haversine.js', '/lib/freshness.js', '/lib/directions.js', '/manifest.webmanifest', '/icons/icon-192.svg', '/icons/icon-512.svg'];
+const SHELL = ['/', '/gasolina/', '/gasolina/regular/', '/gasolina/premium/', '/index.html', '/styles.css', '/app.js', '/selector.js', '/theme.js', '/service-worker-ready.js', '/data-client.js', '/gasolina-contract.js', '/district-list.js', '/offer-card.js', '/sw-cache-policy.js', '/lib/haversine.js', '/lib/decision-view.js', '/lib/freshness.js', '/lib/directions.js', '/manifest.webmanifest', '/icons/icon-192.svg', '/icons/icon-512.svg'];
 const active = new Map();
 const pairRequest = (key) => new Request(`/__masfacil-gasolina-pair/${key}`);
 const tagged = (response, mode) => { const headers = new Headers(response.headers); headers.set('X-Masfacil-Data-Mode', mode); return new Response(response.body, { status: response.status, statusText: response.statusText, headers }); };
