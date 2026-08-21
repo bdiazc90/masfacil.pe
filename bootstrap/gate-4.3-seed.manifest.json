@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "seed_id": "gate-4.3-registry-gis-lima-2026-08-14",
+  "reference_snapshot_date": "2026-08-14",
+  "registry_fields": ["source_activity", "registro", "department", "province", "district"],
+  "gis_fields": ["n", "department", "province", "district", "longitude", "latitude"],
+  "filters": {"source_activity": ["01", "02", "05", "06"], "layer": "35", "department": "LIMA", "province": "LIMA"},
+  "counts": {"registry_rows": 744, "registry_unique_keys": 744, "gis_rows": 750, "gis_unique_n": 750},
+  "sizes": {"json_bytes": 104781, "gzip_bytes": 19447, "base64_bytes": 25932},
+  "hashes": {"json_sha256": "7648760708bb0da9a1546fd7cca65eed39d21b1fed9413f9d8fa0c770f4395b0", "gzip_sha256": "392191248c32dc04bf70c7358cd3efd44a6ecb9e334514dfabe8cfe32fbf5f64", "base64_sha256": "c4d3a3cf61eaaa93d3fbb1838e3de5df8695b883a69344d58b6a8e214a57a91d"},
+  "privacy": {"contains": "joins sanitizados de Registro y GIS para Lima provincia", "forbids": ["OBJECTID", "CODIGO_OSINERGMIN", "CODIGO_DGH", "RUC", "razón social", "dirección", "actividad descriptiva", "overlay", "paths", "lineage"], "delivery": "secret privado GATE_4_3_BOOTSTRAP_SEED_B64; nunca Git, cache ni artifact"}
+}

@@ -1,28 +1,48 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="light" data-bg-mode="css">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#12313b"><meta name="color-scheme" content="light">
-  <title>Gasohol regular cerca de ti</title><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f4f4">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Compara precio y cercanía de combustibles en Lima provincia.">
+  <title>masfacil.pe/gasolina</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <div class="coast-bg" aria-hidden="true"></div>
   <a class="skip-link" href="#main">Ir al contenido</a>
-  <main id="main" tabindex="-1">
-    <section id="start-step" class="card" aria-labelledby="start-title">
-      <p class="eyebrow">Gasohol Regular · Lima provincia</p><h1 id="start-title">Compara antes de salir</h1>
-      <p class="intro">Precio, cercanía y antigüedad del reporte. La ubicación se usa solo en esta pestaña.</p>
-      <dl class="data-status" aria-live="polite"><div><dt>Corte</dt><dd id="snapshot-cutoff">Cargando…</dd></div><div><dt>Consulta</dt><dd id="query-time">—</dd></div><div><dt>Vigentes</dt><dd id="valid-count">—</dd></div><div><dt>Datos</dt><dd id="connection-status">Verificando</dd></div></dl>
-      <div class="actions"><button id="use-location" class="button primary" type="button">Usar mi ubicación</button><button id="use-simulated" class="button text" type="button">Probar con ubicación simulada</button></div>
-      <p id="location-status" class="status" role="status" aria-live="polite"></p>
+  <main id="main" tabindex="-1" class="app-shell">
+    <header class="appbar appbar--compact plate">
+      <a class="brand" href="/gasolina/" aria-label="Volver a elegir combustible en masfacil.pe"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
+      <div class="theme-toggle" role="group" aria-label="Tema">
+        <button data-theme-choice="light" aria-label="Tema claro" aria-pressed="false" title="Claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg><span class="sr-only">Claro</span></button>
+        <button data-theme-choice="system" aria-label="Tema del sistema" aria-pressed="false" title="Sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><span class="sr-only">Sistema</span></button>
+        <button data-theme-choice="dark" aria-label="Tema oscuro" aria-pressed="false" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg><span class="sr-only">Oscuro</span></button>
+      </div>
+    </header>
+    <div id="product-toggle" class="toggle" role="group" aria-label="Cambiar combustible"><button data-product="regular" aria-pressed="false" type="button">Regular</button><button data-product="premium" aria-pressed="false" type="button">Premium</button></div>
+    <section id="start-step" class="screen-flow start-step--compact" aria-labelledby="start-title">
+      <h1 id="start-title">Encuentra gasolina cerca de ti</h1>
+      <button id="use-location" class="button button--primary" type="button" disabled>Usar mi ubicación</button>
+      <button id="choose-district" class="button button--text" type="button" disabled>Elegir distrito</button>
+      <p id="location-status" class="privacy-line" role="status" aria-live="polite">No guardamos tu ubicación.</p>
+      <p id="data-status" class="sr-only" role="status" aria-live="polite">Cargando precios…</p>
     </section>
-    <section id="compare-step" class="card" aria-labelledby="compare-title" hidden>
-      <header><div><p class="eyebrow">20 cercanas → 6 opciones</p><h2 id="compare-title" tabindex="-1">Opciones cercanas</h2></div><button id="change-origin" class="button text compact" type="button">Cambiar ubicación</button></header>
-      <p id="offline-note" class="offline-note" role="status" hidden></p><div class="segmented" role="group" aria-label="Ordenar opciones"><button data-sort="distance" aria-pressed="true" type="button">Cercanía</button><button data-sort="price" aria-pressed="false" type="button">Precio</button><button data-sort="freshness" aria-pressed="false" type="button">Reciente</button></div>
-      <p class="hint">Distancia en línea recta, no ruta ni tiempo de viaje.</p><ol id="offers" class="offers"></ol><p id="empty-state" class="empty" hidden>No quedan ofertas dentro de los últimos 30 días. No se muestran alternativas antiguas.</p>
-      <details><summary>Sobre estos datos</summary><div id="source-content"></div></details>
+    <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button button--text" type="button">Elegir distrito</button></div></section>
+    <section id="district-step" class="screen-flow district-step--compact" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div><button id="district-show-all" class="button button--text button--compact" type="button">Ver todos los distritos</button><button id="retry-location" class="button button--text button--compact" type="button">Reintentar ubicación</button></section>
+    <section id="compare-step" class="screen-flow" aria-labelledby="compare-title" hidden>
+      <div class="results-head results-head--compact"><h2 id="compare-title" tabindex="-1">Cerca de ti</h2><button id="change-origin" class="button button--text button--compact" type="button">Cambiar</button></div>
+      <p id="offline-note" class="offline-note" role="status" hidden></p>
+      <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados"><button data-sort="distance" aria-pressed="true" type="button">Más cercas</button><button data-sort="price" aria-pressed="false" type="button">Más baratas</button></div>
+      <ol id="offers" class="offers"></ol>
+      <section id="empty-state" class="plate empty" hidden><p class="eyebrow">Sin datos recientes</p><h2>No tenemos precios recientes</h2><p class="lede">No mostramos precios de más de 30 días porque ya no sirven para decidir.</p><a id="official-source" class="button button--primary" target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a></section>
+      <details class="about plate"><summary>Sobre los datos</summary><div id="source-content"></div></details>
     </section>
-    <section id="choose-step" class="card choice" aria-labelledby="choose-title" hidden><p class="check" aria-hidden="true">✓</p><h2 id="choose-title" tabindex="-1">Estación elegida</h2><div id="choice-summary"></div><a id="open-directions" class="button primary" href="" target="_blank" rel="noopener noreferrer" hidden>Abrir en Google Maps</a><button id="back-to-results" class="button text" type="button">Volver a comparar</button></section>
-    <section id="fatal-state" class="card error" aria-labelledby="fatal-title" hidden><h2 id="fatal-title">No se pudieron cargar las opciones</h2><p id="fatal-message"></p><button id="retry-load" class="button quiet" type="button">Reintentar</button></section>
-  </main><script type="module" src="/app.js"></script>
+    <section id="fatal-state" class="screen-flow" aria-labelledby="fatal-title" hidden><div class="plate"><p class="eyebrow">No hay datos disponibles</p><h2 id="fatal-title">No se pudieron cargar las opciones</h2><p id="fatal-message" class="lede"></p><button id="retry-load" class="button button--primary" type="button">Reintentar</button></div></section>
+  </main>
+  <script type="module" src="/app.js"></script>
 </body>
 </html>

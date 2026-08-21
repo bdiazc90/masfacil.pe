@@ -12,3 +12,6 @@
 
 # Gate 4.1: proyección pública generada desde el pointer local; nunca se versiona.
 /web/data/
+
+# Configuración local de desarrollo; nunca se lee ni se publica desde Git.
+/.env

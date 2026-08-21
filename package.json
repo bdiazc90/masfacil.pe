@@ -1,5 +1,5 @@
 {
-  "name": "facilito-ux-lab",
+  "name": "masfacil-pe",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -9,10 +9,22 @@
     "probe:gate-3.2": "node scripts/probe-gate-3.2.mjs",
     "refresh:gate-3.3": "node scripts/refresh-gate-3.3.mjs",
     "rollback:gate-3.3": "node scripts/rollback-gate-3.3.mjs",
+    "rollback:gate-4.3": "node scripts/rollback-gate-4.3.mjs",
     "project:gate-4.1": "node pipeline/project.mjs",
+    "project:gasolina": "node pipeline/project-gasolina.mjs",
     "serve:web": "node scripts/serve-web.mjs",
     "verify:web": "node scripts/verify-web.mjs",
+    "verify:pages-bootstrap": "node scripts/verify-first-pages-bootstrap.mjs",
+    "prepare:pages-bootstrap": "node scripts/prepare-pages-bootstrap-root.mjs",
     "audit:publication": "node scripts/audit-publication.mjs",
+    "seed:gate-4.3": "node scripts/generate-gate-4.3-bootstrap-seed.mjs",
+    "install-seed:gate-4.3": "node scripts/install-gate-4.3-bootstrap-seed.mjs",
+    "prepare:gate-4.3": "node scripts/prepare-gate-4.3-publication.mjs",
+    "fetch:public-bundle": "node scripts/fetch-live-public-bundle.mjs",
+    "fetch:refresh-state": "node scripts/fetch-live-refresh-state.mjs",
+    "verify:clean-runner:gate-4.3": "node scripts/verify-gate-4.3-clean-runner.mjs",
+    "make:clean-runner-raw:gate-4.3": "node scripts/make-gate-4.3-clean-runner-raw.mjs",
+    "measure:gasolina:premium": "node scripts/measure-gasolina-premium.mjs",
     "test": "node --test tests/*.test.mjs"
   }
 }

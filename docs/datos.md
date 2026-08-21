@@ -44,6 +44,8 @@ El refresco correctivo real restauró primero `2026-08-14`, tomó ETag/Last-Modi
 
 El candidato produjo **740** ofertas frescas, **714** listas para contrato y **96.486 %** de cobertura, frente a **741**, **714** y **96.356 %**. Registro y GIS siguieron fijados al **14/08/2026**. Los 11 anchors de Gate 2.1 fueron revalidados y reanclados al nuevo `dataset_id`; `--private-preview` proyecta 11/11. Los dos candidatos supersedidos permanecen inactivos y no son elegibles para rollback. Una segunda ejecución fue `unchanged`, sin descarga ni promoción. La reutilización es genérica: si cambian los validators, el raw anterior no coincide y no se reutiliza.
 
+Para Gate 4.3, la promoción se amplió al contrato público v2: el staging construye y valida **Regular y Premium** contra una misma revisión antes de mover el pointer privado. Los guardrails comprueban por producto ofertas frescas/publicables, distritos, cobertura y conflictos; también exigen que avance `source_max_reported_at`. El manifest público común se escribe después de sus dos snapshots inmutables. `npm run rollback:gate-4.3 -- <snapshot-id>` reconstruye y valida el mismo par antes de cambiar el pointer. La simulación de runner limpio verificó `changed` con 714 Regular y 700 Premium, y luego `unchanged` con un HEAD y 0 bytes de raw.
+
 Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026**; no fueron refrescados ni se afirma lo contrario. Los originales y derivados grandes viven solo en `.local-cache/`; la evidencia agregada queda en `evidence/gate-3.3-refresh-2026-08-18.json`.
 
 ## Evidencia externa verificada por el owner: EVPC
@@ -94,31 +96,104 @@ La evidencia EVPC del owner verificó además:
 
 El catálogo UBIGEO INEI contiene 1,891 distritos e IDs únicos, bajo ODbL. Las fuentes observadas usan territorio textual y no ofrecen un campo UBIGEO compatible para join directo.
 
-## Identidad y disponibilidad
+## Identidad comercial
 
-Ninguna fuente bulk oficial expone identidad comercial:
+### Qué expone y qué no expone cada fuente
+
+Ninguna fuente bulk oficial expone identidad comercial de la sede:
 
 - EVPC tenía `MARCA` vacía en 17,472/17,472 filas;
 - el Registro aporta razón social y dirección, no garantiza nombre público de la sede;
 - el formulario RHO y el Padrón Reducido SUNAT no exponen nombre comercial;
 - la consulta individual SUNAT requiere CAPTCHA y no se evade.
 
-No se inventa marca desde razón social, RUC o dirección. Tampoco se interpreta `PRODUCTO_ACTIVO`, `ULT_PRECIO_DIF_CERO` u otros campos como stock sin semántica demostrada.
+Este es un hecho sobre las fuentes bulk, **no una conclusión sobre el proyecto**. Que una fuente automatizable no entregue el dato no implica que el dato sea desconocido ni que obtenerlo por otra vía sea ilegítimo: la observación directa, la confirmación del owner y el aporte moderado de colaboradores son evidencia válida, registrada por nivel según [`AGENTS.md`](../AGENTS.md).
 
-### Piloto de identidad comercial (Gate 2.1)
+Se conservan intactos los controles que protegen la exactitud: no se infiere marca desde razón social, RUC, dirección ni proximidad, y no se interpretan `PRODUCTO_ACTIVO`, `ULT_PRECIO_DIF_CERO` u otros campos como stock sin semántica demostrada.
 
-Un golden set privado, construido por un research scout independiente y verificado el **17 de agosto de 2026**, vinculó identidad comercial fuera de las fuentes bulk oficiales:
+### Clasificación de riesgo del campo
+
+Según los dos ejes del método:
+
+| Eje | Nivel | Consecuencia operativa |
+| --- | --- | --- |
+| Tasa y señal de cambio | Baja tasa, **sin señal propia** | Se puede curar a mano y revisar con poca frecuencia, pero necesita `verified_at` explícito y disparadores propios |
+| Daño y detectabilidad | **Daño atributivo alto**, error poco detectable | Cero falsos positivos en el vínculo; el fallback honesto es preferible a una atribución dudosa |
+
+Publicar un nombre convierte una tarjeta anónima —«SURQUILLO · S/ 16.89»— en una afirmación sobre un negocio identificable. El mismo error que antes solo confundía a quien conduce, después atribuye un precio al establecimiento equivocado. Por eso la identidad **sube** el estándar de exactitud de los campos que la acompañan.
+
+### Hard negatives medidos, que siguen vigentes
+
+El piloto midió modos de fallo reales; no son cautela abstracta:
+
+- **coordenada compartida:** dos establecimientos con razón social distinta —COESTI y Repsol— sobre la misma coordenada exacta. Una coordenada no puede ser anchor de identidad por sí sola;
+- **abanderamiento:** una marca operando sobre la razón social de un tercero. Se excluyó correctamente como conflicto, no como verificado;
+- **dirección normalizada ambigua o compartida** entre candidatos.
+
+### Piloto de identidad comercial — Gate 2.1, contrato histórico
+
+Trabajo realizado y verificado el **17 de agosto de 2026**. Estos hechos no se reescriben.
+
+Un golden set privado, construido por un research scout independiente, vinculó identidad comercial fuera de las fuentes bulk oficiales:
 
 - universo predefinido de 64 ofertas (Surco + 3 distritos aledaños) del dataset Gate 1.1;
 - 14 candidatos con razón social corporativa Repsol exacta; 11 vinculados por dirección normalizada exacta a una fuente first-party (PDF "Relación de Estaciones – Repsol You"), 3 sin contraparte (unmatched, no forzado);
-- 0 vínculos Primax: sin directorio first-party con nombre de sede accesible sin evadir controles ni renderizar JS;
+- 0 vínculos Primax: no se encontró directorio first-party con nombre de sede accesible sin evadir controles ni renderizar JS;
 - método en dos pasos deterministas, sin fuzzy matching: igualdad exacta de razón social corporativa, luego dirección normalizada exacta con candidato único;
-- caso probado de coordenada compartida entre dos establecimientos con razón social distinta (COESTI vs. Repsol): confirma que coordenada exacta no puede usarse sola como anchor de identidad;
-- caso probado de abanderamiento (marca operando sobre razón social de tercero): correctamente excluido como conflicto, no verificado;
-- fuente con antigüedad declarada (~4 años, Last-Modified 2022-11-02): las 11 entradas quedan `identity_freshness=stale`, sin inferir vigencia desde esa fecha;
-- permiso de publicación de las 11 identidades: `unknown`. No hay licencia ni prohibición explícita en la fuente; robots.txt permisivo autoriza rastreo, no reutilización de contenido.
+- fuente con antigüedad declarada (~4 años, Last-Modified 2022-11-02): las 11 entradas quedaron `identity_freshness=stale`, sin inferir vigencia desde esa fecha;
+- permiso de publicación de las 11 identidades: `unknown`. No hay licencia ni prohibición explícita en la fuente; un robots.txt permisivo autoriza rastreo, no reutilización de contenido.
 
-El overlay separa siempre exactitud del vínculo (`verification_status`) de permiso de publicación (`publication_status`), y nunca deriva frescura desde la fecha de acceso o de modificación de la fuente. Vive únicamente en `.local-cache/gate-2.1/`, con permisos `0600`, ignorado por Git; el repositorio conserva solo schema, fixtures sintéticos y evidencia agregada sin identidades reales.
+El overlay separa siempre exactitud del vínculo (`verification_status`) de permiso de publicación (`publication_status`) y de frescura (`identity_freshness`), y nunca deriva frescura desde la fecha de acceso o de modificación de la fuente. Esa separación se conserva. El overlay vive únicamente en `.local-cache/gate-2.1/`, con permisos `0600`, ignorado por Git; el repositorio conserva solo schema, fixtures sintéticos y evidencia agregada sin identidades reales.
+
+**Límite del contrato histórico.** `contracts/gate-2.1-commercial-identity-overlay.schema.json` describe ese piloto y **se conserva sin modificar**. Su forma solo admite el método que el piloto usó: `discovery_method` está congelado en `normalized_address_exact`, `integration_method` en `official_anchor_exact`, y `source.url` exige patrón `^https://` incluso cuando `source.kind` es `owner_verified`. Una verificación presencial del owner no tiene URL y, por lo tanto, **no era representable** en ese contrato. El bloqueo de identidad no fue solo una decisión de criterio: quedó codificado en el artefacto. Ese schema no se muta para simular lo contrario; el gate de catálogo creará un contrato sucesor capaz de representar evidencia observada sin URL obligatoria.
+
+**Límite de la política de publicación vigente.** `app/publication-matrix.mjs` es la política de campos en uso —hoy con coordenada y distancia aprobadas por el owner— y trata `unknown` como campo suprimible. Bajo el método vigente, `unknown` es una cola accionable y no un veredicto terminal, así que esta matriz **requiere migración en el mismo gate de catálogo**. Hasta entonces sigue gobernando la proyección y no se altera de forma oportunista.
+
+**Estado hoy:** ninguna identidad comercial se publica. La tarjeta pública usa el marcador honesto y no muestra ni infiere nombre.
+
+## Catálogo canónico de entidades
+
+El contrato sucesor podrá registrar evidencia `owner_verified`, `first_party`, `public_web_observed`, `open_reusable` o `known_contributor`. En todos los casos conservará en privado fuente o descripción, método, fecha y responsable. La proyección pública mínima no necesita publicar ese expediente, pero el proyecto tampoco lo borra ni presenta el dato como propio.
+
+### Clave y universo
+
+La clave del catálogo es la **entidad oficial**, no la oferta. El anchor ya existe en el pipeline: `establishment_id` se deriva exclusivamente del código de Registro (`scripts/build-gate-1.1.mjs`, `officialAnchorFromRegistration`), de modo que un establecimiento con varios productos es una sola entrada.
+
+Medición sobre los snapshots privados autorizados, contando entidades y no ofertas:
+
+| Medida | Valor |
+| --- | ---: |
+| Establecimientos distintos en el contrato Regular (14/08/2026) | 714 |
+| Establecimientos distintos en el contrato Regular (18/08/2026) | 714 |
+| Altas de código entre ambos cortes | 0 |
+| Bajas de código entre ambos cortes | 0 |
+| Precios que cambiaron entre ambos cortes | 239/714 (33.5 %) |
+
+En Gasohol Regular la relación oferta↔establecimiento fue 1:1 en ambos cortes. **714 no es el tamaño del universo del catálogo:** es el conteo de un producto en un ámbito. El universo real es la unión de códigos con oferta contractual en todos los productos publicados; con Regular en 714 y Premium en 700 entradas, esa unión está acotada entre 714 y 1,414 y **su solapamiento todavía no está medido**. Medirlo es criterio de salida del gate de catálogo, no un supuesto.
+
+### La estabilidad observada es un límite inferior
+
+Las cifras anteriores tienen un límite material que debe declararse: entre esos dos cortes, razón social, dirección y coordenada fueron **idénticas por construcción**, no por estabilidad observada. El refresco de Gate 3.3 actualiza el CSV de precios y reutiliza Registro y GIS fijados al 14/08/2026. Además, un establecimiento nuevo en el CSV de precios sin autorización en ese Registro congelado se **excluye** (17 exclusiones) en lugar de contarse como alta.
+
+Consecuencia directa: hoy **no existe señal alguna de cambio a nivel de entidad**. La rotación medida de 0 altas y 0 bajas es un piso, no una medición del mundo.
+
+### Invalidación barata
+
+Disparadores aceptados para re-verificar una entrada del catálogo:
+
+| Disparador | Observable hoy | Qué falta |
+| --- | --- | --- |
+| Cambio de titular o razón social del código en el Registro | No | Refrescar Registro y comparar por código entre snapshots |
+| Cambio significativo de coordenada del código | No | Refrescar GIS y fijar el umbral de desplazamiento |
+| Alta, baja o desaparición del código | Parcial | Distinguir alta real de exclusión por Registro congelado |
+| Vencimiento de `verified_at` | Sí, al existir el campo | Definir la ventana por ruta |
+| Reporte de una persona usuaria | No | Evolución posterior a la primera versión del catálogo |
+
+Una revisión manual ocasional es una red de seguridad, no garantía de vigencia. La falta de estos disparadores automáticos queda declarada, pero no bloquea un catálogo inicial pequeño y curado. Su cadencia se decidirá con rotación observada, no por adelantado.
+
+### Cobertura inicial
+
+Gate 2.3 medirá la unión de códigos Regular/Premium, la cobertura total del catálogo y el resultado de una muestra auditada. La cobertura por distrito puede usarse como diagnóstico si aparece un sesgo material, pero no es una puerta para publicar la primera cobertura parcial con fallback.
 
 ## PRICE y J7
 
@@ -146,6 +221,8 @@ Granos que no deben mezclarse:
 - marca de producto/envasadora;
 - nombre comercial de sede.
 
+El catálogo canónico se ancla al **establecimiento físico mediante su código oficial**, nunca a la oferta, a la coordenada ni al operador legal.
+
 ## Procedencia, privacidad y reproducción
 
 Los originales grandes o con datos personales viven solo en `.local-cache/`. Los snapshots versionados eliminan RUC, razón social, dirección, representante, teléfono, correo y placa. Un manifiesto previo sella lista, tamaño y SHA-256; la verificación falla ante archivos nuevos, alterados o ausentes.
@@ -155,4 +232,4 @@ node scripts/profile-gate-0.2.mjs
 node scripts/verify-gate-0.2.mjs
 ```
 
-Riesgos abiertos: estabilidad temporal de claves, no-matches, semántica de extremos, mecanismo incremental y linaje CSV→Facilito. La publicación downstream de coordenadas GIS fue aprobada por el owner; se conserva procedencia y atribución, pero no se trata como permiso pendiente ni prohibición.
+Riesgos abiertos: estabilidad temporal de claves, no-matches, semántica de extremos, mecanismo incremental y linaje CSV→Facilito. A ellos se suma la ausencia de refresco de Registro y GIS, que hoy impide observar cambios a nivel de entidad. La publicación downstream de coordenadas GIS fue aprobada por el owner; se conserva procedencia y atribución, pero no se trata como permiso pendiente ni prohibición.

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Gate 4.3 sanitized bootstrap seed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "reference_snapshot_date", "registry_fields", "gis_fields", "registry", "gis"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "reference_snapshot_date": {"const": "2026-08-14"},
+    "registry_fields": {"const": ["source_activity", "registro", "department", "province", "district"]},
+    "gis_fields": {"const": ["n", "department", "province", "district", "longitude", "latitude"]},
+    "registry": {"type": "array", "items": {"type": "array", "minItems": 5, "maxItems": 5}},
+    "gis": {"type": "array", "items": {"type": "array", "minItems": 6, "maxItems": 6}}
+  }
+}

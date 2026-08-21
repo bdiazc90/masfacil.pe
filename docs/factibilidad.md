@@ -1,12 +1,12 @@
-# Factibilidad y contrato privado
+# Factibilidad y contrato experimental
 
-Decisión vigente construida con el [producto observado](descubrimiento.md), las [fuentes](datos.md) y mediciones del **14 de agosto de 2026**.
+La primera mitad conserva la decisión experimental del **14 de agosto de 2026**; las secciones de publicación y límites reflejan el estado vigente. Se apoya en el [producto observado](descubrimiento.md) y las [fuentes](datos.md).
 
-## Veredicto
+## Veredicto histórico de Gate 1.1
 
 **GO CON LÍMITES para un vertical slice privado de Gasohol Regular en Lima provincia.**
 
-La cadena precio → Registro → GIS permite comparar precio, cercanía y frescura. La publicación de coordenadas GIS y distancia derivada fue aprobada explícitamente por el owner para Gate 4.1; la identidad comercial sigue fuera del JSON público y la operación sostenible de actualización queda para publicación posterior. J7 queda excluido.
+La cadena precio → Registro → GIS permitió comparar precio, cercanía y frescura. Después, el owner aprobó explícitamente la publicación downstream de coordenadas GIS y distancia derivada. La identidad comercial sigue fuera del JSON público vigente y J7 continúa excluido.
 
 ## Política de oferta
 
@@ -31,7 +31,7 @@ El límite de 30 días es conservador y coincide con la ventana de publicación 
 | J6 GLP Plantas | 814 | 461 | 455 | 429 (94.29 %) | no seleccionado |
 | J7 Distribuidores | 8 | 0 | 0 | 0 | excluido |
 
-Ningún journey tiene identidad comercial reconocible demostrada en una fuente bulk oficial.
+Ningún journey obtiene identidad comercial reconocible **desde una fuente bulk oficial**. Eso describe el límite de esas fuentes, no el de los métodos aceptables: el catálogo curado con evidencia observada es la vía prevista, y su gate está en [roadmap.md](roadmap.md).
 
 ## Contrato de Gate 1.1
 
@@ -57,10 +57,10 @@ La web local consume las 714 ofertas o un fixture de cuatro casos:
 
 1. solicita ubicación o usa un origen simulado;
 2. forma un pool estable con las 20 estaciones más cercanas mediante Haversine;
-3. muestra seis alternativas ordenables por cercanía, precio o frescura;
+3. muestra exactamente cuatro alternativas; tras fijar el pool de 20, solo permite ordenar por cercanía o precio;
 4. permite elegir y abrir el destino en Google Maps.
 
-Ordenar nunca repuebla el pool. Haversine se presenta como línea recta, no ruta ni ETA. El handoff a Google solo ocurre tras un tap y envía únicamente coordenadas de destino, nunca origen personal, identidad ni tracking.
+Ordenar nunca repuebla el pool. Haversine se presenta como línea recta, no ruta, ETA, tráfico ni costo del desvío. Si no hay coordenada de origen, el fallback por distrito no fabrica distancia ni orden de cercanía. El handoff a Google solo ocurre tras un tap y envía únicamente coordenadas de destino, nunca origen personal, identidad ni tracking.
 
 ## Hipótesis de producto pendientes
 
@@ -68,12 +68,12 @@ La búsqueda debe partir de la ubicación actual y cruzar distritos. Convenienci
 
 Para avanzar se necesita:
 
-- identidad first-party determinística por código Osinergmin;
+- un catálogo canónico de identidad anclado al código Osinergmin, alimentado por evidencia de cualquier nivel admitido —observación del owner, fuente first-party, fuente abierta reutilizable o colaborador conocido corroborado—, con vínculo exacto y sin fuzzy matching;
 - beneficios declarados por el usuario, sin cuenta inicialmente;
 - separación entre precio de lista, descuento y precio efectivo;
 - una política explícita para esfuerzo/desvío antes de crear scoring.
 
-Estas hipótesis no autorizan inferir marca desde razón social ni afirmar convenios todavía.
+Estas hipótesis no autorizan inferir marca desde razón social, coordenada ni proximidad, ni afirmar convenios todavía.
 
 ## Permiso de publicación por campo
 
@@ -84,19 +84,40 @@ Medido en Gate 2.2. El permiso no es uniforme: se evalúa campo por campo, contr
 | Precio, fecha de reporte, frescura, distrito | publicable | ODC-By declarado en las fichas de los datasets de precio |
 | Coordenada | publicable | aprobación explícita del owner para el contrato público downstream; se conserva procedencia y atribución a Osinergmin |
 | Distancia derivada | publicable | Haversine local a partir de coordenada cuya publicación fue aprobada |
-| Razón social, dirección | desconocido | la declaración ODC-By observada describe los datasets de precio, no columnas de identidad |
-| Identidad comercial | gobernada por Gate 2.1 | entrada por entrada; hoy ninguna es `public_safe` |
+| Razón social, dirección | desconocido — en cola | la declaración ODC-By observada describe los datasets de precio, no columnas de identidad |
+| Identidad comercial | gobernada por el catálogo | entrada por entrada, con evidencia privada, vínculo exacto y fecha de verificación |
 
-Consecuencia: el JSON público Gate 4.1 contiene precio, fecha, distrito y coordenadas de las 714 ofertas contractuales; no contiene identidad, razón social ni dirección. La edad se recalcula en el navegador desde `reported_at`.
+**`desconocido` no es un veredicto terminal.** Significa que falta una decisión, y toda fila en ese estado mantiene una entrada accionable con qué falta, qué evidencia lo resolvería y quién decide:
 
-El contrato privado Gate 1.1 mantiene por compatibilidad su clasificación histórica; Gate 4.1 no la reescribe ni la propaga. El contrato público versionado es downstream, con allowlist y hash verificable.
+| Campo | Qué falta | Qué lo resolvería | Decide |
+| --- | --- | --- | --- |
+| Razón social, dirección | Saber si la declaración ODC-By del dataset cubre sus columnas de identidad, y si el producto realmente las necesita en público | Lectura de la ficha del dataset y de sus términos; o la decisión de no publicarlas porque el catálogo cubre mejor la necesidad | Owner |
+| Identidad comercial | Un contrato sucesor que represente evidencia observada y un catálogo con cobertura medida | Gate 2.3: contrato, curación inicial, cobertura total y muestra auditada | Owner, con el gate |
 
-La matriz vive congelada en `app/publication-matrix.mjs`, con la evidencia citada por fila. La proyección pública se reproduce con:
+El precedente relevante: la coordenada estuvo en `desconocido` y salió mediante una decisión explícita del owner, con procedencia y atribución conservadas. Ese es el circuito previsto, no una excepción.
+
+Consecuencia vigente: el JSON público contiene precio, fecha, distrito y coordenadas; **no contiene identidad, razón social ni dirección, y hoy ninguna identidad comercial está publicada**. La edad se recalcula en el navegador desde `reported_at`.
+
+El contrato privado Gate 1.1 mantiene por compatibilidad su clasificación histórica; los contratos públicos posteriores no la reescriben ni la propagan. El contrato público versionado es downstream, con allowlist y hash verificable.
+
+La matriz vive en `app/publication-matrix.mjs`, con la evidencia citada por fila. Es la **política vigente** y trata `unknown` como campo suprimible; bajo el método actual `unknown` es una cola, por lo que la matriz **requiere migración en el gate de catálogo**. Hasta ese gate sigue gobernando la proyección y no se altera de forma oportunista. La proyección pública se reproduce con:
 
 ```bash
 npm run project:gate-4.1
 npm run verify:web
 ```
+
+## Registro de exclusiones y NO-GO
+
+Ninguna exclusión se declara sin condición de reapertura. Un NO-GO sin ella se lee como «resuelto» cuando significa «bloqueado por la única vía que intentamos».
+
+| Exclusión | Razón actual | Alcance | Evidencia que la reabriría | Responsable / trigger |
+| --- | --- | --- | --- | --- |
+| J7 Distribuidores | No se reprodujo una fuente nominal que explique distribuidor, marca, fecha y rangos de sus 444 filas públicas; 0 ofertas frescas | Solo el journey J7 de GLP envasado por distribuidores | Una fuente oficial que explique el grano y la frescura de esas filas | Owner, si aparece la fuente |
+| Identidad comercial en la proyección pública | No existe todavía contrato sucesor ni catálogo con cobertura medida | La publicación del nombre; no la curación ni la evidencia privada | Contrato sucesor + catálogo inicial con cobertura total medida, muestra auditada y fallback | Gate 2.3 (Capa 2) |
+| Razón social y dirección en público | Permiso `desconocido` y utilidad dudosa frente al catálogo | Publicación de esos dos campos | Lectura de términos de la ficha, o decisión del owner de sustituirlos por el catálogo | Owner |
+| Capa GIS 31 | No existe en el servicio observado | Solo esa capa | Que el servicio la exponga en una observación posterior | Trigger: próximo refresco de GIS |
+| Stock y disponibilidad | Ningún campo tiene semántica demostrada de stock | Toda afirmación de stock en cualquier ruta | Documentación oficial que defina el campo, o una fuente que lo declare | Owner |
 
 ## Validación y límites
 
@@ -104,13 +125,15 @@ El protocolo formal A/B contra Facilito permanece disponible, pero no es una pue
 
 Límites vigentes:
 
-- razón social, dirección e identidad comercial conservan límites de publicación documentados; las coordenadas GIS y la distancia derivada están aprobadas downstream;
-- identidad comercial demostrada solo en un piloto de 11 sedes, con publicación desconocida;
+- las coordenadas GIS y la distancia derivada están aprobadas downstream; razón social y dirección siguen en cola de decisión; **ninguna identidad comercial está publicada hoy**;
+- identidad comercial demostrada solo en un piloto de 11 sedes, con fuente stale; el catálogo sucesor curado aún no existe;
+- el contrato del piloto no puede representar evidencia observada sin URL, y la matriz de publicación trata `unknown` como supresión: ambos requieren sucesión en el gate de catálogo;
+- Registro y GIS no se refrescan, de modo que no hay señal de cambio a nivel de entidad y la rotación medida de códigos es un límite inferior;
 - 27/741 ofertas frescas excluidas por joins exactos;
 - categorías rurales/flotantes con menor cobertura;
-- licencia y términos propios del proyecto pendientes de decisión del owner; la procedencia GIS queda registrada en `NOTICE` y la aprobación de coordenadas está cerrada;
+- el código original usa Apache-2.0; la procedencia GIS queda registrada en `NOTICE` y la aprobación de coordenadas está cerrada;
 - sin stock, mecanismo incremental, SLA ni linaje CSV→Facilito demostrado;
-- datos reales y servidor restringidos a uso local privado.
+- raw, minimizados y evidencia de identidad permanecen privados; solo se publica la proyección mínima validada.
 
 ## Reproducción
 

@@ -1,0 +1,95 @@
+name: masfacil.pe · refresh and deploy public PWA
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 2,8,14,20 * * *'
+  workflow_dispatch:
+    inputs:
+      shell_changed:
+        description: Publicar el shell actual usando el último bundle público validado
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: masfacil-pages-refresh-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.20.0
+      - run: npm test
+      - run: npm run audit:publication
+      - run: node scripts/audit-publication.mjs --treeish HEAD --strict-history
+
+  refresh_and_deploy:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: pages-production
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+      GATE_4_3_BOOTSTRAP_SEED_B64: ${{ secrets.GATE_4_3_BOOTSTRAP_SEED_B64 }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.20.0
+      - name: Rechazar configuración incompleta
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_PAGES_PROJECT"
+          test -n "$GATE_4_3_BOOTSTRAP_SEED_B64"
+      - name: Recuperar solo el estado público de refresco
+        run: npm run fetch:refresh-state -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
+      - name: Instalar bootstrap privado mínimo
+        run: npm run install-seed:gate-4.3 -- --target "$RUNNER_TEMP/gate-4.3-reference"
+      - name: Calcular cambio de shell
+        id: shell
+        env:
+          DISPATCH_SHELL_CHANGED: ${{ inputs.shell_changed }}
+        run: |
+          if [ "$DISPATCH_SHELL_CHANGED" = "true" ]; then
+            echo "changed=1" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ] && ! git diff --quiet HEAD^ HEAD -- web ':!web/data'; then
+            echo "changed=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=0" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Recuperar bundle solo para publicar un cambio de shell
+        if: steps.shell.outputs.changed == '1'
+        run: npm run fetch:public-bundle -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
+      - name: Refrescar, proyectar y verificar si corresponde
+        id: prepare
+        env:
+          GATE_4_3_REFRESH_STATE_PATH: ${{ github.workspace }}/web/data/gasolina/refresh-state.json
+          GATE_4_3_REFERENCE_MINIMIZED_ROOT: ${{ runner.temp }}/gate-4.3-reference
+          GATE_4_3_SHELL_CHANGED: ${{ steps.shell.outputs.changed }}
+          GATE_4_3_REFRESH_RESULT: ${{ runner.temp }}/gate-4.3-refresh-result.json
+        run: |
+          set +e
+          npm run prepare:gate-4.3
+          status=$?
+          node --input-type=module -e 'import fs from "node:fs"; const result=JSON.parse(fs.readFileSync(process.env.GATE_4_3_REFRESH_RESULT,"utf8")); console.log(`refresh=${result.refresh.status}; action=${result.decision.action}`); fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${result.decision.deploy}\n`);'
+          exit "$status"
+      - name: Direct Upload a Cloudflare Pages
+        if: steps.prepare.outputs.deploy == 'true'
+        run: npx --yes wrangler@4.31.0 pages deploy web --project-name "$CLOUDFLARE_PAGES_PROJECT" --branch main

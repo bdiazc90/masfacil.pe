@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { loadValidatedDataset } from '../app/contract.mjs';
 import { readActivePointer } from '../app/snapshot-manifest.mjs';
 import { sha256, validatePublicBundle, validatePublicDataset, validatePublicManifest } from './public-contract.mjs';
+import { buildRefreshState, validateRefreshState } from './refresh-state.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const privateSchemaRelative = 'contracts/gate-1.1-experiment-dataset.schema.json';
@@ -59,6 +60,7 @@ export function projectActiveSnapshot({ root = rootFromModule, outputRoot = path
   const snapshotRelative = `data/snapshots/${pointer.snapshot_id}.json`;
   const snapshotPath = path.join(outputRoot, 'snapshots', `${pointer.snapshot_id}.json`);
   const manifestPath = path.join(outputRoot, 'manifest.json');
+  const refreshStatePath = path.join(outputRoot, 'refresh-state.json');
   const manifest = {
     schema_version: '1.0.0', snapshot_id: pointer.snapshot_id, dataset_url: snapshotRelative,
     sha256: sha256(bytes), bytes: Buffer.byteLength(bytes), cutoff_at: publicDataset.cutoff_at,
@@ -71,8 +73,14 @@ export function projectActiveSnapshot({ root = rootFromModule, outputRoot = path
   } else atomicWrite(snapshotPath, bytes, fsModule);
   const bundleErrors = validatePublicBundle(manifest, fsModule.readFileSync(snapshotPath, 'utf8'));
   if (bundleErrors.length) throw new Error(`Snapshot público inválido; manifest preservado:\n- ${bundleErrors.join('\n- ')}`);
+  const evidencePath = pointer.evidence_path ? path.join(root, pointer.evidence_path) : null;
+  if (!evidencePath || !fsModule.existsSync(evidencePath)) throw new Error('Falta evidencia agregada para refresh-state');
+  const refreshState = buildRefreshState(pointer, JSON.parse(fsModule.readFileSync(evidencePath, 'utf8')));
+  const refreshErrors = validateRefreshState(refreshState, manifest);
+  if (refreshErrors.length) throw new Error(`Refresh-state público inválido; manifest preservado:\n- ${refreshErrors.join('\n- ')}`);
+  atomicWrite(refreshStatePath, stableJson(refreshState), fsModule);
   atomicWrite(manifestPath, stableJson(manifest), fsModule);
-  return Object.freeze({ pointer, dataset: publicDataset, manifest, snapshotPath, manifestPath, bytes: manifest.bytes, districts: new Set(publicDataset.offers.map((offer) => offer.district)).size });
+  return Object.freeze({ pointer, dataset: publicDataset, manifest, refreshState, snapshotPath, manifestPath, refreshStatePath, bytes: manifest.bytes, districts: new Set(publicDataset.offers.map((offer) => offer.district)).size });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

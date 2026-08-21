@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es" data-theme="light" data-bg-mode="css">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f4f4">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Elige un combustible para comparar precio y cercanía en Lima provincia.">
+  <title>masfacil.pe/gasolina</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="coast-bg" aria-hidden="true"></div>
+  <a class="skip-link" href="#main">Ir al contenido</a>
+  <main id="main" tabindex="-1" class="app-shell app-shell--selector">
+    <header class="appbar appbar--compact plate">
+      <a class="brand" href="/gasolina/" aria-label="masfacil.pe gasolina"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
+      <div class="theme-toggle" role="group" aria-label="Tema">
+        <button data-theme-choice="light" aria-label="Tema claro" aria-pressed="false" title="Claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg><span class="sr-only">Claro</span></button>
+        <button data-theme-choice="system" aria-label="Tema del sistema" aria-pressed="false" title="Sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><span class="sr-only">Sistema</span></button>
+        <button data-theme-choice="dark" aria-label="Tema oscuro" aria-pressed="false" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg><span class="sr-only">Oscuro</span></button>
+      </div>
+    </header>
+    <section class="product-picker" aria-labelledby="product-title">
+      <h1 id="product-title">¿Qué gasolina buscas?</h1>
+      <div class="product-choices" role="group" aria-label="Elige un combustible" aria-describedby="product-selection-status">
+        <a class="button button--primary" href="/gasolina/regular/" data-product-choice="regular">Regular</a>
+        <a class="button button--primary" href="/gasolina/premium/" data-product-choice="premium">Premium</a>
+      </div>
+      <p id="product-selection-status" class="hint" role="status" aria-live="polite" hidden></p>
+      <p class="product-picker__attribution">Datos de Osinergmin · proyecto independiente.</p>
+    </section>
+  </main>
+  <script type="module" src="/selector.js"></script>
+</body>
+</html>
