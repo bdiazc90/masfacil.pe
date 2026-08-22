@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { createGunzip } from 'node:zlib';
 import { Transform } from 'node:stream';
+import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 
 export const GASOLINA_PRODUCTS = Object.freeze({
   regular: Object.freeze({ canonical: 'GASOHOL REGULAR', label: 'Gasohol Regular' }),
@@ -97,7 +98,15 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
     if (!targetIds.has(clean(row[0]))) continue; const item = Object.fromEntries(rawFields.map((key, index) => [key, clean(row[index])])); identities.set(item.ID3, item);
   }
   const ready = geo.filter((item) => { const identity = identities.get(item.selected.ID3); return identity?.RAZON_SOCIAL && identity?.DIRECCION; });
-  const offers = ready.map((item) => ({ id: `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`, price: item.selected.numericPrice, reported_at: item.selected.time.toISOString(), district: item.selected.DISTRITO, longitude: item.longitude, latitude: item.latitude })).sort((a, b) => a.id.localeCompare(b.id));
+  const offers = ready.map((item) => ({
+    id: `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`,
+    establishment_id: officialAnchorFromRegistration(item.selected.REGISTRO_DE_HIDROCARBUROS),
+    price: item.selected.numericPrice,
+    reported_at: item.selected.time.toISOString(),
+    district: item.selected.DISTRITO,
+    longitude: item.longitude,
+    latitude: item.latitude,
+  })).sort((a, b) => a.id.localeCompare(b.id));
   const metric = (items) => ({ offers: items.length, districts: new Set(items.map((item) => item.selected?.DISTRITO ?? item.district)).size });
   return { product, offers, metrics: { exact_scope_source_rows: sourceRows, latest_offers: metric(latest), latest_lima_lima: metric(latestLima), fresh_0_30_days: metric(fresh), registry_exact: metric(registered), gis_safe: metric(geo), contract_ready: metric(ready), coverage_percent: fresh.length ? Number((ready.length / fresh.length * 100).toFixed(3)) : 0, conflicts: { latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length, latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length, registry_excluded: fresh.length - registered.length, gis_excluded: registered.length - geo.length, identity_excluded: geo.length - ready.length } }, context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl } };
 }

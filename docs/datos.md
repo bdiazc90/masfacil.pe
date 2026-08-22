@@ -11,7 +11,7 @@ Conocimiento vigente medido principalmente el **14 de agosto de 2026**. Caracter
 - `gate-3.2-http-probe-2026-08-18.json` y `gate-3.3-refresh-2026-08-18.json`: resultado de detección/refresco, hashes y decisiones operativas; no sustituyen los raws locales.
 - `facilito-contrast-2026-08-14.json`: observación acotada del producto público; no prueba arquitectura, afiliación ni equivalencia.
 
-Los scripts indicados junto a cada gate reproducen las transformaciones cuando existen los inputs autorizados en `.local-cache/`. Un clon limpio puede ejecutar tests y demo sintética, pero no puede reconstruir un snapshot real ni presentar un fixture como tal.
+Los scripts operativos reproducen las transformaciones cuando existen los inputs autorizados en `.local-cache/`. Un clon limpio puede ejecutar la demo sintética, pero no puede reconstruir un snapshot real ni presentar un fixture como dato real.
 
 ## Fuentes de precio reproducidas
 
@@ -191,9 +191,15 @@ Disparadores aceptados para re-verificar una entrada del catálogo:
 
 Una revisión manual ocasional es una red de seguridad, no garantía de vigencia. La falta de estos disparadores automáticos queda declarada, pero no bloquea un catálogo inicial pequeño y curado. Su cadencia se decidirá con rotación observada, no por adelantado.
 
-### Cobertura inicial
+### Catálogo sucesor y cobertura inicial — Gate 2.3 en curso
 
-Gate 2.3 medirá la unión de códigos Regular/Premium, la cobertura total del catálogo y el resultado de una muestra auditada. La cobertura por distrito puede usarse como diagnóstico si aparece un sesgo material, pero no es una puerta para publicar la primera cobertura parcial con fallback.
+`contracts/gate-2.3-commercial-identity-catalog-v1.1.schema.json` sucede al contrato histórico sin mutarlo. Separa procedencia y adquisición de la fuente, vínculo exacto a la entidad, frescura y permiso de publicación. Permite marca, sede pública o ambas; la proyección v2.1 solo permite `establishment_id` e identidad `{brand, public_site_name}` y nunca exporta expediente ni entidad legal. `contracts/gate-2.3-commercial-identity-audit.schema.json` define la auditoría privada por entrada.
+
+Cada fila de auditoría conserva el SHA-256 de la representación canónica de la entrada completa. Si cambia identidad, fuente, vínculo, frescura o publicación, la auditoría pasa a `pending`; si no hay entradas publicables, informa `not_required`. El seam privado de candidatos (`contracts/gate-2.3-commercial-identity-candidates.schema.json`) separa `commercial_identity_claim` de `legal_entity_claim`: una razón social y un Registro exacto pueden seguir como `candidate` o `conflict`, pero no se convierten en marca. Solo identidad comercial explícita, anchor derivado exactamente del Registro, evidencia comercial específica y revisión permiten `verified`. Ningún candidato se proyecta por esa vía.
+
+La medición se hizo con el raw privado del runner limpio y el seed autorizado de Registro/GIS. El resultado sanitizado en `evidence/gate-2.3-commercial-identity-summary.json` mide 714 establecimientos Regular, 700 Premium, una unión de **717** y solapamiento de **697**. La infraestructura de catálogo está lista, pero continúa en **0/717 (0 %)** y la auditoría informa `not_required` porque no hay entradas. Las tres waves públicas no encontraron un puente comercial válido; el siguiente paso es una primera observación `owner_verified`.
+
+Los 11 vínculos Repsol del piloto siguen siendo antecedentes privados con fuente stale y permiso de publicación `unknown`; no se trasladan silenciosamente al sucesor. Para incorporarlos o añadir cualquier identidad hace falta revalidación autorizada que complete el expediente nuevo y un `publication_status=publishable`. La cobertura por distrito puede usarse como diagnóstico si aparece un sesgo material, pero no es una puerta para publicar la primera cobertura parcial con fallback.
 
 ## PRICE y J7
 
@@ -229,7 +235,6 @@ Los originales grandes o con datos personales viven solo en `.local-cache/`. Los
 
 ```bash
 node scripts/profile-gate-0.2.mjs
-node scripts/verify-gate-0.2.mjs
 ```
 
 Riesgos abiertos: estabilidad temporal de claves, no-matches, semántica de extremos, mecanismo incremental y linaje CSV→Facilito. A ellos se suma la ausencia de refresco de Registro y GIS, que hoy impide observar cambios a nivel de entidad. La publicación downstream de coordenadas GIS fue aprobada por el owner; se conserva procedencia y atribución, pero no se trata como permiso pendiente ni prohibición.

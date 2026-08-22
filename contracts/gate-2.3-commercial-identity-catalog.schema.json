@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:masfacil.pe:gate-2.3:commercial-identity-catalog:1.0.0",
+  "title": "Catálogo privado canónico de identidad comercial",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalog_id", "anchor_scheme", "entries"],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "catalog_id": { "type": "string", "pattern": "^commercial-identity-catalog-[a-z0-9.-]+$" },
+    "anchor_scheme": { "const": "gate-1.1-establishment-id-v1" },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["establishment_id", "brand", "public_site_name", "evidence", "identity_freshness", "verification_status", "publication_status"],
+      "properties": {
+        "establishment_id": { "type": "string", "pattern": "^est_[a-f0-9]{24}$" },
+        "brand": { "type": "string", "minLength": 1 },
+        "public_site_name": { "type": "string", "minLength": 1 },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "identity_freshness": { "enum": ["current", "stale", "unknown"] },
+        "verification_status": { "enum": ["verified", "pending", "conflict"] },
+        "publication_status": { "enum": ["publishable", "pending", "not_publishable"] }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "source_or_description", "method", "observed_at", "verified_at", "responsible"],
+      "properties": {
+        "kind": { "enum": ["owner_verified", "first_party", "public_web_observed", "open_reusable", "known_contributor"] },
+        "source_or_description": { "type": "string", "minLength": 1 },
+        "method": { "const": "official_establishment_id_exact" },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "verified_at": { "type": "string", "format": "date-time" },
+        "responsible": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

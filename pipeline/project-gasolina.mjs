@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { decodeSeed } from '../app/gate-4.3-bootstrap.mjs';
 import { buildGasolinaProduct, GASOLINA_PRODUCTS } from './gasolina-products.mjs';
 import { GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, sha256, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from './gasolina-contract.mjs';
+import { buildCommercialCatalogIndex, emptyCommercialCatalog, loadValidatedCommercialCatalog } from '../app/commercial-catalog.mjs';
+import { assertCommercialPublicationReady, loadValidatedCommercialAudit } from '../app/commercial-audit.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stable = (value) => `${JSON.stringify(value)}\n`;
@@ -46,7 +48,8 @@ function optionalSeed(root) {
   return decodeSeed(fs.readFileSync(encoded, 'utf8'), manifest);
 }
 
-export async function buildGasolinaProjectionCandidate({ pointer, privateDataset, minimizedRoot, rawPath, bootstrapSeed = null }) {
+export async function buildGasolinaProjectionCandidate({ pointer, privateDataset, minimizedRoot, rawPath, bootstrapSeed = null, commercialCatalog = emptyCommercialCatalog(), commercialAudit = null }) {
+  assertCommercialPublicationReady(commercialCatalog, commercialAudit);
   const input = {
     minimizedRoot,
     rawPath,
@@ -57,7 +60,8 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
     bootstrapSeed,
   };
   const results = Object.fromEntries(await Promise.all(GASOLINA_KEYS.map(async (key) => [key, await buildGasolinaProduct({ ...input, productKey: key })])));
-  const revisionId = `gasolina-${pointer.snapshot_id}`;
+  const catalogIndex = buildCommercialCatalogIndex(commercialCatalog, GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)));
+  const revisionId = `gasolina-${pointer.snapshot_id}-identity-v1`;
   const datasets = {};
   const bodies = {};
   const descriptors = {};
@@ -72,7 +76,7 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
       cutoff_at: input.cutoffAt,
       source_max_reported_at: input.sourceMaxReportedAt,
       provenance: { source: 'Osinergmin', source_url: pointer.source_url, attribution: 'Datos de precios y coordenadas: Osinergmin.' },
-      offers: result.offers,
+      offers: result.offers.map((offer) => ({ ...offer, commercial_identity: catalogIndex.byAnchor.get(offer.establishment_id) ?? null })),
     };
     const body = stable(data);
     const relative = `data/gasolina/snapshots/${revisionId}/${key}.json`;
@@ -91,7 +95,20 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
   const errors = [...validateGasolinaManifest(manifest), ...validateGasolinaRefreshState(refreshState, manifest)];
   for (const key of GASOLINA_KEYS) errors.push(...validateGasolinaBundle(manifest, key, bodies[key]));
   if (errors.length) throw new Error(`Contrato gasolina inválido: ${[...new Set(errors)].join('; ')}`);
-  return { manifest, refreshState, datasets, bodies, results, bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
+  return { manifest, refreshState, datasets, bodies, results, catalog: catalogIndex.metrics, bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
+}
+
+export function loadCommercialPublicationInputs(root) {
+  const catalogPath = path.join(root, '.local-cache', 'gate-2.3', 'commercial-identity-catalog.json');
+  const auditPath = path.join(root, '.local-cache', 'gate-2.3', 'commercial-identity-audit.json');
+  return {
+    commercialCatalog: fs.existsSync(catalogPath)
+      ? loadValidatedCommercialCatalog(catalogPath, path.join(root, 'contracts', 'gate-2.3-commercial-identity-catalog-v1.1.schema.json'))
+      : emptyCommercialCatalog(),
+    commercialAudit: fs.existsSync(auditPath)
+      ? loadValidatedCommercialAudit(auditPath, path.join(root, 'contracts', 'gate-2.3-commercial-identity-audit.schema.json'))
+      : null,
+  };
 }
 
 export async function buildGasolinaProjectionForPointer({ root = rootFromModule, pointer, bootstrapSeed } = {}) {
@@ -102,6 +119,7 @@ export async function buildGasolinaProjectionForPointer({ root = rootFromModule,
     minimizedRoot: path.join(root, '.local-cache', 'gate-3.3', 'snapshots', pointer.snapshot_id, 'minimized'),
     rawPath: resolveGasolinaRaw(root, pointer),
     bootstrapSeed: bootstrapSeed === undefined ? optionalSeed(root) : bootstrapSeed,
+    ...loadCommercialPublicationInputs(root),
   });
 }
 

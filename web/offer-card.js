@@ -6,8 +6,11 @@ const ago = (days) => days < 1 ? `hace ${Math.max(1, Math.round(days * 24))} h` 
 const kilometers = (value) => value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`;
 const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y']);
 
-export function stationIdentity() {
-  return UNVERIFIED_STATION_LABEL;
+export function stationIdentity(offer) {
+  const identity = offer?.commercial_identity;
+  if (!identity) return UNVERIFIED_STATION_LABEL;
+  const labels = [identity.brand, identity.public_site_name].filter((value) => typeof value === 'string' && value.trim());
+  return labels.length ? labels.join(' · ') : UNVERIFIED_STATION_LABEL;
 }
 
 export function displayDistrict(district) {
@@ -15,7 +18,7 @@ export function displayDistrict(district) {
 }
 
 export function directionsLabel(offer, { withDistance = true } = {}) {
-  const details = [`Cómo llegar a una opción en ${displayDistrict(offer.district)}`, formatPrice(offer.price)];
+  const details = [`Cómo llegar a ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`, formatPrice(offer.price)];
   if (withDistance) details.push(`a ${kilometers(offer.distance_km)}`);
   return details.join(', ');
 }
@@ -24,5 +27,5 @@ export function renderOfferCard(offer, { withDistance = true, directionsUrl = nu
   const distance = withDistance ? `<p class="offer__distance">${escapeHtml(kilometers(offer.distance_km))}</p>` : '';
   const action = includeDirections && directionsUrl ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance }))}">Cómo llegar</a>` : '';
   const tagHtml = tag ? `<p class="offer__tag">${escapeHtml(tag)}</p>` : '';
-  return `<li class="offer glass">${tagHtml}<div class="offer__topline"><p class="offer__price">${escapeHtml(formatPrice(offer.price))}</p>${distance}</div><h3 class="offer__identity">${escapeHtml(displayDistrict(offer.district))}</h3><p class="offer__context"><span class="offer__freshness">actualizado ${escapeHtml(ago(offer.age_days))}</span></p>${action}</li>`;
+  return `<li class="offer glass">${tagHtml}<div class="offer__topline"><p class="offer__price">${escapeHtml(formatPrice(offer.price))}</p>${distance}</div><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}</h3><p class="offer__context"><span class="offer__district">${escapeHtml(displayDistrict(offer.district))}</span><span class="offer__freshness">actualizado ${escapeHtml(ago(offer.age_days))}</span></p>${action}</li>`;
 }

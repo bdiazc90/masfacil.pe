@@ -96,7 +96,7 @@ Medido en Gate 2.2. El permiso no es uniforme: se evalúa campo por campo, contr
 
 El precedente relevante: la coordenada estuvo en `desconocido` y salió mediante una decisión explícita del owner, con procedencia y atribución conservadas. Ese es el circuito previsto, no una excepción.
 
-Consecuencia vigente: el JSON público contiene precio, fecha, distrito y coordenadas; **no contiene identidad, razón social ni dirección, y hoy ninguna identidad comercial está publicada**. La edad se recalcula en el navegador desde `reported_at`.
+Consecuencia vigente: el bundle activo contiene precio, fecha, distrito y coordenadas; **no tiene identidad publicada**. Los sucesores v2.1 de producto, manifest y refresh-state son compatibles con 2.0 y pueden exportar solamente `establishment_id` e identidad comercial verificable. La cobertura sigue en 0/717 y la auditoría informa `not_required` hasta recibir la primera observación `owner_verified`. Razón social y dirección no se exportan. La edad se recalcula en el navegador desde `reported_at`.
 
 El contrato privado Gate 1.1 mantiene por compatibilidad su clasificación histórica; los contratos públicos posteriores no la reescriben ni la propagan. El contrato público versionado es downstream, con allowlist y hash verificable.
 
@@ -104,7 +104,6 @@ La matriz vive en `app/publication-matrix.mjs`, con la evidencia citada por fila
 
 ```bash
 npm run project:gate-4.1
-npm run verify:web
 ```
 
 ## Registro de exclusiones y NO-GO
@@ -114,7 +113,7 @@ Ninguna exclusión se declara sin condición de reapertura. Un NO-GO sin ella se
 | Exclusión | Razón actual | Alcance | Evidencia que la reabriría | Responsable / trigger |
 | --- | --- | --- | --- | --- |
 | J7 Distribuidores | No se reprodujo una fuente nominal que explique distribuidor, marca, fecha y rangos de sus 444 filas públicas; 0 ofertas frescas | Solo el journey J7 de GLP envasado por distribuidores | Una fuente oficial que explique el grano y la frescura de esas filas | Owner, si aparece la fuente |
-| Identidad comercial en la proyección pública | No existe todavía contrato sucesor ni catálogo con cobertura medida | La publicación del nombre; no la curación ni la evidencia privada | Contrato sucesor + catálogo inicial con cobertura total medida, muestra auditada y fallback | Gate 2.3 (Capa 2) |
+| Identidad comercial en la proyección pública | Catálogo sucesor y cobertura ya medidos, pero 0 entradas publicables | La publicación de un nombre; no la curación ni la evidencia privada | Observación `owner_verified`, vínculo exacto y revisión del Líder | Capa 5 |
 | Razón social y dirección en público | Permiso `desconocido` y utilidad dudosa frente al catálogo | Publicación de esos dos campos | Lectura de términos de la ficha, o decisión del owner de sustituirlos por el catálogo | Owner |
 | Capa GIS 31 | No existe en el servicio observado | Solo esa capa | Que el servicio la exponga en una observación posterior | Trigger: próximo refresco de GIS |
 | Stock y disponibilidad | Ningún campo tiene semántica demostrada de stock | Toda afirmación de stock en cualquier ruta | Documentación oficial que defina el campo, o una fuente que lo declare | Owner |
@@ -138,11 +137,9 @@ Límites vigentes:
 ## Reproducción
 
 ```bash
-node scripts/verify-gate-0.2.mjs
 node scripts/analyze-gate-0.3.mjs
 node scripts/analyze-j7-snapshot.mjs
 node scripts/build-gate-1.1.mjs
-npm test
 ```
 
 Los scripts y JSON sanitizados conservan el detalle cuantitativo que ya no se duplica en este documento.

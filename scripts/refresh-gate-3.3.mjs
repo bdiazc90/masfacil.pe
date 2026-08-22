@@ -18,7 +18,7 @@ import { canUseCurlFallback } from '../app/refresh-policy.mjs';
 import { findMatchingRaw } from '../app/raw-reuse.mjs';
 import { acquireExclusiveLock } from '../app/exclusive-lock.mjs';
 import { validateGasolinaRefreshState } from '../pipeline/gasolina-contract.mjs';
-import { buildGasolinaProjectionCandidate } from '../pipeline/project-gasolina.mjs';
+import { buildGasolinaProjectionCandidate, loadCommercialPublicationInputs } from '../pipeline/project-gasolina.mjs';
 import { compareGasolinaQuality, snapshotIdFromGasolinaRevision } from '../pipeline/refresh-state.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -343,6 +343,7 @@ async function run() {
       privateDataset: built.dataset,
       minimizedRoot: path.join(stage, 'minimized'),
       rawPath,
+      ...loadCommercialPublicationInputs(root),
     });
     const gasolinaQuality = compareGasolinaQuality({
       previousProducts: baseline.previousProducts,

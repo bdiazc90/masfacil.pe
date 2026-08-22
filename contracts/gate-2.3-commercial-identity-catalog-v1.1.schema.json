@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:masfacil.pe:gate-2.3:commercial-identity-catalog:1.1.0",
+  "title": "Catálogo privado canónico de identidad comercial — sucesor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalog_id", "anchor_scheme", "entries"],
+  "properties": {
+    "schema_version": { "const": "1.1.0" },
+    "catalog_id": { "type": "string", "pattern": "^commercial-identity-catalog-[a-z0-9.-]+$" },
+    "anchor_scheme": { "const": "gate-1.1-establishment-id-v1" },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "entry": { "type": "object", "additionalProperties": false, "required": ["establishment_id", "brand", "public_site_name", "source", "entity_link", "identity_freshness", "publication"], "properties": {
+      "establishment_id": { "type": "string", "pattern": "^est_[a-f0-9]{24}$" },
+      "brand": { "type": ["string", "null"] },
+      "public_site_name": { "type": ["string", "null"] },
+      "source": { "$ref": "#/$defs/source" },
+      "entity_link": { "$ref": "#/$defs/entity_link" },
+      "identity_freshness": { "enum": ["current", "stale", "unknown"] },
+      "publication": { "$ref": "#/$defs/publication" }
+    } },
+    "source": { "type": "object", "additionalProperties": false, "required": ["kind", "source_or_description", "acquisition_method", "observed_at", "responsible"], "properties": {
+      "kind": { "enum": ["owner_verified", "first_party", "public_web_observed", "open_reusable", "known_contributor"] },
+      "source_or_description": { "type": "string", "minLength": 1 },
+      "acquisition_method": { "enum": ["direct_observation", "first_party_publication", "public_web_review", "open_dataset", "contributor_submission"] },
+      "observed_at": { "type": "string", "format": "date-time" },
+      "responsible": { "type": "string", "minLength": 1 }
+    } },
+    "entity_link": { "type": "object", "additionalProperties": false, "required": ["method", "status", "verified_at"], "properties": {
+      "method": { "enum": ["official_registration_code_exact", "official_establishment_id_exact"] },
+      "status": { "enum": ["verified", "pending", "conflict"] },
+      "verified_at": { "type": ["string", "null"], "format": "date-time" }
+    } },
+    "publication": { "type": "object", "additionalProperties": false, "required": ["status", "reviewed_at", "responsible"], "properties": {
+      "status": { "enum": ["publishable", "pending", "not_publishable"] },
+      "reviewed_at": { "type": ["string", "null"], "format": "date-time" },
+      "responsible": { "type": "string", "minLength": 1 }
+    } }
+  }
+}

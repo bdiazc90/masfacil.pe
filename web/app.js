@@ -23,7 +23,7 @@ function renderOffers() {
   const showTag = !noOrigin && state.sort === 'distance';
   nodes.offers.innerHTML = items.map((offer) => renderOfferCard(offer, { withDistance: !noOrigin, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: showTag ? decisionTag(offer, state.pool) : null })).join('');
   nodes['sort-toggle'].hidden = noOrigin;
-  nodes['offers-note'].textContent = UNVERIFIED_STATION_LABEL;
+  nodes['offers-note'].textContent = items.some((offer) => !offer.commercial_identity) ? UNVERIFIED_STATION_LABEL : '';
   nodes['offers-note'].hidden = items.length === 0;
   document.querySelectorAll('[data-sort]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.sort === state.sort)));
 }
