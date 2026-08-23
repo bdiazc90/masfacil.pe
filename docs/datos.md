@@ -111,7 +111,48 @@ Ninguna fuente bulk oficial expone identidad comercial de la sede:
 
 Este es un hecho sobre las fuentes bulk, **no una conclusión sobre el proyecto**. Que una fuente automatizable no entregue el dato no implica que el dato sea desconocido ni que obtenerlo por otra vía sea ilegítimo: la observación directa, la confirmación del owner y el aporte moderado de colaboradores son evidencia válida, registrada por nivel según [`AGENTS.md`](../AGENTS.md).
 
-Se conservan intactos los controles que protegen la exactitud: no se infiere marca desde razón social, RUC, dirección ni proximidad, y no se interpretan `PRODUCTO_ACTIVO`, `ULT_PRECIO_DIF_CERO` u otros campos como stock sin semántica demostrada.
+Se conservan intactos los controles que protegen la exactitud: no se infiere marca desde razón social ni RUC, y no se interpretan `PRODUCTO_ACTIVO`, `ULT_PRECIO_DIF_CERO` u otros campos como stock sin semántica demostrada.
+
+### Google Maps como fuente de descubrimiento — autorizado el 23/08/2026
+
+Bruno autorizó de forma explícita y permanente usar Google Maps, incluido el
+raspado con `agent-browser`, para descubrir identidad comercial. La regla previa
+—«no unir por dirección o coordenada»— queda sustituida por una más precisa: la
+coordenada oficial **selecciona candidatos**; lo que **confirma** el vínculo es el
+número de puerta, el nombre de la vía, la razón social o una observación visual,
+más unicidad por margen frente al segundo candidato.
+
+Primera medición, 23/08/2026, sobre un barrido de 68 fichas en un radio de 3 km
+desde `-12.1326704,-77.0123699`. Se cruzaron las 5 fichas más cercanas al centro
+contra los 717 establecimientos del contrato vigente:
+
+| Ficha de Maps | Registro emparejado | Distancia | Corroboración independiente |
+| --- | --- | ---: | --- |
+| EDS Servicentro Germanico SAC | SERVICENTRO GERMANICO F.H. S.A.C. | 30 m | el nombre es la razón social |
+| Primax Alegría · Benavides 2116 | COESTI S.A. · AV. BENAVIDES N° 2116 | 15 m | número de puerta exacto |
+| Primax Granada · M. Castilla 905 | COESTI GRANADA · AV. MARISCAL CASTILLA N° 905 | 26 m | vía, número y la palabra «Granada» |
+| Gasolinera Repsol | REPSOL COMERCIAL S.A.C. | 22 m | la marca aparece en la razón social |
+| Primax El Cortijo gnv · Panamá 6901 | SERVICENTRO GERMANICO · PANAMA N° 6901-A | 18 m | número de puerta exacto |
+
+Las cinco resultaron únicas por margen: el segundo candidato quedó entre 370 m y
+753 m. **Ninguna se apoyó solo en la distancia.**
+
+La primera y la quinta apuntan al **mismo** Registro: Google mantiene dos fichas
+para una sola esquina (Panamá 6901 con Mariscal Castilla). Es un caso de
+**abanderamiento** observado con nombre propio —marca Primax sobre la razón
+social de un tercero— y confirma que la asignación debe ser bipartita: dos fichas
+no pueden reclamar un mismo `establishment_id`. También resuelve qué publicar: el
+conductor reconoce «Primax El Cortijo», no la razón social.
+
+Cinco casos en un distrito denso no son una tasa de precisión. Antes de publicar
+cualquier tier hace falta una muestra auditada por el owner, con cota inferior
+medida. Esa medición todavía no existe.
+
+Procedencia: lo cosechado de Google vive solo en `.local-cache/` y no se
+commitea. Raspar Google Maps contraviene sus términos de servicio y Bruno asume
+esa decisión con conocimiento de causa. Para el dato publicado se prefiere una
+vía redistribuible —OpenStreetMap bajo ODbL, o la observación directa del
+owner—; el catálogo registra el `source.kind` real de cada entrada.
 
 ### Clasificación de riesgo del campo
 

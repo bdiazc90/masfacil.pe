@@ -44,7 +44,8 @@ La búsqueda web secundaria terminó sin puentes válidos. Cobertura actual: **0
 
 ## Límites
 
-- Nunca convertir razón social en marca ni unir por dirección o coordenada.
+- Nunca convertir razón social en marca. Una coordenada selecciona candidatos; no confirma identidad por sí sola.
+- Google Maps como fuente de identidad comercial está **autorizado por Bruno** desde el 23/08/2026, con las condiciones de `AGENTS.md`: corroboración por número de puerta, vía, razón social u observación visual; unicidad por margen; asignación bipartita; precisión auditada. No reabrir esta decisión.
 - No publicar datos privados, secretos o cachés.
 - Mantener runtime validation, auditoría de publicación, promoción atómica y rollback.
 - No introducir framework, backend, autenticación o base de datos antes de que el producto lo necesite.

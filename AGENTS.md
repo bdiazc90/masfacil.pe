@@ -31,10 +31,42 @@ No hay gates de proceso, revisores adicionales, documentos por sesión ni suites
 
 ## Seguridad funcional
 
-- Una razón social no es una marca. No inferir marca desde dirección, coordenada, proximidad o texto parecido.
+- Una razón social no es una marca. Una coordenada nunca basta por sí sola para atribuir identidad.
 - No inferir stock, horario, descuento ni disponibilidad.
 - `establishment_id` deriva únicamente del Registro oficial.
 - Sin identidad verificada se muestra el fallback neutral.
+
+### Identidad comercial desde Google Maps — autorizado por Bruno
+
+Bruno aprobó de forma explícita y permanente el 23 de agosto de 2026 usar Google
+Maps —incluido el raspado vía `agent-browser`— como fuente de descubrimiento de
+identidad comercial. Esta autorización **sustituye** la prohibición anterior de
+«no unir por dirección o coordenada» y no debe volver a cuestionarse.
+
+Lo que la autorización **sí** permite:
+
+- barrer Google Maps por términos y centros para cosechar nombre visible, marca,
+  dirección, coordenada e identificador de lugar (`!19s<id>`);
+- usar la coordenada oficial del GIS para **seleccionar candidatos** dentro de un
+  radio;
+- usar el identificador de lugar como clave de re-verificación y de deduplicación.
+
+Lo que **sigue prohibido**, porque protege la exactitud y no la ceremonia:
+
+- publicar una marca cuya única evidencia sea la proximidad. La coordenada
+  selecciona; lo que confirma es el número de puerta, el nombre de la vía, la
+  razón social o una observación visual;
+- aceptar un match que no sea **único por margen**: si el segundo candidato queda
+  demasiado cerca en puntaje, el resultado es `conflict`, no `verified`;
+- asignar una misma ficha a dos establecimientos, o dos fichas a uno, sin
+  resolver la asignación de forma bipartita;
+- publicar un tier cuya precisión no haya sido muestreada y auditada.
+
+Procedencia y publicación: lo cosechado de Google vive solo en `.local-cache/`
+y nunca se commitea. Raspar Google Maps contraviene sus términos de servicio;
+Bruno asume esa decisión con conocimiento de causa. Para el dato **publicado** se
+prefiere una vía redistribuible —OpenStreetMap (ODbL) o la observación directa
+del owner— y en el catálogo se registra `source.kind` real de cada entrada.
 - Raws, seeds, cachés, credenciales, RUC, razón social, dirección y expedientes privados no entran en Git.
 - Los contratos se validan al proyectar y en el navegador. Es runtime, no testing.
 - Regular y Premium se promueven juntos; el manifest se escribe al final.
