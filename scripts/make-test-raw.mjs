@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const input = process.argv[2];
-const output = path.join(root, '.local-cache', 'gate-4.3', 'clean-runner-liquid.csv');
+const output = path.join(root, '.local-cache', 'publish', 'clean-runner-liquid.csv');
 const schema = ['ID3', 'ACTIVIDAD', 'REGISTRO_DE_HIDROCARBUROS', 'RUC', 'RAZON_SOCIAL', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'DIRECCION', 'FECHA_DE_REGISTRO', 'PRODUCTO', 'PRECIO_DE_VENTA_SOLES', 'UNIDAD'];
 const activities = new Set(['ESTACIÓN DE SERVICIOS / GRIFOS', 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP', 'EE.SS con GNV', 'EE.SS con GLP y GNV']);
 const products = new Set(['GASOHOL REGULAR', 'GASOHOL PREMIUM']);

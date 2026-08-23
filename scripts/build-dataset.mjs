@@ -14,8 +14,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const snapshot = process.env.SNAPSHOT_DATE ?? '2026-08-14';
 const minimizedRoot = process.env.MINIMIZED_ROOT ? path.resolve(root, process.env.MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', snapshot);
 const provenanceRoot = process.env.PROVENANCE_ROOT ? path.resolve(root, process.env.PROVENANCE_ROOT) : path.join(root, 'data', 'provenance', snapshot);
-const localOutput = process.env.LOCAL_OUTPUT ? path.resolve(root, process.env.LOCAL_OUTPUT) : path.join(root, '.local-cache', 'gate-1.1', snapshot, 'experiment-dataset-lima-province.json');
-const evidenceOutput = process.env.EVIDENCE_OUTPUT ? path.resolve(root, process.env.EVIDENCE_OUTPUT) : path.join(root, 'evidence', `gate-1.1-lima-province-${snapshot}.json`);
+const localOutput = process.env.LOCAL_OUTPUT ? path.resolve(root, process.env.LOCAL_OUTPUT) : path.join(root, '.local-cache', 'datasets', snapshot, 'experiment-dataset-lima-province.json');
+const evidenceOutput = process.env.EVIDENCE_OUTPUT ? path.resolve(root, process.env.EVIDENCE_OUTPUT) : path.join(root, 'evidence', `lima-province-${snapshot}.json`);
 const fixturePath = path.join(root, 'fixtures', 'dataset.synthetic.json');
 const sep = '\u001f';
 
@@ -63,7 +63,7 @@ const territory = (row) => ({
 const isPopulationTerritory = (row) => territory(row).department === target.department && territory(row).province === target.province;
 const sameTerritory = (left, right) => JSON.stringify(territory(left)) === JSON.stringify(territory(right));
 const uniqueEstablishments = (items) => new Set(items.map((item) => item.registro)).size;
-const stableHash = (kind, value) => crypto.createHash('sha256').update(`facilito-ux-lab|gate-1.1|v1|${kind}|${value}`).digest('hex').slice(0, 24);
+const stableHash = (kind, value) => crypto.createHash('sha256').update(`masfacil-pe|dataset|v1|${kind}|${value}`).digest('hex').slice(0, 24);
 const digestBuffer = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function parseTimestamp(value) {
@@ -181,7 +181,7 @@ function validateDataset(dataset, expectedSnapshot = snapshot) {
   const offerKeys = ['experimental_id','establishment_id','source_row_id','product','currency','unit','display_unit','price','price_reported_at','age_days_at_cutoff','territory','coordinate','provisional_identity','source','warnings'];
   if (!exactKeys(dataset, rootKeys)) errors.push('root-keys');
   if (dataset.schema_version !== '1.1.0') errors.push('schema-version');
-  if (!/^gate-1\.1-lima-province-gasohol-regular-\d{4}-\d{2}-\d{2}$/.test(dataset.dataset_id ?? '')) errors.push('dataset-id');
+  if (!/^lima-province-gasohol-regular-\d{4}-\d{2}-\d{2}$/.test(dataset.dataset_id ?? '')) errors.push('dataset-id');
   if (!exactKeys(dataset.scope, scopeKeys)) errors.push('scope-keys');
   const expectedScope = { journey: 'J1', department: target.department, province: target.province, population: target.population, origin_policy: target.originPolicy, product: target.product, display_unit: target.displayUnit, usage: 'experimento privado; no publicar' };
   if (JSON.stringify(dataset.scope) !== JSON.stringify(expectedScope)) errors.push('scope-values');
@@ -352,7 +352,7 @@ const temporalContext = {
 };
 const dataset = {
   schema_version: '1.1.0',
-  dataset_id: `gate-1.1-lima-province-gasohol-regular-${snapshot}`,
+  dataset_id: `lima-province-gasohol-regular-${snapshot}`,
   scope: { journey: target.journey, department: target.department, province: target.province, population: target.population, origin_policy: target.originPolicy, product: target.product, display_unit: target.displayUnit, usage: 'experimento privado; no publicar' },
   temporal_context: temporalContext,
   offers: contractReady.map((item) => ({
@@ -447,7 +447,7 @@ const ownerVerifiedControl = {
   classification: 'OWNER-VERIFIED / TRUSTED INPUT; no recalculable en este repositorio',
   snapshot_date: '2026-08-12',
   safe_geography: { numerator: 28, denominator: 28 },
-  reconciliation: 'Control externo con EVPC y reglas adicionales; no es denominador ni se fuerza igualdad con el universo CSV reproducido de Gate 1.1.',
+  reconciliation: 'Control externo con EVPC y reglas adicionales; no es denominador ni se fuerza igualdad con el universo CSV reproducido.',
 };
 const evidenceBase = {
   schema_version: 2,
@@ -478,7 +478,7 @@ const evidenceBase = {
   prospective_decision: { status: prospectiveDecision, frozen_abandonment_threshold_percent: frozenAbandonmentThresholdPercent, rule: 'coverage_percent < 90 => NO-GO' },
   owner_verified_control: ownerVerifiedControl,
   local_dataset: { path: path.relative(root, localOutput), offers: dataset.offers.length, sha256: digestBuffer(datasetText), git_classification: 'ignorado; contiene identidad provisional real y coordenadas de reutilización ambigua' },
-  gate_1_2_boundary: { schema: 'app/dataset-schema.mjs', synthetic_fixture: path.relative(root, fixturePath), transport: 'archivo JSON local validado; solo lectura; sin API, database ni red productiva', origin: target.originPolicy, observable_convenience: ['precio','distancia desde el origen','frescura'], excluded: ['marca','descuentos','convenios','scoring de conveniencia'] },
+  client_boundary: { schema: 'app/dataset-schema.mjs', synthetic_fixture: path.relative(root, fixturePath), transport: 'archivo JSON local validado; solo lectura; sin API, database ni red productiva', origin: target.originPolicy, observable_convenience: ['precio','distancia desde el origen','frescura'], excluded: ['marca','descuentos','convenios','scoring de conveniencia'] },
 };
 
 const assertions = [];

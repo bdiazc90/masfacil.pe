@@ -6,8 +6,8 @@ import { gzipCanonical, sha256, stableJson, validateSeed } from '../app/bootstra
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'bootstrap', 'seed.manifest.json'), 'utf8'));
-const inputRoot = path.join(root, '.local-cache', 'gate-0.2', manifest.reference_snapshot_date, 'superseded-uncompressed', 'minimized');
-const outputRoot = path.join(root, '.local-cache', 'gate-4.3');
+const inputRoot = path.join(root, '.local-cache', 'raw', manifest.reference_snapshot_date, 'superseded-uncompressed', 'minimized');
+const outputRoot = path.join(root, '.local-cache', 'publish');
 
 function parseCsv(file) {
   const text = fs.readFileSync(file, 'utf8'); const rows = []; let row = []; let value = ''; let quoted = false;

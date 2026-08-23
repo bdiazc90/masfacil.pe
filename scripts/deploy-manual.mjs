@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceWeb = path.join(root, 'web');
 const sourceData = path.join(sourceWeb, 'data');
-const destination = path.join(root, '.local-cache', 'gate-4.3', 'pages-bootstrap-web');
+const destination = path.join(root, '.local-cache', 'publish', 'pages-bootstrap-web');
 
 const verified = spawnSync(process.execPath, ['scripts/verify-shell.mjs'], { cwd: root, encoding: 'utf8' });
 if (verified.status !== 0) throw new Error(verified.stderr || verified.stdout || 'Bootstrap local inválido');

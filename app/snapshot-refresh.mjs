@@ -115,15 +115,15 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, beforePoi
 }
 
 export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerUpdate = () => {}) {
-  const snapshotPath = path.join(root, '.local-cache', 'gate-3.3', 'snapshots', snapshotId, 'snapshot-manifest.json');
+  const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
   let target;
   if (fsModule.existsSync(snapshotPath)) {
     target = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
     if (target.eligible_for_rollback === false) throw new Error(`Snapshot no elegible para rollback: ${snapshotId}`);
   } else {
-    // Permite recuperar el last-known-good pre-Gate 3.3 sin copiar ni modificar
+    // Permite recuperar el last-known-good anterior sin copiar ni modificar
     // su dataset legado: rollback solo cambia el pointer.
-    const legacyDataset = path.join(root, '.local-cache', 'gate-1.1', snapshotId, 'experiment-dataset-lima-province.json');
+    const legacyDataset = path.join(root, '.local-cache', 'datasets', snapshotId, 'experiment-dataset-lima-province.json');
     if (!fsModule.existsSync(legacyDataset)) throw new Error(`No existe snapshot para rollback: ${snapshotId}`);
     target = {
       schema_version: 1,
@@ -131,9 +131,9 @@ export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerU
       snapshot_id: snapshotId,
       snapshot_date: snapshotId,
       dataset_path: path.relative(root, legacyDataset),
-      evidence_path: path.relative(root, path.join(root, 'evidence', `gate-1.1-lima-province-${snapshotId}.json`)),
+      evidence_path: path.relative(root, path.join(root, 'evidence', `lima-province-${snapshotId}.json`)),
       acquisition_path: path.relative(root, path.join(root, 'data', 'provenance', snapshotId, 'acquisitions.jsonl')),
-      reference_inputs: { note: 'rollback al last-known-good pre-Gate 3.3' },
+      reference_inputs: { note: 'rollback al last-known-good anterior' },
     };
   }
   const active = readActivePointer(root) ?? resolveActiveSnapshot(root);

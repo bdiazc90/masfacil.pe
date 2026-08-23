@@ -10,11 +10,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const snapshotId = process.argv[2];
 if (!snapshotId) throw new Error('Uso: npm run rollback -- <snapshot-id>');
 
-const activePath = path.join(root, '.local-cache', 'gate-3.3', 'active.json');
+const activePath = path.join(root, '.local-cache', 'snapshots', 'active.json');
 if (!fs.existsSync(activePath)) throw new Error('No existe pointer activo para rollback');
 const activeBefore = JSON.parse(fs.readFileSync(activePath, 'utf8'));
-const manifestPath = path.join(root, '.local-cache', 'gate-3.3', 'snapshots', snapshotId, 'snapshot-manifest.json');
-if (!fs.existsSync(manifestPath)) throw new Error(`Gate 4.3 solo revierte snapshots completos: ${snapshotId}`);
+const manifestPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
+if (!fs.existsSync(manifestPath)) throw new Error(`Solo se revierten snapshots completos: ${snapshotId}`);
 const target = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
 // Ambos productos se reconstruyen y validan antes de mover el pointer privado.

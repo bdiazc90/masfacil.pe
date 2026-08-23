@@ -2,7 +2,7 @@
 /fetch-gis.mjs
 /gis-osinergmin.json
 
-# Originales reutilizables de Gate 0.2: caché local explícita, nunca versionada.
+# Originales reutilizables: caché local explícita, nunca versionada.
 /.local-cache/
 
 # Artefactos de investigación y proyección: se regeneran localmente, nunca se publican en Git.
@@ -10,7 +10,7 @@
 /fetch-gis.mjs
 /gis-osinergmin.json
 
-# Gate 4.1: proyección pública generada desde el pointer local; nunca se versiona.
+# Proyección pública generada desde el pointer local; nunca se versiona.
 /web/data/
 
 # Configuración local de desarrollo; nunca se lee ni se publica desde Git.

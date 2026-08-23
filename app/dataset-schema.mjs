@@ -1,10 +1,10 @@
 // Contrato del dataset privado de establecimientos.
-// Era contracts/gate-1.1-experiment-dataset.schema.json; ahora vive junto a su
+// Vive junto a su
 // validador (app/contract.mjs), que es quien lo interpreta de verdad.
 
 export const DATASET_SCHEMA = Object.freeze({
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:facilito-ux-lab:gate-1.1:experiment-dataset:1.1.0",
+  "$id": "urn:masfacil-pe:dataset:1.1.0",
   "title": "Dataset privado del experimento J1 en Lima provincia",
   "type": "object",
   "additionalProperties": false,
@@ -21,7 +21,7 @@ export const DATASET_SCHEMA = Object.freeze({
     },
     "dataset_id": {
       "type": "string",
-      "pattern": "^gate-1\\.1-lima-province-gasohol-regular-[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+      "pattern": "^lima-province-gasohol-regular-[0-9]{4}-[0-9]{2}-[0-9]{2}$"
     },
     "scope": {
       "type": "object",

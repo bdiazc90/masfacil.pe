@@ -27,7 +27,7 @@ export function validateCommercialAudit(audit) {
   } return [...new Set(errors)];
 }
 export function loadValidatedCommercialAudit(path) { const audit = JSON.parse(fs.readFileSync(path, 'utf8')); const errors = validateCommercialAudit(audit); if (errors.length) throw new Error(`Auditoría comercial fuera de contrato:\n- ${errors.join('\n- ')}`); return audit; }
-export function commercialPublicationGate(catalog, audit) {
+export function commercialPublicationCheck(catalog, audit) {
   const targets = catalog.entries.filter(isPublicCommercialEntry);
   const summary = { required: targets.length, selected: 0, reviewed: 0, incorrect_links: null };
   if (!targets.length) return Object.freeze({ status: 'not_required', reason: 'catalog_empty_or_pending', ...summary });
@@ -47,9 +47,9 @@ export function commercialPublicationGate(catalog, audit) {
 }
 
 export function assertCommercialPublicationReady(catalog, audit) {
-  const gate = commercialPublicationGate(catalog, audit);
-  if (gate.status === 'ready' || gate.status === 'not_required') return gate;
-  throw new Error(`Auditoría comercial impide proyectar (${gate.reason})`);
+  const check = commercialPublicationCheck(catalog, audit);
+  if (check.status === 'ready' || check.status === 'not_required') return check;
+  throw new Error(`Auditoría comercial impide proyectar (${check.reason})`);
 }
 
-export function auditCommercialCatalog(catalog, audit) { return commercialPublicationGate(catalog, audit); }
+export function auditCommercialCatalog(catalog, audit) { return commercialPublicationCheck(catalog, audit); }

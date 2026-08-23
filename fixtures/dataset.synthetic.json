@@ -1,6 +1,6 @@
 {
   "schema_version": "1.1.0",
-  "dataset_id": "gate-1.1-lima-province-gasohol-regular-2026-08-14",
+  "dataset_id": "lima-province-gasohol-regular-2026-08-14",
   "scope": {
     "journey": "J1",
     "department": "LIMA",

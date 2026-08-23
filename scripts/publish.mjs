@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { publicationDecision } from '../app/publication-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const resultPath = process.env.REFRESH_RESULT ? path.resolve(process.env.REFRESH_RESULT) : path.join(root, '.local-cache', 'gate-4.3', 'refresh-result.json');
+const resultPath = process.env.REFRESH_RESULT ? path.resolve(process.env.REFRESH_RESULT) : path.join(root, '.local-cache', 'publish', 'refresh-result.json');
 const shellChanged = process.env.SHELL_CHANGED === '1';
 
 function run(command, args) {

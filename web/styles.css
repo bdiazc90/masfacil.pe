@@ -14,7 +14,7 @@
 .offer__topline{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}.offer__topline>*{min-width:0}.offer__price{margin:0;white-space:nowrap}.offer__distance{flex:0 0 auto;margin:0;color:var(--muted-foreground);font-size:21px;font-weight:600;line-height:1.35;text-align:right;white-space:nowrap}.offer__identity{margin:0 0 6px;font-size:16px;font-weight:700;line-height:1.35}.offer__context{margin:0 0 18px;color:var(--muted-foreground);font-size:14.5px;line-height:1.5;overflow-wrap:anywhere}.offer__freshness{white-space:nowrap}.offer__tag{margin:0 0 8px;color:var(--accent);font-size:13px;font-weight:700}
 @media(max-width:360px){.theme-toggle button{width:36px}}
 
-/* Gate 4.3: composición compacta; conserva los tokens y superficies existentes. */
+/* Composición compacta; conserva los tokens y superficies existentes. */
 .appbar--compact{margin-bottom:12px;padding:8px 12px}
 .app-shell--selector{display:flex;min-height:100dvh;flex-direction:column;padding-bottom:18px}
 .product-picker{display:grid;flex:1;align-content:center;gap:16px}

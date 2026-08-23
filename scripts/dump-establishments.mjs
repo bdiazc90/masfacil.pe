@@ -33,7 +33,7 @@ const cell = (value) => {
 };
 
 async function main() {
-  const pointer = JSON.parse(fs.readFileSync(path.join(root, '.local-cache', 'gate-3.3', 'active.json'), 'utf8'));
+  const pointer = JSON.parse(fs.readFileSync(path.join(root, '.local-cache', 'snapshots', 'active.json'), 'utf8'));
   process.stdout.write(`Snapshot activo: ${pointer.snapshot_id}\nProyectando Regular y Premium...\n`);
 
   const candidate = await buildGasolinaProjectionForPointer({ root, pointer });
@@ -92,7 +92,7 @@ async function main() {
     }));
 
   const body = `﻿${[columns.join(','), ...rows.map((row) => columns.map((key) => cell(row[key])).join(','))].join('\n')}\n`;
-  const out = path.join(root, '.local-cache', 'gate-2.3', 'establecimientos.csv');
+  const out = path.join(root, '.local-cache', 'identity', 'establecimientos.csv');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, body, { mode: 0o600 });
 

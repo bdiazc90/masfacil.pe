@@ -19,8 +19,8 @@ function atomic(file, content) {
 }
 
 function active(root) {
-  const pointer = JSON.parse(fs.readFileSync(path.join(root, '.local-cache', 'gate-3.3', 'active.json'), 'utf8'));
-  if (!pointer?.snapshot_id || !pointer.dataset_path) throw new Error('Pointer Gate 3.3 inválido; no se publica fixture');
+  const pointer = JSON.parse(fs.readFileSync(path.join(root, '.local-cache', 'snapshots', 'active.json'), 'utf8'));
+  if (!pointer?.snapshot_id || !pointer.dataset_path) throw new Error('Pointer de snapshot inválido; no se publica fixture');
   return pointer;
 }
 
@@ -29,7 +29,7 @@ export function resolveGasolinaRaw(root, pointer) {
   const declaredPath = pointer.lineage?.paths?.raw_path && path.join(root, pointer.lineage.paths.raw_path);
   if (declaredPath && fs.existsSync(declaredPath) && fs.statSync(declaredPath).isFile()) return declaredPath;
   if (!declared) throw new Error('Pointer sin lineage raw verificable para gasolina');
-  const snapshots = path.join(root, '.local-cache', 'gate-3.3', 'snapshots');
+  const snapshots = path.join(root, '.local-cache', 'snapshots');
   for (const entry of fs.readdirSync(snapshots, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const manifestPath = path.join(snapshots, entry.name, 'snapshot-manifest.json');
@@ -42,7 +42,7 @@ export function resolveGasolinaRaw(root, pointer) {
 }
 
 function optionalSeed(root) {
-  const encoded = path.join(root, '.local-cache', 'gate-4.3', 'bootstrap-seed.b64');
+  const encoded = path.join(root, '.local-cache', 'publish', 'bootstrap-seed.b64');
   if (!fs.existsSync(encoded)) return null;
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'bootstrap', 'seed.manifest.json'), 'utf8'));
   return decodeSeed(fs.readFileSync(encoded, 'utf8'), manifest);
@@ -99,8 +99,8 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
 }
 
 export function loadCommercialPublicationInputs(root) {
-  const catalogPath = path.join(root, '.local-cache', 'gate-2.3', 'commercial-identity-catalog.json');
-  const auditPath = path.join(root, '.local-cache', 'gate-2.3', 'commercial-identity-audit.json');
+  const catalogPath = path.join(root, '.local-cache', 'identity', 'commercial-identity-catalog.json');
+  const auditPath = path.join(root, '.local-cache', 'identity', 'commercial-identity-audit.json');
   return {
     commercialCatalog: fs.existsSync(catalogPath) ? loadValidatedCommercialCatalog(catalogPath) : emptyCommercialCatalog(),
     commercialAudit: fs.existsSync(auditPath) ? loadValidatedCommercialAudit(auditPath) : null,
@@ -112,7 +112,7 @@ export async function buildGasolinaProjectionForPointer({ root = rootFromModule,
   return buildGasolinaProjectionCandidate({
     pointer,
     privateDataset,
-    minimizedRoot: path.join(root, '.local-cache', 'gate-3.3', 'snapshots', pointer.snapshot_id, 'minimized'),
+    minimizedRoot: path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized'),
     rawPath: resolveGasolinaRaw(root, pointer),
     bootstrapSeed: bootstrapSeed === undefined ? optionalSeed(root) : bootstrapSeed,
     ...loadCommercialPublicationInputs(root),

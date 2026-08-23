@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const ACTIVE_POINTER_RELATIVE = '.local-cache/gate-3.3/active.json';
+export const ACTIVE_POINTER_RELATIVE = '.local-cache/snapshots/active.json';
 
 function relative(root, value) {
   const absolute = path.resolve(root, value);
@@ -10,7 +10,7 @@ function relative(root, value) {
 }
 
 export function validateSnapshotPointer(root, pointer, { requireDataset = true } = {}) {
-  if (!pointer || pointer.schema_version !== 1 || typeof pointer.snapshot_id !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:-|$)/.test(pointer.snapshot_id) || typeof pointer.snapshot_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(pointer.snapshot_date) || typeof pointer.dataset_path !== 'string') throw new Error('Pointer/manifesto fuera del contrato Gate 3.3');
+  if (!pointer || pointer.schema_version !== 1 || typeof pointer.snapshot_id !== 'string' || !/^\d{4}-\d{2}-\d{2}(?:-|$)/.test(pointer.snapshot_id) || typeof pointer.snapshot_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(pointer.snapshot_date) || typeof pointer.dataset_path !== 'string') throw new Error('Pointer/manifesto fuera de contrato');
   const datasetPath = relative(root, pointer.dataset_path);
   if (requireDataset && !fs.existsSync(datasetPath)) throw new Error(`El dataset del snapshot no existe: ${pointer.dataset_path}`);
   if (pointer.evidence_path) relative(root, pointer.evidence_path);
@@ -36,7 +36,7 @@ export function readActivePointer(root) {
 
 function candidateDatasets(root) {
   const candidates = [];
-  const roots = [path.join(root, '.local-cache', 'gate-3.3', 'snapshots'), path.join(root, '.local-cache', 'gate-1.1')];
+  const roots = [path.join(root, '.local-cache', 'snapshots'), path.join(root, '.local-cache', 'datasets')];
   for (const base of roots) {
     if (!fs.existsSync(base)) continue;
     for (const entry of fs.readdirSync(base, { withFileTypes: true })) {

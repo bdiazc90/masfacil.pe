@@ -27,7 +27,7 @@ const userAgent = 'Mozilla/5.0 (compatible; masfacil.pe/4.3; public-data-researc
 const maxRedirects = 3;
 const downloadTimeoutMs = 60 * 60 * 1000;
 const probeTimeoutMs = Number(process.env.PROBE_TIMEOUT_MS ?? 10_000);
-const lockPath = path.join(root, '.local-cache', 'gate-3.3', 'refresh.lock');
+const lockPath = path.join(root, '.local-cache', 'snapshots', 'refresh.lock');
 const publicRefreshStatePath = process.env.REFRESH_STATE_PATH ? path.resolve(process.env.REFRESH_STATE_PATH) : null;
 const referenceMinimizedRoot = process.env.REFERENCE_MINIMIZED_ROOT ? path.resolve(process.env.REFERENCE_MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', referenceSnapshot);
 const testSourceUrl = process.env.TEST_SOURCE_URL ?? null;
@@ -131,12 +131,12 @@ function ensureInitialPointer() {
     snapshotId: legacy.snapshot_id.replace(/^legacy-/, ''),
     snapshotDate: legacy.snapshot_date,
     datasetPath: legacy.dataset_absolute_path,
-    evidencePath: path.join(root, 'evidence', `gate-1.1-lima-province-${legacy.snapshot_date}.json`),
+    evidencePath: path.join(root, 'evidence', `lima-province-${legacy.snapshot_date}.json`),
     acquisitionPath: path.join(root, 'data', 'provenance', legacy.snapshot_date, 'acquisitions.jsonl'),
     sourceUrl: record.final_url ?? record.requested_url,
     validators: { etag: record.response_headers?.etag ?? null, last_modified: record.response_headers?.['last-modified'] ?? null },
     promotedAt: null,
-    referenceInputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'pointer de migración del last-known-good pre-Gate 3.3' },
+    referenceInputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'pointer de migración del last-known-good anterior' },
   });
   writeActivePointer(root, { ...pointer, legacy: true });
   return readActivePointer(root);
@@ -233,7 +233,7 @@ function rewriteFinalAcquisition(final, snapshotDate, rawRelativePath) {
 
 function runBuilder(stage, snapshotDate, rawRecord) {
   const output = path.join(stage, 'dataset', 'experiment-dataset-lima-province.json');
-  const evidence = path.join(stage, 'evidence', `gate-1.1-lima-province-${snapshotDate}.json`);
+  const evidence = path.join(stage, 'evidence', `lima-province-${snapshotDate}.json`);
   const provenance = path.join(stage, 'provenance', snapshotDate);
   const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'build-dataset.mjs')], {
     cwd: root,
@@ -274,13 +274,13 @@ async function run() {
   if (detection.status === 'unverifiable') return { status: 'unverifiable', active_snapshot: active.snapshot_id, detection, downloaded: false, promoted: false };
 
   const runId = `${new Date().toISOString().replace(/[-:.]/g, '')}-${process.pid}-${crypto.randomBytes(3).toString('hex')}`;
-  const stage = path.join(root, '.local-cache', 'gate-3.3', 'staging', runId);
+  const stage = path.join(root, '.local-cache', 'snapshots', 'staging', runId);
   const rawPath = path.join(stage, 'acquired', 'price-liquid', 'CL-Registro-precios-DMA-V-CCA-CCE.csv');
   fs.mkdirSync(stage, { recursive: true, mode: 0o700 });
   try {
     const remoteAttempt = [...(detection.attempts ?? [])].reverse().find((attempt) => attempt.response_validators?.etag || attempt.response_validators?.last_modified);
     const remoteValidators = remoteAttempt?.response_validators ?? { etag: null, last_modified: null };
-    const reusable = await findMatchingRaw({ root, snapshotsRoot: path.join(root, '.local-cache', 'gate-3.3', 'snapshots'), sourceId, validators: remoteValidators });
+    const reusable = await findMatchingRaw({ root, snapshotsRoot: path.join(root, '.local-cache', 'snapshots'), sourceId, validators: remoteValidators });
     let downloaded;
     if (reusable) {
       fs.mkdirSync(path.dirname(rawPath), { recursive: true, mode: 0o700 });
@@ -305,7 +305,7 @@ async function run() {
     fs.mkdirSync(path.join(stage, 'provenance', snapshotDate), { recursive: true, mode: 0o700 });
     const built = runBuilder(stage, snapshotDate, rawRecord);
     const snapshotId = `${snapshotDate}-${runId}`;
-    const final = path.join(root, '.local-cache', 'gate-3.3', 'snapshots', snapshotId);
+    const final = path.join(root, '.local-cache', 'snapshots', snapshotId);
     const lineage = { raw: { sha256: downloaded.sha256, bytes: downloaded.bytes }, minimized: minimizedLineage, dataset: { snapshot_date: built.dataset.temporal_context.snapshot_date, source_max_reported_at: built.dataset.temporal_context.source_max_reported_at } };
     const pointer = makeSnapshotPointer({
       root,
@@ -318,7 +318,7 @@ async function run() {
       sourceUrl: url,
       validators: { etag: downloaded.response_headers.etag ?? null, last_modified: downloaded.response_headers['last-modified'] ?? null },
       promotedAt: new Date().toISOString(),
-      referenceInputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescaron en Gate 3.3' },
+      referenceInputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' },
       lineage: { ...lineage, paths: { raw_path: path.relative(root, path.join(final, path.relative(stage, rawPath))), minimized_path: path.relative(root, path.join(final, 'minimized', 'prices', 'liquid-current.csv.gz')) } },
     });
     const projection = await buildGasolinaProjectionCandidate({
