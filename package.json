@@ -18,6 +18,8 @@
     "fetch:public-bundle": "node scripts/fetch-live-public-bundle.mjs",
     "fetch:refresh-state": "node scripts/fetch-live-refresh-state.mjs",
     "audit": "node scripts/audit-publication.mjs",
-    "verify:web": "node scripts/verify-web.mjs"
+    "verify:web": "node scripts/verify-web.mjs",
+    "harvest:centers": "node scripts/harvest-centers.mjs",
+    "harvest:match": "node scripts/match-identities.mjs"
   }
 }
