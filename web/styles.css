@@ -39,3 +39,33 @@
 .offer__context{margin-bottom:14px}
 .offer .button{min-height:48px;margin-top:0}
 @media(max-width:360px){.app-shell{padding-inline:14px}.appbar--compact{padding-inline:10px}.product-picker h1,.start-step--compact h1{font-size:23px}.product-choices .button{font-size:14px}.offer{padding:16px}}
+
+/* Tarjeta en dos columnas: la izquierda identifica, la derecha ubica. */
+.offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px 12px;margin:0 0 16px}
+.offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
+.offer__identity{font-size:16px;font-weight:700;line-height:1.35}
+.offer__address{color:var(--foreground);font-size:14.5px;line-height:1.35;text-align:right}
+.offer__freshness{color:var(--muted-foreground);font-size:13.5px;line-height:1.4}
+.offer__district{color:var(--muted-foreground);font-size:13.5px;line-height:1.4;text-align:right}
+.offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.offer__actions .button{width:100%}
+.button--ghost{min-height:52px;border:1.5px solid var(--border,rgba(120,120,120,.35));background:transparent;color:var(--foreground)}
+@media(max-width:360px){.offer__grid{grid-template-columns:1fr}.offer__address,.offer__district{text-align:left}.offer__actions{grid-template-columns:1fr}}
+
+/* Radio de búsqueda: filtra; el toggle de abajo solo ordena. */
+.radius{margin:0 0 12px}
+.radius__label{display:block;margin-bottom:6px;color:var(--muted-foreground);font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.radius__input{width:100%;height:44px;margin:0;accent-color:var(--primary);cursor:pointer}
+.radius__input:disabled{cursor:not-allowed;opacity:.45}
+.radius__readout{margin:2px 0 0;color:var(--foreground);font-size:14.5px;font-weight:700}
+#load-more{margin-top:12px}
+
+/* Panel desplegable: solo datos del bundle, funciona sin conexión. */
+.offer__detail{margin-top:14px;padding-top:14px;border-top:1.5px solid var(--border,rgba(120,120,120,.28))}
+.detail__row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;padding:5px 0}
+.detail__product{font-size:14.5px;font-weight:700}
+.detail__price{font-size:15px;font-weight:700;text-align:left}
+.detail__when{color:var(--muted-foreground);font-size:13px;white-space:nowrap}
+.detail__row--empty{grid-template-columns:auto 1fr;color:var(--muted-foreground);font-size:14px}
+.detail__meta,.detail__source{margin:8px 0 0;color:var(--muted-foreground);font-size:12.5px;line-height:1.5}
+.offer__detail .button--text{width:auto;margin-top:10px;padding-inline:0}

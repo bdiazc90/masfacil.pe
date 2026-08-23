@@ -36,9 +36,16 @@
     <section id="compare-step" class="screen-flow" aria-labelledby="compare-title" hidden>
       <div class="results-head results-head--compact"><h2 id="compare-title" tabindex="-1">Cerca de ti</h2><button id="change-origin" class="button button--text button--compact" type="button">Cambiar</button></div>
       <p id="offline-note" class="offline-note" role="status" hidden></p>
-      <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados"><button data-sort="distance" aria-pressed="true" type="button">Más cercas</button><button data-sort="price" aria-pressed="false" type="button">Más baratas</button></div>
+      <div id="radius-control" class="radius" hidden>
+        <label class="radius__label" for="radius-input">Radio de búsqueda</label>
+        <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
+        <p id="radius-readout" class="radius__readout" role="status"></p>
+      </div>
+      <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados"><button data-sort="distance" aria-pressed="true" type="button">Más cerca</button><button data-sort="price" aria-pressed="false" type="button">Más barata</button></div>
       <p id="offers-note" class="hint" hidden></p>
       <ol id="offers" class="offers"></ol>
+      <section id="radius-empty" class="plate empty" hidden><h2>Ningún grifo en este radio</h2><p class="lede">Amplía el radio de búsqueda para encontrar estaciones más lejanas.</p></section>
+      <button id="load-more" class="button button--ghost" type="button" hidden></button>
       <section id="empty-state" class="plate empty" hidden><p class="eyebrow">Sin datos recientes</p><h2>No tenemos precios recientes</h2><p class="lede">No mostramos precios de más de 30 días porque ya no sirven para decidir.</p><a id="official-source" class="button button--primary" target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a></section>
       <details class="about plate"><summary>Sobre los datos</summary><div id="source-content"></div></details>
     </section>
