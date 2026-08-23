@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
 
-export const GASOLINA_MANIFEST_VERSION = '2.1.0';
+export const GASOLINA_MANIFEST_VERSION = '2.2.0';
 export const LEGACY_GASOLINA_MANIFEST_VERSION = '2.0.0';
+export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0']);
 export const GASOLINA_SCOPE = Object.freeze({ department: 'LIMA', province: 'LIMA' });
 export const GASOLINA_KEYS = Object.freeze(['regular', 'premium']);
-export const PUBLIC_OFFER_FIELDS = Object.freeze(['id', 'establishment_id', 'commercial_identity', 'price', 'reported_at', 'district', 'longitude', 'latitude']);
+export const PUBLIC_OFFER_FIELDS = Object.freeze(['id', 'establishment_id', 'commercial_identity', 'address', 'price', 'reported_at', 'district', 'longitude', 'latitude']);
 const PRODUCT_META = Object.freeze({ regular: Object.freeze({ canonical: 'GASOHOL REGULAR', label: 'Gasohol Regular' }), premium: Object.freeze({ canonical: 'GASOHOL PREMIUM', label: 'Gasohol Premium' }) });
 
 export const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -16,18 +17,25 @@ export function validateGasolinaDataset(dataset) {
   const errors = [];
   const version = dataset?.schema_version;
   if (!sameKeys(dataset, ['schema_version', 'revision_id', 'product', 'scope', 'snapshot_date', 'cutoff_at', 'source_max_reported_at', 'provenance', 'offers'])) errors.push('campos del dataset gasolina inválidos');
-  if (![LEGACY_GASOLINA_MANIFEST_VERSION, GASOLINA_MANIFEST_VERSION].includes(version) || !text(dataset?.revision_id)) errors.push('versión o revisión inválida');
+  if (!GASOLINA_VERSIONS.includes(version) || !text(dataset?.revision_id)) errors.push('versión o revisión inválida');
   const expected = PRODUCT_META[dataset?.product?.key]; if (!expected || dataset?.product?.canonical !== expected.canonical || dataset?.product?.label !== expected.label || dataset?.product?.display_unit !== 'Galones') errors.push('producto inválido');
   if (JSON.stringify(dataset?.scope) !== JSON.stringify(GASOLINA_SCOPE)) errors.push('ámbito LIMA/LIMA inválido');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataset?.snapshot_date ?? '') || !timestamp(dataset?.cutoff_at) || !timestamp(dataset?.source_max_reported_at)) errors.push('corte inválido');
   if (!text(dataset?.provenance?.source_url) || !text(dataset?.provenance?.attribution)) errors.push('procedencia inválida');
   if (!Array.isArray(dataset?.offers)) errors.push('ofertas inválidas');
+  const conIdentidad = version !== LEGACY_GASOLINA_MANIFEST_VERSION;
+  const conDireccion = version === GASOLINA_MANIFEST_VERSION;
   for (const offer of dataset?.offers ?? []) {
-    const expectedFields = version === LEGACY_GASOLINA_MANIFEST_VERSION ? ['id', 'price', 'reported_at', 'district', 'longitude', 'latitude'] : PUBLIC_OFFER_FIELDS;
+    const expectedFields = conDireccion ? PUBLIC_OFFER_FIELDS
+      : conIdentidad ? PUBLIC_OFFER_FIELDS.filter((field) => field !== 'address')
+        : ['id', 'price', 'reported_at', 'district', 'longitude', 'latitude'];
     if (!sameKeys(offer, expectedFields)) { errors.push('allowlist de oferta inválida'); continue; }
     const identity = offer.commercial_identity;
-    const identityValid = version === LEGACY_GASOLINA_MANIFEST_VERSION || (identity === null || (sameKeys(identity, ['brand', 'public_site_name']) && (identity.brand === null || text(identity.brand)) && (identity.public_site_name === null || text(identity.public_site_name)) && (identity.brand !== null || identity.public_site_name !== null)));
-    if (!/^g2_[a-f0-9]{24}$/.test(offer.id) || (version !== LEGACY_GASOLINA_MANIFEST_VERSION && !/^est_[a-f0-9]{24}$/.test(offer.establishment_id)) || !identityValid || !Number.isFinite(offer.price) || offer.price <= 0 || !timestamp(offer.reported_at) || !text(offer.district) || !Number.isFinite(offer.longitude) || offer.longitude < -82 || offer.longitude > -68 || !Number.isFinite(offer.latitude) || offer.latitude < -19 || offer.latitude > 1) errors.push('valor de oferta inválido');
+    const identityValid = !conIdentidad || (identity === null || (sameKeys(identity, ['brand', 'public_site_name']) && (identity.brand === null || text(identity.brand)) && (identity.public_site_name === null || text(identity.public_site_name)) && (identity.brand !== null || identity.public_site_name !== null)));
+    // La dirección es opcional: hay establecimientos cuyo Registro no expone una
+    // vía utilizable. Cuando existe, debe ser texto acotado para la tarjeta.
+    const addressValid = !conDireccion || offer.address === null || (text(offer.address) && offer.address.length <= 48);
+    if (!/^g2_[a-f0-9]{24}$/.test(offer.id) || (conIdentidad && !/^est_[a-f0-9]{24}$/.test(offer.establishment_id)) || !identityValid || !addressValid || !Number.isFinite(offer.price) || offer.price <= 0 || !timestamp(offer.reported_at) || !text(offer.district) || !Number.isFinite(offer.longitude) || offer.longitude < -82 || offer.longitude > -68 || !Number.isFinite(offer.latitude) || offer.latitude < -19 || offer.latitude > 1) errors.push('valor de oferta inválido');
   }
   return errors;
 }

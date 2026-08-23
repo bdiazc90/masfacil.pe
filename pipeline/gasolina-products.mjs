@@ -12,6 +12,40 @@ const activities = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'EST
 const sep = '\u001f';
 
 const clean = (value) => String(value ?? '').replace(/\r/g, '').trim();
+
+// La dirección del Registro viene en mayúsculas y mezcla la vía con la
+// descripción del predio: manzana, lote, urbanización, referencias. Para la
+// tarjeta se conserva solo el tramo que ubica —vía y número— con mayúsculas de
+// nombre propio. El original nunca sale de la caché privada.
+const MINUSCULAS = new Set(['de', 'del', 'y', 'con', 'en', 'a']);
+const PREFIJO_RUIDO = /^\s*(?:ESQUINA|ESQ\.?|FRENTE\s+A|ALTURA\s+DE|INTERSECCION\s+DE)\s*(?:DE\s+)?(?:LA\s+|EL\s+|LOS\s+|LAS\s+)?/i;
+const CORTE_DESCRIPCION = /\s*(?:,|\(|\bESQ\b|\bESQUINA\b|\bURB\b|\bURBANIZACI[OÓ]N\b|\bASOC\b|\bAA\.?HH\b|\bSUB\s*LOTE\b|\bDENOMINADO\b|\bANTES\b|\bSECTOR\b|\bETAPA\b|\bCON\s+FRENTE\b|\bFRENTE\s+A\b|\bCOMITE\b|\bAGRUPAMIENTO\b|\bPARCELA\b|\bCENTRO\s+POBLADO\b)/i;
+const ABREVIATURAS = /^(av|jr|mz|mza|lt|km|ca)\.?$/;
+
+export function direccionParaPantalla(bruta) {
+  let texto = String(bruta ?? '').replace(/\s+/g, ' ').trim().replace(PREFIJO_RUIDO, '');
+  if (!texto) return null;
+  const cortado = texto.split(CORTE_DESCRIPCION)[0].trim();
+  texto = cortado.length >= 6 ? cortado : texto;
+  texto = texto.replace(/\bN[°º¿]\s*/gi, '').replace(/\bNRO\.?\s*/gi, '');
+  texto = texto.replace(/(\d+)\s*[-–]\s*[\dA-Z]+(?:\s*[-–]\s*[\dA-Z]+)*/gi, '$1'); // 3810-A y 1294-1298-1302
+  // Si ya hay vía con número, la manzana y el lote sobran para ubicarse.
+  if (/\d/.test(texto.split(/\bMZ|\bLOTE|\bLT\b/i)[0])) texto = texto.split(/\s*\bMZ\b|\s*\bMZA\b|\s*\bLOTE\b|\s*\bLT\b/i)[0];
+  texto = texto.replace(/\bKM\.?\s*/i, 'Km. ').replace(/[-–.,;\s]+$/, '').trim();
+  if (!texto) return null;
+  const palabras = texto.toLocaleLowerCase('es-PE').split(' ').filter(Boolean).map((palabra, indice, todas) => {
+    const previa = indice > 0 ? todas[indice - 1] : null;
+    if (indice > 0 && MINUSCULAS.has(palabra)) return palabra;
+    // El artículo va en minúscula solo cuando sigue a "de" o "del".
+    if (previa && /^del?$/.test(previa) && ['la', 'las', 'los', 'el'].includes(palabra)) return palabra;
+    if (/^a{2}\.?h{2}\.?$/.test(palabra)) return 'AA.HH.';
+    if (ABREVIATURAS.test(palabra)) return `${palabra[0].toLocaleUpperCase('es-PE')}${palabra.slice(1).replace('.', '')}.`;
+    return `${palabra[0].toLocaleUpperCase('es-PE')}${palabra.slice(1)}`;
+  });
+  let salida = palabras.join(' ').replace(/[-–.,;\s]+$/, '');
+  if (salida.length > 46) salida = `${salida.slice(0, 45).replace(/[\s,]+\S*$/, '')}…`;
+  return salida || null;
+}
 function timestamp(value) {
   const match = clean(value).match(/^(\d{4})[-/](\d{2})[-/](\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?)?$/);
   return match ? new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4] ?? '00'}:${match[5] ?? '00'}:${match[6] ?? '00'}-05:00`) : null;
@@ -101,6 +135,7 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   const offers = ready.map((item) => ({
     id: `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`,
     establishment_id: officialAnchorFromRegistration(item.selected.REGISTRO_DE_HIDROCARBUROS),
+    address: direccionParaPantalla(identities.get(item.selected.ID3).DIRECCION),
     price: item.selected.numericPrice,
     reported_at: item.selected.time.toISOString(),
     district: item.selected.DISTRITO,
