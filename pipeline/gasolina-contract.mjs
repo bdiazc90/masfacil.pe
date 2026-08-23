@@ -43,7 +43,7 @@ export function validateGasolinaDataset(dataset) {
 export function validateGasolinaManifest(manifest) {
   const errors = [];
   if (!sameKeys(manifest, ['schema_version', 'revision_id', 'scope', 'products', 'generated_at'])) errors.push('campos del manifest gasolina inválidos');
-  if (![LEGACY_GASOLINA_MANIFEST_VERSION, GASOLINA_MANIFEST_VERSION].includes(manifest?.schema_version) || !text(manifest?.revision_id)) errors.push('versión o revisión de manifest inválida');
+  if (!GASOLINA_VERSIONS.includes(manifest?.schema_version) || !text(manifest?.revision_id)) errors.push('versión o revisión de manifest inválida');
   if (JSON.stringify(manifest?.scope) !== JSON.stringify(GASOLINA_SCOPE)) errors.push('ámbito de manifest inválido');
   if (!manifest?.products || JSON.stringify(Object.keys(manifest.products)) !== JSON.stringify(GASOLINA_KEYS)) errors.push('descriptores de producto inválidos');
   for (const key of GASOLINA_KEYS) {
@@ -57,7 +57,7 @@ export function validateGasolinaManifest(manifest) {
 export function validateGasolinaRefreshState(state, manifest) {
   const errors = [];
   if (!sameKeys(state, ['schema_version', 'revision_id', 'validators', 'source_max_reported_at', 'products'])) errors.push('campos refresh-state inválidos');
-  if (![LEGACY_GASOLINA_MANIFEST_VERSION, GASOLINA_MANIFEST_VERSION].includes(state?.schema_version) || (manifest?.schema_version && state?.schema_version !== manifest.schema_version) || state?.revision_id !== manifest?.revision_id) errors.push('revisión refresh-state inválida');
+  if (!GASOLINA_VERSIONS.includes(state?.schema_version) || (manifest?.schema_version && state?.schema_version !== manifest.schema_version) || state?.revision_id !== manifest?.revision_id) errors.push('revisión refresh-state inválida');
   if (!timestamp(state?.source_max_reported_at)) errors.push('máximo temporal refresh-state inválido');
   if (!state?.validators || !Object.hasOwn(state.validators, 'etag') || !Object.hasOwn(state.validators, 'last_modified')) errors.push('validadores refresh-state inválidos');
   if (JSON.stringify(Object.keys(state?.products ?? {})) !== JSON.stringify(GASOLINA_KEYS)) errors.push('productos refresh-state inválidos');
