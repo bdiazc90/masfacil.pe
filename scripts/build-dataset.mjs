@@ -8,15 +8,15 @@ import { Transform } from 'node:stream';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
+import { DATASET_SCHEMA as schema } from '../app/dataset-schema.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const snapshot = process.env.GATE_SNAPSHOT_DATE ?? '2026-08-14';
-const minimizedRoot = process.env.GATE_MINIMIZED_ROOT ? path.resolve(root, process.env.GATE_MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', snapshot);
-const provenanceRoot = process.env.GATE_PROVENANCE_ROOT ? path.resolve(root, process.env.GATE_PROVENANCE_ROOT) : path.join(root, 'data', 'provenance', snapshot);
-const localOutput = process.env.GATE_LOCAL_OUTPUT ? path.resolve(root, process.env.GATE_LOCAL_OUTPUT) : path.join(root, '.local-cache', 'gate-1.1', snapshot, 'experiment-dataset-lima-province.json');
-const evidenceOutput = process.env.GATE_EVIDENCE_OUTPUT ? path.resolve(root, process.env.GATE_EVIDENCE_OUTPUT) : path.join(root, 'evidence', `gate-1.1-lima-province-${snapshot}.json`);
-const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.schema.json');
-const fixturePath = path.join(root, 'fixtures', 'gate-1.1', 'experiment-dataset.synthetic.json');
+const snapshot = process.env.SNAPSHOT_DATE ?? '2026-08-14';
+const minimizedRoot = process.env.MINIMIZED_ROOT ? path.resolve(root, process.env.MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', snapshot);
+const provenanceRoot = process.env.PROVENANCE_ROOT ? path.resolve(root, process.env.PROVENANCE_ROOT) : path.join(root, 'data', 'provenance', snapshot);
+const localOutput = process.env.LOCAL_OUTPUT ? path.resolve(root, process.env.LOCAL_OUTPUT) : path.join(root, '.local-cache', 'gate-1.1', snapshot, 'experiment-dataset-lima-province.json');
+const evidenceOutput = process.env.EVIDENCE_OUTPUT ? path.resolve(root, process.env.EVIDENCE_OUTPUT) : path.join(root, 'evidence', `gate-1.1-lima-province-${snapshot}.json`);
+const fixturePath = path.join(root, 'fixtures', 'dataset.synthetic.json');
 const sep = '\u001f';
 
 const target = {
@@ -374,7 +374,6 @@ const dataset = {
   })).sort((left, right) => left.experimental_id.localeCompare(right.experimental_id)),
 };
 
-const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
 const datasetText = `${JSON.stringify(dataset, null, 2)}\n`;
 writeAtomic(localOutput, datasetText, 0o600);
@@ -453,7 +452,7 @@ const ownerVerifiedControl = {
 const evidenceBase = {
   schema_version: 2,
   snapshot_date: snapshot,
-  generated_by: 'scripts/build-gate-1.1.mjs',
+  generated_by: 'scripts/build-dataset.mjs',
   classification: 'métricas agregadas sanitizadas; no contiene filas ni identidades reales',
   scope: dataset.scope,
   temporal_semantics: {
@@ -479,7 +478,7 @@ const evidenceBase = {
   prospective_decision: { status: prospectiveDecision, frozen_abandonment_threshold_percent: frozenAbandonmentThresholdPercent, rule: 'coverage_percent < 90 => NO-GO' },
   owner_verified_control: ownerVerifiedControl,
   local_dataset: { path: path.relative(root, localOutput), offers: dataset.offers.length, sha256: digestBuffer(datasetText), git_classification: 'ignorado; contiene identidad provisional real y coordenadas de reutilización ambigua' },
-  gate_1_2_boundary: { schema: path.relative(root, schemaPath), synthetic_fixture: path.relative(root, fixturePath), transport: 'archivo JSON local validado; solo lectura; sin API, database ni red productiva', origin: target.originPolicy, observable_convenience: ['precio','distancia desde el origen','frescura'], excluded: ['marca','descuentos','convenios','scoring de conveniencia'] },
+  gate_1_2_boundary: { schema: 'app/dataset-schema.mjs', synthetic_fixture: path.relative(root, fixturePath), transport: 'archivo JSON local validado; solo lectura; sin API, database ni red productiva', origin: target.originPolicy, observable_convenience: ['precio','distancia desde el origen','frescura'], excluded: ['marca','descuentos','convenios','scoring de conveniencia'] },
 };
 
 const assertions = [];

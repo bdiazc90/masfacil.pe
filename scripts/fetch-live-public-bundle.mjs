@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { GASOLINA_KEYS, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from '../pipeline/gasolina-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'); const baseUrl = process.argv[2]; const output = path.join(root, 'web', 'data', 'gasolina');
-const allowed = (url) => /^https:\/\//.test(url ?? '') || (process.env.GATE_4_3_TEST_MODE === '1' && /^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/.test(url ?? ''));
+const allowed = (url) => /^https:\/\//.test(url ?? '') || (process.env.TEST_MODE === '1' && /^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/.test(url ?? ''));
 if (!allowed(baseUrl)) throw new Error('Uso: fetch-live-public-bundle.mjs https://<proyecto>.pages.dev (HTTP solo en test local)');
 const base = new URL(baseUrl); if (!base.pathname.endsWith('/')) base.pathname = `${base.pathname}/`;
 async function read(relative) { const response = await fetch(new URL(relative, base), { redirect: 'error', headers: { Accept: 'application/json' } }); if (response.status === 404) throw new Error('Bootstrap público de Pages ausente: faltan manifest, refresh-state o snapshots gasolina v2.'); if (!response.ok) throw new Error(`No se pudo descargar ${relative}: HTTP ${response.status}`); return response.text(); }

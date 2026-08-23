@@ -4,11 +4,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { publicationDecision } from '../app/gate-4.3-publication-policy.mjs';
+import { publicationDecision } from '../app/publication-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const resultPath = process.env.GATE_4_3_REFRESH_RESULT ? path.resolve(process.env.GATE_4_3_REFRESH_RESULT) : path.join(root, '.local-cache', 'gate-4.3', 'refresh-result.json');
-const shellChanged = process.env.GATE_4_3_SHELL_CHANGED === '1';
+const resultPath = process.env.REFRESH_RESULT ? path.resolve(process.env.REFRESH_RESULT) : path.join(root, '.local-cache', 'gate-4.3', 'refresh-result.json');
+const shellChanged = process.env.SHELL_CHANGED === '1';
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, env: process.env, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
@@ -21,7 +21,7 @@ function parseResult(result) {
   catch { throw new Error(`El refresco no produjo JSON verificable: ${result.stderr || result.stdout}`); }
 }
 
-const refreshed = run(process.execPath, ['scripts/refresh-gate-3.3.mjs']);
+const refreshed = run(process.execPath, ['scripts/refresh.mjs']);
 const refresh = parseResult(refreshed);
 const decision = publicationDecision(refresh, { shellChanged });
 
@@ -33,7 +33,7 @@ if (decision.action === 'fail_closed') {
   process.exitCode = 1;
 } else {
   if (decision.project) {
-    const projected = run('npm', ['run', 'project:gasolina']);
+    const projected = run('npm', ['run', 'project']);
     if (projected.status !== 0) throw new Error(`Proyección falló: ${projected.stderr || projected.stdout}`);
   }
   if (decision.verify) {

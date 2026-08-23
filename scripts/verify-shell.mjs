@@ -20,7 +20,7 @@ for (const legacy of ['manifest.json', 'refresh-state.json']) if (fs.existsSync(
 const legacySnapshots = path.join(legacyData, 'snapshots'); if (fs.existsSync(legacySnapshots) && fs.readdirSync(legacySnapshots).length) throw new Error('Bootstrap Pages rechaza artefactos públicos legacy: web/data/snapshots/');
 const manifestFile = path.join(data, 'manifest.json');
 const refreshFile = path.join(data, 'refresh-state.json');
-if (!fs.existsSync(manifestFile) || !fs.existsSync(refreshFile)) throw new Error('Bootstrap Pages incompleto: ejecuta npm run project:gasolina y npm run verify:web antes del primer Direct Upload');
+if (!fs.existsSync(manifestFile) || !fs.existsSync(refreshFile)) throw new Error('Bootstrap Pages incompleto: ejecuta npm run project y npm run verify:web antes del primer Direct Upload');
 const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
 const manifestErrors = validateGasolinaManifest(manifest);
 if (manifestErrors.length) throw new Error(`Bootstrap Pages incompleto: manifest inválido: ${manifestErrors.join('; ')}`);

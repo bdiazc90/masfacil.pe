@@ -8,7 +8,7 @@ import { validateGasolinaManifest, validateGasolinaRefreshState } from '../pipel
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const baseUrl = process.argv[2];
 const output = path.join(root, 'web', 'data', 'gasolina', 'refresh-state.json');
-const localHttp = process.env.GATE_4_3_TEST_MODE === '1' && /^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/.test(baseUrl ?? '');
+const localHttp = process.env.TEST_MODE === '1' && /^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/.test(baseUrl ?? '');
 if (!baseUrl || (!/^https:\/\//.test(baseUrl) && !localHttp)) throw new Error('Se requiere URL HTTPS de Pages (HTTP solo en test local)');
 
 const base = new URL(baseUrl);

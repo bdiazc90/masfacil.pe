@@ -16,7 +16,7 @@ function timestamp(value) {
   const match = clean(value).match(/^(\d{4})[-/](\d{2})[-/](\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?)?$/);
   return match ? new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4] ?? '00'}:${match[5] ?? '00'}:${match[6] ?? '00'}-05:00`) : null;
 }
-async function* csvRows(file) {
+export async function* csvRows(file) {
   let source = fs.createReadStream(file, { highWaterMark: 1024 * 1024 });
   if (file.endsWith('.gz')) source = source.pipe(createGunzip());
   source = source.pipe(new Transform({ transform(chunk, encoding, callback) { callback(null, chunk); } })).setEncoding('utf8');

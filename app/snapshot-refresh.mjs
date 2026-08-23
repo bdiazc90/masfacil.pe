@@ -109,7 +109,7 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, beforePoi
     beforePointerUpdate();
     writeActivePointer(root, pointer, fsModule);
   } catch (error) {
-    throw new Error(`Snapshot validado movido pero pointer no actualizado: ${error.message}; snapshot_id=${pointer.snapshot_id}; recuperación: npm run rollback:gate-3.3 -- ${pointer.snapshot_id}`);
+    throw new Error(`Snapshot validado movido pero pointer no actualizado: ${error.message}; snapshot_id=${pointer.snapshot_id}; recuperación: npm run rollback -- ${pointer.snapshot_id}`);
   }
   return pointer;
 }

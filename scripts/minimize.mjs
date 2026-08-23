@@ -9,9 +9,9 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-if (!process.env.GATE_RAW_INPUT || !process.env.GATE_MINIMIZED_OUTPUT) throw new Error('GATE_RAW_INPUT y GATE_MINIMIZED_OUTPUT son obligatorios');
-const rawPath = path.resolve(root, process.env.GATE_RAW_INPUT);
-const outputRoot = path.resolve(root, process.env.GATE_MINIMIZED_OUTPUT);
+if (!process.env.RAW_INPUT || !process.env.MINIMIZED_OUTPUT) throw new Error('RAW_INPUT y MINIMIZED_OUTPUT son obligatorios');
+const rawPath = path.resolve(root, process.env.RAW_INPUT);
+const outputRoot = path.resolve(root, process.env.MINIMIZED_OUTPUT);
 const rawSchema = ['ID3','ACTIVIDAD','REGISTRO_DE_HIDROCARBUROS','RUC','RAZON_SOCIAL','DEPARTAMENTO','PROVINCIA','DISTRITO','DIRECCION','FECHA_DE_REGISTRO','PRODUCTO','PRECIO_DE_VENTA_SOLES','UNIDAD'];
 const minimizedSchema = ['ID3','ACTIVIDAD','REGISTRO_DE_HIDROCARBUROS','DEPARTAMENTO','PROVINCIA','DISTRITO','FECHA_DE_REGISTRO','PRODUCTO','PRECIO_DE_VENTA_SOLES','UNIDAD'];
 const clean = (value) => String(value ?? '').replace(/\r/g, '').trim();

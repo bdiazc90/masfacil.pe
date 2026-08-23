@@ -1,15 +1,18 @@
 import fs from 'node:fs';
 import { isPublicCommercialEntry } from './commercial-catalog.mjs';
 import crypto from 'node:crypto';
+
+export const AUDIT_SCHEMA_VERSION = '1.0.0';
+
 const top = ['schema_version', 'audit_id', 'catalog_id', 'entries']; const entry = ['establishment_id', 'entry_sha256', 'selection_reason', 'reviewer', 'reviewed_at', 'result'];
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
 const text = (value) => typeof value === 'string' && value.trim().length > 0; const iso = (value) => text(value) && Number.isFinite(Date.parse(value));
 export function canonicalizeCommercialEntry(value) { if (Array.isArray(value)) return value.map(canonicalizeCommercialEntry); if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalizeCommercialEntry(value[key])])); return value; }
 export function commercialEntrySha256(value) { return crypto.createHash('sha256').update(JSON.stringify(canonicalizeCommercialEntry(value))).digest('hex'); }
-export function validateCommercialAudit(audit, schema) {
+export function validateCommercialAudit(audit) {
   const errors = [];
   if (!exact(audit, top)) errors.push('audit: campos inesperados o ausentes');
-  if (audit?.schema_version !== schema?.properties?.schema_version?.const) errors.push('audit.schema_version: fuera del contrato');
+  if (audit?.schema_version !== AUDIT_SCHEMA_VERSION) errors.push('audit.schema_version: fuera del contrato');
   if (!/^commercial-identity-audit-[a-z0-9.-]+$/.test(audit?.audit_id ?? '')) errors.push('audit.audit_id: formato inválido');
   if (!/^commercial-identity-catalog-[a-z0-9.-]+$/.test(audit?.catalog_id ?? '')) errors.push('audit.catalog_id: formato inválido');
   if (!Array.isArray(audit?.entries)) { errors.push('audit.entries: debe ser arreglo'); return errors; }
@@ -23,7 +26,7 @@ export function validateCommercialAudit(audit, schema) {
     if (!text(value.reviewer) || !iso(value.reviewed_at) || !['verified', 'incorrect', 'pending'].includes(value.result)) errors.push(`${at}: reviewer, fecha o resultado inválido`);
   } return [...new Set(errors)];
 }
-export function loadValidatedCommercialAudit(path, schemaPath) { const audit = JSON.parse(fs.readFileSync(path, 'utf8')); const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8')); const errors = validateCommercialAudit(audit, schema); if (errors.length) throw new Error(`Auditoría comercial fuera del contrato Gate 2.3:\n- ${errors.join('\n- ')}`); return audit; }
+export function loadValidatedCommercialAudit(path) { const audit = JSON.parse(fs.readFileSync(path, 'utf8')); const errors = validateCommercialAudit(audit); if (errors.length) throw new Error(`Auditoría comercial fuera de contrato:\n- ${errors.join('\n- ')}`); return audit; }
 export function commercialPublicationGate(catalog, audit) {
   const targets = catalog.entries.filter(isPublicCommercialEntry);
   const summary = { required: targets.length, selected: 0, reviewed: 0, incorrect_links: null };

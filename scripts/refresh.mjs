@@ -12,7 +12,6 @@ import { probeSnapshotValidators } from '../app/http-validator-probe.mjs';
 import { makeSnapshotPointer, compareSnapshotQuality, promoteSnapshot, validateDownloadMetadata } from '../app/snapshot-refresh.mjs';
 import { readActivePointer, resolveActiveSnapshot, validateSnapshotPointer, writeActivePointer } from '../app/snapshot-manifest.mjs';
 import { loadValidatedDataset } from '../app/contract.mjs';
-import { buildCommercialIdentityIndex, loadValidatedCommercialOverlay } from '../app/commercial-overlay.mjs';
 import { nativeFetch } from '../app/native-http.mjs';
 import { canUseCurlFallback } from '../app/refresh-policy.mjs';
 import { findMatchingRaw } from '../app/raw-reuse.mjs';
@@ -24,20 +23,17 @@ import { compareGasolinaQuality, snapshotIdFromGasolinaRevision } from '../pipel
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceId = process.argv[2] ?? 'liquid-current';
 const referenceSnapshot = '2026-08-14';
-const schemaPath = path.join(root, 'contracts', 'gate-1.1-experiment-dataset.schema.json');
 const userAgent = 'Mozilla/5.0 (compatible; masfacil.pe/4.3; public-data-research)';
 const maxRedirects = 3;
 const downloadTimeoutMs = 60 * 60 * 1000;
-const probeTimeoutMs = Number(process.env.GATE_PROBE_TIMEOUT_MS ?? 10_000);
+const probeTimeoutMs = Number(process.env.PROBE_TIMEOUT_MS ?? 10_000);
 const lockPath = path.join(root, '.local-cache', 'gate-3.3', 'refresh.lock');
-const overlaySchemaPath = path.join(root, 'contracts', 'gate-2.1-commercial-identity-overlay.schema.json');
-const overlayPath = path.join(root, '.local-cache', 'gate-2.1', 'commercial-identity-overlay.json');
-const publicRefreshStatePath = process.env.GATE_4_3_REFRESH_STATE_PATH ? path.resolve(process.env.GATE_4_3_REFRESH_STATE_PATH) : null;
-const referenceMinimizedRoot = process.env.GATE_4_3_REFERENCE_MINIMIZED_ROOT ? path.resolve(process.env.GATE_4_3_REFERENCE_MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', referenceSnapshot);
-const testSourceUrl = process.env.GATE_4_3_TEST_SOURCE_URL ?? null;
+const publicRefreshStatePath = process.env.REFRESH_STATE_PATH ? path.resolve(process.env.REFRESH_STATE_PATH) : null;
+const referenceMinimizedRoot = process.env.REFERENCE_MINIMIZED_ROOT ? path.resolve(process.env.REFERENCE_MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', referenceSnapshot);
+const testSourceUrl = process.env.TEST_SOURCE_URL ?? null;
 
-if (testSourceUrl && process.env.GATE_4_3_TEST_MODE !== '1') {
-  throw new Error('GATE_4_3_TEST_SOURCE_URL exige GATE_4_3_TEST_MODE=1');
+if (testSourceUrl && process.env.TEST_MODE !== '1') {
+  throw new Error('TEST_SOURCE_URL exige TEST_MODE=1');
 }
 
 const refreshSourceUrl = testSourceUrl ?? CANONICAL_SOURCE_URLS.liquid_current;
@@ -90,7 +86,7 @@ function validatedActiveSnapshot() {
   const evidencePath = checked.evidence_path ? path.join(root, checked.evidence_path) : null;
   const acquisitionPath = checked.acquisition_path ? path.join(root, checked.acquisition_path) : null;
   if (!evidencePath || !fs.existsSync(evidencePath) || !acquisitionPath || !fs.existsSync(acquisitionPath)) throw new Error('Manifest activo sin evidencia o procedencia verificable');
-  const dataset = loadValidatedDataset(checked.dataset_absolute_path, schemaPath);
+  const dataset = loadValidatedDataset(checked.dataset_absolute_path);
   return { ...checked, source_max_reported_at: dataset.temporal_context.source_max_reported_at };
 }
 
@@ -239,40 +235,28 @@ function runBuilder(stage, snapshotDate, rawRecord) {
   const output = path.join(stage, 'dataset', 'experiment-dataset-lima-province.json');
   const evidence = path.join(stage, 'evidence', `gate-1.1-lima-province-${snapshotDate}.json`);
   const provenance = path.join(stage, 'provenance', snapshotDate);
-  const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'build-gate-1.1.mjs')], {
+  const result = spawnSync(process.execPath, [path.join(root, 'scripts', 'build-dataset.mjs')], {
     cwd: root,
     env: {
       ...process.env,
-      GATE_SNAPSHOT_DATE: snapshotDate,
-      GATE_MINIMIZED_ROOT: path.relative(root, path.join(stage, 'minimized')),
-      GATE_PROVENANCE_ROOT: path.relative(root, provenance),
-      GATE_LOCAL_OUTPUT: path.relative(root, output),
-      GATE_EVIDENCE_OUTPUT: path.relative(root, evidence),
+      SNAPSHOT_DATE: snapshotDate,
+      MINIMIZED_ROOT: path.relative(root, path.join(stage, 'minimized')),
+      PROVENANCE_ROOT: path.relative(root, provenance),
+      LOCAL_OUTPUT: path.relative(root, output),
+      EVIDENCE_OUTPUT: path.relative(root, evidence),
     },
     encoding: 'utf8',
     maxBuffer: 1024 * 1024,
   });
   if (result.error) throw result.error;
   if (!fs.existsSync(output) || !fs.existsSync(evidence)) throw new Error(`builder terminó sin dataset o evidencia: ${result.stderr || result.stdout || `exit ${result.status}`}`);
-  const dataset = loadValidatedDataset(output, schemaPath);
+  const dataset = loadValidatedDataset(output);
   const candidateEvidence = readJson(evidence);
   if (result.status !== 0 || (candidateEvidence.assertion_summary?.failed ?? 1) !== 0) {
     const failures = (candidateEvidence.assertions ?? []).filter((item) => !item.pass).map((item) => `${item.id}: ${JSON.stringify(item.observed)}`).join(' | ');
     throw new Error(`builder rechazó el snapshot: ${failures || result.stderr || result.stdout}`);
   }
   return { output, evidence, dataset, candidateEvidence, builder_stdout: result.stdout.trim(), raw_record: rawRecord };
-}
-
-function reanchorOverlay(stage, dataset) {
-  if (!fs.existsSync(overlayPath)) return { path: null, entries: 0, projected: 0 };
-  const source = loadValidatedCommercialOverlay(overlayPath, overlaySchemaPath);
-  const reanchored = { ...source, official_dataset_id: dataset.dataset_id };
-  const index = buildCommercialIdentityIndex(dataset, reanchored, { projectionPolicy: 'private_preview' });
-  if (index.metrics.entries !== 11 || index.metrics.projected !== 11) throw new Error(`overlay Gate 2.1 no reancló completamente: ${index.metrics.entries}/${index.metrics.projected}`);
-  const target = path.join(stage, 'overlay', 'commercial-identity-overlay.json');
-  fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(target, `${JSON.stringify(reanchored, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-  return { path: target, entries: index.metrics.entries, projected: index.metrics.projected };
 }
 
 async function run() {
@@ -305,7 +289,7 @@ async function run() {
     } else downloaded = await fetchFull(url, rawPath);
     const snapshotDate = new Date(downloaded.response_headers['last-modified'] ?? downloaded.completed_at).toISOString().slice(0, 10);
     const rawRecord = writeRecord(stage, { ...downloaded, snapshot_date: snapshotDate, source_id: sourceId, final_url: downloaded.final_url }, path.relative(root, rawPath));
-    const minimized = spawnSync(process.execPath, [path.join(root, 'scripts', 'minimize-gate-3.3.mjs')], { cwd: root, env: { ...process.env, GATE_RAW_INPUT: path.relative(root, rawPath), GATE_MINIMIZED_OUTPUT: path.relative(root, path.join(stage, 'minimized')) }, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+    const minimized = spawnSync(process.execPath, [path.join(root, 'scripts', 'minimize.mjs')], { cwd: root, env: { ...process.env, RAW_INPUT: path.relative(root, rawPath), MINIMIZED_OUTPUT: path.relative(root, path.join(stage, 'minimized')) }, encoding: 'utf8', maxBuffer: 1024 * 1024 });
     if (minimized.status !== 0) throw new Error(`minimización rechazada: ${minimized.stderr || minimized.stdout}`);
     const minimizedLineage = JSON.parse(minimized.stdout);
     minimizedLineage.minimized_path = 'minimized/prices/liquid-current.csv.gz';
@@ -320,7 +304,6 @@ async function run() {
     }
     fs.mkdirSync(path.join(stage, 'provenance', snapshotDate), { recursive: true, mode: 0o700 });
     const built = runBuilder(stage, snapshotDate, rawRecord);
-    const overlay = reanchorOverlay(stage, built.dataset);
     const snapshotId = `${snapshotDate}-${runId}`;
     const final = path.join(root, '.local-cache', 'gate-3.3', 'snapshots', snapshotId);
     const lineage = { raw: { sha256: downloaded.sha256, bytes: downloaded.bytes }, minimized: minimizedLineage, dataset: { snapshot_date: built.dataset.temporal_context.snapshot_date, source_max_reported_at: built.dataset.temporal_context.source_max_reported_at } };
@@ -331,7 +314,7 @@ async function run() {
       datasetPath: path.join(final, 'dataset', 'experiment-dataset-lima-province.json'),
       evidencePath: path.join(final, 'evidence', path.basename(built.evidence)),
       acquisitionPath: path.join(final, 'provenance', snapshotDate, 'acquisitions.jsonl'),
-      overlayPath: overlay.path ? path.join(final, 'overlay', path.basename(overlay.path)) : null,
+      overlayPath: null,
       sourceUrl: url,
       validators: { etag: downloaded.response_headers.etag ?? null, last_modified: downloaded.response_headers['last-modified'] ?? null },
       promotedAt: new Date().toISOString(),
@@ -368,7 +351,7 @@ async function run() {
       quality,
     };
     fs.writeFileSync(path.join(stage, 'gasolina-validation.json'), `${JSON.stringify(validation, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    const report = { schema_version: 2, status: quality.status, detection, active_before: active, download: downloaded, lineage, reference_inputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescaron en Gate 3.3' }, quality, overlay, staging_path: path.relative(root, stage), dataset: { snapshot_date: snapshotDate, offers: built.dataset.offers.length }, gasolina: { revision_id: projection.manifest.revision_id, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: projection.results[key].metrics.contract_ready.districts }])) } };
+    const report = { schema_version: 2, status: quality.status, detection, active_before: active, download: downloaded, lineage, reference_inputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' }, quality, staging_path: path.relative(root, stage), dataset: { snapshot_date: snapshotDate, offers: built.dataset.offers.length }, gasolina: { revision_id: projection.manifest.revision_id, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: projection.results[key].metrics.contract_ready.districts }])) } };
     fs.writeFileSync(path.join(stage, 'refresh-report.json'), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
     if (quality.status === 'needs_review') return { ...report, promoted: false, staging_path: path.relative(root, stage) };
 

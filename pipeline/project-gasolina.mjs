@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodeSeed } from '../app/gate-4.3-bootstrap.mjs';
+import { decodeSeed } from '../app/bootstrap-seed.mjs';
 import { buildGasolinaProduct, GASOLINA_PRODUCTS } from './gasolina-products.mjs';
 import { GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, sha256, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from './gasolina-contract.mjs';
 import { buildCommercialCatalogIndex, emptyCommercialCatalog, loadValidatedCommercialCatalog } from '../app/commercial-catalog.mjs';
@@ -44,7 +44,7 @@ export function resolveGasolinaRaw(root, pointer) {
 function optionalSeed(root) {
   const encoded = path.join(root, '.local-cache', 'gate-4.3', 'bootstrap-seed.b64');
   if (!fs.existsSync(encoded)) return null;
-  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'bootstrap', 'gate-4.3-seed.manifest.json'), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'bootstrap', 'seed.manifest.json'), 'utf8'));
   return decodeSeed(fs.readFileSync(encoded, 'utf8'), manifest);
 }
 
@@ -102,12 +102,8 @@ export function loadCommercialPublicationInputs(root) {
   const catalogPath = path.join(root, '.local-cache', 'gate-2.3', 'commercial-identity-catalog.json');
   const auditPath = path.join(root, '.local-cache', 'gate-2.3', 'commercial-identity-audit.json');
   return {
-    commercialCatalog: fs.existsSync(catalogPath)
-      ? loadValidatedCommercialCatalog(catalogPath, path.join(root, 'contracts', 'gate-2.3-commercial-identity-catalog-v1.1.schema.json'))
-      : emptyCommercialCatalog(),
-    commercialAudit: fs.existsSync(auditPath)
-      ? loadValidatedCommercialAudit(auditPath, path.join(root, 'contracts', 'gate-2.3-commercial-identity-audit.schema.json'))
-      : null,
+    commercialCatalog: fs.existsSync(catalogPath) ? loadValidatedCommercialCatalog(catalogPath) : emptyCommercialCatalog(),
+    commercialAudit: fs.existsSync(auditPath) ? loadValidatedCommercialAudit(auditPath) : null,
   };
 }
 

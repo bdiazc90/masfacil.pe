@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { DATASET_SCHEMA } from './dataset-schema.mjs';
 
 const clean = (value) => String(value ?? '').trim();
 const isIso = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value));
@@ -54,17 +55,15 @@ export function validateDataset(dataset, schema) {
   return errors;
 }
 
-export function loadValidatedDataset(datasetPath, schemaPath) {
+export function loadValidatedDataset(datasetPath, schema = DATASET_SCHEMA) {
   let dataset;
-  let schema;
   try {
     dataset = JSON.parse(fs.readFileSync(datasetPath, 'utf8'));
-    schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
   } catch (error) {
-    throw new Error(`No se pudo leer el dataset o contrato: ${error.message}`);
+    throw new Error(`No se pudo leer el dataset: ${error.message}`);
   }
   const errors = validateDataset(dataset, schema);
-  if (errors.length) throw new Error(`Dataset fuera del contrato Gate 1.1:\n- ${errors.join('\n- ')}`);
+  if (errors.length) throw new Error(`Dataset fuera de contrato:\n- ${errors.join('\n- ')}`);
   return dataset;
 }
 

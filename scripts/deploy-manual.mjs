@@ -9,7 +9,7 @@ const sourceWeb = path.join(root, 'web');
 const sourceData = path.join(sourceWeb, 'data');
 const destination = path.join(root, '.local-cache', 'gate-4.3', 'pages-bootstrap-web');
 
-const verified = spawnSync(process.execPath, ['scripts/verify-first-pages-bootstrap.mjs'], { cwd: root, encoding: 'utf8' });
+const verified = spawnSync(process.execPath, ['scripts/verify-shell.mjs'], { cwd: root, encoding: 'utf8' });
 if (verified.status !== 0) throw new Error(verified.stderr || verified.stdout || 'Bootstrap local inválido');
 const listed = spawnSync('git', ['ls-files', '-z', '--', 'web'], { cwd: root, encoding: 'utf8' });
 if (listed.status !== 0) throw new Error(listed.stderr || 'No se pudo resolver el árbol público trackeado');
@@ -26,7 +26,7 @@ try {
     fs.copyFileSync(source, target);
   }
   fs.cpSync(sourceData, path.join(temporary, 'data'), { recursive: true });
-  const candidate = spawnSync(process.execPath, ['scripts/verify-first-pages-bootstrap.mjs', '--web-root', path.relative(root, temporary)], { cwd: root, encoding: 'utf8' });
+  const candidate = spawnSync(process.execPath, ['scripts/verify-shell.mjs', '--web-root', path.relative(root, temporary)], { cwd: root, encoding: 'utf8' });
   if (candidate.status !== 0) throw new Error(candidate.stderr || candidate.stdout || 'Raíz sellada de Pages inválida');
   fs.rmSync(destination, { recursive: true, force: true });
   fs.renameSync(temporary, destination);

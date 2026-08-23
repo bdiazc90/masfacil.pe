@@ -5,21 +5,19 @@
   "type": "module",
   "scripts": {
     "start": "node scripts/serve-web.mjs",
-    "serve:web": "node scripts/serve-web.mjs",
-    "demo": "node app/server.mjs --demo",
-    "project:gate-4.1": "node pipeline/project.mjs",
-    "project:gasolina": "node pipeline/project-gasolina.mjs",
-    "refresh:gate-3.3": "node scripts/refresh-gate-3.3.mjs",
-    "rollback:gate-3.3": "node scripts/rollback-gate-3.3.mjs",
-    "rollback:gate-4.3": "node scripts/rollback-gate-4.3.mjs",
-    "verify:web": "node scripts/verify-web.mjs",
-    "prepare:pages-bootstrap": "node scripts/prepare-pages-bootstrap-root.mjs",
-    "prepare:gate-4.3": "node scripts/prepare-gate-4.3-publication.mjs",
-    "seed:gate-4.3": "node scripts/generate-gate-4.3-bootstrap-seed.mjs",
-    "install-seed:gate-4.3": "node scripts/install-gate-4.3-bootstrap-seed.mjs",
-    "make:clean-runner-raw:gate-4.3": "node scripts/make-gate-4.3-clean-runner-raw.mjs",
+    "serve": "node scripts/serve-web.mjs",
+    "refresh": "node scripts/refresh.mjs",
+    "project": "node pipeline/project-gasolina.mjs",
+    "publish": "node scripts/publish.mjs",
+    "rollback": "node scripts/rollback.mjs",
+    "deploy:manual": "node scripts/deploy-manual.mjs",
+    "seed:generate": "node scripts/seed-generate.mjs",
+    "seed:install": "node scripts/seed-install.mjs",
+    "make:test-raw": "node scripts/make-test-raw.mjs",
+    "dump:establishments": "node scripts/dump-establishments.mjs",
     "fetch:public-bundle": "node scripts/fetch-live-public-bundle.mjs",
     "fetch:refresh-state": "node scripts/fetch-live-refresh-state.mjs",
-    "audit:publication": "node scripts/audit-publication.mjs"
+    "audit": "node scripts/audit-publication.mjs",
+    "verify:web": "node scripts/verify-web.mjs"
   }
 }

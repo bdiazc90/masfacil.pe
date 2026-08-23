@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import { OFFICIAL_ANCHOR_SCHEME } from './official-anchor.mjs';
 
-const topKeys = ['schema_version', 'catalog_id', 'anchor_scheme', 'entries'];
+export const CATALOG_SCHEMA_VERSION = '1.1.0';
+
+const topKeys =['schema_version', 'catalog_id', 'anchor_scheme', 'entries'];
 const entryKeys = ['establishment_id', 'brand', 'public_site_name', 'source', 'entity_link', 'identity_freshness', 'publication'];
 const sourceKeys = ['kind', 'source_or_description', 'acquisition_method', 'observed_at', 'responsible'];
 const linkKeys = ['method', 'status', 'verified_at'];
@@ -12,10 +14,10 @@ const meaningful = (value) => typeof value === 'string' && value.trim().length >
 const nullableText = (value) => value === null || meaningful(value);
 const iso = (value) => meaningful(value) && Number.isFinite(Date.parse(value));
 
-export function validateCommercialCatalog(catalog, schema) {
+export function validateCommercialCatalog(catalog) {
   const errors = [];
   if (!exactKeys(catalog, topKeys)) errors.push('catalog: campos inesperados o ausentes');
-  if (catalog?.schema_version !== schema?.properties?.schema_version?.const) errors.push('catalog.schema_version: fuera del contrato');
+  if (catalog?.schema_version !== CATALOG_SCHEMA_VERSION) errors.push('catalog.schema_version: fuera del contrato');
   if (!/^commercial-identity-catalog-[a-z0-9.-]+$/.test(catalog?.catalog_id ?? '')) errors.push('catalog.catalog_id: formato inválido');
   if (catalog?.anchor_scheme !== OFFICIAL_ANCHOR_SCHEME) errors.push('catalog.anchor_scheme: fuera del contrato');
   if (!Array.isArray(catalog?.entries)) { errors.push('catalog.entries: debe ser arreglo'); return [...new Set(errors)]; }
@@ -48,8 +50,8 @@ export function validateCommercialCatalog(catalog, schema) {
   return [...new Set(errors)];
 }
 
-export function loadValidatedCommercialCatalog(catalogPath, schemaPath) { const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8')); const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8')); const errors = validateCommercialCatalog(catalog, schema); if (errors.length) throw new Error(`Catálogo comercial fuera del contrato Gate 2.3:\n- ${errors.join('\n- ')}`); return catalog; }
-export function emptyCommercialCatalog() { return { schema_version: '1.1.0', catalog_id: 'commercial-identity-catalog-pending', anchor_scheme: OFFICIAL_ANCHOR_SCHEME, entries: [] }; }
+export function loadValidatedCommercialCatalog(catalogPath) { const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8')); const errors = validateCommercialCatalog(catalog); if (errors.length) throw new Error(`Catálogo comercial fuera de contrato:\n- ${errors.join('\n- ')}`); return catalog; }
+export function emptyCommercialCatalog() { return { schema_version: CATALOG_SCHEMA_VERSION, catalog_id: 'commercial-identity-catalog-pending', anchor_scheme: OFFICIAL_ANCHOR_SCHEME, entries: [] }; }
 export function isPublicCommercialEntry(entry) { return entry.entity_link.status === 'verified' && entry.publication.status === 'publishable'; }
 export function buildCommercialCatalogIndex(catalog, establishmentIds) {
   const universe = new Set(establishmentIds); const byAnchor = new Map(); let pending = 0;

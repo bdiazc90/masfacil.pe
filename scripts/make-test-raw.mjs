@@ -15,8 +15,8 @@ const products = new Set(['GASOHOL REGULAR', 'GASOHOL PREMIUM']);
 const cutoff = Date.parse('2026-08-18T23:59:59-05:00');
 const oldest = cutoff - 30 * 86400000;
 const candidateReportedAt = '2026-08-20 12:00:00';
-if (process.env.GATE_4_3_TEST_MODE !== '1') throw new Error('Este generador solo se ejecuta con GATE_4_3_TEST_MODE=1');
-if (!input || !fs.existsSync(input)) throw new Error('Uso: GATE_4_3_TEST_MODE=1 node scripts/make-gate-4.3-clean-runner-raw.mjs <raw-autorizado.csv>');
+if (process.env.TEST_MODE !== '1') throw new Error('Este generador solo se ejecuta con TEST_MODE=1');
+if (!input || !fs.existsSync(input)) throw new Error('Uso: TEST_MODE=1 node scripts/make-test-raw.mjs <raw-autorizado.csv>');
 
 function clean(value) { return String(value ?? '').replace(/\r/g, '').trim(); }
 function normalizeHeader(value) { return clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toUpperCase(); }

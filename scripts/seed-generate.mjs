@@ -2,10 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipCanonical, sha256, stableJson, validateSeed } from '../app/gate-4.3-bootstrap.mjs';
+import { gzipCanonical, sha256, stableJson, validateSeed } from '../app/bootstrap-seed.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const manifest = JSON.parse(fs.readFileSync(path.join(root, 'bootstrap', 'gate-4.3-seed.manifest.json'), 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'bootstrap', 'seed.manifest.json'), 'utf8'));
 const inputRoot = path.join(root, '.local-cache', 'gate-0.2', manifest.reference_snapshot_date, 'superseded-uncompressed', 'minimized');
 const outputRoot = path.join(root, '.local-cache', 'gate-4.3');
 

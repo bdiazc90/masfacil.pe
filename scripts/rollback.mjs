@@ -8,7 +8,7 @@ import { buildGasolinaProjectionForPointer, writeGasolinaProjection } from '../p
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const snapshotId = process.argv[2];
-if (!snapshotId) throw new Error('Uso: npm run rollback:gate-4.3 -- <snapshot-id>');
+if (!snapshotId) throw new Error('Uso: npm run rollback -- <snapshot-id>');
 
 const activePath = path.join(root, '.local-cache', 'gate-3.3', 'active.json');
 if (!fs.existsSync(activePath)) throw new Error('No existe pointer activo para rollback');
