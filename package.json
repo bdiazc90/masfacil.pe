@@ -20,6 +20,8 @@
     "audit": "node scripts/audit-publication.mjs",
     "verify:web": "node scripts/verify-web.mjs",
     "harvest:centers": "node scripts/harvest-centers.mjs",
-    "harvest:match": "node scripts/match-identities.mjs"
+    "harvest:match": "node scripts/match-identities.mjs",
+    "identity:install": "node scripts/identity-install.mjs",
+    "identity:pack": "node scripts/identity-pack.mjs"
   }
 }

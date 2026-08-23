@@ -44,6 +44,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
       BOOTSTRAP_SEED_B64: ${{ secrets.BOOTSTRAP_SEED_B64 }}
+      COMMERCIAL_IDENTITY_B64: ${{ secrets.COMMERCIAL_IDENTITY_B64 }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -61,6 +62,9 @@ jobs:
         run: npm run fetch:refresh-state -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
       - name: Instalar bootstrap privado mínimo
         run: npm run seed:install -- --target "$RUNNER_TEMP/seed-reference"
+      - name: Instalar identidad comercial verificada
+        if: env.COMMERCIAL_IDENTITY_B64 != ''
+        run: npm run identity:install
       - name: Calcular cambio de shell
         id: shell
         env:
