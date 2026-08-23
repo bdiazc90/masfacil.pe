@@ -135,6 +135,30 @@ const ndjson = fs.existsSync(path.join(baseCosecha, 'raw.ndjson'))
     .filter((p) => fs.existsSync(p)).sort().pop();
 if (!ndjson) throw new Error(`No hay raw.ndjson bajo ${path.relative(root, baseCosecha)}`);
 
+// El innerText de una tarjeta de Maps mezcla nombre, calificación, número de
+// reseñas, categoría, dirección y horario, en orden variable. Hay que descartar
+// lo que parece dirección pero no lo es: "4,1" es una calificación y "(216)" un
+// conteo de reseñas, y ambos llevan dígitos.
+const ES_CALIFICACION = /^\d[.,]\d\s*$/;
+const ES_RESEÑAS = /^\(\s*[\d.,\s]+\)$/;
+const ES_HORARIO = /abierto|cierra|cerrado|abre|24\s*horas|a\.\s?m\.|p\.\s?m\./i;
+const ES_TELEFONO = /^\+?\s*\d[\d\s()-]{7,}$/;
+const PREFIJO_VIA = /\b(AV|AVDA|AVENIDA|JR|JIRON|CALLE|CA|PSJE|PASAJE|CARR|CARRETERA|PROL|PANAMERICANA|MALECON|PLAZA|OVALO)\b\.?/i;
+
+function direccionDeTarjeta(info) {
+  const util = info.filter((t) => {
+    const texto = String(t ?? '').trim();
+    if (!texto || texto.length < 4) return false;
+    return !ES_CALIFICACION.test(texto) && !ES_RESEÑAS.test(texto) && !ES_HORARIO.test(texto) && !ES_TELEFONO.test(texto);
+  });
+  // Preferir lo que empieza como una vía; si no, lo primero con un número de
+  // puerta plausible. Nunca la calificación ni el horario.
+  return util.find((t) => PREFIJO_VIA.test(t) && /\d/.test(t))
+    ?? util.find((t) => PREFIJO_VIA.test(t))
+    ?? util.find((t) => /\b\d{2,6}\b/.test(t) && !/gasoliner|grifo|combustible/i.test(t))
+    ?? '';
+}
+
 // Deduplicación por identificador estable de lugar: sin esto un mismo grifo
 // aparece una vez por término de búsqueda.
 const fichas = new Map();
@@ -155,7 +179,7 @@ for (const linea of fs.readFileSync(ndjson, 'utf8').split('\n')) {
       nombre: lugar.name ?? '',
       marca,
       categoria,
-      direccion: info.find((t) => /\d/.test(t) && !/gasoliner/i.test(t)) ?? '',
+      direccion: direccionDeTarjeta(info),
       lat: Number(lugar.lat), lng: Number(lugar.lng),
     });
   }
