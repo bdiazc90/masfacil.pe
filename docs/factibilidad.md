@@ -2,7 +2,7 @@
 
 La primera mitad conserva la decisión experimental del **14 de agosto de 2026**; las secciones de publicación y límites reflejan el estado vigente. Se apoya en el [producto observado](descubrimiento.md) y las [fuentes](datos.md).
 
-## Veredicto histórico de Gate 1.1
+## Veredicto histórico del experimento privado
 
 **GO CON LÍMITES para un vertical slice privado de Gasohol Regular en Lima provincia.**
 
@@ -31,9 +31,9 @@ El límite de 30 días es conservador y coincide con la ventana de publicación 
 | J6 GLP Plantas | 814 | 461 | 455 | 429 (94.29 %) | no seleccionado |
 | J7 Distribuidores | 8 | 0 | 0 | 0 | excluido |
 
-Ningún journey obtiene identidad comercial reconocible **desde una fuente bulk oficial**. Eso describe el límite de esas fuentes, no el de los métodos aceptables: el catálogo curado con evidencia observada es la vía prevista, y su gate está en [roadmap.md](roadmap.md).
+Ningún journey obtiene identidad comercial reconocible **desde una fuente bulk oficial**. Eso describe el límite de esas fuentes, no el de los métodos aceptables: el catálogo curado con evidencia observada es la vía prevista, y su plan está en [roadmap.md](roadmap.md).
 
-## Contrato de Gate 1.1
+## Contrato del dataset privado
 
 Para Lima/provincia Lima, actividades urbanas 1/2/5/6 y `GASOHOL REGULAR` en galones:
 
@@ -47,9 +47,9 @@ Para Lima/provincia Lima, actividades urbanas 1/2/5/6 y `GASOHOL REGULAR` en gal
 
 Resultado: **714/741 = 96.356 %**, 42 distritos, 0 ambiguos y 0 conflictos. La población previa solo Surco quedó en **26/30 = 86.667 %** y continúa como NO-GO separado; no se cambió su denominador.
 
-El schema `contracts/gate-1.1-experiment-dataset.schema.json` permite precio, fecha/edad, distrito, coordenada, procedencia e identidad provisional rotulada como razón social/dirección. Rechaza propiedades adicionales como marca, stock, RUC, descuentos, convenios o scoring.
+El schema `app/dataset-schema.mjs` permite precio, fecha/edad, distrito, coordenada, procedencia e identidad provisional rotulada como razón social/dirección. Rechaza propiedades adicionales como marca, stock, RUC, descuentos, convenios o scoring. Su validador es `app/contract.mjs`, que es quien lo interpreta al construir el dataset.
 
-El dataset real vive en `.local-cache/gate-1.1/2026-08-14/`, ignorado por Git y con permisos `0600`. Git conserva schema, fixture sintético y métricas agregadas.
+El dataset real vive en `.local-cache/datasets/2026-08-14/`, ignorado por Git y con permisos `0600`. Git conserva el schema y un fixture sintético de cuatro ofertas (`fixtures/dataset.synthetic.json`); las métricas agregadas se regeneran al construir el dataset y ya no se versionan en el repositorio.
 
 ## Producto construido en Capa 1
 
@@ -77,7 +77,7 @@ Estas hipótesis no autorizan inferir marca desde razón social, coordenada ni p
 
 ## Permiso de publicación por campo
 
-Medido en Gate 2.2. El permiso no es uniforme: se evalúa campo por campo, contra la licencia real de su fuente.
+Medido al evaluar el subconjunto público. El permiso no es uniforme: se evalúa campo por campo, contra la licencia real de su fuente.
 
 | Campo | Veredicto | Base |
 | --- | --- | --- |
@@ -92,18 +92,18 @@ Medido en Gate 2.2. El permiso no es uniforme: se evalúa campo por campo, contr
 | Campo | Qué falta | Qué lo resolvería | Decide |
 | --- | --- | --- | --- |
 | Razón social, dirección | Saber si la declaración ODC-By del dataset cubre sus columnas de identidad, y si el producto realmente las necesita en público | Lectura de la ficha del dataset y de sus términos; o la decisión de no publicarlas porque el catálogo cubre mejor la necesidad | Owner |
-| Identidad comercial | Un contrato sucesor que represente evidencia observada y un catálogo con cobertura medida | Gate 2.3: contrato, curación inicial, cobertura total y muestra auditada | Owner, con el gate |
+| Identidad comercial | Cobertura curada en el catálogo sucesor, que ya representa evidencia observada | Curación inicial, cobertura total medida y muestra auditada | Owner, con el catálogo |
 
 El precedente relevante: la coordenada estuvo en `desconocido` y salió mediante una decisión explícita del owner, con procedencia y atribución conservadas. Ese es el circuito previsto, no una excepción.
 
 Consecuencia vigente: el bundle activo contiene precio, fecha, distrito y coordenadas; **no tiene identidad publicada**. Los sucesores v2.1 de producto, manifest y refresh-state son compatibles con 2.0 y pueden exportar solamente `establishment_id` e identidad comercial verificable. La cobertura sigue en 0/717 y la auditoría informa `not_required` hasta recibir la primera observación `owner_verified`. Razón social y dirección no se exportan. La edad se recalcula en el navegador desde `reported_at`.
 
-El contrato privado Gate 1.1 mantiene por compatibilidad su clasificación histórica; los contratos públicos posteriores no la reescriben ni la propagan. El contrato público versionado es downstream, con allowlist y hash verificable.
+El contrato privado del dataset mantiene por compatibilidad su clasificación histórica; los contratos públicos posteriores no la reescriben ni la propagan. El contrato público versionado es downstream, con allowlist y hash verificable.
 
-La matriz vive en `app/publication-matrix.mjs`, con la evidencia citada por fila. Es la **política vigente** y trata `unknown` como campo suprimible; bajo el método actual `unknown` es una cola, por lo que la matriz **requiere migración en el gate de catálogo**. Hasta ese gate sigue gobernando la proyección y no se altera de forma oportunista. La proyección pública se reproduce con:
+Existió un módulo de matriz de publicación que citaba la evidencia por fila y trataba `unknown` como campo suprimible; bajo el método actual `unknown` es una cola, por lo que esa matriz requería migración. Ya no se conserva en el repositorio. Lo que hoy se ejecuta son dos artefactos más estrechos: la **allowlist cerrada** `PUBLIC_OFFER_FIELDS` de `pipeline/gasolina-contract.mjs`, que rechaza cualquier oferta cuyo conjunto exacto de campos no coincida, y la **puerta de catálogo y auditoría** de `app/commercial-catalog.mjs` y `app/commercial-audit.mjs`, donde solo una entrada con vínculo `verified` y `publication.status = publishable` se proyecta. La tabla de arriba es, por tanto, el único registro del permiso campo por campo: no está codificada en ningún artefacto ejecutable. La proyección pública se reproduce con:
 
 ```bash
-npm run project:gate-4.1
+npm run project
 ```
 
 ## Registro de exclusiones y NO-GO
@@ -125,8 +125,9 @@ El protocolo formal A/B contra Facilito permanece disponible, pero no es una pue
 Límites vigentes:
 
 - las coordenadas GIS y la distancia derivada están aprobadas downstream; razón social y dirección siguen en cola de decisión; **ninguna identidad comercial está publicada hoy**;
-- identidad comercial demostrada solo en un piloto de 11 sedes, con fuente stale; el catálogo sucesor curado aún no existe;
-- el contrato del piloto no puede representar evidencia observada sin URL, y la matriz de publicación trata `unknown` como supresión: ambos requieren sucesión en el gate de catálogo;
+- identidad comercial demostrada solo en un piloto de 11 sedes, con fuente stale; esos 11 vínculos ya no son recuperables desde el repositorio, porque el overlay se eliminó y el `establishment_id` cambió de derivación;
+- el catálogo sucesor ya representa evidencia observada sin URL obligatoria, pero sigue **sin curación: 0 entradas**, así que la capacidad existe y la cobertura no;
+- el permiso de publicación campo por campo ya no vive en ningún módulo ejecutable: la allowlist cerrada impide publicar razón social y dirección, pero el registro de por qué siguen en cola existe solo en este documento;
 - Registro y GIS no se refrescan, de modo que no hay señal de cambio a nivel de entidad y la rotación medida de códigos es un límite inferior;
 - 27/741 ofertas frescas excluidas por joins exactos;
 - categorías rurales/flotantes con menor cobertura;
@@ -137,9 +138,9 @@ Límites vigentes:
 ## Reproducción
 
 ```bash
-node scripts/analyze-gate-0.3.mjs
-node scripts/analyze-j7-snapshot.mjs
-node scripts/build-gate-1.1.mjs
+node scripts/build-dataset.mjs
+npm run project
+npm run audit
 ```
 
-Los scripts y JSON sanitizados conservan el detalle cuantitativo que ya no se duplica en este documento.
+Los scripts regeneran el detalle cuantitativo agregado que ya no se duplica en este documento. Los JSON sanitizados de cada corte, junto con los scripts de perfilado y de análisis de J7 que los produjeron, ya no se conservan en el repositorio; quedan en el historial de Git.

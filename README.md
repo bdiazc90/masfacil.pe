@@ -17,20 +17,15 @@ La app nunca afirma stock, horario, descuentos o disponibilidad. Las ofertas de 
 Requiere Node.js.
 
 ```bash
-npm run serve:web
+npm run serve
 ```
 
-Abre <http://127.0.0.1:4173>. Para una demo sin datos reales:
+Abre <http://127.0.0.1:4173>. La proyección requiere los inputs privados
+autorizados de `.local-cache/`:
 
 ```bash
-npm run demo
-```
-
-La proyección real requiere los inputs privados autorizados de `.local-cache/`:
-
-```bash
-npm run project:gasolina
-npm run serve:web
+npm run project
+npm run serve
 ```
 
 `web/data/` se genera localmente y no vive en Git.
@@ -58,21 +53,22 @@ El expediente permanece privado; el JSON público contiene solo la identidad mí
 ## Operación
 
 ```bash
-npm run refresh:gate-3.3       # refresca y promueve snapshot privado
-npm run project:gasolina       # proyecta Regular + Premium
-npm run prepare:gate-4.3       # prepara publicación automatizada
-npm run rollback:gate-4.3 -- <snapshot-id>
-npm run audit:publication      # bloquea material privado
+npm run refresh                # refresca y promueve snapshot privado
+npm run project                # proyecta Regular + Premium
+npm run publish                # prepara publicación automatizada
+npm run rollback -- <snapshot-id>
+npm run audit                  # bloquea material privado
+npm run dump:establishments    # vuelca los 717 con dirección y coordenada
 ```
 
 El workflow `.github/workflows/refresh-pages.yml` comprueba cambios y despliega ambos productos juntos. Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
 
-Bootstrap manual, si fuera necesario:
+Deploy manual, si fuera necesario:
 
 ```bash
-npm run project:gasolina
-npm run prepare:pages-bootstrap
-npx --yes wrangler@4.31.0 pages deploy .local-cache/gate-4.3/pages-bootstrap-web --project-name masfacil-pe --branch main
+npm run project
+npm run deploy:manual
+npx --yes wrangler@4.31.0 pages deploy .local-cache/publish/pages-bootstrap-web --project-name masfacil-pe --branch main
 ```
 
 ## Proyecto
@@ -80,11 +76,21 @@ npx --yes wrangler@4.31.0 pages deploy .local-cache/gate-4.3/pages-bootstrap-web
 ```text
 web/         PWA estática
 pipeline/    transformación a snapshots públicos
-app/         utilidades y catálogo privado
-contracts/   validación en runtime
+app/         contratos, validación en runtime y catálogo privado
 scripts/     refresh, publicación, auditoría y rollback
+fixtures/    dataset sintético para los controles negativos
 docs/        fuentes, decisiones y roadmap
-evidence/    métricas agregadas y sanitizadas
+```
+
+Los datos privados y los JSON públicos generados viven solo en `.local-cache/`
+y `web/data/`, ambos ignorados por Git:
+
+```text
+.local-cache/raw/        originales descargados
+.local-cache/datasets/   datasets privados construidos
+.local-cache/snapshots/  snapshots promovidos + active.json
+.local-cache/identity/   catálogo, auditoría y volcados de identidad comercial
+.local-cache/publish/    seed y artefactos de publicación
 ```
 
 Diseño: [DESIGN.md](DESIGN.md). Fuentes y límites: [docs/datos.md](docs/datos.md). Próximos releases: [docs/roadmap.md](docs/roadmap.md).
