@@ -31,6 +31,7 @@ const lockPath = path.join(root, '.local-cache', 'snapshots', 'refresh.lock');
 const publicRefreshStatePath = process.env.REFRESH_STATE_PATH ? path.resolve(process.env.REFRESH_STATE_PATH) : null;
 const referenceMinimizedRoot = process.env.REFERENCE_MINIMIZED_ROOT ? path.resolve(process.env.REFERENCE_MINIMIZED_ROOT) : path.join(root, 'data', 'minimized', referenceSnapshot);
 const testSourceUrl = process.env.TEST_SOURCE_URL ?? null;
+const forceRefresh = process.env.FORCE_PROJECT === '1';
 
 if (testSourceUrl && process.env.TEST_MODE !== '1') {
   throw new Error('TEST_SOURCE_URL exige TEST_MODE=1');
@@ -270,7 +271,11 @@ async function run() {
     detection = await probeSnapshotValidators({ url, local: localValidators, timeoutMs: probeTimeoutMs, fetchImpl: curlHeadFetch });
     detection.transport_fallback = 'curl HEAD por fallo del cliente HTTPS nativo';
   }
-  if (detection.status === 'unchanged') return { status: 'unchanged', active_snapshot: active.snapshot_id, detection, downloaded: false, promoted: false };
+  // Un runner limpio no conserva snapshots entre corridas: si el origen no
+  // cambió, no descarga y no queda nada que proyectar. Por eso una reproyección
+  // forzada —cambio de contrato o de catálogo, no de datos— tiene que pagar la
+  // descarga completa igual. Es caro y por eso es manual.
+  if (detection.status === 'unchanged' && !forceRefresh) return { status: 'unchanged', active_snapshot: active.snapshot_id, detection, downloaded: false, promoted: false };
   if (detection.status === 'unverifiable') return { status: 'unverifiable', active_snapshot: active.snapshot_id, detection, downloaded: false, promoted: false };
 
   const runId = `${new Date().toISOString().replace(/[-:.]/g, '')}-${process.pid}-${crypto.randomBytes(3).toString('hex')}`;
@@ -333,6 +338,7 @@ async function run() {
       candidateProducts: projection.refreshState.products,
       previousSourceMaxReportedAt: baseline.previousSourceMaxReportedAt,
       candidateSourceMaxReportedAt: projection.refreshState.source_max_reported_at,
+      forcedReprojection: forceRefresh,
     });
     const legacyQuality = baseline.previousEvidence
       ? compareSnapshotQuality(baseline.previousEvidence, built.candidateEvidence)

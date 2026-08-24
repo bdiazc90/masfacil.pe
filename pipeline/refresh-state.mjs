@@ -64,10 +64,17 @@ function productQuality(previous, candidate, key) {
   return { status: reasons.length ? 'needs_review' : 'ready', reasons, previous: previous ?? null, candidate };
 }
 
-export function compareGasolinaQuality({ previousProducts = null, candidateProducts, previousSourceMaxReportedAt = null, candidateSourceMaxReportedAt }) {
+export function compareGasolinaQuality({ previousProducts = null, candidateProducts, previousSourceMaxReportedAt = null, candidateSourceMaxReportedAt, forcedReprojection = false }) {
   const products = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, productQuality(previousProducts?.[key], candidateProducts?.[key], key)]));
   const reasons = GASOLINA_KEYS.flatMap((key) => products[key].reasons);
   if (!Number.isFinite(Date.parse(candidateSourceMaxReportedAt ?? ''))) reasons.push('máximo temporal del candidato inválido');
-  if (previousSourceMaxReportedAt && Date.parse(candidateSourceMaxReportedAt) <= Date.parse(previousSourceMaxReportedAt)) reasons.push('el máximo temporal de la fuente no avanzó');
-  return { status: reasons.length ? 'needs_review' : 'ready', reasons, products, source_max_reported_at: { previous: previousSourceMaxReportedAt, candidate: candidateSourceMaxReportedAt } };
+  // Este guardrail existe para no publicar una fuente que retrocedió. En una
+  // reproyección forzada la fuente es idéntica por definición —lo que cambió es
+  // el código o el catálogo—, así que exigir que avance impediría justo lo que
+  // se pidió. Se omite solo esta comprobación; el resto sigue aplicando.
+  const retrocede = previousSourceMaxReportedAt && Date.parse(candidateSourceMaxReportedAt) < Date.parse(previousSourceMaxReportedAt);
+  const noAvanza = previousSourceMaxReportedAt && Date.parse(candidateSourceMaxReportedAt) === Date.parse(previousSourceMaxReportedAt);
+  if (retrocede) reasons.push('el máximo temporal de la fuente retrocedió');
+  if (noAvanza && !forcedReprojection) reasons.push('el máximo temporal de la fuente no avanzó');
+  return { status: reasons.length ? 'needs_review' : 'ready', reasons, products, forced_reprojection: forcedReprojection, source_max_reported_at: { previous: previousSourceMaxReportedAt, candidate: candidateSourceMaxReportedAt } };
 }
