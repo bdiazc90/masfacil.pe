@@ -1,10 +1,16 @@
 import fs from 'node:fs';
 import { OFFICIAL_ANCHOR_SCHEME } from './official-anchor.mjs';
 
-export const CATALOG_SCHEMA_VERSION = '1.1.0';
+export const CATALOG_SCHEMA_VERSION = '1.2.0';
+
+// Dos niveles de evidencia sobre el NOMBRE, no sobre el vínculo con la entidad:
+// el anchor siempre deriva exacto del Registro. `verified` tiene corroboración
+// ajena a la distancia —número de puerta, razón social o marca del operador—;
+// `nearby` solo tiene cercanía comprobada, y la interfaz lo marca como tal.
+export const CONFIDENCE_LEVELS = Object.freeze(['verified', 'nearby']);
 
 const topKeys =['schema_version', 'catalog_id', 'anchor_scheme', 'entries'];
-const entryKeys = ['establishment_id', 'brand', 'public_site_name', 'source', 'entity_link', 'identity_freshness', 'publication'];
+const entryKeys = ['establishment_id', 'brand', 'public_site_name', 'confidence', 'source', 'entity_link', 'identity_freshness', 'publication'];
 const sourceKeys = ['kind', 'source_or_description', 'acquisition_method', 'observed_at', 'responsible'];
 const linkKeys = ['method', 'status', 'verified_at'];
 const publicationKeys = ['status', 'reviewed_at', 'responsible'];
@@ -28,6 +34,7 @@ export function validateCommercialCatalog(catalog) {
     if (!/^est_[a-f0-9]{24}$/.test(entry.establishment_id ?? '')) errors.push(`${where}.establishment_id: formato inválido`);
     if (seen.has(entry.establishment_id)) errors.push(`${where}.establishment_id: duplicado o conflicto`); seen.add(entry.establishment_id);
     if (!nullableText(entry.brand) || !nullableText(entry.public_site_name) || (entry.brand === null && entry.public_site_name === null)) errors.push(`${where}: requiere marca, sede pública o ambas`);
+    if (!CONFIDENCE_LEVELS.includes(entry.confidence)) errors.push(`${where}.confidence: fuera del catálogo`);
     if (!exactKeys(entry.source, sourceKeys)) { errors.push(`${where}.source: campos inesperados o ausentes`); continue; }
     if (!Object.hasOwn(sourceMethods, entry.source.kind)) errors.push(`${where}.source.kind: fuera del catálogo`);
     if (sourceMethods[entry.source.kind] !== entry.source.acquisition_method) errors.push(`${where}.source.acquisition_method: no corresponde a la procedencia`);
@@ -56,6 +63,6 @@ export function isPublicCommercialEntry(entry) { return entry.entity_link.status
 export function buildCommercialCatalogIndex(catalog, establishmentIds) {
   const universe = new Set(establishmentIds); const byAnchor = new Map(); let pending = 0;
   const unknown = catalog.entries.filter((entry) => !universe.has(entry.establishment_id)); if (unknown.length) throw new Error(`Catálogo comercial contiene establishment_id fuera de la unión contractual: ${unknown.length}`);
-  for (const entry of catalog.entries) if (isPublicCommercialEntry(entry)) byAnchor.set(entry.establishment_id, Object.freeze({ brand: entry.brand, public_site_name: entry.public_site_name })); else pending += 1;
+  for (const entry of catalog.entries) if (isPublicCommercialEntry(entry)) byAnchor.set(entry.establishment_id, Object.freeze({ brand: entry.brand, public_site_name: entry.public_site_name, confidence: entry.confidence })); else pending += 1;
   return Object.freeze({ byAnchor, metrics: Object.freeze({ entries: catalog.entries.length, projected: byAnchor.size, pending, unknown_anchors: 0 }) });
 }

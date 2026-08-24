@@ -36,8 +36,24 @@ const verified = porEstado('verified');
 const conflict = porEstado('conflict');
 const ajustados = [...verified].sort((a, b) => (a.margen_m ?? 1e9) - (b.margen_m ?? 1e9)).slice(0, 40);
 
+// Solo tiene sentido auditar lo que de verdad va a publicarse: un candidato a
+// más de 40 m, o cuyo nombre se cae al quitarle una marca sin respaldo, no
+// entra al catálogo y revisarlo desperdicia el trabajo del owner.
+const enCatalogo = (() => {
+  const archivo = path.join(root, '.local-cache', 'identity', 'commercial-identity-catalog.json');
+  if (!fs.existsSync(archivo)) return null;
+  return new Set(JSON.parse(fs.readFileSync(archivo, 'utf8')).entries.map((e) => e.establishment_id));
+})();
+const yaRevisados = (() => {
+  const archivo = path.join(root, '.local-cache', 'identity', 'veredictos-candidatos.json');
+  if (!fs.existsSync(archivo)) return new Set();
+  return new Set(JSON.parse(fs.readFileSync(archivo, 'utf8')).entradas.map((x) => x.id));
+})();
+const candidatosPublicables = porEstado('candidate')
+  .filter((r) => (!enCatalogo || enCatalogo.has(r.establishment_id)) && !yaRevisados.has(r.establishment_id));
+
 const muestra = CANDIDATOS
-  ? repartir(porEstado('candidate'), TAMANO).map((r) => ({ ...r, motivo: 'risk_sample' }))
+  ? repartir(candidatosPublicables, TAMANO).map((r) => ({ ...r, motivo: 'risk_sample' }))
   : TODOS ? matches.resultados.filter((r) => r.estado !== 'unmatched') : [
     ...repartir(verified, Math.round(TAMANO * 0.62)).map((r) => ({ ...r, motivo: 'random_sample' })),
     ...repartir(conflict, Math.round(TAMANO * 0.25)).map((r) => ({ ...r, motivo: 'risk_sample' })),
@@ -109,7 +125,7 @@ header{display:flex;justify-content:space-between;margin-bottom:10px;font-size:1
 #out{width:100%;height:150px;margin-top:8px;font:12px ui-monospace,monospace}
 </style></head><body>
 <h1>${CANDIDATOS ? 'Candidatos: ¿es el nombre del grifo?' : 'Auditoría de identidad comercial'}</h1>
-<p class="sub">${CANDIDATOS ? `Muestra de ${unicos.length} de ${porEstado('candidate').length} candidatos. Estos están en el sitio correcto pero sin evidencia de que la ficha sea <b>el grifo</b> y no la tienda, el lavado o el módulo de GNV de adentro. Mira la ficha en Maps y decide.` : `Muestra de ${unicos.length} de ${matches.resultados.filter((r) => r.estado !== 'unmatched').length} emparejamientos. Marca cada uno mirando la ficha en Maps. No corriges: mides.`}</p>
+<p class="sub">${CANDIDATOS ? `Muestra de ${unicos.length} de ${candidatosPublicables.length} candidatos aún sin revisar. Estos están en el sitio correcto pero sin evidencia de que la ficha sea <b>el grifo</b> y no la tienda, el lavado o el módulo de GNV de adentro. Mira la ficha en Maps y decide.` : `Muestra de ${unicos.length} de ${matches.resultados.filter((r) => r.estado !== 'unmatched').length} emparejamientos. Marca cada uno mirando la ficha en Maps. No corriges: mides.`}</p>
 <div class="bar"><b id="prog">0/${unicos.length}</b> <span id="res"></span><button class="b" id="exp" style="width:auto;padding:0 16px;min-height:36px">Exportar</button></div>
 ${unicos.map(tarjeta).join('')}
 <textarea id="out" hidden readonly placeholder="Aquí sale el JSON al pulsar Exportar"></textarea>

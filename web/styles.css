@@ -69,3 +69,6 @@
 .detail__row--empty{grid-template-columns:auto 1fr;color:var(--muted-foreground);font-size:14px}
 .detail__meta,.detail__source{margin:8px 0 0;color:var(--muted-foreground);font-size:12.5px;line-height:1.5}
 .offer__detail .button--text{width:auto;margin-top:10px;padding-inline:0}
+
+/* Un nombre con solo cercanía comprobada se muestra, pero no se afirma. */
+.offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}

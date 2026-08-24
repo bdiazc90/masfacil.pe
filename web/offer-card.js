@@ -6,6 +6,8 @@ const ago = (days) => days < 1 ? `hace ${Math.max(1, Math.round(days * 24))} h` 
 const kilometers = (value) => value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`;
 const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y']);
 
+export const UNCONFIRMED_LABEL = 'por confirmar';
+
 export function stationIdentity(offer) {
   const identity = offer?.commercial_identity;
   if (!identity) return UNVERIFIED_STATION_LABEL;
@@ -16,6 +18,11 @@ export function stationIdentity(offer) {
   const [brand, site] = [identity.brand, identity.public_site_name];
   if (brand && site && site.toLocaleLowerCase('es-PE').includes(brand.toLocaleLowerCase('es-PE'))) return site;
   return labels.join(' · ');
+}
+
+/** Un nombre `nearby` solo tiene cercanía comprobada: se muestra, marcado. */
+export function isUnconfirmedIdentity(offer) {
+  return offer?.commercial_identity?.confidence === 'nearby';
 }
 
 export function displayDistrict(district) {
@@ -66,5 +73,5 @@ export function renderOfferCard(offer, { withDistance = true, directionsUrl = nu
   // La columna derecha ubica —dirección y distrito— y la izquierda identifica.
   // Sin dirección publicable, el distrito sube para que la fila no quede coja.
   const address = offer.address ? escapeHtml(offer.address) : '';
-  return `<li class="offer glass">${tagHtml}<div class="offer__topline"><p class="offer__price">${escapeHtml(formatPrice(offer.price))}</p>${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${ago(offer.age_days)[0].toLocaleUpperCase('es-PE')}${ago(offer.age_days).slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
+  return `<li class="offer glass">${tagHtml}<div class="offer__topline"><p class="offer__price">${escapeHtml(formatPrice(offer.price))}</p>${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${ago(offer.age_days)[0].toLocaleUpperCase('es-PE')}${ago(offer.age_days).slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
 }

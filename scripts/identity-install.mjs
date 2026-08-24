@@ -7,6 +7,7 @@
 // (AGENTS.md). Solo `brand` y `public_site_name` salen al bundle público.
 
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateCommercialCatalog } from '../app/commercial-catalog.mjs';
@@ -18,7 +19,7 @@ if (!encoded) throw new Error('COMMERCIAL_IDENTITY_B64 es obligatorio');
 
 let payload;
 try {
-  payload = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'));
+  payload = JSON.parse(zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
 } catch (error) {
   throw new Error(`El secret de identidad comercial no decodifica: ${error.message}`);
 }

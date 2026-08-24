@@ -23,6 +23,7 @@
     "harvest:match": "node scripts/match-identities.mjs",
     "identity:install": "node scripts/identity-install.mjs",
     "identity:pack": "node scripts/identity-pack.mjs",
-    "audit:sheet": "node scripts/audit-sheet.mjs"
+    "audit:sheet": "node scripts/audit-sheet.mjs",
+    "build:catalog": "node scripts/build-catalog.mjs"
   }
 }
