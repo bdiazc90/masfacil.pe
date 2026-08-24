@@ -9,6 +9,7 @@ import { publicationDecision } from '../app/publication-policy.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const resultPath = process.env.REFRESH_RESULT ? path.resolve(process.env.REFRESH_RESULT) : path.join(root, '.local-cache', 'publish', 'refresh-result.json');
 const shellChanged = process.env.SHELL_CHANGED === '1';
+const forceProject = process.env.FORCE_PROJECT === '1';
 
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, env: process.env, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
@@ -23,7 +24,7 @@ function parseResult(result) {
 
 const refreshed = run(process.execPath, ['scripts/refresh.mjs']);
 const refresh = parseResult(refreshed);
-const decision = publicationDecision(refresh, { shellChanged });
+const decision = publicationDecision(refresh, { shellChanged, forceProject });
 
 fs.mkdirSync(path.dirname(resultPath), { recursive: true, mode: 0o700 });
 fs.writeFileSync(resultPath, `${JSON.stringify({ refresh, decision })}\n`, { mode: 0o600 });

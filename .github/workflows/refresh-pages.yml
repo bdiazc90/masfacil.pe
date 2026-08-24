@@ -13,6 +13,11 @@ on:
         required: false
         type: boolean
         default: false
+      force_project:
+        description: Reproyectar el snapshot activo aunque los datos no hayan cambiado (para cambios de contrato o de catálogo)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -86,6 +91,7 @@ jobs:
           REFRESH_STATE_PATH: ${{ github.workspace }}/web/data/gasolina/refresh-state.json
           REFERENCE_MINIMIZED_ROOT: ${{ runner.temp }}/seed-reference
           SHELL_CHANGED: ${{ steps.shell.outputs.changed }}
+          FORCE_PROJECT: ${{ inputs.force_project && '1' || '0' }}
           REFRESH_RESULT: ${{ runner.temp }}/refresh-result.json
         run: |
           set +e

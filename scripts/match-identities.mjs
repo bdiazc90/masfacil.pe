@@ -219,7 +219,12 @@ for (const par of pares) {
   // establecimiento. Que haya varias fichas de Google sobre un mismo grifo —el
   // surtidor, el módulo de GNV, la tienda— es lo normal, no una duda: se queda
   // la de mejor puntaje y las demás se conservan como rivales para la auditoría.
-  const rivalesFicha = porFicha.get(par.ficha.id).filter((p) => p.est.establishment_id !== par.est.establishment_id && !estTomado.has(p.est.establishment_id));
+  // Un rival solo compite si él mismo podría pasar la prueba de distancia. Un
+  // establecimiento a 121 m no disputa una ficha que está a 32 m de la suya: el
+  // margen absoluto castigaba emparejamientos con cuatro señales coincidentes.
+  const rivalesFicha = porFicha.get(par.ficha.id).filter((p) => p.est.establishment_id !== par.est.establishment_id
+    && !estTomado.has(p.est.establishment_id)
+    && p.distancia <= DISTANCIA_FIRME);
   const segundo = rivalesFicha.sort((a, b) => a.distancia - b.distancia)[0] ?? null;
   const margen = segundo ? segundo.distancia - par.distancia : Infinity;
   const confirma = par.señales.filter((s) => s.peso >= 25);

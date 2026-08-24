@@ -1,7 +1,23 @@
 /** Decisión pequeña y cerrada entre refresco de datos y despliegue público. */
-export function publicationDecision(refresh, { shellChanged = false } = {}) {
+export function publicationDecision(refresh, { shellChanged = false, forceProject = false } = {}) {
   if (!refresh || typeof refresh.status !== 'string') throw new Error('Resultado de refresco ausente o inválido');
   if (refresh.status === 'unchanged') {
+    // El diseño asumía que solo un dato nuevo justifica reproyectar. Pero un
+    // cambio en el CÓDIGO de proyección —un campo nuevo, un catálogo de
+    // identidad distinto— también lo exige, y nada lo disparaba: el contrato
+    // 2.2.0 con dirección quedó construido y sin publicar. Este forzado lo
+    // cubre, y solo aplica cuando el refresco fue limpio: si falla, manda el
+    // fail_closed de abajo.
+    if (forceProject) {
+      return {
+        action: 'force_project_verify_deploy',
+        download_data: false,
+        project: true,
+        verify: true,
+        deploy: true,
+        reason: 'reproyección forzada sobre el snapshot activo; los datos no cambiaron',
+      };
+    }
     return {
       action: shellChanged ? 'deploy_existing_bundle' : 'no_op',
       download_data: false,
