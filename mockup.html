@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<!-- Mockup aprobado por Bruno el 25/08/2026 para la UI de precios (variante B).
+     Referencia visual para implementar en web/offer-card.js y web/styles.css.
+     Autocontenido: CSS y JS dentro; no carga nada externo. -->
+<title>Tarjeta de precios masfacil.pe</title>
+<style>
+  /* Tokens reales de web/styles.css + los nuevos de producto.
+     Escala de espaciado: --s1 4 · --s2 8 · --s3 12 · --s4 16 · --s5 24. */
+  :root{--primary:#074b3f;--primary-foreground:#fff;--background:#f3f4f4;--card:#e8f2f1;--card-2:#d1dfe4;--foreground:#12232b;--muted-foreground:#515f66;--accent:#17615d;--border:#095445;--border-2:#1f4652;--ring:#2e7d32;
+    --glow-alpha:.55;--bgx-5:#f6b04a;--bgx-6:#f0c9a4;--bgx-8:#f79a5c;
+    /* Producto: el tono base es desaturado; el activo sube la saturación. */
+    --product-regular:#3d8a5f;--product-regular-strong:#1f7a4a;
+    --product-premium:#4a78a8;--product-premium-strong:#2860a8;
+    --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;
+    --font:Roboto,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --radius:36px;--radius-small:12px;--blur:30px;
+    --surface:linear-gradient(115deg,color-mix(in srgb,var(--card) 20%,transparent),color-mix(in srgb,var(--card-2) 14%,transparent) 52%,color-mix(in srgb,var(--card) 8%,transparent));
+    --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 30%,transparent),color-mix(in srgb,var(--border) 15%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 22%,transparent) 100%)}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--primary:#4caf50;--primary-foreground:#052611;--background:#0e1417;--card:#304143;--card-2:#1a2426;--foreground:#e7ecec;--muted-foreground:#9aaab0;--accent:#63d0c9;--border:#728186;--border-2:#d7e6ea;--ring:#4caf50;--glow-alpha:.5;--bgx-5:#8a5a1e;--bgx-6:#4a3320;--bgx-8:#7a3d14;--product-regular:#7fc9a0;--product-regular-strong:#8fe3b3;--product-premium:#8fb4e0;--product-premium-strong:#a4c6f2}}
+  :root[data-theme="dark"]{--primary:#4caf50;--primary-foreground:#052611;--background:#0e1417;--card:#304143;--card-2:#1a2426;--foreground:#e7ecec;--muted-foreground:#9aaab0;--accent:#63d0c9;--border:#728186;--border-2:#d7e6ea;--ring:#4caf50;--glow-alpha:.5;--bgx-5:#8a5a1e;--bgx-6:#4a3320;--bgx-8:#7a3d14;--product-regular:#7fc9a0;--product-regular-strong:#8fe3b3;--product-premium:#8fb4e0;--product-premium-strong:#a4c6f2}
+
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font);font-variant-numeric:tabular-nums}
+  body{min-height:100vh}
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:3px solid var(--ring);outline-offset:3px}
+
+  /* Fondo: ground sólido + dos brillos ámbar/naranja con presencia real.
+     Sin velo encima: el velo de coast-bg los apagaba por completo. */
+  .glow{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;background:var(--background)}
+  .glow i{position:absolute;display:block;border-radius:50%;filter:blur(70px);opacity:var(--glow-alpha)}
+  .glow i:nth-child(1){width:60vw;height:60vw;max-width:520px;max-height:520px;right:-14vw;top:-16vw;background:var(--bgx-5)}
+  .glow i:nth-child(2){width:70vw;height:70vw;max-width:600px;max-height:600px;left:-24vw;bottom:-26vw;background:var(--bgx-8)}
+  .glow i:nth-child(3){width:34vw;height:34vw;max-width:300px;max-height:300px;left:48%;top:42%;background:var(--bgx-6);opacity:calc(var(--glow-alpha)*.6)}
+
+  .app-shell{width:min(100%,520px);margin:auto;padding:var(--s4) var(--s4) 48px}
+
+  .glass,.plate,.toggle{position:relative;border-radius:var(--radius-small);background:var(--surface);backdrop-filter:blur(var(--blur)) saturate(60%);-webkit-backdrop-filter:blur(var(--blur)) saturate(60%)}
+  .glass:after,.plate:after,.toggle:after{content:"";position:absolute;inset:0;border-radius:inherit;padding:.9px;background:var(--rim);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;pointer-events:none}
+  .glass{border-radius:var(--radius);padding:var(--s5) var(--s5) var(--s5);box-shadow:0 2px 6px #0000000d}
+
+  .appbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);margin-bottom:var(--s4);padding:var(--s2) var(--s3)}
+  .brand{color:var(--foreground);font-weight:700;text-decoration:none;letter-spacing:-.01em;display:flex;align-items:center}
+  .brand em{font-style:normal;color:var(--accent)}
+  .brand__pin{display:inline-grid;place-items:center;width:27px;height:27px;border-radius:9px;margin-right:var(--s2);background:var(--primary);color:var(--primary-foreground)}
+  .theme-toggle{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;min-height:44px;padding:3px;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);backdrop-filter:blur(var(--blur)) saturate(60%)}
+  .theme-toggle button{display:grid;place-items:center;width:36px;min-height:38px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground)}
+  .theme-toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);box-shadow:0 1px 4px #0002}
+  .theme-toggle svg,.place__icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+  /* Navbar fijo. Todo lo de dentro se separa con --s3; nada más. */
+  .sticky-controls{position:sticky;top:0;z-index:5;display:grid;gap:var(--s3);padding:var(--s2) 0 var(--s3);background:var(--background)}
+  .place{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:0 2px}
+  .place__where{display:flex;align-items:center;gap:var(--s2);min-width:0}
+  .place__label{color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .place__value{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700;letter-spacing:-.01em}
+  .place__icon{width:17px;height:17px;color:var(--accent)}
+  .button--text{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-underline-offset:4px;font-weight:700;min-height:44px;padding:var(--s2) 2px}
+  .radius{display:grid;gap:2px}
+  .radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
+  .radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .radius__readout{margin:0;font-size:14px;font-weight:700}
+  .radius__input{width:100%;height:40px;margin:0;accent-color:var(--primary);cursor:pointer}
+  .toggle{display:flex;gap:var(--s1);padding:3px;border-radius:999px;margin:0}
+  .toggle button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);font-size:15px;font-weight:500}
+  .toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);font-weight:700}
+  .toggle--sub button{font-size:14px}
+
+  .offers{display:grid;gap:var(--s3);list-style:none;margin:var(--s4) 0 0;padding:0}
+
+  /* ── Tarjeta ─────────────────────────────────────────── */
+  .offer{list-style:none}
+  .offer__tag{margin:0 0 var(--s2);color:var(--accent);font-size:13px;font-weight:700}
+  .offer__topline{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s2);margin-bottom:var(--s3)}
+  .offer__price{display:grid;gap:6px;margin:0;justify-items:start;min-width:0}
+  .chip{font-family:var(--mono);display:inline-block;padding:2px 4px 1px;border-radius:4px;font-size:8px;font-weight:400;letter-spacing:.08em;line-height:1;
+    background:color-mix(in srgb,var(--product) 16%,var(--card));color:var(--product);border:1px solid color-mix(in srgb,var(--product) 38%,transparent)}
+  .chip--reg{--product:var(--product-regular)}
+  .chip--pre{--product:var(--product-premium)}
+  .chip--dist{--product:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
+  .offer__price b{font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1;white-space:nowrap;color:var(--foreground)}
+  .offer__price b small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
+  /* Énfasis en la tarjeta: el producto elegido en «Más barata» pinta su cifra
+     y su chip con el color fuerte; el otro baja a gris y su chip se apaga.
+     En «Más cerca» no hay énfasis: los dos en tinta. */
+  .offer__price[data-key="regular"]{--product-strong:var(--product-regular-strong)}
+  .offer__price[data-key="premium"]{--product-strong:var(--product-premium-strong)}
+  .offer__price--on b{color:var(--product-strong)}
+  .offer__price--on b small{color:color-mix(in srgb,var(--product-strong) 70%,var(--muted-foreground))}
+  .offer__price--on .chip{--product:var(--product-strong);font-weight:700;background:color-mix(in srgb,var(--product) 26%,var(--card));border-color:color-mix(in srgb,var(--product) 65%,transparent)}
+  .offer__price--off b{color:var(--muted-foreground);font-weight:600}
+  .offer__price--off .chip{opacity:.5}
+  .offer__distance{display:grid;gap:6px;justify-items:end;margin:0}
+  .offer__distance b{font-size:19px;font-weight:600;color:var(--muted-foreground);line-height:1;white-space:nowrap}
+  .offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
+  .offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
+  .offer__identity{font-size:16px;font-weight:700;line-height:1.35}
+  .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
+  .offer__address{font-size:14.5px;line-height:1.35;text-align:right}
+  .offer__freshness{color:var(--muted-foreground);font-size:13.5px}
+  .offer__district{color:var(--muted-foreground);font-size:13.5px;text-align:right}
+  .offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+  .button{min-height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:.04em;text-decoration:none;border:0}
+  .button--ghost{border:1.5px solid color-mix(in srgb,var(--border) 35%,transparent);background:transparent;color:var(--foreground)}
+  .button--primary{background:var(--primary);color:var(--primary-foreground)}
+
+  /* Panel de detalle, calcado de renderOfferDetail y ajustado a la escala. */
+  .offer__detail{margin-top:var(--s4);padding-top:var(--s4);border-top:1.5px solid color-mix(in srgb,var(--border) 28%,transparent);display:grid;gap:var(--s2)}
+  .detail__row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s3);align-items:baseline}
+  .detail__row .chip{align-self:center}
+  .detail__price{font-size:16px;font-weight:700}
+  .detail__price small{font-size:12px;font-weight:600;color:var(--muted-foreground);margin-right:2px}
+  .detail__when{color:var(--muted-foreground);font-size:13px;white-space:nowrap}
+  .detail__row--empty .detail__price{color:var(--muted-foreground);font-weight:500}
+  .detail__meta{margin:var(--s1) 0 0;color:var(--muted-foreground);font-size:12.5px;line-height:1.5;display:grid;gap:2px}
+  .detail__meta b{font-weight:600;color:var(--foreground)}
+  .offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:40px}
+  #load-more{width:100%;margin-top:var(--s3)}
+  @media (prefers-reduced-motion:no-preference){.toggle button,.chip,.offer__price b{transition:color .15s,background-color .15s,opacity .15s}}
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
+<main class="app-shell">
+  <header class="appbar plate">
+    <a class="brand" href="#"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
+    <div class="theme-toggle" role="group" aria-label="Tema">
+      <button data-t="light" aria-pressed="true" aria-label="Tema claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg></button>
+      <button data-t="system" aria-pressed="false" aria-label="Tema del sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg></button>
+      <button data-t="dark" aria-pressed="false" aria-label="Tema oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg></button>
+    </div>
+  </header>
+
+  <div class="sticky-controls">
+    <div class="place">
+      <div class="place__where">
+        <span class="place__label">Lugar</span>
+        <span class="place__value"><svg class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg>Mi ubicación</span>
+      </div>
+      <button class="button--text" type="button">Cambiar</button>
+    </div>
+    <div class="radius">
+      <div class="radius__head"><label class="radius__label" for="r">Radio</label><p class="radius__readout" id="ro">1 km · 7 estaciones</p></div>
+      <input id="r" class="radius__input" type="range" min="1" max="5" step="0.5" value="1">
+    </div>
+    <div class="toggle" role="group" aria-label="Ordenar resultados">
+      <button data-sort="distance" aria-pressed="false" type="button">Más cerca</button>
+      <button data-sort="price" aria-pressed="true" type="button">Más barata</button>
+    </div>
+    <div class="toggle toggle--sub" id="sub" role="group" aria-label="Producto para ordenar por precio">
+      <button data-prod="regular" aria-pressed="true" type="button">Regular</button>
+      <button data-prod="premium" aria-pressed="false" type="button">Premium</button>
+    </div>
+  </div>
+
+  <ol class="offers" id="offers"></ol>
+  <button id="load-more" class="button button--ghost" type="button">Ver 6 más (14 restantes)</button>
+</main>
+
+<script>
+  const OFFERS = [
+    { name: 'Primax Alegría', reg: 19.99, pre: 21.59, m: 603, addr: 'Av. Benavides 2116', d: 'Miraflores', age: 'Hace 1 día', when: '25 ago., 07:14', lat: -12.12800, lng: -76.99200 },
+    { name: 'El Cortijo', brand: 'Primax', reg: 19.84, pre: 21.42, m: 601, addr: 'Av. Republica de Panama 6901', d: 'Santiago de Surco', age: 'Hace 1 día', when: '25 ago., 06:52', lat: -12.13520, lng: -77.00720, open: true },
+    { name: 'Primax Granada', reg: 20.15, pre: 22.35, m: 628, addr: 'Av. Mariscal Castilla 905', d: 'Santiago de Surco', age: 'Hace 1 día', when: '25 ago., 07:25', lat: -12.13520, lng: -77.00720 },
+    { name: 'Estacion de servicio PRIMAX- Barranco', reg: 19.55, pre: 21.49, m: 917, addr: 'Av. El Sol 697', d: 'Barranco', age: 'Hace 2 días', when: '24 ago., 11:03', lat: -12.14, lng: -77.01 },
+    { name: null, reg: 22.99, pre: null, m: 922, addr: 'Av. Republica de Panama 290', d: 'Barranco', age: 'Hace 1 día', when: '25 ago., 09:40', lat: -12.14, lng: -77.02 },
+    { name: 'Estacion AVA Barranco', unc: true, reg: 22.49, pre: 24.49, m: 1300, addr: 'Av. Bolognesi Cuadra 8', d: 'Barranco', age: 'Hace 2 días', when: '24 ago., 08:12', lat: -12.15, lng: -77.02 },
+  ];
+  let sort = 'price', prod = 'regular';
+  const km = (m) => m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
+  const money = (v) => v == null ? '—' : `<small>S/</small>${v.toFixed(2)}`;
+  const cell = (o, key, label, cls) => {
+    const v = o[key];
+    const state = sort !== 'price' ? '' : (prod === key ? ' offer__price--on' : ' offer__price--off');
+    return `<p class="offer__price${state}" data-key="${key}"><span class="chip ${cls}">${label}</span><b>${money(v)}</b></p>`;
+  };
+  const detail = (o) => `<div class="offer__detail">
+      <div class="detail__row${o.reg == null ? ' detail__row--empty' : ''}"><span class="chip chip--reg">REG</span><span class="detail__price">${o.reg == null ? 'sin precio vigente' : money(o.reg)}</span><span class="detail__when">${o.reg == null ? '' : o.when}</span></div>
+      <div class="detail__row${o.pre == null ? ' detail__row--empty' : ''}"><span class="chip chip--pre">PRE</span><span class="detail__price">${o.pre == null ? 'sin precio vigente' : money(o.pre)}</span><span class="detail__when">${o.pre == null ? '' : o.when}</span></div>
+      <p class="detail__meta"><span>Coordenada oficial <b>${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}</b></span><span>Datos de precios y coordenadas: Osinergmin.</span></p>
+      <a class="button--text" href="#">Ver en Street View</a>
+    </div>`;
+  function render() {
+    const list = [...OFFERS];
+    if (sort === 'price') list.sort((a, b) => (a[prod] ?? 1e9) - (b[prod] ?? 1e9)); else list.sort((a, b) => a.m - b.m);
+    const cheap = [...list].filter((o) => o[prod] != null).sort((a, b) => a[prod] - b[prod])[0];
+    document.getElementById('offers').innerHTML = list.map((o) => {
+      const tag = o === cheap ? `<p class="offer__tag">${prod === 'premium' ? 'Premium' : 'Regular'} más barata en 1 km</p>` : '';
+      const nm = o.name ? (o.brand && !o.name.toLowerCase().includes(o.brand.toLowerCase()) ? `${o.brand} · ${o.name}` : o.name) : 'Estación sin nombre verificado';
+      return `<li class="offer glass">${tag}<div class="offer__topline">${cell(o, 'reg', 'REG', 'chip--reg')}${cell(o, 'pre', 'PRE', 'chip--pre')}<p class="offer__distance"><span class="chip chip--dist">DIST</span><b>${km(o.m)}</b></p></div><div class="offer__grid"><h3 class="offer__identity">${nm}${o.unc ? ' <span class="offer__unconfirmed">· por confirmar</span>' : ''}</h3><p class="offer__address">${o.addr}</p><p class="offer__freshness">${o.age}</p><p class="offer__district">${o.d}</p></div><div class="offer__actions"><span class="button button--ghost">${o.open ? 'Ocultar' : 'Ver detalle'}</span><span class="button button--primary">Cómo llegar</span></div>${o.open ? detail(o) : ''}</li>`;
+    }).join('');
+    document.getElementById('sub').hidden = sort !== 'price';
+    document.querySelectorAll('[data-sort]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sort === sort)));
+    document.querySelectorAll('[data-prod]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.prod === prod)));
+  }
+  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; render(); }));
+  document.querySelectorAll('[data-prod]').forEach((b) => b.addEventListener('click', () => { prod = b.dataset.prod; render(); }));
+  document.getElementById('r').addEventListener('input', (e) => { const n = { 1: 7, 1.5: 14, 2: 20, 2.5: 26, 3: 32, 3.5: 43, 4: 54, 4.5: 68, 5: 83 }[e.target.value] ?? 7; document.getElementById('ro').textContent = `${e.target.value} km · ${n} estaciones`; });
+  document.querySelectorAll('[data-t]').forEach((b) => b.addEventListener('click', () => {
+    const t = b.dataset.t; if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+    document.querySelectorAll('[data-t]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  document.documentElement.setAttribute('data-theme', 'light');
+  render();
+</script>
+
+</body>
+</html>

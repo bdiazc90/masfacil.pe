@@ -1,32 +1,38 @@
 # Roadmap
 
-Última revisión: 24 de agosto de 2026.
+Última revisión: 25 de agosto de 2026.
 
 ## Ahora
 
-La PWA de Gasohol Regular y Premium está desplegada, con refresco y deploy
-automáticos funcionando. La primera identidad comercial —Primax Granada— llegó a
-producción por el camino completo: catálogo, auditoría, gate de publicación,
-proyección y despliegue.
+En producción: home directo en `/`, una tarjeta por grifo con Regular y
+Premium, radio adaptativo, paginación que duplica y **548 identidades**
+publicadas (377 confirmadas, 171 «por confirmar»), con la precisión medida
+declarada en la app: 54 revisiones del owner sin un solo error, cota 89 % y 86 %.
 
-El barrido de Google Maps autorizado por Bruno cosechó 1,560 fichas sobre 229
-centros y emparejó **396 de los 717** establecimientos con evidencia suficiente.
-Auditoría del owner: **40 de 40 correctos, cero errores**; cota inferior de
-Wilson al 95 % sobre la muestra aleatoria de 25: **86.7 %**.
+## Roadmap corto — decidido por Bruno el 25/08/2026
 
-Siguiente: publicar esos 396 declarando la precisión medida, en vez de esperar a
-una muestra que certifique 99 %.
+1. **UI de precios.** Chips `[REG]` verde y `[PRE]` azul en vez de etiquetas de
+   texto; los tres valores de la primera línea con `justify-between`; precios
+   con estética de display de surtidor **sin perder legibilidad** a 360 px.
+   Solo `web/offer-card.js` y `web/styles.css`; no toca datos ni contratos.
+2. **Separar «datos» de «código» en el deploy.** Hoy un cambio de UI o de
+   catálogo obliga a bajar el giga de Osinergmin aunque los precios no hayan
+   cambiado, porque `force_project` mezcla ambos. Un cambio de `web/` debe
+   reusar el bundle ya publicado y solo re-subir el shell; el giga solo se paga
+   cuando hay precios nuevos. El cache entre corridas (`actions/cache`) es el
+   paliativo mientras tanto.
 
 ## Capa 5 — identidad y datos vivos
 
-Objetivo: releases públicos frecuentes que aumenten utilidad sin esperar
-cobertura completa.
-
 1. ~~Publicar la primera identidad comercial verificada.~~ Hecho.
-2. Publicar el lote de 396 con la precisión medida declarada en la app.
+2. ~~Publicar el lote con la precisión medida declarada en la app.~~ Hecho: 548.
 3. ~~Elegir frecuencia de actualización.~~ Hecho: cron 4 veces al día.
 4. ~~Automatizar refresh, promoción conjunta y deploy.~~ Hecho.
 5. Observar uso real, errores y comprensión de frescura.
+6. Los 169 sin nombre: 66 quedaron en genérico, 42 sin ficha, 33 candidatos
+   lejanos, 28 en conflicto. Necesitan Street View o presencia, no más barrido.
+7. Marca desde directorios first-party (Primax, Repsol, Pecsa, AVA): hoy solo
+   137 de 548 llevan marca, siempre respaldada por la razón social o el owner.
 
 ### Verificación por quien usa la app — decidido el 24/08/2026
 
