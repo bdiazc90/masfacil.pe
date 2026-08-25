@@ -1,4 +1,5 @@
 import { GASOLINA_KEYS, validGasolinaBundle, validateGasolinaManifest } from './gasolina-contract.js';
+import { mergeProducts } from './lib/merge-products.js';
 
 export async function loadGasolinaProduct(key, fetchImpl = fetch) {
   if (!GASOLINA_KEYS.includes(key)) throw new Error('Producto gasolina no permitido');
@@ -12,4 +13,12 @@ export async function loadGasolinaProduct(key, fetchImpl = fetch) {
   const body = await snapshotResponse.clone().text();
   if (!(await validGasolinaBundle(manifest, key, body))) throw new Error(`El bundle ${descriptor.label} no coincide con su revisión`);
   return { dataset: JSON.parse(body), manifest, key, dataMode: snapshotResponse.headers.get('X-Masfacil-Data-Mode') ?? manifestResponse.headers.get('X-Masfacil-Data-Mode') ?? 'network' };
+}
+
+// Los dos bundles ya viajaban bajo demanda al abrir un detalle; ahora se piden
+// en paralelo y llegan juntos. Tras la primera visita el service worker los
+// sirve de cache, así que el costo se paga una vez.
+export async function loadGasolina(fetchImpl = fetch) {
+  const cargados = await Promise.all(GASOLINA_KEYS.map((key) => loadGasolinaProduct(key, fetchImpl)));
+  return mergeProducts(...cargados);
 }

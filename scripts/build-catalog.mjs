@@ -68,6 +68,14 @@ function nombreParaPantalla(bruto, marcaSoportada) {
     const distintivas = texto.split(/[\s.,()"]+/).filter((p) => p && !GENERICAS.has(p.toLocaleLowerCase('es-PE')) && !FORMAS_LEGALES.test(p));
     if (!distintivas.length) return null;
   }
+  // Google añade «gnv»/«glp» al final como si fuera parte del nombre. Se retira
+  // solo cuando lo que queda sigue distinguiendo al grifo: «El Cortijo gnv» pasa
+  // a «El Cortijo», pero «Grifo GNV» se queda, porque «Grifo» solo no es nombre.
+  const sinCola = texto.replace(/[\s·,-]*\b(?:gnv|glp)\b\s*$/i, '').trim();
+  if (sinCola !== texto) {
+    const queda = sinCola.split(/[\s.,()"]+/).filter((p) => p && !GENERICAS.has(p.toLocaleLowerCase('es-PE')) && !FORMAS_LEGALES.test(p));
+    if (queda.length) texto = sinCola;
+  }
   if (!texto) return null;
   const salida = recasear(texto);
   return salida.length > 44 ? `${salida.slice(0, 43).replace(/[\s,]+\S*$/, '')}…` : salida;
@@ -109,6 +117,29 @@ function construirEntrada(r) {
 }
 
 const entradas = publicables.map(construirEntrada).filter(Boolean);
+// Correcciones del owner sobre lo que el algoritmo propuso. La razón social no
+// respalda la marca, pero Bruno la ve en el letrero: es un abanderado, y la vía
+// para eso es owner_verified, igual que Primax Granada.
+const OWNER_OVERRIDES = new Map([
+  ['est_05db4a610415de20ebbc5a14', {
+    brand: 'Primax',
+    public_site_name: 'El Cortijo',
+    description: 'Bandera Primax visible en el letrero, confirmada por el owner de forma presencial. Av. República de Panamá 6901, Santiago de Surco. Registro 9573-107-130426.',
+    observed_at: '2026-08-25T09:00:00.000-05:00',
+  }],
+]);
+for (const entrada of entradas) {
+  const fix = OWNER_OVERRIDES.get(entrada.establishment_id);
+  if (!fix) continue;
+  entrada.brand = fix.brand;
+  entrada.public_site_name = fix.public_site_name;
+  entrada.confidence = 'verified';
+  entrada.source = { kind: 'owner_verified', source_or_description: fix.description, acquisition_method: 'direct_observation', observed_at: fix.observed_at, responsible: RESPONSABLE };
+  // El vínculo y la publicación no pueden ser anteriores a la observación que
+  // los sustenta; el contrato lo exige y tiene razón.
+  entrada.entity_link = { ...entrada.entity_link, verified_at: fix.observed_at };
+  entrada.publication = { ...entrada.publication, reviewed_at: fix.observed_at };
+}
 const catalogo = {
   schema_version: CATALOG_SCHEMA_VERSION,
   catalog_id: 'commercial-identity-catalog-2026-08-24',

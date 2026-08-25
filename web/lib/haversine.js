@@ -13,16 +13,28 @@ export function haversineKm(origin, destination) {
 }
 
 export function orderOffers(offers, criterion = 'distance') {
-  const accessor = { distance: (offer) => offer.distance_km, price: (offer) => offer.price, freshness: (offer) => offer.age_days }[criterion];
+  // Una fila sin el producto activo va al final, no se descarta: sigue siendo un
+  // grifo cercano y todavía tiene el otro precio que ofrecer.
+  const accessor = { distance: (row) => row.distance_km, 'price:regular': (row) => row.prices.regular?.price ?? Infinity, 'price:premium': (row) => row.prices.premium?.price ?? Infinity }[criterion];
   if (!accessor) throw new Error(`Criterio de orden desconocido: ${criterion}`);
-  return offers.map((offer, index) => ({ offer, index })).sort((left, right) => accessor(left.offer) - accessor(right.offer) || left.offer.id.localeCompare(right.offer.id) || left.index - right.index).map(({ offer }) => offer);
+  return offers.map((offer, index) => ({ offer, index })).sort((left, right) => accessor(left.offer) - accessor(right.offer) || left.offer.establishment_id.localeCompare(right.offer.establishment_id) || left.index - right.index).map(({ offer }) => offer);
 }
 
 export const RADIUS_MIN_KM = 1;
 export const RADIUS_MAX_KM = 5;
 export const RADIUS_STEP_KM = 0.5;
 export const PAGE_SIZE = 6;
-export const PAGE_INCREMENT = 3;
+export const SHOW_ALL_THRESHOLD = 4;
+
+// El incremento se adapta a la densidad en vez de ignorarla: duplica lo que ya
+// se ve y, cuando lo que falta cabe en el umbral, muestra todo. En Lima Cercado
+// a 5 km son 120 estaciones en cinco toques en vez de 38, y donde quedan cuatro
+// o menos no hace falta ni el botón. Cada paso al menos duplica, así que la
+// sucesión siempre termina en el total.
+export function nextVisibleCount(current, total) {
+  const doubled = current * 2;
+  return total - doubled <= SHOW_ALL_THRESHOLD ? total : doubled;
+}
 
 export function withinRadius(offers, radiusKm) {
   if (!Number.isFinite(radiusKm) || radiusKm <= 0) throw new RangeError('El radio debe ser un número positivo');

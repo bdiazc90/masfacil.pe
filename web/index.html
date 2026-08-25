@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f3f4f4">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Compara precio y cercanía de combustibles en Lima provincia.">
-  <title>masfacil.pe/gasolina</title>
+  <title>masfacil.pe</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
@@ -16,14 +16,13 @@
   <a class="skip-link" href="#main">Ir al contenido</a>
   <main id="main" tabindex="-1" class="app-shell">
     <header class="appbar appbar--compact plate">
-      <a class="brand" href="/gasolina/" aria-label="Volver a elegir combustible en masfacil.pe"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
+      <a class="brand" href="/" aria-label="masfacil.pe, inicio"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
       <div class="theme-toggle" role="group" aria-label="Tema">
         <button data-theme-choice="light" aria-label="Tema claro" aria-pressed="false" title="Claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg><span class="sr-only">Claro</span></button>
         <button data-theme-choice="system" aria-label="Tema del sistema" aria-pressed="false" title="Sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><span class="sr-only">Sistema</span></button>
         <button data-theme-choice="dark" aria-label="Tema oscuro" aria-pressed="false" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg><span class="sr-only">Oscuro</span></button>
       </div>
     </header>
-    <div id="product-toggle" class="toggle" role="group" aria-label="Cambiar combustible"><button data-product="regular" aria-pressed="false" type="button">Regular</button><button data-product="premium" aria-pressed="false" type="button">Premium</button></div>
     <section id="start-step" class="screen-flow start-step--compact" aria-labelledby="start-title">
       <h1 id="start-title">Encuentra gasolina cerca de ti</h1>
       <button id="use-location" class="button button--primary" type="button" disabled>Usar mi ubicación</button>
@@ -35,17 +34,20 @@
     <section id="district-step" class="screen-flow district-step--compact" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o reintenta.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div><button id="district-show-all" class="button button--text button--compact" type="button">Ver todos los distritos</button><button id="retry-location" class="button button--text button--compact" type="button">Reintentar ubicación</button></section>
     <section id="compare-step" class="screen-flow" aria-labelledby="compare-title" hidden>
       <div class="results-head results-head--compact"><h2 id="compare-title" tabindex="-1">Cerca de ti</h2><button id="change-origin" class="button button--text button--compact" type="button">Cambiar</button></div>
-      <p id="offline-note" class="offline-note" role="status" hidden></p>
-      <div id="radius-control" class="radius" hidden>
-        <label class="radius__label" for="radius-input">Radio de búsqueda</label>
-        <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
-        <p id="radius-readout" class="radius__readout" role="status"></p>
+      <div class="sticky-controls">
+        <div id="radius-control" class="radius" hidden>
+          <div class="radius__head"><label class="radius__label" for="radius-input">Radio</label><p id="radius-readout" class="radius__readout" role="status"></p></div>
+          <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
+        </div>
+        <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados"><button data-sort="distance" aria-pressed="true" type="button">Más cerca</button><button data-sort="price" aria-pressed="false" type="button">Más barata</button></div>
+        <div id="price-product-toggle" class="toggle toggle--sub" role="group" aria-label="Producto para ordenar por precio" hidden><button data-price-product="regular" aria-pressed="true" type="button">Regular</button><button data-price-product="premium" aria-pressed="false" type="button">Premium</button></div>
       </div>
-      <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados"><button data-sort="distance" aria-pressed="true" type="button">Más cerca</button><button data-sort="price" aria-pressed="false" type="button">Más barata</button></div>
+      <p id="offline-note" class="offline-note" role="status" hidden></p>
       <p id="offers-note" class="hint" hidden></p>
       <ol id="offers" class="offers"></ol>
       <section id="radius-empty" class="plate empty" hidden><h2>Ningún grifo en este radio</h2><p class="lede">Amplía el radio de búsqueda para encontrar estaciones más lejanas.</p></section>
       <button id="load-more" class="button button--ghost" type="button" hidden></button>
+      <p id="offers-status" class="sr-only" role="status"></p>
       <section id="empty-state" class="plate empty" hidden><p class="eyebrow">Sin datos recientes</p><h2>No tenemos precios recientes</h2><p class="lede">No mostramos precios de más de 30 días porque ya no sirven para decidir.</p><a id="official-source" class="button button--primary" target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a></section>
       <details class="about plate"><summary>Sobre los datos</summary><div id="source-content"></div></details>
     </section>

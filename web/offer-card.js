@@ -30,7 +30,8 @@ export function displayDistrict(district) {
 }
 
 export function directionsLabel(offer, { withDistance = true } = {}) {
-  const details = [`Cómo llegar a ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`, formatPrice(offer.price)];
+  const details = [`Cómo llegar a ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`];
+  for (const [key, label] of Object.entries(PRODUCTOS)) { const item = offer.prices?.[key]; if (item) details.push(`${label} ${formatPrice(item.price)}`); }
   if (withDistance) details.push(`a ${kilometers(offer.distance_km)}`);
   return details.join(', ');
 }
@@ -59,19 +60,33 @@ export function detailLabel(offer) {
   return `Ver detalle de ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`;
 }
 
-export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null } = {}) {
+// Los dos precios se ven a la vez porque la decisión se toma comparándolos.
+// Cuando el orden es por precio, el producto que ordena manda visualmente y el
+// otro queda atenuado; en «Más cerca» los dos pesan igual. Un producto sin
+// precio vigente muestra «—» y no rompe la fila: el grifo sigue sirviendo.
+function priceCell(offer, key, label, activeProduct) {
+  const item = offer.prices?.[key];
+  const clases = ['offer__price'];
+  if (activeProduct && activeProduct !== key) clases.push('offer__price--muted');
+  if (!item) clases.push('offer__price--absent');
+  return `<p class="${clases.join(' ')}"><span class="offer__product">${escapeHtml(label)}</span><b>${item ? escapeHtml(formatPrice(item.price)) : '—'}</b></p>`;
+}
+
+export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null } = {}) {
   const distance = withDistance ? `<p class="offer__distance">${escapeHtml(kilometers(offer.distance_km))}</p>` : '';
+  const precios = Object.entries(PRODUCTOS).map(([key, label]) => priceCell(offer, key, label, activeProduct)).join('');
   const detail = includeDetail
-    ? `<button type="button" class="button button--ghost" data-detail="${escapeHtml(offer.id)}" aria-expanded="false" aria-label="${escapeHtml(detailLabel(offer))}">Ver detalle</button>`
+    ? `<button type="button" class="button button--ghost" data-detail="${escapeHtml(offer.establishment_id)}" aria-expanded="false" aria-label="${escapeHtml(detailLabel(offer))}">Ver detalle</button>`
     : '';
   const directions = includeDirections && directionsUrl
     ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance }))}">Cómo llegar</a>`
     : '';
   const actions = detail || directions ? `<div class="offer__actions">${detail}${directions}</div>` : '';
-  const detailSlot = includeDetail ? `<div class="offer__detail-slot" data-detail-slot="${escapeHtml(offer.id)}" hidden></div>` : '';
+  const detailSlot = includeDetail ? `<div class="offer__detail-slot" data-detail-slot="${escapeHtml(offer.establishment_id)}" hidden></div>` : '';
   const tagHtml = tag ? `<p class="offer__tag">${escapeHtml(tag)}</p>` : '';
   // La columna derecha ubica —dirección y distrito— y la izquierda identifica.
   // Sin dirección publicable, el distrito sube para que la fila no quede coja.
+  // El `tabindex="-1"` no entra al tabulador: es el destino de foco al paginar.
   const address = offer.address ? escapeHtml(offer.address) : '';
-  return `<li class="offer glass">${tagHtml}<div class="offer__topline"><p class="offer__price">${escapeHtml(formatPrice(offer.price))}</p>${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${ago(offer.age_days)[0].toLocaleUpperCase('es-PE')}${ago(offer.age_days).slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
+  return `<li class="offer glass" tabindex="-1">${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${ago(offer.age_days)[0].toLocaleUpperCase('es-PE')}${ago(offer.age_days).slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
 }

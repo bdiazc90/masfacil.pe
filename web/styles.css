@@ -72,3 +72,34 @@
 
 /* Un nombre con solo cercanía comprobada se muestra, pero no se afirma. */
 .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
+
+/* Header fijo: slider y toggles siguen a la vista mientras pasan las tarjetas.
+   `sticky` y no `fixed` porque no sale del flujo: no hay que compensar con un
+   padding calculado ni se rompe con el teclado virtual. */
+.sticky-controls{position:sticky;top:0;z-index:5;padding:4px 0 8px;background:var(--background)}
+.sticky-controls .toggle{margin-top:6px;padding:3px}
+.sticky-controls .toggle button{min-height:44px}
+.radius{margin:0}
+.radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.radius__label{margin:0;font-size:12px}
+.radius__readout{margin:0;font-size:14px}
+.radius__input{height:44px}
+/* Sub-toggle: elige sobre qué producto ordena «Más barata». Vive bajo el toggle
+   que lo activa, así que se lee como su continuación y no como otro filtro. */
+.toggle--sub{margin-top:5px}
+.toggle--sub button{font-size:14px}
+/* El foco al paginar cae en una tarjeta nueva; sin esto quedaría debajo del
+   bloque fijo. */
+.offer{scroll-margin-top:200px}
+
+/* Dos precios por tarjeta: la comparación que antes exigía cambiar de ruta
+   ahora cabe en la primera línea, con la distancia a la derecha. */
+.offer__topline{display:flex;align-items:flex-end;justify-content:flex-start;gap:14px;margin-bottom:12px}
+.offer__price{display:grid;gap:2px;margin:0;min-width:0}
+.offer__product{color:var(--muted-foreground);font-size:11px;font-weight:700;letter-spacing:.07em;line-height:1.2;text-transform:uppercase}
+.offer__price b{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.05;white-space:nowrap}
+/* El producto que no ordena, y el que no tiene precio vigente, se atenúan: se
+   ven, pero no compiten por la decisión. */
+.offer__price--muted b,.offer__price--absent b{color:var(--muted-foreground);font-weight:600}
+.offer__distance{margin:0 0 0 auto;flex:0 0 auto;color:var(--muted-foreground);font-size:19px;font-weight:600;line-height:1.05;text-align:right;white-space:nowrap}
+@media(max-width:360px){.offer__price b{font-size:20px}.offer__distance{font-size:17px}.offer__topline{gap:10px}}

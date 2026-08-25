@@ -1,7 +1,7 @@
 {
-  "name": "masfacil.pe/gasolina",
+  "name": "masfacil.pe",
   "short_name": "masfacil.pe",
-  "start_url": "/gasolina/",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#f3f4f4",
   "theme_color": "#074b3f",

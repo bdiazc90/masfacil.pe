@@ -1,7 +1,7 @@
 import { SHELL_CACHE, DATA_CACHE, cacheFirst } from './sw-cache-policy.js';
 import { GASOLINA_KEYS, validGasolinaBundle, validateGasolinaManifest } from './gasolina-contract.js';
 
-const SHELL = ['/gasolina/', '/gasolina/regular/', '/gasolina/premium/', '/styles.css', '/app.js', '/selector.js', '/theme.js', '/service-worker-ready.js', '/data-client.js', '/gasolina-contract.js', '/district-list.js', '/offer-card.js', '/sw-cache-policy.js', '/lib/haversine.js', '/lib/decision-view.js', '/lib/freshness.js', '/lib/directions.js', '/manifest.webmanifest', '/icons/icon-192.svg', '/icons/icon-512.svg'];
+const SHELL = ['/', '/styles.css', '/app.js', '/theme.js', '/service-worker-ready.js', '/data-client.js', '/gasolina-contract.js', '/district-list.js', '/offer-card.js', '/sw-cache-policy.js', '/lib/haversine.js', '/lib/decision-view.js', '/lib/freshness.js', '/lib/directions.js', '/lib/merge-products.js', '/manifest.webmanifest', '/icons/icon-192.svg', '/icons/icon-512.svg'];
 const active = new Map();
 const pairRequest = (key) => new Request(`/__masfacil-gasolina-pair/${key}`);
 const tagged = (response, mode) => { const headers = new Headers(response.headers); headers.set('X-Masfacil-Data-Mode', mode); return new Response(response.body, { status: response.status, statusText: response.statusText, headers }); };
@@ -39,7 +39,6 @@ self.addEventListener('install', (event) => event.waitUntil(caches.open(SHELL_CA
 self.addEventListener('activate', (event) => event.waitUntil(caches.keys().then((names) => Promise.all(names.filter((name) => /^(?:masfacil|facilito)-/.test(name) && ![SHELL_CACHE, DATA_CACHE].includes(name)).map((name) => caches.delete(name)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url); if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (url.pathname === '/') { event.respondWith(Response.redirect('/gasolina/', 302)); return; }
   if (url.pathname === '/data/gasolina/manifest.json') {
     const key = requestedKey(event.request); if (!key) { event.respondWith(new Response('Producto requerido', { status: 400 })); return; }
     event.respondWith(networkManifest(event.request, key).then((response) => tagged(response, 'network')).catch(async (error) => { const pair = await cachedPair(key); if (!pair) throw error; return tagged(pair.manifestResponse, 'saved'); })); return;
