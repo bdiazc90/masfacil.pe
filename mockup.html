@@ -6,182 +6,296 @@
 <meta name="color-scheme" content="light dark">
 <!-- Mockup aprobado por Bruno el 25/08/2026 para la UI de precios (variante B).
      Referencia visual para implementar en web/offer-card.js y web/styles.css.
-     Autocontenido: CSS y JS dentro; no carga nada externo. -->
+     Autocontenido: CSS y JS dentro; no carga nada externo.
+     Cómo afinar: edita solo el bloque TOKENS. Cada color lleva light-dark(claro, oscuro);
+     el resto del CSS deriva de ahí y no debería tocarse para cambiar la paleta. -->
 <title>Tarjeta de precios masfacil.pe</title>
 <style>
-  /* Tokens reales de web/styles.css + los nuevos de producto.
-     Escala de espaciado: --s1 4 · --s2 8 · --s3 12 · --s4 16 · --s5 24. */
-  :root{--primary:#074b3f;--primary-foreground:#fff;--background:#f3f4f4;--card:#e8f2f1;--card-2:#d1dfe4;--foreground:#12232b;--muted-foreground:#515f66;--accent:#17615d;--border:#095445;--border-2:#1f4652;--ring:#2e7d32;
-    --glow-alpha:.55;--bgx-5:#f6b04a;--bgx-6:#f0c9a4;--bgx-8:#f79a5c;
-    /* Producto: el tono base es desaturado; el activo sube la saturación. */
-    --product-regular:#3d8a5f;--product-regular-strong:#1f7a4a;
-    --product-premium:#4a78a8;--product-premium-strong:#2860a8;
-    --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;
-    --font:Roboto,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-    --radius:36px;--radius-small:12px;--blur:30px;
-    --surface:linear-gradient(115deg,color-mix(in srgb,var(--card) 20%,transparent),color-mix(in srgb,var(--card-2) 14%,transparent) 52%,color-mix(in srgb,var(--card) 8%,transparent));
-    --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 30%,transparent),color-mix(in srgb,var(--border) 15%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 22%,transparent) 100%)}
-  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--primary:#4caf50;--primary-foreground:#052611;--background:#0e1417;--card:#304143;--card-2:#1a2426;--foreground:#e7ecec;--muted-foreground:#9aaab0;--accent:#63d0c9;--border:#728186;--border-2:#d7e6ea;--ring:#4caf50;--glow-alpha:.5;--bgx-5:#8a5a1e;--bgx-6:#4a3320;--bgx-8:#7a3d14;--product-regular:#7fc9a0;--product-regular-strong:#8fe3b3;--product-premium:#8fb4e0;--product-premium-strong:#a4c6f2}}
-  :root[data-theme="dark"]{--primary:#4caf50;--primary-foreground:#052611;--background:#0e1417;--card:#304143;--card-2:#1a2426;--foreground:#e7ecec;--muted-foreground:#9aaab0;--accent:#63d0c9;--border:#728186;--border-2:#d7e6ea;--ring:#4caf50;--glow-alpha:.5;--bgx-5:#8a5a1e;--bgx-6:#4a3320;--bgx-8:#7a3d14;--product-regular:#7fc9a0;--product-regular-strong:#8fe3b3;--product-premium:#8fb4e0;--product-premium-strong:#a4c6f2}
+/* ═══════════════════════════════════════════════════════════════════
+   TOKENS · edita aquí y mira en vivo. light-dark(claro, oscuro).
+   Escala de espaciado: --s1 4 · --s2 8 · --s3 12 · --s4 16 · --s5 24.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  color-scheme:light dark;
 
-  *{box-sizing:border-box}
-  html,body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font);font-variant-numeric:tabular-nums}
-  body{min-height:100vh}
-  button{font:inherit;cursor:pointer}
-  :focus-visible{outline:3px solid var(--ring);outline-offset:3px}
+  /* PAPEL · knobs del fondo «Kindle». Toda la familia de neutros sale de aquí.
+     hue: 60 marrón … 75 sepia-gris … 90 amarillo Kindle.
+     chroma: 0 gris puro … .022 sutil … .04 sepia franco (Kindle usa ≈ .04). */
+  --paper-hue:          130;
+  --paper-chroma:       .01;    /* claro */
+  --paper-chroma-dark:  .02;    /* oscuro: más bajo o se vuelve oliva */
+  --ink-chroma:         .010;    /* tinta y bordes, un pelín menos color */
 
-  /* Fondo: ground sólido + dos brillos ámbar/naranja con presencia real.
-     Sin velo encima: el velo de coast-bg los apagaba por completo. */
-  .glow{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;background:var(--background)}
-  .glow i{position:absolute;display:block;border-radius:50%;filter:blur(70px);opacity:var(--glow-alpha)}
-  .glow i:nth-child(1){width:60vw;height:60vw;max-width:520px;max-height:520px;right:-14vw;top:-16vw;background:var(--bgx-5)}
-  .glow i:nth-child(2){width:70vw;height:70vw;max-width:600px;max-height:600px;left:-24vw;bottom:-26vw;background:var(--bgx-8)}
-  .glow i:nth-child(3){width:34vw;height:34vw;max-width:300px;max-height:300px;left:48%;top:42%;background:var(--bgx-6);opacity:calc(var(--glow-alpha)*.6)}
+  /* Tinta y fondo: solo cambia la L (luminosidad); el matiz y el croma son los knobs.
+     Hex de referencia con los knobs iniciales → claro #f7eddf/#2d2821 · oscuro #17130e/#e8e4df */
+  --background:         light-dark(oklch(95% var(--paper-chroma) var(--paper-hue)), oklch(20% var(--paper-chroma-dark) var(--paper-hue)));
+  --foreground:         light-dark(oklch(30% var(--ink-chroma)   var(--paper-hue)), oklch(75% var(--ink-chroma)        var(--paper-hue)));
+  --muted-foreground:   light-dark(oklch(48% var(--ink-chroma)   var(--paper-hue)), oklch(72% var(--ink-chroma)        var(--paper-hue)));
+  --card:               light-dark(oklch(98% var(--paper-chroma) var(--paper-hue)), oklch(30% var(--paper-chroma-dark) var(--paper-hue)));
+  --card-2:             light-dark(oklch(90% var(--paper-chroma) var(--paper-hue)), oklch(23% var(--paper-chroma-dark) var(--paper-hue)));
+  --border:             light-dark(oklch(40% var(--ink-chroma)   var(--paper-hue)), oklch(62% var(--ink-chroma)        var(--paper-hue)));
+  --border-2:           light-dark(oklch(30% var(--ink-chroma)   var(--paper-hue)), oklch(85% var(--ink-chroma)        var(--paper-hue)));
 
-  .app-shell{width:min(100%,520px);margin:auto;padding:var(--s4) var(--s4) 48px}
+  /* Marca */
+  --primary:            light-dark(#074b3f, #32b988);
+  --primary-foreground: light-dark(#ffffff, #052611);
+  --accent:             light-dark(#17615d, #63d0c9);
+  --ring:               light-dark(#2e7d32, #4caf50);
 
-  .glass,.plate,.toggle{position:relative;border-radius:var(--radius-small);background:var(--surface);backdrop-filter:blur(var(--blur)) saturate(60%);-webkit-backdrop-filter:blur(var(--blur)) saturate(60%)}
-  .glass:after,.plate:after,.toggle:after{content:"";position:absolute;inset:0;border-radius:inherit;padding:.9px;background:var(--rim);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;pointer-events:none}
-  .glass{border-radius:var(--radius);padding:var(--s5) var(--s5) var(--s5);box-shadow:0 2px 6px #0000000d}
+  /* Producto: el tono base es desaturado; «strong» es el activo. */
+  --product-regular:        light-dark(#708d3a, #7fc9a0);
+  --product-regular-strong: light-dark(#207461, #8fe3b3);
+  --product-premium:        light-dark(#4a78a8, #8fb4e0);
+  --product-premium-strong: light-dark(#1d4e8e, #a4c6f2);
 
-  .appbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);margin-bottom:var(--s4);padding:var(--s2) var(--s3)}
-  .brand{color:var(--foreground);font-weight:700;text-decoration:none;letter-spacing:-.01em;display:flex;align-items:center}
-  .brand em{font-style:normal;color:var(--accent)}
-  .brand__pin{display:inline-grid;place-items:center;width:27px;height:27px;border-radius:9px;margin-right:var(--s2);background:var(--primary);color:var(--primary-foreground)}
-  .theme-toggle{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;min-height:44px;padding:3px;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);backdrop-filter:blur(var(--blur)) saturate(60%)}
-  .theme-toggle button{display:grid;place-items:center;width:36px;min-height:38px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground)}
-  .theme-toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);box-shadow:0 1px 4px #0002}
-  .theme-toggle svg,.place__icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  /* Glow de fondo: ámbar sobre papel en claro; terracota sobre carbón en oscuro
+     (el ámbar se pierde contra el carbón cálido). */
+  --glow-1:             light-dark(#bfb6a7, #815a48);   /* arriba-derecha */
+  --glow-2:             light-dark(#d7d2c3, #585b48);   /* abajo-izquierda */
+  --glow-3:             light-dark(#bb9978, #8d6c5e);   /* centro */
+  --glow-alpha:         .60;                             /* intensidad global; sobre sepia el ámbar satura antes */
+  --glow-blur:          80px;
 
-  /* Navbar fijo. Todo lo de dentro se separa con --s3; nada más. */
-  .sticky-controls{position:sticky;top:0;z-index:5;display:grid;gap:var(--s3);padding:var(--s2) 0 var(--s3);background:var(--background)}
-  .place{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:0 2px}
-  .place__where{display:flex;align-items:center;gap:var(--s2);min-width:0}
-  .place__label{color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-  .place__value{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700;letter-spacing:-.01em}
-  .place__icon{width:17px;height:17px;color:var(--accent)}
-  .button--text{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-underline-offset:4px;font-weight:700;min-height:44px;padding:var(--s2) 2px}
-  .radius{display:grid;gap:2px}
-  .radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
-  .radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-  .radius__readout{margin:0;font-size:14px;font-weight:700}
-  .radius__input{width:100%;height:40px;margin:0;accent-color:var(--primary);cursor:pointer}
-  .toggle{display:flex;gap:var(--s1);padding:3px;border-radius:999px;margin:0}
-  .toggle button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);font-size:15px;font-weight:500}
-  .toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);font-weight:700}
-  .toggle--sub button{font-size:14px}
+  /* Vidrio: cuánto deja pasar del glow. saturate(100%) = glow intacto. */
+  --blur:               30px;
+  --glass-saturate:     35%;                             /* el 60% compensaba el tinte teal frío; ya no hace falta */
 
-  .offers{display:grid;gap:var(--s3);list-style:none;margin:var(--s4) 0 0;padding:0}
+  /* Tipografía y forma de la tarjeta */
+  --price-size:         24px;
+  --distance-size:      18px;
+  --chip-size:          8px;
+  --radius:             36px;
+  --radius-small:       12px;
 
-  /* ── Tarjeta ─────────────────────────────────────────── */
-  .offer{list-style:none}
-  .offer__tag{margin:0 0 var(--s2);color:var(--accent);font-size:13px;font-weight:700}
-  .offer__topline{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s2);margin-bottom:var(--s3)}
-  .offer__price{display:grid;gap:6px;margin:0;justify-items:start;min-width:0}
-  .chip{font-family:var(--mono);display:inline-block;padding:2px 4px 1px;border-radius:4px;font-size:8px;font-weight:400;letter-spacing:.08em;line-height:1;
-    background:color-mix(in srgb,var(--product) 16%,var(--card));color:var(--product);border:1px solid color-mix(in srgb,var(--product) 38%,transparent)}
-  .chip--reg{--product:var(--product-regular)}
-  .chip--pre{--product:var(--product-premium)}
-  .chip--dist{--product:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
-  .offer__price b{font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1;white-space:nowrap;color:var(--foreground)}
-  .offer__price b small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
-  /* Énfasis en la tarjeta: el producto elegido en «Más barata» pinta su cifra
-     y su chip con el color fuerte; el otro baja a gris y su chip se apaga.
-     En «Más cerca» no hay énfasis: los dos en tinta. */
-  .offer__price[data-key="regular"]{--product-strong:var(--product-regular-strong)}
-  .offer__price[data-key="premium"]{--product-strong:var(--product-premium-strong)}
-  .offer__price--on b{color:var(--product-strong)}
-  .offer__price--on b small{color:color-mix(in srgb,var(--product-strong) 70%,var(--muted-foreground))}
-  .offer__price--on .chip{--product:var(--product-strong);font-weight:700;background:color-mix(in srgb,var(--product) 26%,var(--card));border-color:color-mix(in srgb,var(--product) 65%,transparent)}
-  .offer__price--off b{color:var(--muted-foreground);font-weight:600}
-  .offer__price--off .chip{opacity:.5}
-  .offer__distance{display:grid;gap:6px;justify-items:end;margin:0}
-  .offer__distance b{font-size:19px;font-weight:600;color:var(--muted-foreground);line-height:1;white-space:nowrap}
-  .offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
-  .offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
-  .offer__identity{font-size:16px;font-weight:700;line-height:1.35}
-  .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
-  .offer__address{font-size:14.5px;line-height:1.35;text-align:right}
-  .offer__freshness{color:var(--muted-foreground);font-size:13.5px}
-  .offer__district{color:var(--muted-foreground);font-size:13.5px;text-align:right}
-  .offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
-  .button{min-height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:.04em;text-decoration:none;border:0}
-  .button--ghost{border:1.5px solid color-mix(in srgb,var(--border) 35%,transparent);background:transparent;color:var(--foreground)}
-  .button--primary{background:var(--primary);color:var(--primary-foreground)}
+  /* Card de Controles: sticky con dos estados (full | compact) */
+  --controls-top:       var(--s4);   /* alto al que se fija; = padding del shell para que fijo y en flujo coincidan */
+  --controls-compact-h: 52px;        /* alto de la fila resumen */
+  --collapse-at:        96px;        /* cuánto hay que bajar para que se contraiga solo */
+  --expand-at:          8px;         /* a menos de esto del top vuelve a full (en flujo) solo */
+  --controls-ease:      200ms;
+  --controls-fixed-fill:   90%;                          /* opacidad del card cuando va fijo (compact/overlay): más = más contraste con la lista */
+  --controls-fixed-shadow: 0 8px 24px -10px rgb(0 0 0 / .75);
+  --logo-halo:          light-dark(transparent, rgb(255 255 255 / .45)); /* contorno para que el aro oscuro no se funda con el fondo oscuro */
 
-  /* Panel de detalle, calcado de renderOfferDetail y ajustado a la escala. */
-  .offer__detail{margin-top:var(--s4);padding-top:var(--s4);border-top:1.5px solid color-mix(in srgb,var(--border) 28%,transparent);display:grid;gap:var(--s2)}
-  .detail__row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s3);align-items:baseline}
-  .detail__row .chip{align-self:center}
-  .detail__price{font-size:16px;font-weight:700}
-  .detail__price small{font-size:12px;font-weight:600;color:var(--muted-foreground);margin-right:2px}
-  .detail__when{color:var(--muted-foreground);font-size:13px;white-space:nowrap}
-  .detail__row--empty .detail__price{color:var(--muted-foreground);font-weight:500}
-  .detail__meta{margin:var(--s1) 0 0;color:var(--muted-foreground);font-size:12.5px;line-height:1.5;display:grid;gap:2px}
-  .detail__meta b{font-weight:600;color:var(--foreground)}
-  .offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:40px}
-  #load-more{width:100%;margin-top:var(--s3)}
-  @media (prefers-reduced-motion:no-preference){.toggle button,.chip,.offer__price b{transition:color .15s,background-color .15s,opacity .15s}}
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;
+  --font:Roboto,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+/* El tema lo fija JS en data-theme (igual que web/theme.js); color-scheme decide light-dark(). */
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+
+/* Derivados: recetas, no colores. Cambia los tokens de arriba, no esto. */
+:root{
+  --surface:linear-gradient(115deg,color-mix(in srgb,var(--card) 20%,transparent),color-mix(in srgb,var(--card-2) 14%,transparent) 52%,color-mix(in srgb,var(--card) 8%,transparent));
+  --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 30%,transparent),color-mix(in srgb,var(--border) 15%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 22%,transparent) 100%);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────── */
+*{box-sizing:border-box}
+/* Solo html pinta el fondo: si body también lo pinta, tapa el glow (z-index:-1). */
+html{background:var(--background);color:var(--foreground);font-family:var(--font);font-variant-numeric:tabular-nums}
+body{margin:0;min-height:100vh}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--ring);outline-offset:3px}
+[hidden]{display:none!important}
+
+/* ── Fondo: ground sólido (html) + tres manchas. Sin velo encima. ─── */
+.glow{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.glow i{position:absolute;display:block;border-radius:50%;filter:blur(var(--glow-blur));opacity:var(--glow-alpha)}
+.glow i:nth-child(1){width:60vw;height:60vw;max-width:520px;max-height:520px;right:-14vw;top:-16vw;background:var(--glow-1)}
+.glow i:nth-child(2){width:70vw;height:70vw;max-width:600px;max-height:600px;left:-24vw;bottom:-26vw;background:var(--glow-2)}
+.glow i:nth-child(3){width:34vw;height:34vw;max-width:300px;max-height:300px;left:48%;top:42%;background:var(--glow-3);opacity:calc(var(--glow-alpha)*.6)}
+
+/* ── Vidrio ────────────────────────────────────────────────────────── */
+.app-shell{width:min(100%,520px);margin:auto;padding:var(--s4) var(--s4) 48px}
+.glass,.plate,.toggle{position:relative;border-radius:var(--radius-small);background:var(--surface);backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));-webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate))}
+.glass:after,.plate:after,.toggle:after{content:"";position:absolute;inset:0;border-radius:inherit;padding:.9px;background:var(--rim);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;pointer-events:none}
+.glass{border-radius:var(--radius);padding:var(--s5);box-shadow:0 2px 6px #0000000d}
+
+/* ── Appbar ────────────────────────────────────────────────────────── */
+.appbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s3)}
+.brand{color:#B8071B;font-weight:700;text-decoration:none;letter-spacing:-.01em;display:flex;align-items:center}
+.brand em{font-style:normal;color:var(--foreground)}
+.brand__logo{display:block;width:28px;height:auto;flex-shrink:0;filter:drop-shadow(0 0 1.5px var(--logo-halo))}
+.brand .brand__logo{margin-right:var(--s2)} /* en el resumen compacto el gap ya lo pone el flex */
+.theme-toggle{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;min-height:44px;padding:3px;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));-webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate))}
+.theme-toggle button{display:grid;place-items:center;width:36px;min-height:38px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground)}
+.theme-toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);box-shadow:0 1px 4px #0002}
+.theme-toggle svg,.place__icon,.controls__chevron{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── Card de Controles: un solo plate con tres estados. ──
+   full: en flujo, arriba del todo (marca + tema + filtros).
+   compact: fixed, fila resumen; el hueco (.controls-slot) conserva su alto para que la lista no salte.
+   overlay: fixed y desplegado sobre la lista. Nunca cambia el flujo estando scrolleado:
+   así no entra el scroll anchoring del navegador ni se empujan las tarjetas.
+   Sentinels absolutos (sin layout) + IntersectionObserver con histéresis:
+   sale el de --collapse-at → compact · entra el de --expand-at → full. */
+.app-shell{position:relative}
+.controls-sentinel{position:absolute;left:0;top:0;width:1px;pointer-events:none;visibility:hidden}
+.controls-sentinel--collapse{height:var(--collapse-at)}
+.controls-sentinel--expand{height:var(--expand-at)}
+.controls-slot{min-height:var(--controls-slot-h,auto)}
+.controls{padding:0 var(--s3)}
+.controls[data-state="compact"],.controls[data-state="overlay"]{position:fixed;top:var(--controls-top);left:50%;transform:translateX(-50%);width:min(100% - 2*var(--s4),520px - 2*var(--s4));z-index:5;background:color-mix(in srgb,var(--card) var(--controls-fixed-fill),transparent);box-shadow:var(--controls-fixed-shadow)}
+.controls-scrim{position:fixed;inset:0;z-index:4}
+.controls__summary{display:flex;align-items:center;gap:var(--s2);width:100%;min-height:var(--controls-compact-h);padding:0;border:0;background:transparent;color:var(--foreground);text-align:left;border-radius:inherit}
+.controls__text{flex:1;display:flex;gap:.3em;min-width:0;font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+.controls__place{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.controls__criteria{white-space:nowrap;flex-shrink:0;color:var(--muted-foreground);font-weight:500}
+.controls__expand{display:inline-flex;align-items:center;gap:2px;flex-shrink:0;color:var(--accent);font-weight:700;text-decoration:underline;text-underline-offset:4px}
+.controls__chevron{width:16px;height:16px}
+.controls__panel{display:grid;grid-template-rows:1fr}
+.controls__inner{min-height:0;overflow:hidden;display:grid;gap:var(--s3);padding:var(--s2) 3px var(--s3);margin:0 -3px}
+.controls__done{justify-self:end;display:inline-flex;align-items:center;gap:2px;min-height:36px;margin-top:calc(-1 * var(--s2))}
+.controls:not([data-state="compact"]) .controls__summary{display:none}
+.controls[data-state="full"] .controls__done{display:none} /* arriba del todo no hay nada que contraer */
+.controls[data-state="compact"] .controls__panel{grid-template-rows:0fr;visibility:hidden}
+.controls[data-state="compact"] .controls__inner{padding-block:0} /* el padding no colapsa con el track 0fr; hay que quitarlo */
+.place{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:0 2px}
+.place__where{display:flex;align-items:center;gap:var(--s2);min-width:0}
+.place__label,.radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.place__value{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700;letter-spacing:-.01em}
+.place__icon{width:17px;height:17px;color:var(--accent)}
+.button--text{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-underline-offset:4px;font-weight:700;min-height:44px;padding:var(--s2) 2px}
+.radius{display:grid;gap:2px}
+.radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
+.radius__readout{margin:0;font-size:14px;font-weight:700}
+.radius__input{width:100%;height:40px;margin:0;accent-color:var(--primary);cursor:pointer}
+.toggle{display:flex;gap:var(--s1);padding:3px;border-radius:999px;margin:0}
+.toggle button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);font-size:15px;font-weight:500}
+.toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);font-weight:700}
+.toggle--sub button{font-size:14px}
+
+.offers{display:grid;gap:var(--s3);list-style:none;margin:var(--s4) 0 0;padding:0}
+
+/* ── Tarjeta ───────────────────────────────────────────────────────── */
+.offer__tag{margin:0 0 var(--s2);color:var(--accent);font-size:13px;font-weight:700}
+.offer__topline{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s2);margin-bottom:var(--s3)}
+.offer__price{display:grid;gap:6px;margin:0;justify-items:start;min-width:0}
+/* Un solo sitio decide el color de producto: el chip suelto (detalle) o el bloque de precio. */
+.chip--regular,[data-key="regular"]{--product:var(--product-regular);--product-strong:var(--product-regular-strong)}
+.chip--premium,[data-key="premium"]{--product:var(--product-premium);--product-strong:var(--product-premium-strong)}
+.chip{font-family:var(--mono);display:inline-block;padding:2px 4px 1px;border-radius:4px;font-size:var(--chip-size);font-weight:400;letter-spacing:.08em;line-height:1;background:color-mix(in srgb,var(--product) 16%,var(--card));color:var(--product);border:1px solid color-mix(in srgb,var(--product) 38%,transparent)}
+.chip--distance{--product:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
+.offer__price b{font-size:var(--price-size);font-weight:800;letter-spacing:-.035em;line-height:1;white-space:nowrap;color:var(--foreground)}
+.offer__price b small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
+/* Énfasis: en «Más barata» el producto elegido pinta cifra y chip con «strong»;
+   el otro (--muted) baja a gris y su chip se apaga. Sin precio (--absent) siempre apagado.
+   En «Más cerca» no hay énfasis: los dos en tinta. */
+.offer__price--on b{color:var(--product-strong)}
+.offer__price--on b small{color:color-mix(in srgb,var(--product-strong) 70%,var(--muted-foreground))}
+.offer__price--on .chip{--product:var(--product-strong);font-weight:700;background:color-mix(in srgb,var(--product) 26%,var(--card));border-color:color-mix(in srgb,var(--product) 65%,transparent)}
+.offer__price--muted b,.offer__price--absent b{color:var(--muted-foreground);font-weight:600}
+.offer__price--muted .chip,.offer__price--absent .chip{opacity:.5}
+.offer__distance{display:grid;gap:6px;justify-items:end;margin:0}
+.offer__distance b{font-size:var(--distance-size);font-weight:600;color:var(--muted-foreground);line-height:1;white-space:nowrap}
+.offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
+.offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
+.offer__identity{font-size:16px;font-weight:700;line-height:1.35}
+.offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
+.offer__address{font-size:14.5px;line-height:1.35;text-align:right}
+.offer__freshness,.offer__district{color:var(--muted-foreground);font-size:13.5px}
+.offer__district{text-align:right}
+.offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+.button{min-height:48px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:.04em;text-decoration:none;border:0}
+.button--ghost{border:1.5px solid color-mix(in srgb,var(--border) 35%,transparent);background:transparent;color:var(--foreground)}
+.button--primary{background:var(--primary);color:var(--primary-foreground)}
+
+/* ── Panel de detalle, calcado de renderOfferDetail y ajustado a la escala. ── */
+.offer__detail{margin-top:var(--s4);padding-top:var(--s4);border-top:1.5px solid color-mix(in srgb,var(--border) 28%,transparent);display:grid;gap:var(--s2)}
+.detail__row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s3);align-items:baseline}
+.detail__row .chip{align-self:center}
+.detail__price{font-size:16px;font-weight:700}
+.detail__price small{font-size:12px;font-weight:600;color:var(--muted-foreground);margin-right:2px}
+.detail__when{color:var(--muted-foreground);font-size:13px;white-space:nowrap}
+.detail__row--empty .detail__price{color:var(--muted-foreground);font-weight:500}
+.detail__meta{margin:var(--s1) 0 0;color:var(--muted-foreground);font-size:12.5px;line-height:1.5;display:grid;gap:2px}
+.detail__meta b{font-weight:600;color:var(--foreground)}
+.offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:40px}
+#load-more{width:100%;margin-top:var(--s3)}
+@media (prefers-reduced-motion:no-preference){.toggle button,.chip,.offer__price b{transition:color .15s,background-color .15s,opacity .15s}
+  .controls__panel{transition:grid-template-rows var(--controls-ease) ease}.controls__inner{transition:padding var(--controls-ease) ease}.controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--controls-ease) ease,visibility 0s var(--controls-ease)}}
 </style>
 </head>
 <body>
 <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
 <main class="app-shell">
-  <header class="appbar plate">
-    <a class="brand" href="#"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
-    <div class="theme-toggle" role="group" aria-label="Tema">
-      <button data-t="light" aria-pressed="true" aria-label="Tema claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg></button>
-      <button data-t="system" aria-pressed="false" aria-label="Tema del sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg></button>
-      <button data-t="dark" aria-pressed="false" aria-label="Tema oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg></button>
-    </div>
-  </header>
-
-  <div class="sticky-controls">
-    <div class="place">
-      <div class="place__where">
-        <span class="place__label">Lugar</span>
-        <span class="place__value"><svg class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg>Mi ubicación</span>
+  <div class="controls-sentinel controls-sentinel--collapse" aria-hidden="true"></div>
+  <div class="controls-sentinel controls-sentinel--expand" aria-hidden="true"></div>
+  <div class="controls-slot" id="controls-slot">
+  <section class="controls plate" id="controls" data-state="full" aria-label="Controles de búsqueda">
+    <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
+      <img class="brand__logo" src="web/icons/logo.svg" alt="" width="28" height="29">
+      <span class="controls__text"><span class="controls__place" id="sum-place">Mi ubicación</span><span class="controls__criteria" id="sum-criteria"></span></span>
+      <span class="controls__expand">Ajustar <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+    </button>
+    <div class="controls__panel" id="controls-panel">
+      <div class="controls__inner">
+        <header class="appbar">
+          <a class="brand" href="#"><img class="brand__logo" src="web/icons/logo.svg" alt="" width="28" height="29">masfacil<em>.pe</em></a>
+          <div class="theme-toggle" role="group" aria-label="Tema">
+            <button data-theme-choice="light" aria-pressed="true" aria-label="Tema claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg></button>
+            <button data-theme-choice="system" aria-pressed="false" aria-label="Tema del sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg></button>
+            <button data-theme-choice="dark" aria-pressed="false" aria-label="Tema oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg></button>
+          </div>
+        </header>
+        <div class="place">
+          <div class="place__where">
+            <span class="place__label">Lugar</span>
+            <span class="place__value"><svg class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg>Mi ubicación</span>
+          </div>
+          <button class="button--text" type="button">Cambiar</button>
+        </div>
+        <div class="radius">
+          <div class="radius__head"><label class="radius__label" for="r">Radio</label><p class="radius__readout" id="ro">1 km · 7 estaciones</p></div>
+          <input id="r" class="radius__input" type="range" min="1" max="5" step="0.5" value="1">
+        </div>
+        <div class="toggle" role="group" aria-label="Ordenar resultados">
+          <button data-sort="distance" aria-pressed="false" type="button">Más cerca</button>
+          <button data-sort="price" aria-pressed="true" type="button">Más barata</button>
+        </div>
+        <div class="toggle toggle--sub" id="sub" role="group" aria-label="Producto para ordenar por precio">
+          <button data-prod="regular" aria-pressed="true" type="button">Regular</button>
+          <button data-prod="premium" aria-pressed="false" type="button">Premium</button>
+        </div>
+        <button class="button--text controls__done" id="controls-done" type="button" aria-expanded="true" aria-controls="controls-panel">Listo <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
       </div>
-      <button class="button--text" type="button">Cambiar</button>
     </div>
-    <div class="radius">
-      <div class="radius__head"><label class="radius__label" for="r">Radio</label><p class="radius__readout" id="ro">1 km · 7 estaciones</p></div>
-      <input id="r" class="radius__input" type="range" min="1" max="5" step="0.5" value="1">
-    </div>
-    <div class="toggle" role="group" aria-label="Ordenar resultados">
-      <button data-sort="distance" aria-pressed="false" type="button">Más cerca</button>
-      <button data-sort="price" aria-pressed="true" type="button">Más barata</button>
-    </div>
-    <div class="toggle toggle--sub" id="sub" role="group" aria-label="Producto para ordenar por precio">
-      <button data-prod="regular" aria-pressed="true" type="button">Regular</button>
-      <button data-prod="premium" aria-pressed="false" type="button">Premium</button>
-    </div>
+  </section>
   </div>
+  <div class="controls-scrim" id="controls-scrim" hidden></div>
 
   <ol class="offers" id="offers"></ol>
   <button id="load-more" class="button button--ghost" type="button">Ver 6 más (14 restantes)</button>
 </main>
 
 <script>
+  // Las claves de producto son las mismas en datos, JS y CSS ([data-key]): regular | premium.
   const OFFERS = [
-    { name: 'Primax Alegría', reg: 19.99, pre: 21.59, m: 603, addr: 'Av. Benavides 2116', d: 'Miraflores', age: 'Hace 1 día', when: '25 ago., 07:14', lat: -12.12800, lng: -76.99200 },
-    { name: 'El Cortijo', brand: 'Primax', reg: 19.84, pre: 21.42, m: 601, addr: 'Av. Republica de Panama 6901', d: 'Santiago de Surco', age: 'Hace 1 día', when: '25 ago., 06:52', lat: -12.13520, lng: -77.00720, open: true },
-    { name: 'Primax Granada', reg: 20.15, pre: 22.35, m: 628, addr: 'Av. Mariscal Castilla 905', d: 'Santiago de Surco', age: 'Hace 1 día', when: '25 ago., 07:25', lat: -12.13520, lng: -77.00720 },
-    { name: 'Estacion de servicio PRIMAX- Barranco', reg: 19.55, pre: 21.49, m: 917, addr: 'Av. El Sol 697', d: 'Barranco', age: 'Hace 2 días', when: '24 ago., 11:03', lat: -12.14, lng: -77.01 },
-    { name: null, reg: 22.99, pre: null, m: 922, addr: 'Av. Republica de Panama 290', d: 'Barranco', age: 'Hace 1 día', when: '25 ago., 09:40', lat: -12.14, lng: -77.02 },
-    { name: 'Estacion AVA Barranco', unc: true, reg: 22.49, pre: 24.49, m: 1300, addr: 'Av. Bolognesi Cuadra 8', d: 'Barranco', age: 'Hace 2 días', when: '24 ago., 08:12', lat: -12.15, lng: -77.02 },
+    { name: 'Primax Alegría', regular: 19.99, premium: 21.59, m: 603, addr: 'Av. Benavides 2116', d: 'Miraflores', age: 'Hace 1 día', when: '25 ago., 07:14', lat: -12.12800, lng: -76.99200 },
+    { name: 'El Cortijo', brand: 'Primax', regular: 19.84, premium: 21.42, m: 601, addr: 'Av. Republica de Panama 6901', d: 'Santiago de Surco', age: 'Hace 1 día', when: '25 ago., 06:52', lat: -12.13520, lng: -77.00720, open: true },
+    { name: 'Primax Granada', regular: 20.15, premium: 22.35, m: 628, addr: 'Av. Mariscal Castilla 905', d: 'Santiago de Surco', age: 'Hace 1 día', when: '25 ago., 07:25', lat: -12.13520, lng: -77.00720 },
+    { name: 'Estacion de servicio PRIMAX- Barranco', regular: 19.55, premium: 21.49, m: 917, addr: 'Av. El Sol 697', d: 'Barranco', age: 'Hace 2 días', when: '24 ago., 11:03', lat: -12.14, lng: -77.01 },
+    { name: null, regular: 22.99, premium: null, m: 922, addr: 'Av. Republica de Panama 290', d: 'Barranco', age: 'Hace 1 día', when: '25 ago., 09:40', lat: -12.14, lng: -77.02 },
+    { name: 'Estacion AVA Barranco', unc: true, regular: 22.49, premium: 24.49, m: 1300, addr: 'Av. Bolognesi Cuadra 8', d: 'Barranco', age: 'Hace 2 días', when: '24 ago., 08:12', lat: -12.15, lng: -77.02 },
   ];
+  const LABEL = { regular: 'REG', premium: 'PRE' };
   let sort = 'price', prod = 'regular';
   const km = (m) => m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
   const money = (v) => v == null ? '—' : `<small>S/</small>${v.toFixed(2)}`;
-  const cell = (o, key, label, cls) => {
+  // Estado del bloque de precio: --on (producto activo), --muted (el otro), --absent (sin precio).
+  const cell = (o, key) => {
     const v = o[key];
-    const state = sort !== 'price' ? '' : (prod === key ? ' offer__price--on' : ' offer__price--off');
-    return `<p class="offer__price${state}" data-key="${key}"><span class="chip ${cls}">${label}</span><b>${money(v)}</b></p>`;
+    const cls = ['offer__price'];
+    if (v == null) cls.push('offer__price--absent');
+    else if (sort === 'price') cls.push(prod === key ? 'offer__price--on' : 'offer__price--muted');
+    return `<p class="${cls.join(' ')}" data-key="${key}"><span class="chip">${LABEL[key]}</span><b>${money(v)}</b></p>`;
   };
+  const detailRow = (o, key) => `<div class="detail__row${o[key] == null ? ' detail__row--empty' : ''}"><span class="chip chip--${key}">${LABEL[key]}</span><span class="detail__price">${o[key] == null ? 'sin precio vigente' : money(o[key])}</span><span class="detail__when">${o[key] == null ? '' : o.when}</span></div>`;
   const detail = (o) => `<div class="offer__detail">
-      <div class="detail__row${o.reg == null ? ' detail__row--empty' : ''}"><span class="chip chip--reg">REG</span><span class="detail__price">${o.reg == null ? 'sin precio vigente' : money(o.reg)}</span><span class="detail__when">${o.reg == null ? '' : o.when}</span></div>
-      <div class="detail__row${o.pre == null ? ' detail__row--empty' : ''}"><span class="chip chip--pre">PRE</span><span class="detail__price">${o.pre == null ? 'sin precio vigente' : money(o.pre)}</span><span class="detail__when">${o.pre == null ? '' : o.when}</span></div>
+      ${detailRow(o, 'regular')}
+      ${detailRow(o, 'premium')}
       <p class="detail__meta"><span>Coordenada oficial <b>${o.lat.toFixed(5)}, ${o.lng.toFixed(5)}</b></span><span>Datos de precios y coordenadas: Osinergmin.</span></p>
       <a class="button--text" href="#">Ver en Street View</a>
     </div>`;
@@ -192,20 +306,85 @@
     document.getElementById('offers').innerHTML = list.map((o) => {
       const tag = o === cheap ? `<p class="offer__tag">${prod === 'premium' ? 'Premium' : 'Regular'} más barata en 1 km</p>` : '';
       const nm = o.name ? (o.brand && !o.name.toLowerCase().includes(o.brand.toLowerCase()) ? `${o.brand} · ${o.name}` : o.name) : 'Estación sin nombre verificado';
-      return `<li class="offer glass">${tag}<div class="offer__topline">${cell(o, 'reg', 'REG', 'chip--reg')}${cell(o, 'pre', 'PRE', 'chip--pre')}<p class="offer__distance"><span class="chip chip--dist">DIST</span><b>${km(o.m)}</b></p></div><div class="offer__grid"><h3 class="offer__identity">${nm}${o.unc ? ' <span class="offer__unconfirmed">· por confirmar</span>' : ''}</h3><p class="offer__address">${o.addr}</p><p class="offer__freshness">${o.age}</p><p class="offer__district">${o.d}</p></div><div class="offer__actions"><span class="button button--ghost">${o.open ? 'Ocultar' : 'Ver detalle'}</span><span class="button button--primary">Cómo llegar</span></div>${o.open ? detail(o) : ''}</li>`;
+      return `<li class="offer glass">${tag}<div class="offer__topline">${cell(o, 'regular')}${cell(o, 'premium')}<p class="offer__distance"><span class="chip chip--distance">DIST</span><b>${km(o.m)}</b></p></div><div class="offer__grid"><h3 class="offer__identity">${nm}${o.unc ? ' <span class="offer__unconfirmed">· por confirmar</span>' : ''}</h3><p class="offer__address">${o.addr}</p><p class="offer__freshness">${o.age}</p><p class="offer__district">${o.d}</p></div><div class="offer__actions"><span class="button button--ghost">${o.open ? 'Ocultar' : 'Ver detalle'}</span><span class="button button--primary">Cómo llegar</span></div>${o.open ? detail(o) : ''}</li>`;
     }).join('');
     document.getElementById('sub').hidden = sort !== 'price';
     document.querySelectorAll('[data-sort]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sort === sort)));
     document.querySelectorAll('[data-prod]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.prod === prod)));
+    updateSummary();
   }
-  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; render(); }));
-  document.querySelectorAll('[data-prod]').forEach((b) => b.addEventListener('click', () => { prod = b.dataset.prod; render(); }));
-  document.getElementById('r').addEventListener('input', (e) => { const n = { 1: 7, 1.5: 14, 2: 20, 2.5: 26, 3: 32, 3.5: 43, 4: 54, 4.5: 68, 5: 83 }[e.target.value] ?? 7; document.getElementById('ro').textContent = `${e.target.value} km · ${n} estaciones`; });
-  document.querySelectorAll('[data-t]').forEach((b) => b.addEventListener('click', () => {
-    const t = b.dataset.t; if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
-    document.querySelectorAll('[data-t]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  }));
-  document.documentElement.setAttribute('data-theme', 'light');
+  // Resumen del modo compact: el lugar puede truncar; el criterio nunca.
+  function updateSummary() {
+    const crit = sort === 'price' ? `${prod === 'premium' ? 'Premium' : 'Regular'} más barata` : 'Más cerca';
+    document.getElementById('sum-criteria').textContent = `· ${document.getElementById('r').value} km · ${crit}`;
+  }
+  // Cambiar un filtro estando scrolleado: el primer resultado es la respuesta, así que volvemos arriba (y el card queda full).
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  function afterFilterChange() {
+    render();
+    if (scrollY > EXPAND_AT) scrollTo({ top: 0, behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+  }
+  document.querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => { sort = b.dataset.sort; afterFilterChange(); }));
+  document.querySelectorAll('[data-prod]').forEach((b) => b.addEventListener('click', () => { prod = b.dataset.prod; afterFilterChange(); }));
+  document.getElementById('r').addEventListener('input', (e) => { const n = { 1: 7, 1.5: 14, 2: 20, 2.5: 26, 3: 32, 3.5: 43, 4: 54, 4.5: 68, 5: 83 }[e.target.value] ?? 7; document.getElementById('ro').textContent = `${e.target.value} km · ${n} estaciones`; updateSummary(); });
+  document.getElementById('r').addEventListener('change', afterFilterChange);
+
+  // Card de Controles: full | compact | overlay.
+  // Regla: baja más de --collapse-at → compact solo; vuelve a menos de --expand-at → full solo.
+  // Entre ambos no cambia (histéresis). overlay (abierto a mano estando abajo) dura hasta bajar 32 px más,
+  // tocar fuera, Escape o «Listo».
+  const controls = document.getElementById('controls');
+  const slot = document.getElementById('controls-slot');
+  const scrim = document.getElementById('controls-scrim');
+  const summaryBtn = document.getElementById('controls-summary');
+  const doneBtn = document.getElementById('controls-done');
+  const cssPx = (name) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+  const EXPAND_AT = cssPx('--expand-at');
+  let overlayWatch = null;
+  function setControls(state) {
+    if (overlayWatch) { removeEventListener('scroll', overlayWatch); overlayWatch = null; }
+    if (controls.dataset.state === state) return;
+    controls.dataset.state = state;
+    const open = state !== 'compact';
+    summaryBtn.setAttribute('aria-expanded', String(open));
+    doneBtn.setAttribute('aria-expanded', String(open));
+    scrim.hidden = state !== 'overlay';
+    // Nadie se queda enfocado dentro de un panel que acaba de cerrarse.
+    if (!open && controls.contains(document.activeElement)) summaryBtn.focus({ preventScroll: true });
+    if (state === 'overlay') {
+      const from = scrollY;
+      overlayWatch = () => { if (scrollY - from > 32) setControls('compact'); };
+      addEventListener('scroll', overlayWatch, { passive: true });
+    }
+  }
+  summaryBtn.addEventListener('click', () => setControls('overlay'));
+  doneBtn.addEventListener('click', () => setControls('compact'));
+  scrim.addEventListener('click', () => setControls('compact'));
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && controls.dataset.state === 'overlay') setControls('compact'); });
+  const collapseSentinel = document.querySelector('.controls-sentinel--collapse');
+  const expandSentinel = document.querySelector('.controls-sentinel--expand');
+  const sentinels = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.target === collapseSentinel && !e.isIntersecting && controls.dataset.state === 'full') setControls('compact');
+      if (e.target === expandSentinel && e.isIntersecting) setControls('full');
+    }
+  });
+  sentinels.observe(collapseSentinel); sentinels.observe(expandSentinel);
+  // El hueco conserva el alto del card en full: fijarlo no mueve la lista y volver al flujo tampoco.
+  new ResizeObserver(() => { if (controls.dataset.state === 'full') slot.style.setProperty('--controls-slot-h', `${controls.offsetHeight}px`); }).observe(controls);
+
+  // Tema: calcado de web/theme.js. «system» se resuelve aquí y data-theme siempre queda en light|dark.
+  const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+  let themeChoice = 'light';
+  function applyTheme(choice) {
+    themeChoice = choice;
+    const dark = choice === 'system' ? darkQuery.matches : choice === 'dark';
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.querySelectorAll('[data-theme-choice]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === choice)));
+  }
+  document.querySelectorAll('[data-theme-choice]').forEach((b) => b.addEventListener('click', () => applyTheme(b.dataset.themeChoice)));
+  darkQuery.addEventListener('change', () => { if (themeChoice === 'system') applyTheme('system'); });
+  applyTheme('light');
   render();
 </script>
 

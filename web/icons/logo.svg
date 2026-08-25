@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 520" role="img" aria-labelledby="logo-title">
+  <title id="logo-title">masfacil.pe</title>
+  <defs>
+    <!-- ARO / MARCADOR -->
+    <linearGradient id="ringGradient" x1="250" y1="20" x2="250" y2="515" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#c6ccaa"/>
+      <stop offset="45%"  stop-color="#948a63"/>
+      <stop offset="100%" stop-color="#352d21"/>
+    </linearGradient>
+
+    <!-- FRANJAS ROJO PERÚ -->
+    <linearGradient id="peruRedLeft" x1="115" y1="130" x2="165" y2="355" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#E91C2C"/>
+      <stop offset="50%"  stop-color="#D91023"/>
+      <stop offset="100%" stop-color="#B8071B"/>
+    </linearGradient>
+    <linearGradient id="peruRedRight" x1="385" y1="130" x2="335" y2="355" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#E91C2C"/>
+      <stop offset="50%"  stop-color="#D91023"/>
+      <stop offset="100%" stop-color="#B8071B"/>
+    </linearGradient>
+
+    <!-- M -->
+    <linearGradient id="mGradient" x1="250" y1="142" x2="250" y2="354" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#FFC800"/>
+      <stop offset="45%"  stop-color="#FF9B00"/>
+      <stop offset="100%" stop-color="#F26200"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 1. MARCADOR EXTERIOR (Grosor base 60px) -->
+  <path fill="url(#ringGradient)" d="
+    M250 20
+    C128.5 20 30 118.5 30 240
+    C30 339.2 94.7 423.2 185.5 453.8
+    C203 459.7 217.8 470.5 228.4 485
+    L250 515
+    L271.6 485
+    C282.2 470.5 297 459.7 314.5 453.8
+    C405.3 423.2 470 339.2 470 240
+    C470 118.5 371.5 20 250 20
+    Z"/>
+
+  <!-- 2. CAVIDAD BLANCA INTERIOR (Ajuste a y=455 para grosor uniforme de 60px) -->
+  <path fill="#FFFFFF" d="
+    M250 80
+    C161.6 80 90 151.6 90 240
+    C90 307.2 130.5 369.7 189.2 393.6
+    C201.7 398.7 212.3 406.6 220 417.3
+    L250 455
+    L280 417.3
+    C287.7 406.6 298.3 398.7 310.8 393.6
+    C369.5 369.7 410 307.2 410 240
+    C410 151.6 338.4 80 250 80
+    Z"/>
+
+  <!-- 3. FRANJAS ROJAS (Arcos exactos sobre el círculo R=160 de la cavidad) -->
+  <path fill="url(#peruRedLeft)" d="
+    M140 128
+    A156 160 0 0 0 140 356
+    Z"/>
+  <path fill="url(#peruRedRight)" d="
+    M360 128
+    A156 160 0 0 1 360 356
+    Z"/>
+
+  <!-- 4. M (Geometría con reflejo espejo matemáticamente puro) -->
+  <path fill="url(#mGradient)" d="
+    M148 297
+    L182 158 Q185 142 194 158
+    L243 230 Q250 240 257 230
+    L306 158 Q315 142 318 158
+    L352 297 Q358 314 344 307
+    L302 251 Q295 241 288 251
+    L256 340 Q250 354 244 340
+    L212 251 Q205 241 198 251
+    L156 307 Q142 314 148 297
+    Z"/>
+</svg>

@@ -5,17 +5,32 @@ import { filterFreshOffers } from './lib/freshness.js';
 import { mergeOfferRows } from './lib/merge-products.js';
 import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
 import { visibleDistricts } from './district-list.js';
-import { UNVERIFIED_STATION_LABEL, displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
+import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
 import { GASOLINA_KEYS } from './gasolina-contract.js';
 import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
+import { initControlsCard } from './controls-card.js';
 
 const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0 };
 const $ = (id) => document.getElementById(id);
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'district-show-all', 'compare-title', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-note', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'district-show-all', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
+const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
 
-function show(name) { for (const key of ['start-step', 'loading-step', 'district-step', 'compare-step', 'fatal-state']) nodes[key].hidden = key !== name; $('main').setAttribute('aria-busy', String(name === 'loading-step')); }
+// El card de controles solo se fija en resultados; en las demás pantallas es la
+// appbar de siempre, en flujo.
+const controls = initControlsCard({
+  card: nodes.controls, slot: nodes['controls-slot'], scrim: nodes['controls-scrim'], summaryButton: nodes['controls-summary'], doneButton: nodes['controls-done'],
+  collapseSentinel: document.querySelector('.controls-sentinel--collapse'), expandSentinel: document.querySelector('.controls-sentinel--expand'),
+  isActive: () => !nodes['compare-step'].hidden,
+});
+
+function show(name) {
+  for (const key of ['start-step', 'loading-step', 'district-step', 'compare-step', 'fatal-state']) nodes[key].hidden = key !== name;
+  $('main').setAttribute('aria-busy', String(name === 'loading-step'));
+  nodes.controls.dataset.screen = name === 'compare-step' ? 'compare' : 'other';
+  if (name !== 'compare-step') controls.setState('full');
+}
 // La vigencia se evalúa por producto y recién después se fusiona: un grifo con
 // Regular vigente y Premium vencido conserva su tarjeta y apaga solo ese precio.
 function currentFresh() {
@@ -33,6 +48,13 @@ function renderRadiusControl() {
   nodes['radius-readout'].textContent = inerte
     ? (total === 1 ? `Única estación en ${formatRadius(RADIUS_MAX_KM)}` : `Las mismas ${total} estaciones en todo el radio`)
     : `${formatRadius(state.radiusKm)} · ${total} ${total === 1 ? 'estación' : 'estaciones'}`;
+}
+// Resumen del card compacto: el lugar puede truncar; el criterio nunca.
+function renderSummary() {
+  const porPrecio = state.sort.startsWith('price:') || !state.origin;
+  const criterio = porPrecio ? `${PRODUCTOS[state.priceProduct]} más barata` : 'Más cerca';
+  const partes = state.origin ? [formatRadius(state.radiusKm), criterio] : [criterio];
+  nodes['sum-criteria'].textContent = `· ${partes.join(' · ')}`;
 }
 
 function renderOffers() {
@@ -71,10 +93,9 @@ function renderOffers() {
   // radio ya dice cuántas son y repetirlo sería ruido. Cuando sí paginó, el
   // último toque cierra con «N de N», que es lo que el botón ya no puede decir.
   nodes['offers-status'].textContent = ordenadas.length > items.length || ordenadas.length > PAGE_SIZE + SHOW_ALL_THRESHOLD ? `Se muestran ${items.length} de ${ordenadas.length} estaciones.` : '';
-  nodes['offers-note'].textContent = items.some((offer) => !offer.commercial_identity) ? UNVERIFIED_STATION_LABEL : '';
-  nodes['offers-note'].hidden = items.length === 0 || !nodes['offers-note'].textContent;
   document.querySelectorAll('[data-sort]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.sort === (porPrecio ? 'price' : 'distance'))));
   document.querySelectorAll('[data-price-product]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.priceProduct === producto)));
+  renderSummary();
 }
 
 // Los dos precios ya viajan en la fila, así que el panel se abre sin pedir nada
@@ -96,18 +117,21 @@ function renderResults() {
   nodes['empty-state'].hidden = state.fresh.length > 0;
   nodes.offers.hidden = state.fresh.length === 0;
   nodes['sort-toggle'].hidden = state.fresh.length === 0 || !state.origin;
+  // La fila «Lugar» es el encabezado de resultados: dice desde dónde se compara.
+  const lugar = state.origin ? 'Mi ubicación' : displayDistrict(state.district);
+  nodes['place-name'].textContent = lugar;
+  nodes['sum-place'].textContent = lugar;
+  nodes['place-icon'].hidden = !state.origin;
   if (state.fresh.length === 0) return;
   state.visibleCount = PAGE_SIZE;
   if (state.origin) {
     state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
     state.radiusKm = initialRadiusKm(state.located);
     state.sort = 'distance';
-    nodes['compare-title'].textContent = 'Cerca de ti';
   } else {
     state.located = [];
     nodes['radius-control'].hidden = true;
     nodes['radius-empty'].hidden = true;
-    nodes['compare-title'].textContent = `Más baratas en ${displayDistrict(state.district)}`;
   }
   renderOffers();
 }
@@ -115,7 +139,7 @@ function showCompare() {
   renderResults();
   nodes['offline-note'].hidden = state.dataMode !== 'saved';
   nodes['offline-note'].textContent = state.dataMode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(state.dataset.cutoff_at)}.` : '';
-  show('compare-step'); $('compare-title').focus();
+  show('compare-step'); nodes['compare-title'].focus();
 }
 function renderDistricts(query = '') {
   const normalizedQuery = query.trim();
@@ -147,7 +171,6 @@ function fatal(error) { console.error(error); nodes['fatal-message'].textContent
 function applyLoaded(dataset) {
   state.dataset = dataset; state.dataMode = dataset.dataMode;
   const fresh = currentFresh();
-  document.querySelector('meta[name="description"]').content = 'Compara precio y cercanía de Gasohol Regular y Premium en Lima provincia.';
   $('use-location').disabled = false;
   $('choose-district').disabled = false;
   nodes['data-status'].textContent = `${fresh.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
@@ -169,14 +192,17 @@ async function initialize() {
 $('use-location').addEventListener('click', locate); $('choose-district').addEventListener('click', chooseDistrict); $('retry-location').addEventListener('click', locate);
 $('cancel-location').addEventListener('click', cancelLocation); nodes['district-search'].addEventListener('input', () => { state.showAllDistricts = false; renderDistricts(nodes['district-search'].value); }); nodes['district-show-all'].addEventListener('click', () => { state.showAllDistricts = true; renderDistricts(nodes['district-search'].value); });
 nodes.districts.addEventListener('click', (event) => { const district = event.target.closest('[data-district]')?.dataset.district; if (district) { state.origin = null; state.district = district; showCompare(); } });
-document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', () => { state.sort = button.dataset.sort === 'price' ? `price:${state.priceProduct}` : 'distance'; state.visibleCount = PAGE_SIZE; renderOffers(); }));
+// Cambiar un filtro estando abajo: el primer resultado es la respuesta, así
+// que la lista vuelve arriba y el card de controles regresa al flujo.
+document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', () => { state.sort = button.dataset.sort === 'price' ? `price:${state.priceProduct}` : 'distance'; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
 // El sub-toggle recuerda la elección aunque se vuelva a «Más cerca», así que
 // quien compara Premium no tiene que volver a decirlo en cada vuelta.
-document.querySelectorAll('[data-price-product]').forEach((button) => button.addEventListener('click', () => { state.priceProduct = button.dataset.priceProduct; if (state.sort.startsWith('price:')) state.sort = `price:${state.priceProduct}`; state.visibleCount = PAGE_SIZE; renderOffers(); }));
+document.querySelectorAll('[data-price-product]').forEach((button) => button.addEventListener('click', () => { state.priceProduct = button.dataset.priceProduct; if (state.sort.startsWith('price:')) state.sort = `price:${state.priceProduct}`; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
 nodes.offers.addEventListener('click', (event) => { const button = event.target.closest('[data-detail]'); if (button) toggleDetail(button); });
 // Filtrado local sobre datos ya cargados: no hay red, así que `input` responde
-// mientras se arrastra sin costo perceptible.
+// mientras se arrastra sin costo perceptible; al soltar, la lista vuelve arriba.
 nodes['radius-input'].addEventListener('input', () => { state.radiusKm = Number(nodes['radius-input'].value); state.visibleCount = PAGE_SIZE; renderOffers(); });
+nodes['radius-input'].addEventListener('change', () => controls.scrollToTop());
 nodes['load-more'].addEventListener('click', () => {
   const pintadas = nodes.offers.children.length;
   state.visibleCount = Number(nodes['load-more'].dataset.siguiente);
@@ -185,6 +211,6 @@ nodes['load-more'].addEventListener('click', () => {
   // primera tarjeta nueva, que es justo lo que se acaba de pedir.
   nodes.offers.children[pintadas]?.focus();
 });
-$('change-origin').addEventListener('click', () => show('start-step')); $('retry-load').addEventListener('click', () => location.reload());
+$('change-origin').addEventListener('click', () => { show('start-step'); $('use-location').focus(); }); $('retry-load').addEventListener('click', () => location.reload());
 initTheme();
 initialize();

@@ -1,49 +1,69 @@
 <!doctype html>
-<html lang="es" data-theme="light" data-bg-mode="css">
+<html lang="es" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f3f4f4">
+  <meta name="theme-color" content="#ecf0e9">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Compara precio y cercanía de combustibles en Lima provincia.">
+  <meta name="description" content="Compara precio y cercanía de Gasohol Regular y Premium en Lima provincia.">
   <title>masfacil.pe</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="coast-bg" aria-hidden="true"></div>
+  <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
   <a class="skip-link" href="#main">Ir al contenido</a>
   <main id="main" tabindex="-1" class="app-shell">
-    <header class="appbar appbar--compact plate">
-      <a class="brand" href="/" aria-label="masfacil.pe, inicio"><span class="brand__pin" aria-hidden="true">⌖</span>masfacil<em>.pe</em></a>
-      <div class="theme-toggle" role="group" aria-label="Tema">
-        <button data-theme-choice="light" aria-label="Tema claro" aria-pressed="false" title="Claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg><span class="sr-only">Claro</span></button>
-        <button data-theme-choice="system" aria-label="Tema del sistema" aria-pressed="false" title="Sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg><span class="sr-only">Sistema</span></button>
-        <button data-theme-choice="dark" aria-label="Tema oscuro" aria-pressed="false" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg><span class="sr-only">Oscuro</span></button>
-      </div>
-    </header>
-    <section id="start-step" class="screen-flow start-step--compact" aria-labelledby="start-title">
+    <div class="controls-sentinel controls-sentinel--collapse" aria-hidden="true"></div>
+    <div class="controls-sentinel controls-sentinel--expand" aria-hidden="true"></div>
+    <div class="controls-slot" id="controls-slot">
+      <section class="controls plate" id="controls" data-state="full" data-screen="other" aria-label="Controles de búsqueda">
+        <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
+          <img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">
+          <span class="controls__text"><span class="controls__place" id="sum-place"></span><span class="controls__criteria" id="sum-criteria"></span></span>
+          <span class="controls__expand">Ajustar <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+        </button>
+        <div class="controls__panel" id="controls-panel">
+          <div class="controls__inner">
+            <header class="appbar">
+              <a class="brand" href="/" aria-label="masfacil.pe, inicio"><img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">masfacil<em>.pe</em></a>
+              <div class="theme-toggle" role="group" aria-label="Tema">
+                <button data-theme-choice="light" aria-pressed="false" aria-label="Tema claro" title="Claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg></button>
+                <button data-theme-choice="system" aria-pressed="false" aria-label="Tema del sistema" title="Sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg></button>
+                <button data-theme-choice="dark" aria-pressed="false" aria-label="Tema oscuro" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg></button>
+              </div>
+            </header>
+            <div class="place">
+              <div class="place__where">
+                <span class="place__label">Lugar</span>
+                <h2 class="place__value" id="compare-title" tabindex="-1"><svg id="place-icon" class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span id="place-name">Mi ubicación</span></h2>
+              </div>
+              <button id="change-origin" class="button--text" type="button">Cambiar</button>
+            </div>
+            <div id="radius-control" class="radius" hidden>
+              <div class="radius__head"><label class="radius__label" for="radius-input">Radio</label><p id="radius-readout" class="radius__readout" role="status"></p></div>
+              <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
+            </div>
+            <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados" hidden><button data-sort="distance" aria-pressed="true" type="button">Más cerca</button><button data-sort="price" aria-pressed="false" type="button">Más barata</button></div>
+            <div id="price-product-toggle" class="toggle toggle--sub" role="group" aria-label="Producto para ordenar por precio" hidden><button data-price-product="regular" aria-pressed="true" type="button">Regular</button><button data-price-product="premium" aria-pressed="false" type="button">Premium</button></div>
+            <button class="button--text controls__done" id="controls-done" type="button" aria-expanded="true" aria-controls="controls-panel">Listo <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="controls-scrim" id="controls-scrim" hidden></div>
+    <section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">
       <h1 id="start-title">Encuentra gasolina cerca de ti</h1>
       <button id="use-location" class="button button--primary" type="button" disabled>Usar mi ubicación</button>
-      <button id="choose-district" class="button button--text" type="button" disabled>Elegir distrito</button>
+      <button id="choose-district" class="button--text" type="button" disabled>Elegir distrito</button>
       <p id="location-status" class="privacy-line" role="status" aria-live="polite">No guardamos tu ubicación.</p>
       <p id="data-status" class="hint" role="status" aria-live="polite">Cargando precios…</p>
     </section>
-    <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button button--text" type="button">Elegir distrito</button></div></section>
-    <section id="district-step" class="screen-flow district-step--compact" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o reintenta.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div><button id="district-show-all" class="button button--text button--compact" type="button">Ver todos los distritos</button><button id="retry-location" class="button button--text button--compact" type="button">Reintentar ubicación</button></section>
-    <section id="compare-step" class="screen-flow" aria-labelledby="compare-title" hidden>
-      <div class="results-head results-head--compact"><h2 id="compare-title" tabindex="-1">Cerca de ti</h2><button id="change-origin" class="button button--text button--compact" type="button">Cambiar</button></div>
-      <div class="sticky-controls">
-        <div id="radius-control" class="radius" hidden>
-          <div class="radius__head"><label class="radius__label" for="radius-input">Radio</label><p id="radius-readout" class="radius__readout" role="status"></p></div>
-          <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
-        </div>
-        <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados"><button data-sort="distance" aria-pressed="true" type="button">Más cerca</button><button data-sort="price" aria-pressed="false" type="button">Más barata</button></div>
-        <div id="price-product-toggle" class="toggle toggle--sub" role="group" aria-label="Producto para ordenar por precio" hidden><button data-price-product="regular" aria-pressed="true" type="button">Regular</button><button data-price-product="premium" aria-pressed="false" type="button">Premium</button></div>
-      </div>
+    <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button--text" type="button">Elegir distrito</button></div></section>
+    <section id="district-step" class="screen-flow district-step" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o reintenta.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div><button id="district-show-all" class="button--text" type="button">Ver todos los distritos</button><button id="retry-location" class="button--text" type="button">Reintentar ubicación</button></section>
+    <section id="compare-step" class="screen-flow screen-flow--results" aria-labelledby="compare-title" hidden>
       <p id="offline-note" class="offline-note" role="status" hidden></p>
-      <p id="offers-note" class="hint" hidden></p>
       <ol id="offers" class="offers"></ol>
       <section id="radius-empty" class="plate empty" hidden><h2>Ningún grifo en este radio</h2><p class="lede">Amplía el radio de búsqueda para encontrar estaciones más lejanas.</p></section>
       <button id="load-more" class="button button--ghost" type="button" hidden></button>

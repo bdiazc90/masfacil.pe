@@ -2,11 +2,21 @@ export const UNVERIFIED_STATION_LABEL = 'Estación sin nombre verificado';
 
 export const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 export const formatPrice = (value) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 }).format(value);
-const ago = (days) => days < 1 ? `hace ${Math.max(1, Math.round(days * 24))} h` : `hace ${Math.floor(days)} ${Math.floor(days) === 1 ? 'día' : 'días'}`;
+// «hace 24 h» y «hace 1 día» son lo mismo; a partir de 23.5 h se redondea a día.
+const ago = (days) => { const horas = Math.max(1, Math.round(days * 24)); return horas < 24 ? `hace ${horas} h` : `hace ${Math.max(1, Math.floor(days))} ${Math.floor(days) <= 1 ? 'día' : 'días'}`; };
 const kilometers = (value) => value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`;
 const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y']);
 
 export const UNCONFIRMED_LABEL = 'por confirmar';
+
+// Las claves de producto son las mismas en datos, JS y CSS ([data-key]).
+const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
+export const PRODUCT_CHIPS = Object.freeze({ regular: 'REG', premium: 'PRE' });
+const fechaHora = (iso) => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date(iso));
+// «S/» reducido dentro de la cifra: el número es el dato que decide, la moneda solo lo acompaña.
+const priceHtml = (value) => `<small>S/</small>${escapeHtml(value.toFixed(2))}`;
+// El chip lleva su nombre completo para lectores de pantalla; el texto visible es la sigla.
+const chip = (key, extra = '') => `<span class="chip chip--${key}${extra}" role="img" aria-label="${escapeHtml(PRODUCTOS[key])}">${PRODUCT_CHIPS[key]}</span>`;
 
 export function stationIdentity(offer) {
   const identity = offer?.commercial_identity;
@@ -36,20 +46,17 @@ export function directionsLabel(offer, { withDistance = true } = {}) {
   return details.join(', ');
 }
 
-const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
-const fechaHora = (iso) => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date(iso));
-
 // Panel que se despliega bajo la tarjeta. Solo usa datos que ya viajan en el
 // bundle: nada externo, así que funciona igual sin conexión.
 export function renderOfferDetail(offer, { prices = {}, attribution = null } = {}) {
-  const filas = Object.entries(PRODUCTOS).map(([key, label]) => {
+  const filas = Object.keys(PRODUCTOS).map((key) => {
     const item = prices[key];
-    if (!item) return `<div class="detail__row detail__row--empty"><span>${escapeHtml(label)}</span><span>sin precio vigente</span></div>`;
-    return `<div class="detail__row"><span class="detail__product">${escapeHtml(label)}</span><span class="detail__price">${escapeHtml(formatPrice(item.price))}</span><span class="detail__when">${escapeHtml(fechaHora(item.reported_at))}</span></div>`;
+    if (!item) return `<div class="detail__row detail__row--empty">${chip(key)}<span class="detail__price">sin precio vigente</span><span class="detail__when"></span></div>`;
+    return `<div class="detail__row">${chip(key)}<span class="detail__price">${priceHtml(item.price)}</span><span class="detail__when">${escapeHtml(fechaHora(item.reported_at))}</span></div>`;
   }).join('');
   const coordenada = `${offer.latitude.toFixed(5)}, ${offer.longitude.toFixed(5)}`;
-  const fuente = attribution ? `<p class="detail__source">${escapeHtml(attribution)}</p>` : '';
-  return `<div class="offer__detail">${filas}<p class="detail__meta">Coordenada oficial ${escapeHtml(coordenada)}</p>${fuente}<a class="button button--text" href="${escapeHtml(streetViewUrl(offer))}" target="_blank" rel="noopener noreferrer">Ver en Street View</a></div>`;
+  const fuente = attribution ? `<span>${escapeHtml(attribution)}</span>` : '';
+  return `<div class="offer__detail">${filas}<p class="detail__meta"><span>Coordenada oficial <b>${escapeHtml(coordenada)}</b></span>${fuente}</p><a class="button--text" href="${escapeHtml(streetViewUrl(offer))}" target="_blank" rel="noopener noreferrer">Ver en Street View</a></div>`;
 }
 
 export function streetViewUrl(offer) {
@@ -61,20 +68,20 @@ export function detailLabel(offer) {
 }
 
 // Los dos precios se ven a la vez porque la decisión se toma comparándolos.
-// Cuando el orden es por precio, el producto que ordena manda visualmente y el
-// otro queda atenuado; en «Más cerca» los dos pesan igual. Un producto sin
-// precio vigente muestra «—» y no rompe la fila: el grifo sigue sirviendo.
-function priceCell(offer, key, label, activeProduct) {
+// Estado del bloque: --on (producto que ordena), --muted (el otro), --absent
+// (sin precio vigente, siempre apagado). En «Más cerca» no hay énfasis.
+function priceCell(offer, key, activeProduct) {
   const item = offer.prices?.[key];
   const clases = ['offer__price'];
-  if (activeProduct && activeProduct !== key) clases.push('offer__price--muted');
   if (!item) clases.push('offer__price--absent');
-  return `<p class="${clases.join(' ')}"><span class="offer__product">${escapeHtml(label)}</span><b>${item ? escapeHtml(formatPrice(item.price)) : '—'}</b></p>`;
+  else if (activeProduct) clases.push(activeProduct === key ? 'offer__price--on' : 'offer__price--muted');
+  const cifra = item ? priceHtml(item.price) : '<span aria-hidden="true">—</span><span class="sr-only">sin precio vigente</span>';
+  return `<p class="${clases.join(' ')}" data-key="${key}"><span class="chip" role="img" aria-label="${escapeHtml(PRODUCTOS[key])}">${PRODUCT_CHIPS[key]}</span><b>${cifra}</b></p>`;
 }
 
 export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null } = {}) {
-  const distance = withDistance ? `<p class="offer__distance">${escapeHtml(kilometers(offer.distance_km))}</p>` : '';
-  const precios = Object.entries(PRODUCTOS).map(([key, label]) => priceCell(offer, key, label, activeProduct)).join('');
+  const distance = withDistance ? `<p class="offer__distance"><span class="chip chip--distance" role="img" aria-label="Distancia">DIST</span><b>${escapeHtml(kilometers(offer.distance_km))}</b></p>` : '';
+  const precios = Object.keys(PRODUCTOS).map((key) => priceCell(offer, key, activeProduct)).join('');
   const detail = includeDetail
     ? `<button type="button" class="button button--ghost" data-detail="${escapeHtml(offer.establishment_id)}" aria-expanded="false" aria-label="${escapeHtml(detailLabel(offer))}">Ver detalle</button>`
     : '';
@@ -88,5 +95,6 @@ export function renderOfferCard(offer, { withDistance = true, directionsUrl = nu
   // Sin dirección publicable, el distrito sube para que la fila no quede coja.
   // El `tabindex="-1"` no entra al tabulador: es el destino de foco al paginar.
   const address = offer.address ? escapeHtml(offer.address) : '';
-  return `<li class="offer glass" tabindex="-1">${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${ago(offer.age_days)[0].toLocaleUpperCase('es-PE')}${ago(offer.age_days).slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
+  const frescura = ago(offer.age_days);
+  return `<li class="offer glass" tabindex="-1">${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${frescura[0].toLocaleUpperCase('es-PE')}${frescura.slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
 }
