@@ -1,9 +1,12 @@
 # BITÁCORA
 
-- PWA de Gasohol Regular y Premium desplegada y funcionando en Cloudflare Pages.
-- Bundle público 2.1 preparado para identidad opcional; fallback neutral activo.
-- Universo actual: 717 establecimientos; identidad comercial publicable: 0/717.
-- Waves 1–3 quedan en `.local-cache/`; la búsqueda web secundaria cerró sin puentes válidos.
-- Próximo cambio: primera identidad `owner_verified` con marca visible + Registro oficial.
-- Después: Capa 5, releases de identidad y refresco automatizado varias veces al día.
-- Capa 6: framework, marca e instalación PWA optimizada tras observar uso real.
+- PWA desplegada en Cloudflare Pages con refresco automático 4 veces al día.
+- Home directo en `/`; una tarjeta por grifo con Regular y Premium; radio de
+  búsqueda adaptativo; paginación que duplica.
+- Universo: 717 establecimientos. Identidad comercial publicada: 548
+  (377 confirmadas, 171 «por confirmar»); precisión medida sobre 54 revisiones
+  sin errores: cota 89 % y 86 %.
+- Marca publicada solo con respaldo de la razón social o del owner; 137 con
+  marca.
+- Pendiente inmediato: UI de precios (chips REG/PRE, estética de display).
+- Después: aportes de quien usa la app y catálogo en D1 (`docs/aportes.md`).

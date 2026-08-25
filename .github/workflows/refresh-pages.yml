@@ -8,11 +8,6 @@ on:
     - cron: '17 2,8,14,20 * * *'
   workflow_dispatch:
     inputs:
-      shell_changed:
-        description: Publicar el shell actual usando el último bundle público validado
-        required: false
-        type: boolean
-        default: false
       force_project:
         description: Reproyectar el snapshot activo aunque los datos no hayan cambiado (para cambios de contrato o de catálogo)
         required: false
@@ -72,19 +67,19 @@ jobs:
         run: npm run identity:install
       - name: Calcular cambio de shell
         id: shell
-        env:
-          DISPATCH_SHELL_CHANGED: ${{ inputs.shell_changed }}
         run: |
-          if [ "$DISPATCH_SHELL_CHANGED" = "true" ]; then
-            echo "changed=1" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "push" ] && ! git diff --quiet HEAD^ HEAD -- web ':!web/data'; then
+          if [ "${{ github.event_name }}" = "push" ] && ! git diff --quiet HEAD^ HEAD -- web ':!web/data'; then
             echo "changed=1" >> "$GITHUB_OUTPUT"
           else
             echo "changed=0" >> "$GITHUB_OUTPUT"
           fi
-      - name: Recuperar bundle solo para publicar un cambio de shell
-        if: steps.shell.outputs.changed == '1'
-        run: npm run fetch:public-bundle -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
+      - name: Restaurar el snapshot activo entre corridas
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.3
+        with:
+          path: .local-cache/snapshots
+          key: snapshots-${{ hashFiles('bootstrap/seed.manifest.json') }}-${{ github.run_id }}
+          restore-keys: |
+            snapshots-${{ hashFiles('bootstrap/seed.manifest.json') }}-
       - name: Refrescar, proyectar y verificar si corresponde
         id: prepare
         env:

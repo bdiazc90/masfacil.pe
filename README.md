@@ -63,14 +63,6 @@ npm run dump:establishments    # vuelca los 717 con dirección y coordenada
 
 El workflow `.github/workflows/refresh-pages.yml` comprueba cambios y despliega ambos productos juntos. Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
 
-Deploy manual, si fuera necesario:
-
-```bash
-npm run project
-npm run deploy:manual
-npx --yes wrangler@4.31.0 pages deploy .local-cache/publish/pages-bootstrap-web --project-name masfacil-pe --branch main
-```
-
 ## Proyecto
 
 ```text
