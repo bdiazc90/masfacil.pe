@@ -9,7 +9,12 @@ on:
   workflow_dispatch:
     inputs:
       force_project:
-        description: Reproyectar el snapshot activo aunque los datos no hayan cambiado (para cambios de contrato o de catálogo)
+        description: Reproyectar el snapshot activo aunque los datos no hayan cambiado (para cambios de contrato, de catálogo o de código de proyección)
+        required: false
+        type: boolean
+        default: false
+      deploy_shell:
+        description: Volver a publicar el shell reusando el bundle de datos ya publicado (sin proyectar ni descargar)
         required: false
         type: boolean
         default: false
@@ -58,8 +63,8 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_PAGES_PROJECT"
           test -n "$BOOTSTRAP_SEED_B64"
-      - name: Recuperar solo el estado público de refresco
-        run: npm run fetch:refresh-state -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
+      - name: Recuperar el bundle público ya verificado (~500 KB)
+        run: npm run fetch:live -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
       - name: Instalar bootstrap privado mínimo
         run: npm run seed:install -- --target "$RUNNER_TEMP/seed-reference"
       - name: Instalar identidad comercial verificada
@@ -67,12 +72,25 @@ jobs:
         run: npm run identity:install
       - name: Calcular cambio de shell
         id: shell
+        env:
+          DEPLOY_SHELL: ${{ inputs.deploy_shell && '1' || '0' }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && ! git diff --quiet HEAD^ HEAD -- web ':!web/data'; then
-            echo "changed=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=0" >> "$GITHUB_OUTPUT"
+          # Shell = solo web/ (sin web/data). Si el push toca además código de
+          # proyección, el bundle publicado podría no corresponder al shell nuevo:
+          # no se despliega solo y se pide force_project.
+          changed=0
+          if [ "${{ github.event_name }}" = "push" ]; then
+            if ! git diff --quiet HEAD^ HEAD -- web ':!web/data'; then
+              if git diff --quiet HEAD^ HEAD -- pipeline app scripts bootstrap package.json; then
+                changed=1
+              else
+                echo "::notice::El push toca web/ y también código fuera de web/; no se despliega el shell solo. Publica con force_project=true (o deploy_shell=true si lo de fuera no afecta la proyección)."
+              fi
+            fi
+          elif [ "$DEPLOY_SHELL" = "1" ]; then
+            changed=1
           fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
       - name: Restaurar el snapshot activo entre corridas
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.3
         with:

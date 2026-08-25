@@ -15,12 +15,12 @@ declarada en la app: 54 revisiones del owner sin un solo error, cota 89 % y 86 %
    texto; los tres valores de la primera línea con `justify-between`; precios
    con estética de display de surtidor **sin perder legibilidad** a 360 px.
    Solo `web/offer-card.js` y `web/styles.css`; no toca datos ni contratos.
-2. **Separar «datos» de «código» en el deploy.** Hoy un cambio de UI o de
-   catálogo obliga a bajar el giga de Osinergmin aunque los precios no hayan
-   cambiado, porque `force_project` mezcla ambos. Un cambio de `web/` debe
-   reusar el bundle ya publicado y solo re-subir el shell; el giga solo se paga
-   cuando hay precios nuevos. El cache entre corridas (`actions/cache`) es el
-   paliativo mientras tanto.
+2. ~~**Separar «datos» de «código» en el deploy.**~~ Hecho el 25/08/2026. Un
+   push que solo toca `web/` reusa el bundle ya publicado (descargado y
+   verificado por SHA-256, ~500 KB) y re-sube el shell en menos de un minuto.
+   El giga de Osinergmin solo se paga cuando hay precios nuevos o cuando se
+   fuerza una reproyección (`force_project`, para catálogo, contrato o código
+   de proyección). `deploy_shell=true` re-publica el shell a mano.
 
 ## Capa 5 — identidad y datos vivos
 

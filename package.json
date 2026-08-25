@@ -12,7 +12,7 @@
     "rollback": "node scripts/rollback.mjs",
     "seed:install": "node scripts/seed-install.mjs",
     "dump:establishments": "node scripts/dump-establishments.mjs",
-    "fetch:refresh-state": "node scripts/fetch-live-refresh-state.mjs",
+    "fetch:live": "node scripts/fetch-live-bundle.mjs",
     "audit": "node scripts/audit-publication.mjs",
     "verify:web": "node scripts/verify-web.mjs",
     "harvest:centers": "node scripts/harvest-centers.mjs",

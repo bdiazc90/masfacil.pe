@@ -16,8 +16,15 @@ producción o en el repo, salvo lo marcado como pendiente.
 - Rutas viejas (`/gasolina/`, `/gasolina/{regular,premium}/`) → **301** a `/`.
 - Precisión declarada en la app: 54 revisiones del owner sin un solo error,
   cota inferior de Wilson 89 % (`verified`) y 86 % (`nearby`).
-- Refresco automático 4×/día (cron 03:17 · 09:17 · 15:17 · 21:17 Lima). Un
-  cambio de código se publica con `gh workflow run … -f force_project=true`.
+- Refresco automático 4×/día (cron 03:17 · 09:17 · 15:17 · 21:17 Lima).
+- **Datos y código van separados en el deploy.** Un push que solo toca `web/`
+  se publica solo, en menos de un minuto: el runner baja el bundle ya publicado
+  (~500 KB), lo verifica por SHA-256 y re-sube el shell. El giga de Osinergmin
+  se paga únicamente cuando cambian los precios (cron) o cuando se fuerza una
+  reproyección: `gh workflow run … -f force_project=true`, obligatorio para
+  cambios de catálogo, contrato o código de `pipeline/`, `app/`, `scripts/`.
+  Un push mixto (`web/` + código de proyección) no despliega y avisa en el log.
+  Para re-publicar el shell a mano: `-f deploy_shell=true`.
 
 ## Cómo funciona el flujo (lo que hay que saber para operar)
 
@@ -51,8 +58,8 @@ producción o en el repo, salvo lo marcado como pendiente.
    `web/offer-card.js`, `web/styles.css`, `web/index.html`.
    **Además:** quitar la leyenda `#offers-note` («Estación sin nombre
    verificado») sobre la lista, y revisar el resto de textos.
-2. **Separar «datos» de «código» en el deploy.** Un cambio de `web/` no debería
-   bajar el giga: reusar el bundle publicado y re-subir solo el shell.
+2. ~~Separar «datos» de «código» en el deploy.~~ Hecho el 25/08:
+   `scripts/fetch-live-bundle.mjs` + camino `deploy_existing_bundle`.
 3. Después: aportes de usuarios + catálogo en D1 (`docs/aportes.md`, diseño
    listo, **no** implementar aún); marca desde directorios first-party; los 169
    sin nombre.
