@@ -250,6 +250,28 @@ El enlace PRICE visible en Facilito redirige a una biblioteca documental. En la 
 
 J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique distribuidor, marca, fecha y rangos de sus 444 filas públicas. La capa GIS 31 que se suponía asociada tampoco existe.
 
+## Cadencia de la fuente y frescura — medido el 25–26/08/2026
+
+**La fuente es semanal.** `CL-Registro-precios-DMA-V-CCA-CCE.csv` cambió de `Last-Modified` **mar. 18 ago 12:28:58 GMT** a **mar. 25 ago 12:29:26 GMT** (ETag `,238` → `,245`), y las cuatro sondas HEAD del lunes 24 devolvieron `unchanged`. El archivo del martes contiene registros hasta el lunes 23:59 Lima (`source_max_reported_at` 2026-08-25T04:54:33Z). Un precio cambiado un miércoles aparece el martes siguiente: hasta 6 días de retraso, que ningún cron nuestro puede acortar. La carpeta se llama `Reporte-Diario`, pero se publica semanalmente. Distribución en el bundle del 25/08: 522 de 715 grifos registraron el lunes 24 (ajuste semanal de las cadenas), 43 el 25, 128 entre 3 y 6 días, 14 con más de una semana.
+
+**Qué es `FECHA_DE_REGISTRO`.** Por RCD 050-2017-OS/CD (leída del PDF firmado, art. 1 que modifica el art. 2 del Anexo A del procedimiento PRICE de 2005) el registro «debe ser actualizado inmediatamente después de los cambios efectuados en la lista de precios» del establecimiento, y «los precios registrados en el PRICE deben ser iguales a los que son publicados en su establecimiento». El procedimiento vigente, RCD 256-2021-OS/CD (deroga la 394-2005; modificada por RCD 051-2023-OS/CD, que añade alertas de cumplimiento), conserva la regla en su art. 3: el registro se actualiza inmediatamente cuando el precio se modifica. Conclusión: la fecha de registro es, por norma, el **inicio de vigencia** del precio en el surtidor. La app puede decir «precio desde el <fecha>»; lo que no puede afirmar es cuánto tardó el archivo semanal en recogerlo.
+
+**Fuentes evaluadas para una frescura ≤ 24 h** (cuatro agentes de lectura pública, 26/08; ninguna sonda escribió ni saltó controles):
+
+| Canal | Frescura | Automatizable | Motivo |
+|---|---|---|---|
+| CSV semanal de `Reporte-Diario` (actual) | martes; hasta 6 días | sí | única fuente oficial nominal por establecimiento |
+| `CL-Registro-precios-DMIN.csv` (misma carpeta) | mismo sello semanal | sí | distribuidores minoristas, no grifos |
+| Otras rutas de `SCOP-DOCS` | — | — | variantes probadas 404; el listado SharePoint exige autenticación |
+| Facilito web | horas (lee PRICE) | no | formulario Struts con reCAPTCHA v3 |
+| Facilito app | horas | no | sin API pública; no se decompila |
+| PRICE/SCOP (`pvo.osinergmin.gob.pe`) | inmediato | no | credenciales de operador |
+| datosabiertos.gob.pe «Lista de precios diaria» | mensual | sí | anonimizado: sin establecimiento |
+| Precios de referencia PR1/PR2 | semanal | condicional | promedios nacionales, no por grifo |
+| ArcGIS de Osinergmin | — | — | `gis.osinergmin.gob.pe` no resuelve; `gisem` 404 |
+
+**Decisión.** Se mantiene el CSV semanal y la app declara la cadencia (fecha del registro en cada tarjeta y fecha del archivo sobre la lista). Dos caminos legítimos hacia ≤ 24 h, ninguno técnico: pedir a Osinergmin la publicación diaria del reporte o un acceso al módulo PRICE, y los aportes de usuarios como evidencia junto al precio oficial (`docs/aportes.md`). El cron sigue sondeando 4×/día: sus logs registran `Last-Modified` y confirmarán si la cadencia es martes fijo.
+
 ## Modelo útil
 
 ```text

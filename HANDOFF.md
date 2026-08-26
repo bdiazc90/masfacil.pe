@@ -84,6 +84,21 @@ desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
    listo, **no** implementar aún); marca desde directorios first-party; los 169
    sin nombre.
 
+## Frescura de precios (medido y decidido el 26/08/2026)
+
+- La fuente oficial automatizable es **semanal**: el CSV de `Reporte-Diario`
+  se regenera los martes ~07:30 Lima (18 y 25 ago; cuatro sondas del lunes 24
+  sin cambio) y trae registros hasta el lunes 23:59. Un cambio de mitad de
+  semana tarda hasta 6 días. Facilito sí muestra el registro PRICE en horas,
+  pero no tiene API pública y su web lleva reCAPTCHA: no se automatiza.
+- Por norma (RCD 050-2017 y 256-2021-OS/CD, art. 3) el grifo registra el cambio
+  **inmediatamente** y el precio registrado debe ser igual al del surtidor:
+  `FECHA_DE_REGISTRO` es el inicio de vigencia. La tarjeta puede decir «Precio
+  desde el 24 ago.» con verdad. Detalle en `docs/datos.md`.
+- Camino a ≤ 24 h: pedir a Osinergmin la publicación diaria (la carpeta se llama
+  «Reporte-Diario» y se publica semanal) o un acceso; y los aportes de usuarios
+  (`docs/aportes.md`) como evidencia junto al precio oficial.
+
 ## Decisiones que no se reabren
 
 - Google Maps como fuente de identidad está **autorizado por Bruno** (23/08);
