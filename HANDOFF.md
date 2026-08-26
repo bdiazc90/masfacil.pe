@@ -29,6 +29,23 @@ desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
   Un push mixto (`web/` + código de proyección) no despliega y avisa en el log.
   Para re-publicar el shell a mano: `-f deploy_shell=true`.
 
+## Dominio y borde (configurado el 25–26/08/2026)
+
+- Registrar Punto.pe; DNS y borde en Cloudflare (nameservers `clayton` y
+  `treasure`). Pages tiene como custom domains `masfacil.pe` y `www.masfacil.pe`.
+- Una sola URL canónica: `https://masfacil.pe/`. Redirect Rule de zona
+  `www → apex` (301, conserva query) y Bulk Redirect de cuenta
+  `masfacil-pe.pages.dev → masfacil.pe` (301, sin subdominios: los previews
+  `<hash>.masfacil-pe.pages.dev` siguen sirviendo para depurar).
+- SSL Full (strict), TLS 1.3 activo, HTTP→HTTPS 301. Sin correo: MX nulo,
+  `v=spf1 -all` y DMARC `p=reject`.
+- **Pendiente:** DNSSEC habilitado en Cloudflare, esperando que Punto.pe
+  publique el DS (ticket abierto el 26/08; comprobar con
+  `dig DS masfacil.pe @1.1.1.1 +short`). **HSTS** recién a partir del
+  2/09/2026 si nada falló: max-age 6 meses, subdominios sí, preload no.
+- PWA instalable: iconos PNG 192/512 + maskable + `apple-touch-icon`,
+  manifest con `id` y `scope` en `/`. Instalada por Bruno desde `masfacil.pe`.
+
 ## Cómo funciona el flujo (lo que hay que saber para operar)
 
 - **Datos:** Osinergmin publica UN CSV de 1.078 GB con todo el Perú. El refresh
