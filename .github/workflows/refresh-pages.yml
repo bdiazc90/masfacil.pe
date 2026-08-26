@@ -48,6 +48,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+      # Origen público canónico (https://masfacil.pe). Si falta, cae al pages.dev del proyecto.
+      PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
       BOOTSTRAP_SEED_B64: ${{ secrets.BOOTSTRAP_SEED_B64 }}
       COMMERCIAL_IDENTITY_B64: ${{ secrets.COMMERCIAL_IDENTITY_B64 }}
     steps:
@@ -64,7 +66,7 @@ jobs:
           test -n "$CLOUDFLARE_PAGES_PROJECT"
           test -n "$BOOTSTRAP_SEED_B64"
       - name: Recuperar el bundle público ya verificado (~500 KB)
-        run: npm run fetch:live -- "https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
+        run: npm run fetch:live -- "${PUBLIC_ORIGIN:-https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev}"
       - name: Instalar bootstrap privado mínimo
         run: npm run seed:install -- --target "$RUNNER_TEMP/seed-reference"
       - name: Instalar identidad comercial verificada

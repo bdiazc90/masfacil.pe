@@ -6,7 +6,10 @@ producción o en el repo, salvo lo marcado como pendiente.
 
 ## Producción, ahora mismo
 
-`https://masfacil-pe.pages.dev/` — home directo, schema público **2.3.0**.
+`https://masfacil.pe/` — dominio propio (Punto.pe, DNS en Cloudflare) desde el
+25/08/2026; `masfacil-pe.pages.dev` sigue vivo como alias del mismo proyecto.
+Home directo, schema público **2.3.0**. El pipeline lee el bundle publicado
+desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
 
 - **715 ofertas**, todas con dirección; **545 con nombre** (374 `verified`,
   171 `nearby` marcadas «por confirmar»); 170 sin nombre con fallback honesto.
