@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { decodeSeed } from '../app/bootstrap-seed.mjs';
 import { buildGasolinaProduct, GASOLINA_PRODUCTS } from './gasolina-products.mjs';
 import { GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, sha256, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from './gasolina-contract.mjs';
-import { buildCommercialCatalogIndex, emptyCommercialCatalog, loadValidatedCommercialCatalog } from '../app/commercial-catalog.mjs';
-import { assertCommercialPublicationReady, loadValidatedCommercialAudit } from '../app/commercial-audit.mjs';
+import { buildCommercialCatalogIndex, emptyCommercialCatalog, loadValidatedCommercialCatalog, staleBrandEvidence } from '../app/commercial-catalog.mjs';
+import { assertCommercialPublicationReady, brandAccreditationGroups, loadValidatedCommercialAudit } from '../app/commercial-audit.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stable = (value) => `${JSON.stringify(value)}\n`;
@@ -60,8 +60,13 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
     bootstrapSeed,
   };
   const results = Object.fromEntries(await Promise.all(GASOLINA_KEYS.map(async (key) => [key, await buildGasolinaProduct({ ...input, productKey: key })])));
-  const catalogIndex = buildCommercialCatalogIndex(commercialCatalog, GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)));
-  const revisionId = `gasolina-${pointer.snapshot_id}-identity-v1`;
+  const brandGroups = brandAccreditationGroups(commercialCatalog, commercialAudit);
+  const catalogIndex = buildCommercialCatalogIndex(commercialCatalog, {
+    registryIds: GASOLINA_KEYS.flatMap((key) => [...results[key].registryAnchors]),
+    offerIds: GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)),
+    approvedBrandMethods: brandGroups.approved,
+  });
+  const revisionId = `gasolina-${pointer.snapshot_id}-identity-v2`;
   const datasets = {};
   const bodies = {};
   const descriptors = {};
@@ -95,7 +100,10 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
   const errors = [...validateGasolinaManifest(manifest), ...validateGasolinaRefreshState(refreshState, manifest)];
   for (const key of GASOLINA_KEYS) errors.push(...validateGasolinaBundle(manifest, key, bodies[key]));
   if (errors.length) throw new Error(`Contrato gasolina inválido: ${[...new Set(errors)].join('; ')}`);
-  return { manifest, refreshState, datasets, bodies, results, catalog: catalogIndex.metrics, bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
+  // Cada identidad sin oferta viene con la etapa en la que se perdió por producto:
+  // Regular y Premium pueden caerse por motivos distintos, así que se anotan los dos.
+  const catalogWithoutOffer = catalogIndex.withoutOffer.map((id) => Object.fromEntries([['id', id], ...GASOLINA_KEYS.map((key) => [key, results[key].exclusions.get(id) ?? 'fuera_del_registro_del_producto'])]));
+  return { manifest, refreshState, datasets, bodies, results, catalog: catalogIndex.metrics, catalogWithoutOffer, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
 }
 
 export function loadCommercialPublicationInputs(root) {
@@ -127,7 +135,25 @@ export function writeGasolinaProjection(candidate, { root = rootFromModule, outp
   }
   atomic(path.join(outputRoot, 'refresh-state.json'), stable(candidate.refreshState));
   atomic(path.join(outputRoot, 'manifest.json'), stable(candidate.manifest));
+  writeCommercialCoverage(candidate, root);
   return candidate;
+}
+
+// Las identidades acreditadas que hoy no tienen oferta vigente no se borran ni
+// se publican: quedan anotadas en la caché privada para poder revisarlas.
+export function writeCommercialCoverage(candidate, root = rootFromModule) {
+  const file = path.join(root, '.local-cache', 'publish', 'commercial-identity-coverage.json');
+  const report = {
+    revision_id: candidate.manifest.revision_id,
+    generated_at: candidate.manifest.generated_at,
+    metrics: candidate.catalog,
+    without_current_offer: candidate.catalogWithoutOffer ?? [],
+    brand_groups: candidate.brandGroups ?? [],
+    brand_evidence_review_queue: candidate.brandEvidenceQueue ?? [],
+  };
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  return file;
 }
 
 export async function projectGasolina({ root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina') } = {}) {
@@ -136,5 +162,5 @@ export async function projectGasolina({ root = rootFromModule, outputRoot = path
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) projectGasolina()
-  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes\n`))
+  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca, ${result.catalog.projected_with_accredited_brand} con logo, ${result.catalog.without_current_offer} sin oferta vigente\n`))
   .catch((error) => { process.stderr.write(`No se publicó gasolina: ${error.message}\n`); process.exitCode = 1; });

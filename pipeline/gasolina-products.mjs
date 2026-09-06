@@ -119,7 +119,16 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
     return { selected, priceConflict: pricesAtLatest.size !== 1, territoryConflict: territories.size !== 1 };
   }).filter((item) => item.selected);
   const latestLima = latest.filter((item) => lima(item.selected));
-  const cutoff = new Date(cutoffAt); const fresh = latestLima.filter((item) => item.selected.time && item.selected.time <= cutoff && item.selected.time >= new Date(cutoff.getTime() - 30 * 86400000) && !item.priceConflict && !item.territoryConflict && item.selected.numericPrice > 0);
+  const cutoff = new Date(cutoffAt); const desde = new Date(cutoff.getTime() - 30 * 86400000);
+  // Dos motivos distintos que conviene no confundir al descartar un reporte: la
+  // estación dejó de reportar y su último dato quedó fuera de la ventana de 30
+  // días, o la fuente se contradice a sí misma en precio o territorio.
+  const motivoNoFresco = (item) => {
+    if (!item.selected.time || item.selected.time > cutoff || item.selected.time < desde) return 'reporte_vencido';
+    if (item.priceConflict || item.territoryConflict || !(item.selected.numericPrice > 0)) return 'conflicto_precio_o_territorio';
+    return null;
+  };
+  const fresh = latestLima.filter((item) => !motivoNoFresco(item));
   const registered = fresh.map((item) => ({ ...item, matches: byRegistry.get(`${activities[item.selected.ACTIVIDAD]}${sep}${item.selected.REGISTRO_DE_HIDROCARBUROS}`) ?? [] })).filter((item) => item.matches.length === 1 && lima(item.matches[0]) && item.matches[0].DISTRITO === item.selected.DISTRITO);
   const geo = registered.map((item) => { const matches = byGis.get(item.selected.REGISTRO_DE_HIDROCARBUROS) ?? []; const coordinate = matches.length === 1 ? matches[0] : null; const longitude = Number(coordinate?.LONGITUDE); const latitude = Number(coordinate?.LATITUDE); return { ...item, coordinate, longitude, latitude }; }).filter((item) => item.coordinate && lima(item.coordinate) && item.coordinate.DISTRITO === item.selected.DISTRITO && Number.isFinite(item.longitude) && item.longitude >= -82 && item.longitude <= -68 && Number.isFinite(item.latitude) && item.latitude >= -19 && item.latitude <= 1);
   const targetIds = new Set(geo.map((item) => item.selected.ID3)); const identities = new Map(); let rawHeader;
@@ -143,5 +152,24 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
     latitude: item.latitude,
   })).sort((a, b) => a.id.localeCompare(b.id));
   const metric = (items) => ({ offers: items.length, districts: new Set(items.map((item) => item.selected?.DISTRITO ?? item.district)).size });
-  return { product, offers, metrics: { exact_scope_source_rows: sourceRows, latest_offers: metric(latest), latest_lima_lima: metric(latestLima), fresh_0_30_days: metric(fresh), registry_exact: metric(registered), gis_safe: metric(geo), contract_ready: metric(ready), coverage_percent: fresh.length ? Number((ready.length / fresh.length * 100).toFixed(3)) : 0, conflicts: { latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length, latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length, registry_excluded: fresh.length - registered.length, gis_excluded: registered.length - geo.length, identity_excluded: geo.length - ready.length } }, context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl } };
+  // El universo del Registro es la referencia oficial contra la que se valida
+  // la identidad comercial. No depende de que hoy haya precio vigente: una
+  // estación que deja de reportar sigue existiendo en el Registro.
+  const registryAnchors = new Set(registry.map((row) => clean(row.REGISTRO)).filter(Boolean).map(officialAnchorFromRegistration));
+  // Que una identidad no llegue a oferta ya no bloquea, pero sigue mereciendo
+  // explicación: sin esta traza el hueco solo se ve como un número y no se puede
+  // decidir si sobra la identidad o falta el dato. Se anota la etapa MÁS profunda
+  // que alcanzó cada anchor del Registro.
+  const anchorDe = (item) => { const registro = clean(item.selected.REGISTRO_DE_HIDROCARBUROS); return registro ? officialAnchorFromRegistration(registro) : null; };
+  const anchorsDe = (items) => new Set(items.map(anchorDe).filter(Boolean));
+  const publicados = anchorsDe(ready);
+  const noFrescos = new Map();
+  for (const item of latestLima) { const anchor = anchorDe(item); const motivo = motivoNoFresco(item); if (anchor && motivo && !noFrescos.has(anchor)) noFrescos.set(anchor, motivo); }
+  const etapas = [['sin_razon_social_o_direccion', anchorsDe(geo)], ['sin_gis_unico', anchorsDe(registered)], ['no_cruza_registro', anchorsDe(fresh)]];
+  const exclusions = new Map();
+  for (const anchor of registryAnchors) {
+    if (publicados.has(anchor)) continue;
+    exclusions.set(anchor, etapas.find(([, alcanzados]) => alcanzados.has(anchor))?.[0] ?? noFrescos.get(anchor) ?? 'sin_reporte_en_lima');
+  }
+  return { product, offers, registryAnchors, exclusions, metrics: { exact_scope_source_rows: sourceRows, latest_offers: metric(latest), latest_lima_lima: metric(latestLima), fresh_0_30_days: metric(fresh), registry_exact: metric(registered), gis_safe: metric(geo), contract_ready: metric(ready), coverage_percent: fresh.length ? Number((ready.length / fresh.length * 100).toFixed(3)) : 0, conflicts: { latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length, latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length, registry_excluded: fresh.length - registered.length, gis_excluded: registered.length - geo.length, identity_excluded: geo.length - ready.length } }, context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl } };
 }

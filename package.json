@@ -20,6 +20,9 @@
     "identity:install": "node scripts/identity-install.mjs",
     "identity:pack": "node scripts/identity-pack.mjs",
     "audit:sheet": "node scripts/audit-sheet.mjs",
-    "build:catalog": "node scripts/build-catalog.mjs"
+    "build:catalog": "node scripts/build-catalog.mjs",
+    "brand:directory": "node scripts/brand-directory.mjs",
+    "brand:sample": "node scripts/brand-sample.mjs",
+    "brand:logo": "node scripts/install-brand-logo.mjs"
   }
 }

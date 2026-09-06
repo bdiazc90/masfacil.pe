@@ -1,3 +1,5 @@
+import { brandLogoFor, brandLogoPath } from './brand-logos.js';
+
 export const UNVERIFIED_STATION_LABEL = 'Estación sin nombre verificado';
 
 export const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
@@ -33,6 +35,15 @@ export function stationIdentity(offer) {
 /** Un nombre `nearby` solo tiene cercanía comprobada: se muestra, marcado. */
 export function isUnconfirmedIdentity(offer) {
   return offer?.commercial_identity?.confidence === 'nearby';
+}
+
+// El logo es refuerzo visual de una marca que el nombre ya dice; por eso va con
+// `alt` vacío, para que un lector de pantalla no la repita. Sin marca acreditada
+// —o con nombre «por confirmar»— no hay logo y la tarjeta queda neutral.
+export function brandLogoHtml(offer) {
+  const logo = brandLogoFor(offer?.commercial_identity);
+  if (!logo) return '';
+  return `<img class="offer__brand" src="${escapeHtml(brandLogoPath(logo.slug))}" alt="" width="${logo.width}" height="${logo.height}" loading="lazy" decoding="async">`;
 }
 
 export function displayDistrict(district) {
@@ -96,5 +107,5 @@ export function renderOfferCard(offer, { withDistance = true, directionsUrl = nu
   // El `tabindex="-1"` no entra al tabulador: es el destino de foco al paginar.
   const address = offer.address ? escapeHtml(offer.address) : '';
   const frescura = ago(offer.age_days);
-  return `<li class="offer glass" tabindex="-1">${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${frescura[0].toLocaleUpperCase('es-PE')}${frescura.slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
+  return `<li class="offer glass" tabindex="-1">${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${brandLogoHtml(offer)}${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${frescura[0].toLocaleUpperCase('es-PE')}${frescura.slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
 }

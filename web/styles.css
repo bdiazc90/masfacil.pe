@@ -105,7 +105,15 @@ h1,h2,h3,p{margin-top:0}
 .controls{padding:0 var(--s3)}
 .controls[data-state="compact"],.controls[data-state="overlay"]{position:fixed;top:var(--controls-top);left:50%;transform:translateX(-50%);width:min(100% - 2*var(--s4),520px - 2*var(--s4));z-index:5;background:color-mix(in srgb,var(--card) var(--controls-fixed-fill),transparent);box-shadow:var(--controls-fixed-shadow)}
 .controls-scrim{position:fixed;inset:0;z-index:4}
-.controls__summary{display:flex;align-items:center;gap:var(--s2);width:100%;min-height:var(--controls-compact-h);padding:0;border:0;background:transparent;color:var(--foreground);text-align:left;border-radius:inherit}
+.controls__bar{display:flex;align-items:center;gap:var(--s1)}
+.controls__summary{display:flex;align-items:center;gap:var(--s2);flex:1;min-width:0;min-height:var(--controls-compact-h);padding:0;border:0;background:transparent;color:var(--foreground);text-align:left;border-radius:inherit}
+/* Acceso directo a «Actualizar ubicación» en la barra compacta: botón propio,
+   no anidado dentro de «Ajustar», con etiqueta accesible y área de 44 px. Ocupa
+   el sitio del logo, que ahí solo decoraba, para no comerle ancho al resumen. */
+.controls__quick{display:grid;place-items:center;flex-shrink:0;width:44px;min-height:44px;padding:0;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);color:var(--accent)}
+.controls__bar:has(>.controls__quick:not([hidden])) .controls__summary .brand__logo{display:none}
+.controls__quick:disabled{cursor:progress;opacity:.55}
+.controls__quick-icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .controls__text{flex:1;display:flex;gap:.3em;min-width:0;font-size:14px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
 .controls__place{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .controls__criteria{white-space:nowrap;flex-shrink:0;color:var(--muted-foreground);font-weight:500}
@@ -114,17 +122,21 @@ h1,h2,h3,p{margin-top:0}
 .controls__panel{display:grid;grid-template-rows:1fr}
 .controls__inner{min-height:0;overflow:hidden;display:grid;gap:var(--s3);padding:var(--s2) 3px var(--s3);margin:0 -3px}
 .controls__done{justify-self:end;display:inline-flex;align-items:center;gap:2px;min-height:36px;margin-top:calc(-1 * var(--s2))}
-.controls:not([data-state="compact"]) .controls__summary{display:none}
+.controls:not([data-state="compact"]) .controls__bar{display:none}
 .controls[data-state="full"] .controls__done{display:none}
 .controls[data-state="compact"] .controls__panel{grid-template-rows:0fr;visibility:hidden}
 .controls[data-state="compact"] .controls__inner{padding-block:0}
 .controls:not([data-screen="compare"]) :is(.place,.radius,.toggle,.controls__done){display:none}
-.place{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:0 2px}
+.place{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s1) var(--s3);padding:0 2px}
 .place__where{display:flex;align-items:center;gap:var(--s2);min-width:0}
 .place__label,.radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .place__value{display:flex;align-items:center;gap:6px;margin:0;min-width:0;font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
 .place__value span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .place__icon{width:17px;height:17px;flex-shrink:0;color:var(--accent)}
+/* En 360 px los dos accesos no caben junto al lugar: la fila envuelve y las
+   acciones bajan enteras en vez de recortarse. */
+.place__actions{display:flex;align-items:center;gap:var(--s3);margin-left:auto}
+.place__actions .button--text{white-space:nowrap;min-height:40px}
 .radius{display:grid;gap:2px}
 .radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
 .radius__readout{margin:0;font-size:14px;font-weight:700}
@@ -172,6 +184,11 @@ h3{font-size:16px;margin-bottom:6px}
 /* ── Resultados ────────────────────────────────────────────────────── */
 .screen-flow--results{display:block}
 .offline-note{margin:var(--s4) 2px 0;color:var(--muted-foreground);font-size:13px;line-height:1.4}
+/* Aviso de «Actualizar ubicación»: la lista sigue debajo, con o sin éxito. */
+.location-update{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);margin:var(--s4) 2px 0}
+.location-update__text{margin:0;color:var(--muted-foreground);font-size:13px;line-height:1.4}
+.location-update[data-status="error"] .location-update__text{color:var(--foreground);font-weight:600}
+.location-update .button--text{flex-shrink:0;white-space:nowrap;min-height:36px;padding-block:0}
 .offers{display:grid;gap:var(--s3);list-style:none;margin:var(--s4) 0 0;padding:0}
 .screen-flow--results .empty,.about{margin-top:var(--s4)}
 #load-more{width:100%;margin-top:var(--s3)}
@@ -202,6 +219,9 @@ h3{font-size:16px;margin-bottom:6px}
 .offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
 .offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
 .offer__identity{font-size:16px;font-weight:700;line-height:1.35}
+/* Logo oficial sin retocar, sobre una placa clara: así conserva sus colores
+   de marca y se lee igual en tema claro y en oscuro. */
+.offer__brand{display:inline-block;vertical-align:-3px;margin-right:6px;padding:2px 4px;border-radius:4px;background:#fff;box-shadow:0 0 0 1px color-mix(in srgb,var(--border) 18%,transparent)}
 .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
 .offer__address{font-size:14.5px;line-height:1.35;text-align:right}
 .offer__freshness,.offer__district{color:var(--muted-foreground);font-size:13.5px}

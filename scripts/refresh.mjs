@@ -354,10 +354,11 @@ async function run() {
       revision_id: projection.manifest.revision_id,
       source_max_reported_at: projection.refreshState.source_max_reported_at,
       products: Object.fromEntries(Object.entries(projection.results).map(([key, value]) => [key, { metrics: value.metrics, public_snapshot: projection.manifest.products[key] }])),
+      commercial_identity: { ...projection.catalog, without_current_offer_detail: projection.catalogWithoutOffer, brand_groups: projection.brandGroups, brand_evidence_review_queue: projection.brandEvidenceQueue },
       quality,
     };
     fs.writeFileSync(path.join(stage, 'gasolina-validation.json'), `${JSON.stringify(validation, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    const report = { schema_version: 2, status: quality.status, detection, active_before: active, download: downloaded, lineage, reference_inputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' }, quality, staging_path: path.relative(root, stage), dataset: { snapshot_date: snapshotDate, offers: built.dataset.offers.length }, gasolina: { revision_id: projection.manifest.revision_id, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: projection.results[key].metrics.contract_ready.districts }])) } };
+    const report = { schema_version: 2, status: quality.status, detection, active_before: active, download: downloaded, lineage, commercial_identity: projection.catalog, reference_inputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' }, quality, staging_path: path.relative(root, stage), dataset: { snapshot_date: snapshotDate, offers: built.dataset.offers.length }, gasolina: { revision_id: projection.manifest.revision_id, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: projection.results[key].metrics.contract_ready.districts }])) } };
     fs.writeFileSync(path.join(stage, 'refresh-report.json'), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
     if (quality.status === 'needs_review') return { ...report, promoted: false, staging_path: path.relative(root, stage) };
 

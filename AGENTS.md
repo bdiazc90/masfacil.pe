@@ -83,6 +83,10 @@ npm run publish
 npm run rollback
 npm run audit
 npm run dump:establishments
+npm run brand:directory -- fetch <marca>
+npm run brand:directory -- match
+npm run brand:sample
+npm run brand:logo -- <slug> <archivo.svg> <url> <AAAA-MM-DD>
 ```
 
 ## Mapa

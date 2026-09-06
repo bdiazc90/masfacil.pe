@@ -11,6 +11,11 @@ producción o en el repo, salvo lo marcado como pendiente.
 Home directo, schema público **2.3.0**. El pipeline lee el bundle publicado
 desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
 
+> **Al 6/09/2026 producción sirve el bundle del 29 de agosto** (revisión
+> `…-2026-08-29-…-identity-v1`): ocho días de atraso por el fallo del refresco,
+> ya arreglado. En local está proyectado y verificado el snapshot del 6/09 con
+> schema **2.4.0**. **El deploy no está hecho: espera autorización de Bruno.**
+
 - **715 ofertas**, todas con dirección; **545 con nombre** (374 `verified`,
   171 `nearby` marcadas «por confirmar»); 170 sin nombre con fallback honesto.
 - Una tarjeta por grifo con **Regular y Premium**; radio de búsqueda adaptativo
@@ -48,20 +53,48 @@ desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
 
 ## Cómo funciona el flujo (lo que hay que saber para operar)
 
-- **Datos:** Osinergmin publica UN CSV de 1.078 GB con todo el Perú. El refresh
+- **Datos:** Osinergmin publica UN CSV de ~1.22 GB con todo el Perú. El refresh
   pregunta con HEAD si cambió (0 bytes); solo baja si cambió. Lima se filtra a
-  717 establecimientos. Registro y GIS van en un seed (`BOOTSTRAP_SEED_B64`).
+  ~720 establecimientos. Registro y GIS van en un seed (`BOOTSTRAP_SEED_B64`).
+- **Universo del Registro ≠ ofertas vigentes** (arreglado el 6/09/2026). El
+  índice comercial recibía la unión de IDs de las ofertas ya filtradas como si
+  fuera el universo válido: una estación que dejaba de reportar precio salía de
+  esa unión, pasaba a «ID desconocido» y tumbaba la corrida entera. Fueron 27
+  fallos seguidos desde el 30/08 con producción congelada en el bundle del 29.
+  Ahora la identidad se VALIDA contra el Registro (744 anchors Lima/Lima, del
+  seed o de las tablas locales) y se PROYECTA solo sobre las ofertas que hoy
+  existen. Las identidades sin oferta se conservan en privado, en
+  `.local-cache/publish/commercial-identity-coverage.json`. Un ID ajeno al
+  Registro sigue bloqueando.
 - **Identidad comercial:** catálogo privado en `.local-cache/identity/`, viaja
-  al CI en el secret `COMMERCIAL_IDENTITY_B64` (gzip; **43.5 de 48 KB**: casi
-  lleno). Se regenera con `npm run build:catalog` y se sube con
-  `npm run identity:pack | gh secret set COMMERCIAL_IDENTITY_B64 --env pages-production`.
-- **Gate de publicación:** `app/commercial-audit.mjs` v2 exige muestra por
-  tier (≥20 revisiones) con cota recalculada; nada se publica sin pasar.
+  al CI en el secret `COMMERCIAL_IDENTITY_B64`. **Ya no cabe en uno solo:**
+  53.252 bytes contra un límite de 48 KB. `npm run identity:pack` lo parte y
+  deja los trozos en `.local-cache/identity/identity-secret-parts/`; el CI los
+  reensambla desde `COMMERCIAL_IDENTITY_B64`, `_2`, `_3`. Si falta una parte o
+  llegan desordenadas el gunzip falla y no se publica: la partición se verifica
+  sola. `npm run identity:pack -- --measure` dice si todavía cabe en uno.
+- **Gate de publicación:** `app/commercial-audit.mjs` **v3**. Cada veredicto
+  declara qué AFIRMACIÓN revisó (`claim`: `name` o `brand`) y su hash cubre solo
+  los campos de esa afirmación: incorporar una marca no hereda el visto bueno
+  del nombre, y corregir un nombre no invalida una bandera aprobada. Tiers de
+  nombre por confianza (≥20 revisiones); tiers de bandera por método de
+  acreditación (umbral 0.90, muestra 35 o el grupo entero si es menor). Un grupo
+  de bandera que no pasa **no bloquea la publicación**: pierde el logo y su
+  marca se sigue publicando como texto.
+- **Compatibilidad:** el contrato acepta catálogo 1.2.0 y 1.3.0, y auditoría
+  2.0.0 y 3.0.0. Con el secret viejo todo sigue publicando igual que hoy, sin
+  logos. No hace falta recargar el secret para desplegar.
 - **Cache entre corridas:** `actions/cache` guarda `.local-cache/snapshots`.
   Medido: un `force_project` con cache caliente tarda **4 min 52 s**; sin
   cache, 27 min. El giga solo se baja cuando hay precios nuevos.
 - **Local:** `npm run serve` en `:4173`. En Chrome, DevTools → Application →
   Service Workers → «Bypass for network», o el SW sirve el shell viejo.
+- **Refresco rechazado:** `scripts/publish.mjs` conserva la causa original.
+  Antes, un rechazo del refresh llegaba por stderr, el parseo de stdout fallaba
+  y la excepción tapaba el motivo real sin dejar `refresh-result.json`; el paso
+  de CI se caía después leyendo un archivo que no existía. Ahora cualquier
+  salida produce un resultado estructurado, siempre se escribe el archivo y CI
+  informa si aun así faltara.
 
 ## Roadmap corto, decidido por Bruno
 
@@ -80,9 +113,15 @@ desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
    verificado») sobre la lista, y revisar el resto de textos.
 2. ~~Separar «datos» de «código» en el deploy.~~ Hecho el 25/08:
    `scripts/fetch-live-bundle.mjs` + camino `deploy_existing_bundle`.
-3. Después: aportes de usuarios + catálogo en D1 (`docs/aportes.md`, diseño
-   listo, **no** implementar aún); marca desde directorios first-party; los 169
-   sin nombre.
+3. ~~Marca desde directorios first-party.~~ Repsol hecho el 6/09: su padrón
+   oficial (`scripts/brand-directory.mjs`) acredita 110 establecimientos y la
+   marca publicada sube de 138 a 197 de 717. Primax exige autenticación en su
+   localizador; AVA y Petroperú cargan por JS. **Los logos siguen apagados**
+   hasta que Bruno revise la muestra de 35 en
+   `.local-cache/identity/brand-sample.html` y devuelva
+   `.local-cache/identity/veredictos-marca.json`.
+4. Después: aportes de usuarios + catálogo en D1 (`docs/aportes.md`, diseño
+   listo, **no** implementar aún); los que siguen sin nombre.
 
 ## Frescura de precios (medido y decidido el 26/08/2026)
 
@@ -104,8 +143,11 @@ desde `vars.PUBLIC_ORIGIN` (`https://masfacil.pe`).
 - Google Maps como fuente de identidad está **autorizado por Bruno** (23/08);
   condiciones en `AGENTS.md`. La coordenada selecciona; confirman número de
   puerta, vía, razón social o el owner.
-- `brand` solo se publica con respaldo de la razón social o `owner_verified`.
-  Un nombre que queda genérico («Grifo») no se publica.
+- `brand` se publica con respaldo de la razón social del operador, del
+  directorio oficial vigente de la cadena o de `owner_verified`. Un nombre que
+  queda genérico («Grifo») no se publica. El **logo** exige además que el grupo
+  de acreditación pase su propia auditoría de bandera: sin eso, la marca sale
+  como texto y sin logo.
 - Un reporte de precio de usuario **nunca** reemplaza el oficial.
 - Auditar por muestra, no entrada por entrada.
 

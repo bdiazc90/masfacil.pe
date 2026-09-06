@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOG_SCHEMA_VERSION } from '../app/commercial-catalog.mjs';
-import { AUDIT_SCHEMA_VERSION, commercialEntrySha256, wilsonLowerBound } from '../app/commercial-audit.mjs';
+import { AUDIT_SCHEMA_VERSION, BRAND_MIN_SAMPLE, BRAND_THRESHOLD, commercialClaimSha256, wilsonLowerBound } from '../app/commercial-audit.mjs';
 import { OFFICIAL_ANCHOR_SCHEME } from '../app/official-anchor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,6 +25,11 @@ const UMBRALES = { verified: 0.80, nearby: 0.70 };
 const RESPONSABLE = 'Bruno Diaz';
 const OBSERVADO = '2026-08-23T20:00:00.000-05:00';
 const REVISADO = '2026-08-24T13:00:00.000-05:00';
+// La revisión de bandera es posterior y propia: no reutiliza la fecha del
+// nombre, para que se vea cuándo se acreditó cada afirmación.
+const REVISADO_MARCA = process.env.REVISADO_MARCA ?? '2026-09-06T12:00:00.000-05:00';
+const CATALOG_ID = process.env.CATALOG_ID ?? 'commercial-identity-catalog-2026-08-24';
+const AUDIT_ID = process.env.AUDIT_ID ?? 'commercial-identity-audit-2026-08-24';
 
 const sinTildes = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 const MARCAS = ['Primax', 'Repsol', 'Pecsa', 'Petroperú', 'Petroperu', 'Terpel', 'Coesti'];
@@ -86,6 +91,17 @@ const veredictos = JSON.parse(fs.readFileSync(path.join(identidad, 'veredictos.j
 const veredictosCandidatos = fs.existsSync(path.join(identidad, 'veredictos-candidatos.json'))
   ? JSON.parse(fs.readFileSync(path.join(identidad, 'veredictos-candidatos.json'), 'utf8')).entradas.map((x) => ({ establishment_id: x.id, result: x.r, selection_reason: 'risk_sample' }))
   : [];
+// Evidencia de bandera acreditada aparte del nombre: directorio oficial vigente
+// o letrero observado. Sin archivo, ninguna marca obtiene logo y todo sigue
+// publicándose como hasta ahora.
+const evidenciaDeMarca = fs.existsSync(path.join(identidad, 'brand-evidence.json'))
+  ? new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(identidad, 'brand-evidence.json'), 'utf8')).entradas))
+  : new Map();
+// Veredictos de BANDERA. Son otra afirmación que la del nombre y por eso viven
+// en su propio archivo: un visto bueno al nombre nunca acredita la marca.
+const veredictosMarca = fs.existsSync(path.join(identidad, 'veredictos-marca.json'))
+  ? JSON.parse(fs.readFileSync(path.join(identidad, 'veredictos-marca.json'), 'utf8')).entradas.map((x) => ({ establishment_id: x.id, result: x.r, selection_reason: x.motivo ?? 'random_sample' }))
+  : [];
 
 const tierDe = (r) => (r.estado === 'verified' ? 'verified' : (r.estado === 'candidate' && r.distancia_m <= RADIO_NEARBY ? 'nearby' : null));
 const publicables = matches.resultados.filter((r) => tierDe(r));
@@ -94,13 +110,17 @@ function construirEntrada(r) {
   const confidence = tierDe(r);
   const operador = marcaDelOperador(r.razon_social);
   const marca = marcaEnNombre(r.nombre_maps);
-  const marcaSoportada = Boolean(marca && operador && sinTildes(marca) === sinTildes(operador));
+  // El directorio oficial de la cadena respalda la bandera igual que el
+  // operador del Registro: si el padrón vigente lista este establecimiento, la
+  // marca del nombre visible deja de estar huérfana.
+  const delDirectorio = evidenciaDeMarca.get(r.establishment_id)?.brand ?? null;
+  const marcaSoportada = Boolean(marca && ((operador && sinTildes(marca) === sinTildes(operador)) || (delDirectorio && sinTildes(marca) === sinTildes(delDirectorio))));
   const nombre = nombreParaPantalla(r.nombre_maps, marcaSoportada);
   if (!nombre) return null;
   const señales = r.señales.map((s) => s.tipo).join('+') || 'proximidad';
   return {
     establishment_id: r.establishment_id,
-    brand: marcaSoportada ? operador : null,
+    brand: marcaSoportada ? (operador ?? delDirectorio) : null,
     public_site_name: nombre,
     confidence,
     source: {
@@ -113,6 +133,7 @@ function construirEntrada(r) {
     entity_link: { method: 'official_establishment_id_exact', status: 'verified', verified_at: REVISADO },
     identity_freshness: 'current',
     publication: { status: 'publishable', reviewed_at: REVISADO, responsible: RESPONSABLE },
+    brand_evidence: null,
   };
 }
 
@@ -140,32 +161,73 @@ for (const entrada of entradas) {
   entrada.entity_link = { ...entrada.entity_link, verified_at: fix.observed_at };
   entrada.publication = { ...entrada.publication, reviewed_at: fix.observed_at };
 }
+// El directorio oficial acredita la bandera. Donde el catálogo ya publica otra
+// marca no se sobrescribe: eso es un conflicto y se registra sin acreditar nada.
+const conflictosDeMarca = [];
+const conNombre = new Set(entradas.map((e) => e.establishment_id));
+for (const entrada of entradas) {
+  const evidencia = evidenciaDeMarca.get(entrada.establishment_id);
+  if (!evidencia) continue;
+  if (entrada.brand && sinTildes(entrada.brand) !== sinTildes(evidencia.brand)) { conflictosDeMarca.push({ establishment_id: entrada.establishment_id, catalogo: entrada.brand, directorio: evidencia.brand }); continue; }
+  entrada.brand = evidencia.brand;
+  entrada.brand_evidence = { method: evidencia.method, reference: evidencia.reference, evidenced_at: evidencia.evidenced_at, consulted_at: evidencia.consulted_at };
+}
+// Un establecimiento del padrón oficial sin ficha de nombre utilizable sigue
+// teniendo bandera acreditada: se publica la marca sin nombre de sede, que el
+// contrato admite y la tarjeta sabe presentar.
+const soloMarca = [...evidenciaDeMarca.entries()].filter(([id]) => !conNombre.has(id)).map(([establishment_id, evidencia]) => ({
+  establishment_id,
+  brand: evidencia.brand,
+  public_site_name: null,
+  confidence: 'verified',
+  source: {
+    kind: 'first_party',
+    source_or_description: evidencia.reference,
+    acquisition_method: 'first_party_publication',
+    observed_at: evidencia.evidenced_at,
+    responsible: RESPONSABLE,
+  },
+  entity_link: { method: 'official_establishment_id_exact', status: 'verified', verified_at: REVISADO_MARCA },
+  identity_freshness: 'current',
+  publication: { status: 'publishable', reviewed_at: REVISADO_MARCA, responsible: RESPONSABLE },
+  brand_evidence: { method: evidencia.method, reference: evidencia.reference, evidenced_at: evidencia.evidenced_at, consulted_at: evidencia.consulted_at },
+}));
+entradas.push(...soloMarca);
+entradas.sort((a, b) => a.establishment_id.localeCompare(b.establishment_id));
 const catalogo = {
   schema_version: CATALOG_SCHEMA_VERSION,
-  catalog_id: 'commercial-identity-catalog-2026-08-24',
+  catalog_id: CATALOG_ID,
   anchor_scheme: OFFICIAL_ANCHOR_SCHEME,
   entries: entradas,
 };
 
 // La auditoría solo puede hablar de entradas que existan en el catálogo.
 const porAnchor = new Map(entradas.map((e) => [e.establishment_id, e]));
-const revisadas = [...veredictos, ...veredictosCandidatos]
-  .filter((v) => porAnchor.has(v.establishment_id))
-  .map((v) => {
-    const entrada = porAnchor.get(v.establishment_id);
-    return {
-      establishment_id: v.establishment_id,
-      entry_sha256: commercialEntrySha256(entrada),
-      confidence: entrada.confidence,
-      selection_reason: v.selection_reason ?? 'random_sample',
-      reviewer: RESPONSABLE,
-      reviewed_at: REVISADO,
-      result: v.result,
-    };
-  });
+const veredictoA = (v, claim, revisadoEn) => {
+  const entrada = porAnchor.get(v.establishment_id);
+  return {
+    establishment_id: v.establishment_id,
+    // El hash cubre solo los campos de esta afirmación: incorporar una marca no
+    // hereda el visto bueno del nombre ni al revés.
+    entry_sha256: commercialClaimSha256(entrada, claim),
+    claim,
+    confidence: entrada.confidence,
+    selection_reason: v.selection_reason ?? 'random_sample',
+    reviewer: RESPONSABLE,
+    reviewed_at: revisadoEn,
+    result: v.result,
+  };
+};
+const revisadas = [
+  // Un veredicto de nombre solo vale sobre una entrada que publica nombre.
+  ...[...veredictos, ...veredictosCandidatos].filter((v) => porAnchor.get(v.establishment_id)?.public_site_name).map((v) => veredictoA(v, 'name', REVISADO)),
+  ...veredictosMarca.filter((v) => porAnchor.get(v.establishment_id)?.brand_evidence).map((v) => veredictoA(v, 'brand', REVISADO_MARCA)),
+];
 
+// El tier de nombre mide precisión de NOMBRES: una entrada que solo publica
+// bandera no tiene nombre que auditar y no entra en su población.
 const tiers = ['verified', 'nearby'].map((confidence) => {
-  const poblacion = entradas.filter((e) => e.confidence === confidence).length;
+  const poblacion = entradas.filter((e) => e.confidence === confidence && e.public_site_name).length;
   const muestra = revisadas.filter((r) => r.confidence === confidence);
   const correctas = muestra.filter((r) => r.result === 'verified').length;
   return {
@@ -180,20 +242,47 @@ const tiers = ['verified', 'nearby'].map((confidence) => {
   };
 }).filter((t) => t.population > 0);
 
-const auditoria = { schema_version: AUDIT_SCHEMA_VERSION, audit_id: 'commercial-identity-audit-2026-08-24', catalog_id: catalogo.catalog_id, tiers, entries: revisadas };
+// Tiers de bandera: uno por método de acreditación, con umbral fijo de 90 % y
+// muestra mínima de 35 —o el grupo entero si es menor—. Un grupo que no llega
+// no bloquea a los demás: su marca se publica como texto, sin logo.
+const brandTiers = [...new Set(entradas.filter((e) => e.brand_evidence).map((e) => e.brand_evidence.method))].map((method) => {
+  const poblacion = entradas.filter((e) => e.brand_evidence?.method === method).length;
+  const muestra = revisadas.filter((r) => r.claim === 'brand' && porAnchor.get(r.establishment_id)?.brand_evidence?.method === method);
+  const correctas = muestra.filter((r) => r.result === 'verified').length;
+  return {
+    method,
+    population: poblacion,
+    sampled: muestra.length,
+    correct: correctas,
+    lower_bound_95: Number(wilsonLowerBound(correctas, muestra.length).toFixed(3)),
+    threshold: BRAND_THRESHOLD,
+    reviewer: RESPONSABLE,
+    reviewed_at: REVISADO_MARCA,
+  };
+// Un grupo sin revisar no se declara: aparecer con muestra cero solo rompería
+// el contrato de la auditoría. Sin tier, el grupo queda pendiente y sin logo.
+}).filter((t) => t.population > 0 && t.sampled > 0);
+
+const auditoria = { schema_version: AUDIT_SCHEMA_VERSION, audit_id: AUDIT_ID, catalog_id: catalogo.catalog_id, tiers, brand_tiers: brandTiers, entries: revisadas };
 
 fs.writeFileSync(path.join(identidad, 'commercial-identity-catalog.json'), `${JSON.stringify(catalogo, null, 2)}\n`, { mode: 0o600 });
 fs.writeFileSync(path.join(identidad, 'commercial-identity-audit.json'), `${JSON.stringify(auditoria, null, 2)}\n`, { mode: 0o600 });
 
 const conMarca = entradas.filter((e) => e.brand).length;
+if (conflictosDeMarca.length) fs.writeFileSync(path.join(identidad, 'brand-conflicts.json'), `${JSON.stringify({ generated_at: new Date().toISOString(), conflictos: conflictosDeMarca }, null, 2)}\n`, { mode: 0o600 });
 const limpiados = publicables.filter((r) => marcaEnNombre(r.nombre_maps) && !(marcaDelOperador(r.razon_social) && sinTildes(marcaEnNombre(r.nombre_maps)) === sinTildes(marcaDelOperador(r.razon_social)))).length;
 process.stdout.write(`Catálogo         ${entradas.length} entradas de 717 (${(entradas.length / 717 * 100).toFixed(1)} %)
   verified       ${entradas.filter((e) => e.confidence === 'verified').length}
   nearby         ${entradas.filter((e) => e.confidence === 'nearby').length}
 
-Marca publicada  ${conMarca}   (respaldada por la razón social)
+Marca publicada  ${conMarca}   (razón social del operador o directorio oficial)
 Nombres limpiados ${limpiados}  (marca sin respaldo retirada del nombre)
 
-Auditoría
+Auditoría de nombre
 ${tiers.map((t) => `  ${t.confidence.padEnd(9)} ${t.correct}/${t.sampled} correctos · cota ${(t.lower_bound_95 * 100).toFixed(1)} % · umbral ${(t.threshold * 100).toFixed(0)} % ${t.lower_bound_95 >= t.threshold ? '✅' : '❌'}`).join('\n')}
+
+Marca con evidencia ${entradas.filter((e) => e.brand_evidence).length}   (logo solo si su grupo pasa la auditoría de bandera)
+Solo bandera      ${soloMarca.length}   (del padrón oficial, sin nombre de sede publicable)
+Conflictos marca  ${conflictosDeMarca.length}   ${conflictosDeMarca.map((c) => `${c.catalogo}≠${c.directorio}`).join(', ')}
+${brandTiers.length ? brandTiers.map((t) => `  ${t.method.padEnd(24)} ${t.correct}/${t.sampled} de ${t.population} · cota ${(t.lower_bound_95 * 100).toFixed(1)} % · umbral ${(t.threshold * 100).toFixed(0)} % · mínimo ${Math.min(BRAND_MIN_SAMPLE, t.population)} ${t.lower_bound_95 >= t.threshold && t.sampled >= Math.min(BRAND_MIN_SAMPLE, t.population) ? '✅' : '❌'}`).join('\n') : '  (sin evidencia de bandera todavía; ninguna marca obtiene logo)'}
 `);

@@ -11,9 +11,9 @@ import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
 
-const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0 };
+const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false };
 const $ = (id) => document.getElementById(id);
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'district-show-all', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'district-show-all', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'location-update', 'location-update-text', 'retry-location-update'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
 
@@ -54,7 +54,9 @@ function renderSummary() {
   const porPrecio = state.sort.startsWith('price:') || !state.origin;
   const criterio = porPrecio ? `${PRODUCTOS[state.priceProduct]} más barata` : 'Más cerca';
   const partes = state.origin ? [formatRadius(state.radiusKm), criterio] : [criterio];
-  nodes['sum-criteria'].textContent = `· ${partes.join(' · ')}`;
+  // Con GPS el icono de la barra ya dice «mi ubicación»: repetirlo en texto solo
+  // le robaba ancho al criterio, que nunca debe truncar.
+  nodes['sum-criteria'].textContent = state.origin ? partes.join(' · ') : `· ${partes.join(' · ')}`;
 }
 
 function renderOffers() {
@@ -120,8 +122,11 @@ function renderResults() {
   // La fila «Lugar» es el encabezado de resultados: dice desde dónde se compara.
   const lugar = state.origin ? 'Mi ubicación' : displayDistrict(state.district);
   nodes['place-name'].textContent = lugar;
-  nodes['sum-place'].textContent = lugar;
+  nodes['sum-place'].textContent = state.origin ? '' : lugar;
   nodes['place-icon'].hidden = !state.origin;
+  // Los dos accesos a «Actualizar ubicación» solo existen sobre un origen GPS:
+  // con distrito elegido no hay nada que volver a medir.
+  for (const key of ['refresh-location', 'refresh-location-compact']) nodes[key].hidden = !state.origin;
   if (state.fresh.length === 0) return;
   state.visibleCount = PAGE_SIZE;
   if (state.origin) {
@@ -136,6 +141,8 @@ function renderResults() {
   renderOffers();
 }
 function showCompare() {
+  state.updatingLocation = false;
+  renderLocationUpdate('idle', '');
   renderResults();
   nodes['offline-note'].hidden = state.dataMode !== 'saved';
   nodes['offline-note'].textContent = state.dataMode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(state.dataset.cutoff_at)}.` : '';
@@ -157,6 +164,54 @@ function chooseDistrict({ fromError = false } = {}) {
   nodes['district-hint'].hidden = !fromError;
   show('district-step'); $('district-title').focus();
 }
+// Actualizar ubicación no es el flujo inicial: aquel reinicia radio y orden y,
+// si falla, borra el origen y manda a elegir distrito. Aquí se conserva todo
+// —radio, producto y criterio— y un fallo deja intacta la posición anterior.
+const AVISO_UBICACION = Object.freeze({
+  pending: 'Actualizando tu ubicación…',
+  error: 'No pudimos actualizar. Las distancias usan tu ubicación anterior.',
+});
+function renderLocationUpdate(status, message = null) {
+  const texto = message ?? AVISO_UBICACION[status] ?? '';
+  nodes['location-update'].hidden = !texto;
+  nodes['location-update'].dataset.status = status;
+  nodes['location-update-text'].textContent = texto;
+  nodes['retry-location-update'].hidden = status !== 'error';
+  for (const key of ['refresh-location', 'refresh-location-compact']) nodes[key].disabled = status === 'pending';
+  nodes['refresh-location'].textContent = status === 'pending' ? 'Actualizando…' : 'Actualizar ubicación';
+}
+// Reordena y repagina sobre el origen nuevo sin volver a decidir radio ni
+// criterio: si el radio conservado queda vacío, se ve el estado vacío y la
+// persona decide si lo amplía.
+function applyUpdatedOrigin() {
+  state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
+  state.visibleCount = PAGE_SIZE;
+  renderOffers();
+}
+function refreshLocation() {
+  if (!state.origin || state.updatingLocation) return;
+  if (!navigator.geolocation) { renderLocationUpdate('error'); return; }
+  const attempt = ++state.locationAttempt;
+  state.updatingLocation = true;
+  renderLocationUpdate('pending');
+  // El token de intento es el mismo del flujo inicial: si mientras tanto se
+  // elige distrito o se reintenta, la respuesta que llegue tarde se descarta.
+  const stale = () => attempt !== state.locationAttempt;
+  navigator.geolocation.getCurrentPosition((position) => {
+    if (stale()) return;
+    state.updatingLocation = false;
+    state.origin = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+    applyUpdatedOrigin();
+    renderLocationUpdate('done', `Ubicación actualizada · ${state.pool.length} ${state.pool.length === 1 ? 'estación' : 'estaciones'} en ${formatRadius(state.radiusKm)}.`);
+    controls.scrollToTop();
+    nodes['location-update-text'].focus({ preventScroll: true });
+  }, () => {
+    if (stale()) return;
+    state.updatingLocation = false;
+    renderLocationUpdate('error');
+    nodes['retry-location-update'].focus({ preventScroll: true });
+  }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 });
+}
 function locate() {
   if (!navigator.geolocation) { chooseDistrict({ fromError: true }); return; }
   const attempt = ++state.locationAttempt;
@@ -175,7 +230,7 @@ function applyLoaded(dataset) {
   $('choose-district').disabled = false;
   nodes['data-status'].textContent = `${fresh.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
-  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos 54 al azar y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 86 % en los marcados <b>por confirmar</b>. Si ves un nombre equivocado, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
+  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado. Las marcas y sus logos pertenecen a sus titulares y se muestran solo para identificar la estación.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos una muestra aleatoria y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 85 % en los marcados <b>por confirmar</b>. La marca y su logo se acreditan aparte, contra el directorio oficial de la cadena, y solo aparecen cuando esa comprobación pasa su propia auditoría. Si ves un nombre o una marca equivocada, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
 async function hasGrantedLocationPermission() {
   try { return (await navigator.permissions?.query({ name: 'geolocation' }))?.state === 'granted'; }
@@ -211,6 +266,9 @@ nodes['load-more'].addEventListener('click', () => {
   // primera tarjeta nueva, que es justo lo que se acaba de pedir.
   nodes.offers.children[pintadas]?.focus();
 });
-$('change-origin').addEventListener('click', () => { show('start-step'); $('use-location').focus(); }); $('retry-load').addEventListener('click', () => location.reload());
+nodes['refresh-location'].addEventListener('click', refreshLocation);
+nodes['refresh-location-compact'].addEventListener('click', refreshLocation);
+nodes['retry-location-update'].addEventListener('click', refreshLocation);
+$('change-origin').addEventListener('click', () => { state.locationAttempt += 1; state.updatingLocation = false; show('start-step'); $('use-location').focus(); }); $('retry-load').addEventListener('click', () => location.reload());
 initTheme();
 initialize();

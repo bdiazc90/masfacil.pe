@@ -14,14 +14,30 @@ import { validateCommercialCatalog } from '../app/commercial-catalog.mjs';
 import { validateCommercialAudit } from '../app/commercial-audit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const encoded = process.env.COMMERCIAL_IDENTITY_B64;
-if (!encoded) throw new Error('COMMERCIAL_IDENTITY_B64 es obligatorio');
+
+// El límite de un secret de GitHub son 48 KB y el paquete ya ronda los 44,7 KB.
+// Cuando no quepa, `identity:pack` lo parte y el CI publica COMMERCIAL_IDENTITY_B64,
+// _2, _3… Aquí se reensamblan en orden antes de decodificar: el gunzip solo
+// funciona si el paquete quedó completo, así que la partición se verifica sola.
+function encodedParts() {
+  const first = process.env.COMMERCIAL_IDENTITY_B64;
+  if (!first) throw new Error('COMMERCIAL_IDENTITY_B64 es obligatorio');
+  const parts = [first];
+  for (let index = 2; ; index += 1) {
+    const next = process.env[`COMMERCIAL_IDENTITY_B64_${index}`];
+    if (!next) break;
+    parts.push(next);
+  }
+  return parts;
+}
+const partes = encodedParts();
+const encoded = partes.map((part) => part.trim()).join('');
 
 let payload;
 try {
   payload = JSON.parse(zlib.gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
 } catch (error) {
-  throw new Error(`El secret de identidad comercial no decodifica: ${error.message}`);
+  throw new Error(`El secret de identidad comercial no decodifica (${partes.length} parte(s), ${encoded.length} bytes): ${error.message}`);
 }
 if (!payload?.catalog || !payload?.audit) throw new Error('El secret debe contener catalog y audit');
 
@@ -39,4 +55,4 @@ write('commercial-identity-catalog.json', payload.catalog);
 write('commercial-identity-audit.json', payload.audit);
 
 const publicables = payload.catalog.entries.filter((entry) => entry.publication.status === 'publishable').length;
-process.stdout.write(`${JSON.stringify({ catalog_id: payload.catalog.catalog_id, entries: payload.catalog.entries.length, publishable: publicables, audited: payload.audit.entries.length, installed: true })}\n`);
+process.stdout.write(`${JSON.stringify({ catalog_id: payload.catalog.catalog_id, catalog_schema: payload.catalog.schema_version, audit_schema: payload.audit.schema_version, entries: payload.catalog.entries.length, publishable: publicables, audited: payload.audit.entries.length, secret_parts: partes.length, installed: true })}\n`);

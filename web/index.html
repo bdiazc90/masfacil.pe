@@ -21,11 +21,14 @@
     <div class="controls-sentinel controls-sentinel--expand" aria-hidden="true"></div>
     <div class="controls-slot" id="controls-slot">
       <section class="controls plate" id="controls" data-state="full" data-screen="other" aria-label="Controles de búsqueda">
-        <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
-          <img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">
-          <span class="controls__text"><span class="controls__place" id="sum-place"></span><span class="controls__criteria" id="sum-criteria"></span></span>
-          <span class="controls__expand">Ajustar <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
-        </button>
+        <div class="controls__bar">
+          <button class="controls__quick" id="refresh-location-compact" type="button" aria-label="Actualizar ubicación" title="Actualizar ubicación" hidden><svg class="controls__quick-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg></button>
+          <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
+            <img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">
+            <span class="controls__text"><span class="controls__place" id="sum-place"></span><span class="controls__criteria" id="sum-criteria"></span></span>
+            <span class="controls__expand">Ajustar <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+          </button>
+        </div>
         <div class="controls__panel" id="controls-panel">
           <div class="controls__inner">
             <header class="appbar">
@@ -41,7 +44,10 @@
                 <span class="place__label">Lugar</span>
                 <h2 class="place__value" id="compare-title" tabindex="-1"><svg id="place-icon" class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span id="place-name">Mi ubicación</span></h2>
               </div>
-              <button id="change-origin" class="button--text" type="button">Cambiar</button>
+              <div class="place__actions">
+                <button id="refresh-location" class="button--text" type="button" hidden>Actualizar ubicación</button>
+                <button id="change-origin" class="button--text" type="button">Cambiar</button>
+              </div>
             </div>
             <div id="radius-control" class="radius" hidden>
               <div class="radius__head"><label class="radius__label" for="radius-input">Radio</label><p id="radius-readout" class="radius__readout" role="status"></p></div>
@@ -66,6 +72,10 @@
     <section id="district-step" class="screen-flow district-step" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o reintenta.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div><button id="district-show-all" class="button--text" type="button">Ver todos los distritos</button><button id="retry-location" class="button--text" type="button">Reintentar ubicación</button></section>
     <section id="compare-step" class="screen-flow screen-flow--results" aria-labelledby="compare-title" hidden>
       <p id="offline-note" class="offline-note" role="status" hidden></p>
+      <div id="location-update" class="location-update" hidden>
+        <p id="location-update-text" class="location-update__text" role="status" aria-live="polite" tabindex="-1"></p>
+        <button id="retry-location-update" class="button--text" type="button" hidden>Reintentar</button>
+      </div>
       <ol id="offers" class="offers"></ol>
       <section id="radius-empty" class="plate empty" hidden><h2>Ningún grifo en este radio</h2><p class="lede">Amplía el radio de búsqueda para encontrar estaciones más lejanas.</p></section>
       <button id="load-more" class="button button--ghost" type="button" hidden></button>

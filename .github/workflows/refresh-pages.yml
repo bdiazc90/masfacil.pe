@@ -52,6 +52,9 @@ jobs:
       PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
       BOOTSTRAP_SEED_B64: ${{ secrets.BOOTSTRAP_SEED_B64 }}
       COMMERCIAL_IDENTITY_B64: ${{ secrets.COMMERCIAL_IDENTITY_B64 }}
+      # Partes opcionales: solo se usan si el paquete no cabe en un secret.
+      COMMERCIAL_IDENTITY_B64_2: ${{ secrets.COMMERCIAL_IDENTITY_B64_2 }}
+      COMMERCIAL_IDENTITY_B64_3: ${{ secrets.COMMERCIAL_IDENTITY_B64_3 }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -110,9 +113,43 @@ jobs:
           REFRESH_RESULT: ${{ runner.temp }}/refresh-result.json
         run: |
           set +e
-          npm run publish
+          npm run publish > "$RUNNER_TEMP/publish-stdout.txt" 2> "$RUNNER_TEMP/publish-stderr.txt"
           status=$?
-          node --input-type=module -e 'import fs from "node:fs"; const result=JSON.parse(fs.readFileSync(process.env.REFRESH_RESULT,"utf8")); console.log(`refresh=${result.refresh.status}; action=${result.decision.action}`); fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${result.decision.deploy}\n`);'
+          cat "$RUNNER_TEMP/publish-stdout.txt"
+          cat "$RUNNER_TEMP/publish-stderr.txt" >&2
+          # El resultado del refresco manda; si por lo que sea no llegó a
+          # escribirse, se informa eso sin tapar la salida original de publish.
+          if [ -f "$REFRESH_RESULT" ]; then
+            # Un archivo ilegible no puede dejar el paso en verde: sin try/catch el
+            # lector moría sin escribir `deploy` y, si publish había salido 0, el
+            # rechazo quedaba invisible. Aquí siempre se decide y siempre se explica.
+            if ! node --input-type=module -e '
+              import fs from "node:fs";
+              const salida = (deploy) => fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${deploy}\n`);
+              try {
+                const result = JSON.parse(fs.readFileSync(process.env.REFRESH_RESULT, "utf8"));
+                const refresh = result.refresh ?? {};
+                const decision = result.decision ?? {};
+                if (typeof decision.deploy !== "boolean") throw new Error("sin decision.deploy");
+                console.log(`refresh=${refresh.status}; action=${decision.action}; motivo=${decision.reason}`);
+                if (refresh.error) console.log(`causa=${refresh.error}`);
+                if (refresh.detection?.reason) console.log(`deteccion: ${refresh.detection.reason}`);
+                for (const motivo of refresh.quality?.reasons ?? []) console.log(`guardrail: ${motivo}`);
+                if (result.execution?.error) console.log(`fallo en ${result.execution.stage}: ${result.execution.error}`);
+                salida(decision.deploy);
+              } catch (error) {
+                console.log(`::error::refresh-result.json ilegible (${error.message}); se conserva el deployment anterior. Revisa la salida de arriba.`);
+                salida(false);
+                process.exitCode = 1;
+              }
+            '; then
+              status=1
+            fi
+          else
+            echo "::error::publish no dejó refresh-result.json; se conserva el deployment anterior. Revisa la salida de arriba."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            [ "$status" -eq 0 ] && status=1
+          fi
           exit "$status"
       - name: Direct Upload a Cloudflare Pages
         if: steps.prepare.outputs.deploy == 'true'
