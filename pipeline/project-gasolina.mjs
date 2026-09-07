@@ -66,7 +66,7 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
     offerIds: GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)),
     approvedBrandMethods: brandGroups.approved,
   });
-  const revisionId = `gasolina-${pointer.snapshot_id}-identity-v2`;
+  const revisionId = `gasolina-${pointer.snapshot_id}-identity-v4`;
   const datasets = {};
   const bodies = {};
   const descriptors = {};
@@ -162,5 +162,5 @@ export async function projectGasolina({ root = rootFromModule, outputRoot = path
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) projectGasolina()
-  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca, ${result.catalog.projected_with_accredited_brand} con logo, ${result.catalog.without_current_offer} sin oferta vigente\n`))
+  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca, ${result.catalog.projected_with_accredited_brand} con logo, ${result.catalog.without_current_offer} sin reporte en el Registro\n`))
   .catch((error) => { process.stderr.write(`No se publicó gasolina: ${error.message}\n`); process.exitCode = 1; });

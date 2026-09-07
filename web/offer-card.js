@@ -6,6 +6,14 @@ export const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (char) =>
 export const formatPrice = (value) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 }).format(value);
 // «hace 24 h» y «hace 1 día» son lo mismo; a partir de 23.5 h se redondea a día.
 const ago = (days) => { const horas = Math.max(1, Math.round(days * 24)); return horas < 24 ? `hace ${horas} h` : `hace ${Math.max(1, Math.floor(days))} ${Math.floor(days) <= 1 ? 'día' : 'días'}`; };
+// El silencio se mide en meses porque casi siempre son meses: «hace 190 días»
+// es exacto y no se siente. `ago` se queda para la tarjeta con precio, donde el
+// día sí importa.
+const calladoDesde = (days) => {
+  if (!Number.isFinite(days)) return 'desde hace un tiempo';
+  if (days < 60) return `hace ${Math.max(1, Math.floor(days))} días`;
+  return days < 365 ? `hace ${Math.round(days / 30)} meses` : 'hace más de un año';
+};
 const kilometers = (value) => value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`;
 const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y']);
 
@@ -67,7 +75,10 @@ export function renderOfferDetail(offer, { prices = {}, attribution = null } = {
   }).join('');
   const coordenada = `${offer.latitude.toFixed(5)}, ${offer.longitude.toFixed(5)}`;
   const fuente = attribution ? `<span>${escapeHtml(attribution)}</span>` : '';
-  return `<div class="offer__detail">${filas}<p class="detail__meta"><span>Coordenada oficial <b>${escapeHtml(coordenada)}</b></span>${fuente}</p><a class="button--text" href="${escapeHtml(streetViewUrl(offer))}" target="_blank" rel="noopener noreferrer">Ver en Street View</a></div>`;
+  // En una fila muda las dos filas de arriba dicen «sin precio vigente»; lo que
+  // el panel puede añadir es cuándo fue la última vez que reportó.
+  const ultimo = offer.has_price === false && offer.last_reported_at ? `<span>Último precio reportado el <b>${escapeHtml(fechaHora(offer.last_reported_at))}</b></span>` : '';
+  return `<div class="offer__detail">${filas}<p class="detail__meta">${ultimo}<span>Coordenada oficial <b>${escapeHtml(coordenada)}</b></span>${fuente}</p><a class="button--text" href="${escapeHtml(streetViewUrl(offer))}" target="_blank" rel="noopener noreferrer">Ver en Street View</a></div>`;
 }
 
 export function streetViewUrl(offer) {
@@ -90,7 +101,30 @@ function priceCell(offer, key, activeProduct) {
   return `<p class="${clases.join(' ')}" data-key="${key}"><span class="chip" role="img" aria-label="${escapeHtml(PRODUCTOS[key])}">${PRODUCT_CHIPS[key]}</span><b>${cifra}</b></p>`;
 }
 
+// Sin ningún precio vigente la tarjeta no desaparece: se encoge. Se va la fila
+// de precios —la más alta— y queda lo que sigue siendo cierto: quién es, dónde
+// está, a qué distancia y desde cuándo calla. Conserva «Ver detalle» porque el
+// Street View es justo como se averigua si el grifo sigue abierto.
+function renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail }) {
+  const detail = includeDetail
+    ? `<button type="button" class="button button--ghost" data-detail="${escapeHtml(offer.establishment_id)}" aria-expanded="false" aria-label="${escapeHtml(detailLabel(offer))}">Ver detalle</button>`
+    : '';
+  const directions = includeDirections && directionsUrl
+    ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance }))}">Cómo llegar</a>`
+    : '';
+  const actions = detail || directions ? `<div class="offer__actions">${detail}${directions}</div>` : '';
+  const detailSlot = includeDetail ? `<div class="offer__detail-slot" data-detail-slot="${escapeHtml(offer.establishment_id)}" hidden></div>` : '';
+  const address = offer.address ? escapeHtml(offer.address) : '';
+  const desde = offer.last_reported_at ? ` datetime="${escapeHtml(offer.last_reported_at)}"` : '';
+  // Sin precios que alinear, la fila superior no tiene nada que sostener: la
+  // distancia baja a la columna derecha, junto al distrito, y la tarjeta se
+  // queda en dos filas.
+  const ubicacion = [withDistance ? kilometers(offer.distance_km) : '', displayDistrict(offer.district)].filter(Boolean).join(' · ');
+  return `<li class="offer offer--silent glass" tabindex="-1"><div class="offer__grid"><h3 class="offer__identity">${brandLogoHtml(offer)}${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address}</p><p class="offer__silence"><time${desde}>Sin precio ${escapeHtml(calladoDesde(offer.silent_days))}</time></p><p class="offer__district">${escapeHtml(ubicacion)}</p></div>${actions}${detailSlot}</li>`;
+}
+
 export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null } = {}) {
+  if (offer.has_price === false) return renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail });
   const distance = withDistance ? `<p class="offer__distance"><span class="chip chip--distance" role="img" aria-label="Distancia">DIST</span><b>${escapeHtml(kilometers(offer.distance_km))}</b></p>` : '';
   const precios = Object.keys(PRODUCTOS).map((key) => priceCell(offer, key, activeProduct)).join('');
   const detail = includeDetail

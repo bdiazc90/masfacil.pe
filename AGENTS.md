@@ -71,7 +71,7 @@ del owner— y en el catálogo se registra `source.kind` real de cada entrada.
 - Los contratos se validan al proyectar y en el navegador. Es runtime, no testing.
 - Regular y Premium se promueven juntos; el manifest se escribe al final.
 - `npm run audit` y rollback se conservan.
-- Las ofertas de más de 30 días se ocultan antes de ordenar.
+- Los precios de más de 30 días no se muestran ni compiten al ordenar. El grifo sí: queda en una tarjeta compacta que dice desde cuándo calla, porque sigue existiendo en el Registro.
 
 ## Comandos
 

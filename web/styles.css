@@ -110,7 +110,12 @@ h1,h2,h3,p{margin-top:0}
 /* Acceso directo a «Actualizar ubicación» en la barra compacta: botón propio,
    no anidado dentro de «Ajustar», con etiqueta accesible y área de 44 px. Ocupa
    el sitio del logo, que ahí solo decoraba, para no comerle ancho al resumen. */
-.controls__quick{display:grid;place-items:center;flex-shrink:0;width:44px;min-height:44px;padding:0;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);color:var(--accent)}
+.controls__quick{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;min-width:44px;min-height:44px;padding:0 var(--s3) 0 11px;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);color:var(--accent)}
+.controls__quick-label{font-size:13px;font-weight:700;white-space:nowrap}
+/* Con distrito elegido el resumen ya carga el nombre del distrito y el criterio;
+   la etiqueta no cabe y el botón vuelve a icono, con su nombre accesible intacto. */
+.controls__quick[data-compact-label="off"]{width:44px;padding:0}
+.controls__quick[data-compact-label="off"] .controls__quick-label{display:none}
 .controls__bar:has(>.controls__quick:not([hidden])) .controls__summary .brand__logo{display:none}
 .controls__quick:disabled{cursor:progress;opacity:.55}
 .controls__quick-icon{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -126,17 +131,48 @@ h1,h2,h3,p{margin-top:0}
 .controls[data-state="full"] .controls__done{display:none}
 .controls[data-state="compact"] .controls__panel{grid-template-rows:0fr;visibility:hidden}
 .controls[data-state="compact"] .controls__inner{padding-block:0}
-.controls:not([data-screen="compare"]) :is(.place,.radius,.toggle,.controls__done){display:none}
-.place{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s1) var(--s3);padding:0 2px}
-.place__where{display:flex;align-items:center;gap:var(--s2);min-width:0}
-.place__label,.radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.place__value{display:flex;align-items:center;gap:6px;margin:0;min-width:0;font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+/* Fuera de resultados la tarjeta era solo la marca. En distritos conserva la
+   píldora —que es la salida de esa pantalla— pero no el encabezado, porque ahí
+   el título es «Elige un distrito» y el del lugar hablaría de otra pantalla. */
+.controls:not([data-screen="compare"]) :is(.radius,.toggle,.controls__done,.place__value){display:none}
+.controls:not([data-screen="compare"]):not([data-screen="district"]) .place{display:none}
+/* En distritos no hay radio ni criterio que resumir, así que la barra compacta
+   es la píldora entera y no hay panel que valga la pena desplegar. */
+.controls[data-screen="district"] .controls__summary{display:none}
+.controls[data-screen="district"] .controls__quick{flex:1}
+/* Un solo menú para las dos pantallas: cada ítem declara dónde vive. */
+.controls[data-screen="district"] [data-menu-screen="compare"],
+.controls:not([data-screen="district"]) [data-menu-screen="district"]{display:none}
+/* Arriba dónde estás —encabezado pequeño, nunca pulsable—, abajo qué puedes
+   hacer. Un solo botón ancho: el uso real es en movimiento y el blanco tiene que
+   acertarse con el pulgar sin mirar. */
+.place{display:grid;gap:var(--s2);padding:0 2px}
+.radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.place__value{display:flex;align-items:center;gap:5px;margin:0;min-width:0;font-size:13px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
 .place__value span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.place__icon{width:17px;height:17px;flex-shrink:0;color:var(--accent)}
-/* En 360 px los dos accesos no caben junto al lugar: la fila envuelve y las
-   acciones bajan enteras en vez de recortarse. */
-.place__actions{display:flex;align-items:center;gap:var(--s3);margin-left:auto}
-.place__actions .button--text{white-space:nowrap;min-height:40px}
+.place__icon{width:15px;height:15px;flex-shrink:0;color:var(--accent)}
+.place__row{position:relative;display:flex;align-items:center;gap:var(--s2)}
+.place__action{flex:1;min-width:0;min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);padding:10px 16px;border:1.5px solid transparent;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:.02em}
+.place__action span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.place__action[data-variant="solid"]{background:var(--primary);color:var(--primary-foreground)}
+/* Outline dice «no estás aquí»: el relleno se reserva para cuando ya lo estás. */
+.place__action[data-variant="outline"]{background:transparent;border-color:color-mix(in srgb,var(--border) 38%,transparent);color:var(--foreground)}
+.place__action[data-status="pending"]{cursor:progress;opacity:.6}
+.place__action[data-status="error"]{background:transparent;border-color:var(--foreground);color:var(--foreground)}
+.place__action-icon,.place__menu-item svg{width:19px;height:19px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.place__more{flex-shrink:0;display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:transparent;color:var(--foreground)}
+.place__more svg{width:20px;height:20px}
+/* `.controls__inner` recorta para animar el colapso; el recorte se abre solo
+   mientras el menú está desplegado, que es cuando el panel ya está expandido. */
+.controls__inner:has(.place__menu:not([hidden])){overflow:visible}
+.place__menu{position:absolute;top:calc(100% + var(--s1));right:0;z-index:6;display:grid;min-width:214px;padding:var(--s1);border:1px solid color-mix(in srgb,var(--border) 26%,transparent);border-radius:16px;background:var(--card);box-shadow:var(--controls-fixed-shadow)}
+.place__menu-item{display:flex;align-items:center;gap:var(--s2);min-height:44px;padding:0 var(--s2);border:0;border-radius:12px;background:transparent;color:var(--foreground);font-size:15px;font-weight:600;text-align:left}
+.place__menu-item svg{color:var(--accent)}
+.place__menu-item:disabled{color:var(--muted-foreground);cursor:default;opacity:1}
+.place__menu-item:disabled svg{color:var(--muted-foreground)}
+.place__menu-item--home{margin-top:var(--s1);padding-top:var(--s1);border-top:1px solid color-mix(in srgb,var(--border) 18%,transparent);border-radius:0 0 12px 12px}
+.place__menu-item--home .brand__logo{flex-shrink:0}
+.chip-soon{margin-left:auto;padding:2px 8px;border-radius:999px;background:var(--card-2);color:var(--muted-foreground);font-size:11px;font-weight:700;letter-spacing:.02em}
 .radius{display:grid;gap:2px}
 .radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
 .radius__readout{margin:0;font-size:14px;font-weight:700}
@@ -170,7 +206,6 @@ h3{font-size:16px;margin-bottom:6px}
 .loading{min-height:55vh;place-content:center}
 .dot{display:block;width:14px;height:14px;margin:0 auto var(--s4);border-radius:50%;background:var(--primary)}
 .district-step h2{margin:0 0 2px}
-.district-step .button--text{justify-content:flex-start;padding-inline:2px}
 .district-filter{display:grid;gap:6px}
 .district-filter label{color:var(--muted-foreground);font-size:14px;font-weight:600}
 .district-filter input{width:100%;min-height:44px;border:1px solid color-mix(in srgb,var(--border) 46%,transparent);border-radius:var(--radius-small);background:var(--surface);color:var(--foreground);padding:10px 14px;font:inherit}
@@ -225,6 +260,11 @@ h3{font-size:16px;margin-bottom:6px}
 .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
 .offer__address{font-size:14.5px;line-height:1.35;text-align:right}
 .offer__freshness,.offer__district{color:var(--muted-foreground);font-size:13.5px}
+/* Tarjeta muda: la misma tarjeta sin su fila de precios, que es la más alta.
+   Reutiliza --muted-foreground, ya auditado a 4.5:1 en los dos temas. */
+.offer--silent{padding:var(--s4) var(--s5)}
+.offer--silent .offer__grid{margin-bottom:var(--s3)}
+.offer__silence{color:var(--muted-foreground);font-size:13.5px;font-weight:600}
 .offer__district{text-align:right}
 .offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
 

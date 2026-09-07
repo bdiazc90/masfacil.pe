@@ -10,7 +10,7 @@ PWA independiente para comparar Gasohol Regular y Premium en Lima provincia por 
 - Identidad Comercial preparada en el bundle 2.1, pero todavía en **0/717**.
 - Sin identidad verificada se muestra `Estación sin nombre verificado`.
 
-La app nunca afirma stock, horario, descuentos o disponibilidad. Las ofertas de más de 30 días se ocultan antes de ordenar.
+La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de más de 30 días no se muestran ni compiten al ordenar; el grifo permanece en una tarjeta compacta que dice desde cuándo calla.
 
 ## Uso local
 

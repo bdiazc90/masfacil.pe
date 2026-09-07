@@ -120,16 +120,22 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   }).filter((item) => item.selected);
   const latestLima = latest.filter((item) => lima(item.selected));
   const cutoff = new Date(cutoffAt); const desde = new Date(cutoff.getTime() - 30 * 86400000);
-  // Dos motivos distintos que conviene no confundir al descartar un reporte: la
-  // estación dejó de reportar y su último dato quedó fuera de la ventana de 30
-  // días, o la fuente se contradice a sí misma en precio o territorio.
-  const motivoNoFresco = (item) => {
-    if (!item.selected.time || item.selected.time > cutoff || item.selected.time < desde) return 'reporte_vencido';
+  // Un reporte inservible y un reporte viejo son cosas distintas. El inservible
+  // —sin fecha, del futuro, o con la fuente contradiciéndose en precio o
+  // territorio— no se publica nunca. El viejo sí se publica, y el navegador le
+  // apaga el precio: el grifo sigue existiendo en el Registro y borrarlo de la
+  // lista afirmaría que cerró, que es justo lo que el dato no dice.
+  const motivoNoPublicable = (item) => {
+    if (!item.selected.time || item.selected.time > cutoff) return 'reporte_invalido';
     if (item.priceConflict || item.territoryConflict || !(item.selected.numericPrice > 0)) return 'conflicto_precio_o_territorio';
     return null;
   };
-  const fresh = latestLima.filter((item) => !motivoNoFresco(item));
-  const registered = fresh.map((item) => ({ ...item, matches: byRegistry.get(`${activities[item.selected.ACTIVIDAD]}${sep}${item.selected.REGISTRO_DE_HIDROCARBUROS}`) ?? [] })).filter((item) => item.matches.length === 1 && lima(item.matches[0]) && item.matches[0].DISTRITO === item.selected.DISTRITO);
+  const vencido = (item) => item.selected.time < desde;
+  const fresco = (item) => !vencido(item);
+  const motivoNoFresco = (item) => motivoNoPublicable(item) ?? (vencido(item) ? 'reporte_vencido' : null);
+  const publicables = latestLima.filter((item) => !motivoNoPublicable(item));
+  const fresh = publicables.filter(fresco);
+  const registered = publicables.map((item) => ({ ...item, matches: byRegistry.get(`${activities[item.selected.ACTIVIDAD]}${sep}${item.selected.REGISTRO_DE_HIDROCARBUROS}`) ?? [] })).filter((item) => item.matches.length === 1 && lima(item.matches[0]) && item.matches[0].DISTRITO === item.selected.DISTRITO);
   const geo = registered.map((item) => { const matches = byGis.get(item.selected.REGISTRO_DE_HIDROCARBUROS) ?? []; const coordinate = matches.length === 1 ? matches[0] : null; const longitude = Number(coordinate?.LONGITUDE); const latitude = Number(coordinate?.LATITUDE); return { ...item, coordinate, longitude, latitude }; }).filter((item) => item.coordinate && lima(item.coordinate) && item.coordinate.DISTRITO === item.selected.DISTRITO && Number.isFinite(item.longitude) && item.longitude >= -82 && item.longitude <= -68 && Number.isFinite(item.latitude) && item.latitude >= -19 && item.latitude <= 1);
   const targetIds = new Set(geo.map((item) => item.selected.ID3)); const identities = new Map(); let rawHeader;
   for await (const row of csvRows(rawPath)) {
@@ -165,11 +171,16 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   const publicados = anchorsDe(ready);
   const noFrescos = new Map();
   for (const item of latestLima) { const anchor = anchorDe(item); const motivo = motivoNoFresco(item); if (anchor && motivo && !noFrescos.has(anchor)) noFrescos.set(anchor, motivo); }
-  const etapas = [['sin_razon_social_o_direccion', anchorsDe(geo)], ['sin_gis_unico', anchorsDe(registered)], ['no_cruza_registro', anchorsDe(fresh)]];
+  const etapas = [['sin_razon_social_o_direccion', anchorsDe(geo)], ['sin_gis_unico', anchorsDe(registered)], ['no_cruza_registro', anchorsDe(publicables)]];
   const exclusions = new Map();
   for (const anchor of registryAnchors) {
     if (publicados.has(anchor)) continue;
     exclusions.set(anchor, etapas.find(([, alcanzados]) => alcanzados.has(anchor))?.[0] ?? noFrescos.get(anchor) ?? 'sin_reporte_en_lima');
   }
-  return { product, offers, registryAnchors, exclusions, metrics: { exact_scope_source_rows: sourceRows, latest_offers: metric(latest), latest_lima_lima: metric(latestLima), fresh_0_30_days: metric(fresh), registry_exact: metric(registered), gis_safe: metric(geo), contract_ready: metric(ready), coverage_percent: fresh.length ? Number((ready.length / fresh.length * 100).toFixed(3)) : 0, conflicts: { latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length, latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length, registry_excluded: fresh.length - registered.length, gis_excluded: registered.length - geo.length, identity_excluded: geo.length - ready.length } }, context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl } };
+  // El embudo declarado sigue midiendo lo VIGENTE, con las mismas definiciones de
+  // siempre: así el contrato conserva `fresh >= ready`, la cobertura no se mueve
+  // por publicar más, y los guardrails de caída siguen comparando lo mismo entre
+  // corridas. Lo publicado de más se cuenta aparte.
+  const registeredFresco = registered.filter(fresco); const geoFresco = geo.filter(fresco); const readyFresco = ready.filter(fresco);
+  return { product, offers, registryAnchors, exclusions, metrics: { exact_scope_source_rows: sourceRows, latest_offers: metric(latest), latest_lima_lima: metric(latestLima), fresh_0_30_days: metric(fresh), registry_exact: metric(registeredFresco), gis_safe: metric(geoFresco), contract_ready: metric(readyFresco), coverage_percent: fresh.length ? Number((readyFresco.length / fresh.length * 100).toFixed(3)) : 0, published: metric(ready), silent_over_30_days: metric(ready.filter(vencido)), conflicts: { latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length, latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length, registry_excluded: fresh.length - registeredFresco.length, gis_excluded: registeredFresco.length - geoFresco.length, identity_excluded: geoFresco.length - readyFresco.length } }, context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl } };
 }

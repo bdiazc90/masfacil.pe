@@ -29,6 +29,14 @@ export const BRAND_LOGOS = Object.freeze({
     source_url: 'https://www.repsol.pe/content/dam/global/logotipos/repsol/logo-repsol.svg',
     retrieved_at: '2026-09-06',
   }),
+  ava: Object.freeze({
+    slug: 'ava',
+    brand: 'AVA',
+    width: 17,
+    height: 15,
+    source_url: 'aportado por el owner',
+    retrieved_at: '2026-09-07',
+  }),
 });
 
 export const brandLogoPath = (slug) => `/icons/brands/${slug}.svg`;

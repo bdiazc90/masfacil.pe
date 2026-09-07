@@ -11,9 +11,9 @@ import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
 
-const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false };
+const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false, preferencesTouched: false };
 const $ = (id) => document.getElementById(id);
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'district-show-all', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'location-update', 'location-update-text', 'retry-location-update'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
 
@@ -22,21 +22,34 @@ const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
 const controls = initControlsCard({
   card: nodes.controls, slot: nodes['controls-slot'], scrim: nodes['controls-scrim'], summaryButton: nodes['controls-summary'], doneButton: nodes['controls-done'],
   collapseSentinel: document.querySelector('.controls-sentinel--collapse'), expandSentinel: document.querySelector('.controls-sentinel--expand'),
-  isActive: () => !nodes['compare-step'].hidden,
+  // La tarjeta se fija sobre las dos pantallas con lista larga: resultados y
+  // distritos. En las demás no hay nada que perseguir al hacer scroll.
+  isActive: () => !nodes['compare-step'].hidden || !nodes['district-step'].hidden,
 });
 
 function show(name) {
   for (const key of ['start-step', 'loading-step', 'district-step', 'compare-step', 'fatal-state']) nodes[key].hidden = key !== name;
   $('main').setAttribute('aria-busy', String(name === 'loading-step'));
-  nodes.controls.dataset.screen = name === 'compare-step' ? 'compare' : 'other';
-  if (name !== 'compare-step') controls.setState('full');
+  // Tres valores, no dos: en distritos la tarjeta conserva la píldora y se fija.
+  const pantalla = name === 'compare-step' ? 'compare' : name === 'district-step' ? 'district' : 'other';
+  nodes.controls.dataset.screen = pantalla;
+  if (pantalla === 'other') controls.setState('full');
 }
 // La vigencia se evalúa por producto y recién después se fusiona: un grifo con
 // Regular vigente y Premium vencido conserva su tarjeta y apaga solo ese precio.
-function currentFresh() {
+// Lo vencido ya no se descarta: viaja aparte para que la fila quede muda en vez
+// de desaparecer.
+function currentRows() {
   const now = () => new Date();
-  return mergeOfferRows(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, filterFreshOffers(state.dataset.offers[key], { now, cutoffAt: state.dataset.cutoff_at }).offers])));
+  const porProducto = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, filterFreshOffers(state.dataset.offers[key], { now, cutoffAt: state.dataset.cutoff_at })]));
+  return mergeOfferRows(
+    Object.fromEntries(GASOLINA_KEYS.map((key) => [key, porProducto[key].offers])),
+    Object.fromEntries(GASOLINA_KEYS.map((key) => [key, porProducto[key].expired])),
+  );
 }
+// Lo que de verdad se puede comparar. Lo consultan el estado vacío, el radio
+// inicial y los controles que solo tienen sentido con más de un precio.
+const conPrecio = (filas) => filas.filter((row) => row.has_price);
 function renderRadiusControl() {
   const inerte = radiusIsInert(state.located);
   nodes['radius-control'].hidden = false;
@@ -67,21 +80,22 @@ function renderOffers() {
   // Cada control hace una cosa.
   state.pool = noOrigin ? [] : withinRadius(state.located, state.radiusKm);
   const ordenadas = noOrigin
-    ? orderOffers(state.fresh.filter((row) => row.district === state.district && row.prices[producto]), `price:${producto}`)
+    ? orderOffers(state.fresh.filter((row) => row.district === state.district), `price:${producto}`)
     : orderOffers(state.pool, state.sort);
   // Si lo que falta cabe en el umbral se muestra entero: un botón para cuatro
   // tarjetas cuesta más de lo que ahorra.
   const pedidas = Math.min(state.visibleCount, ordenadas.length);
   const corte = ordenadas.length - pedidas <= SHOW_ALL_THRESHOLD ? ordenadas.length : pedidas;
   const items = ordenadas.slice(0, corte);
-  const showTag = !noOrigin && items.length > 1;
+  const comparables = conPrecio(items).length;
+  const showTag = !noOrigin && comparables > 1;
   const activeProduct = porPrecio || noOrigin ? producto : null;
   nodes.offers.innerHTML = items.map((offer) => renderOfferCard(offer, { withDistance: !noOrigin, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: showTag ? decisionTag(offer, state.pool, state.radiusKm, producto) : null, activeProduct })).join('');
   nodes.offers.hidden = items.length === 0;
-  nodes['sort-toggle'].hidden = noOrigin || items.length < 2;
+  nodes['sort-toggle'].hidden = noOrigin || comparables < 2;
   // El sub-toggle solo aparece cuando el orden depende del producto: en «Más
   // cerca» no ordena nada y sería un control que no hace lo que promete.
-  nodes['price-product-toggle'].hidden = !(porPrecio || noOrigin) || items.length < 2;
+  nodes['price-product-toggle'].hidden = !(porPrecio || noOrigin) || comparables < 2;
   if (!noOrigin) renderRadiusControl();
   nodes['radius-empty'].hidden = noOrigin || items.length > 0;
   const restantes = ordenadas.length - items.length;
@@ -114,25 +128,33 @@ function toggleDetail(button) {
 }
 
 function renderResults() {
-  state.fresh = currentFresh();
+  state.fresh = currentRows();
   nodes['official-source'].href = state.dataset.provenance.source_url;
-  nodes['empty-state'].hidden = state.fresh.length > 0;
-  nodes.offers.hidden = state.fresh.length === 0;
-  nodes['sort-toggle'].hidden = state.fresh.length === 0 || !state.origin;
-  // La fila «Lugar» es el encabezado de resultados: dice desde dónde se compara.
+  // Con las mudas siempre presentes, la cantidad de filas dejó de ser señal: un
+  // apagón total de la fuente se vería como 800 tarjetas sin precio y sin
+  // explicación. Lo que decide el estado vacío es que no quede nada que comparar.
+  const comparables = conPrecio(state.fresh);
+  nodes['empty-state'].hidden = comparables.length > 0;
+  nodes.offers.hidden = comparables.length === 0;
+  nodes['sort-toggle'].hidden = comparables.length === 0 || !state.origin;
+  // El nombre del lugar es el encabezado de los resultados: dice desde dónde se
+  // compara, y por eso nunca es un botón.
   const lugar = state.origin ? 'Mi ubicación' : displayDistrict(state.district);
   nodes['place-name'].textContent = lugar;
   nodes['sum-place'].textContent = state.origin ? '' : lugar;
-  nodes['place-icon'].hidden = !state.origin;
-  // Los dos accesos a «Actualizar ubicación» solo existen sobre un origen GPS:
-  // con distrito elegido no hay nada que volver a medir.
-  for (const key of ['refresh-location', 'refresh-location-compact']) nodes[key].hidden = !state.origin;
-  if (state.fresh.length === 0) return;
+  // `hidden` como propiedad solo existe en HTMLElement: sobre un <svg> hay que
+  // escribir el atributo o el icono se queda visible en los dos modos.
+  nodes['place-icon'].toggleAttribute('hidden', !state.origin);
+  renderPlaceAction('idle');
+  if (comparables.length === 0) return;
   state.visibleCount = PAGE_SIZE;
   if (state.origin) {
     state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
-    state.radiusKm = initialRadiusKm(state.located);
-    state.sort = 'distance';
+    // El radio se abre donde caben seis PRECIOS. Medirlo sobre todas las filas
+    // lo dejaría estrecho y lleno de tarjetas mudas. Si la persona ya eligió
+    // radio o criterio, esa elección sobrevive a volver al inicio y a cambiar
+    // de origen: es una preferencia, no una consecuencia de dónde está.
+    if (!state.preferencesTouched) { state.radiusKm = initialRadiusKm(conPrecio(state.located)); state.sort = 'distance'; }
   } else {
     state.located = [];
     nodes['radius-control'].hidden = true;
@@ -141,28 +163,40 @@ function renderResults() {
   renderOffers();
 }
 function showCompare() {
+  // La pantalla se declara ANTES de pintar: la píldora decide su promesa según
+  // dónde está, y renderizarla con la pantalla anterior le ponía la etiqueta
+  // equivocada.
+  show('compare-step');
   state.updatingLocation = false;
   renderLocationUpdate('idle', '');
   renderResults();
   nodes['offline-note'].hidden = state.dataMode !== 'saved';
   nodes['offline-note'].textContent = state.dataMode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(state.dataset.cutoff_at)}.` : '';
-  show('compare-step'); nodes['compare-title'].focus();
+  nodes['compare-title'].focus();
 }
 function renderDistricts(query = '') {
   const normalizedQuery = query.trim();
   const matches = visibleDistricts(state.districts, normalizedQuery, state.showAllDistricts);
   nodes.districts.innerHTML = matches.map((district) => `<button type="button" data-district="${escapeHtml(district)}">${escapeHtml(displayDistrict(district))}</button>`).join('');
   nodes['district-empty'].hidden = !normalizedQuery || matches.length > 0;
-  nodes['district-show-all'].hidden = state.showAllDistricts || Boolean(normalizedQuery);
 }
 function chooseDistrict({ fromError = false } = {}) {
   state.locationAttempt += 1;
-  state.districts = [...new Set(currentFresh().map((offer) => offer.district))].sort();
-  state.showAllDistricts = false;
+  state.updatingLocation = false;
+  state.districts = [...new Set(currentRows().map((offer) => offer.district))].sort();
+  // Todos los chips de entrada: el buscador acota una lista visible, no la revela.
+  state.showAllDistricts = true;
   nodes['district-search'].value = '';
   renderDistricts();
   nodes['district-hint'].hidden = !fromError;
-  show('district-step'); $('district-title').focus();
+  // Solo se ofrece volver si hay resultados detrás a los que volver.
+  nodes['menu-back-results'].hidden = !(state.origin || state.district);
+  show('district-step');
+  renderPlaceAction('idle');
+  // Una pantalla nueva empieza arriba: si se llegaba desde una lista scrolleada,
+  // quedarse a media altura escondía el buscador y la propia píldora.
+  scrollTo({ top: 0, behavior: 'auto' });
+  $('district-title').focus();
 }
 // Actualizar ubicación no es el flujo inicial: aquel reinicia radio y orden y,
 // si falla, borra el origen y manda a elegir distrito. Aquí se conserva todo
@@ -171,14 +205,47 @@ const AVISO_UBICACION = Object.freeze({
   pending: 'Actualizando tu ubicación…',
   error: 'No pudimos actualizar. Las distancias usan tu ubicación anterior.',
 });
+// La píldora nombra la ACCIÓN, nunca el lugar: el lugar es el encabezado de al
+// lado. Y la acción es siempre la misma promesa —llevarte a tu posición actual—,
+// que con GPS significa volver a medirla y con distrito, cambiar el origen.
+const ACCION_LUGAR = Object.freeze({
+  gps: { label: 'Actualizar ubicación', corta: 'Actualizar', icono: 'refresh', variante: 'solid' },
+  distrito: { label: 'Ver en mi ubicación', corta: 'Mi ubicación', icono: 'gps', variante: 'outline' },
+});
+// La píldora es también el indicador. En movimiento el dedo y la vista están
+// ahí, y como la lista ya no salta al inicio, un aviso arriba puede quedar fuera
+// de pantalla: el proceso y el fallo tienen que contarse en el propio botón.
+// Con GPS guardado pero fuera de resultados —en la lista de distritos— la píldora
+// no puede prometer «actualizar»: ahí solo tiene sentido salir hacia el GPS.
+const enGps = () => Boolean(state.origin) && nodes.controls.dataset.screen === 'compare';
+function renderPlaceAction(status = 'idle') {
+  const accion = enGps() ? ACCION_LUGAR.gps : ACCION_LUGAR.distrito;
+  const pendiente = status === 'pending';
+  const error = status === 'error';
+  nodes['place-action-label'].textContent = pendiente ? 'Actualizando…' : error ? 'Reintentar' : accion.label;
+  // En distritos la barra compacta lleva solo este botón: no hay resumen con el
+  // que competir, así que cabe el nombre completo y no hay por qué abreviarlo.
+  const soloEnLaBarra = nodes.controls.dataset.screen === 'district';
+  nodes['refresh-location-compact-label'].textContent = pendiente ? 'Actualizando…' : error ? 'Reintentar' : (soloEnLaBarra ? accion.label : accion.corta);
+  const nombre = error ? `${AVISO_UBICACION.error} Reintentar.` : nodes['place-action-label'].textContent;
+  for (const key of ['refresh-location', 'refresh-location-compact']) {
+    nodes[key].dataset.status = status;
+    nodes[key].disabled = pendiente;
+    nodes[key].setAttribute('aria-label', nombre);
+  }
+  nodes['refresh-location'].dataset.variant = accion.variante;
+  // La etiqueta corta solo estorba en la barra compacta de resultados con distrito,
+  // donde el resumen ya carga el nombre del distrito y el criterio.
+  nodes['refresh-location-compact'].dataset.compactLabel = enGps() || soloEnLaBarra ? 'on' : 'off';
+  nodes['refresh-location-compact'].title = nombre;
+  for (const icono of document.querySelectorAll('[data-place-icon]')) icono.toggleAttribute('hidden', icono.dataset.placeIcon !== accion.icono);
+}
 function renderLocationUpdate(status, message = null) {
   const texto = message ?? AVISO_UBICACION[status] ?? '';
   nodes['location-update'].hidden = !texto;
   nodes['location-update'].dataset.status = status;
   nodes['location-update-text'].textContent = texto;
-  nodes['retry-location-update'].hidden = status !== 'error';
-  for (const key of ['refresh-location', 'refresh-location-compact']) nodes[key].disabled = status === 'pending';
-  nodes['refresh-location'].textContent = status === 'pending' ? 'Actualizando…' : 'Actualizar ubicación';
+  renderPlaceAction(status);
 }
 // Reordena y repagina sobre el origen nuevo sin volver a decidir radio ni
 // criterio: si el radio conservado queda vacío, se ve el estado vacío y la
@@ -202,16 +269,19 @@ function refreshLocation() {
     state.updatingLocation = false;
     state.origin = { latitude: position.coords.latitude, longitude: position.coords.longitude };
     applyUpdatedOrigin();
+    // Sin salto al inicio: si te moviste 300 m la lista casi no cambia de orden,
+    // y arrancarte de la tarjeta que leías castiga justo el uso en movimiento.
+    // El foco se queda en la píldora, que es la que cuenta el resultado.
     renderLocationUpdate('done', `Ubicación actualizada · ${state.pool.length} ${state.pool.length === 1 ? 'estación' : 'estaciones'} en ${formatRadius(state.radiusKm)}.`);
-    controls.scrollToTop();
-    nodes['location-update-text'].focus({ preventScroll: true });
   }, () => {
     if (stale()) return;
     state.updatingLocation = false;
     renderLocationUpdate('error');
-    nodes['retry-location-update'].focus({ preventScroll: true });
   }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 });
 }
+// Un solo gesto con una sola promesa. Con distrito elegido es el flujo inicial
+// completo, porque el radio y el orden solo tienen sentido sobre una posición.
+function placeAction() { if (enGps()) refreshLocation(); else locate(); }
 function locate() {
   if (!navigator.geolocation) { chooseDistrict({ fromError: true }); return; }
   const attempt = ++state.locationAttempt;
@@ -225,12 +295,12 @@ function cancelLocation() { state.locationAttempt += 1; chooseDistrict(); }
 function fatal(error) { console.error(error); nodes['fatal-message'].textContent = navigator.onLine ? 'No pudimos cargar los precios. Revisa tu conexión y reintenta.' : 'No hay datos guardados todavía. Conéctate una vez para descargar precios.'; show('fatal-state'); }
 function applyLoaded(dataset) {
   state.dataset = dataset; state.dataMode = dataset.dataMode;
-  const fresh = currentFresh();
+  const filas = currentRows();
   $('use-location').disabled = false;
   $('choose-district').disabled = false;
-  nodes['data-status'].textContent = `${fresh.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
+  nodes['data-status'].textContent = `${conPrecio(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
-  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado. Las marcas y sus logos pertenecen a sus titulares y se muestran solo para identificar la estación.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos una muestra aleatoria y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 85 % en los marcados <b>por confirmar</b>. La marca y su logo se acreditan aparte, contra el directorio oficial de la cadena, y solo aparecen cuando esa comprobación pasa su propia auditoría. Si ves un nombre o una marca equivocada, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
+  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>Un grifo que lleva más de 30 días sin reportar aparece igual, sin precios y diciendo desde cuándo calla: sigue existiendo en el Registro, pero no podemos decir a cuánto vende.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado. Las marcas y sus logos pertenecen a sus titulares y se muestran solo para identificar la estación.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos una muestra aleatoria y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 85 % en los marcados <b>por confirmar</b>. La marca y su logo se acreditan aparte, contra el directorio oficial de la cadena, y solo aparecen cuando esa comprobación pasa su propia auditoría. Si ves un nombre o una marca equivocada, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
 async function hasGrantedLocationPermission() {
   try { return (await navigator.permissions?.query({ name: 'geolocation' }))?.state === 'granted'; }
@@ -244,19 +314,22 @@ async function initialize() {
   } catch (error) { fatal(error); }
 }
 
-$('use-location').addEventListener('click', locate); $('choose-district').addEventListener('click', chooseDistrict); $('retry-location').addEventListener('click', locate);
-$('cancel-location').addEventListener('click', cancelLocation); nodes['district-search'].addEventListener('input', () => { state.showAllDistricts = false; renderDistricts(nodes['district-search'].value); }); nodes['district-show-all'].addEventListener('click', () => { state.showAllDistricts = true; renderDistricts(nodes['district-search'].value); });
+$('use-location').addEventListener('click', locate); $('choose-district').addEventListener('click', chooseDistrict);
+$('cancel-location').addEventListener('click', cancelLocation); nodes['district-search'].addEventListener('input', () => renderDistricts(nodes['district-search'].value));
+// Volver a los resultados los devuelve tal como estaban: no se recalcula nada,
+// solo se vuelve a mostrar la pantalla que seguía pintada debajo.
+$('menu-back-results').addEventListener('click', () => { closePlaceMenu(); show('compare-step'); renderPlaceAction('idle'); nodes['compare-title'].focus(); });
 nodes.districts.addEventListener('click', (event) => { const district = event.target.closest('[data-district]')?.dataset.district; if (district) { state.origin = null; state.district = district; showCompare(); } });
 // Cambiar un filtro estando abajo: el primer resultado es la respuesta, así
 // que la lista vuelve arriba y el card de controles regresa al flujo.
-document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', () => { state.sort = button.dataset.sort === 'price' ? `price:${state.priceProduct}` : 'distance'; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
+document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', () => { state.sort = button.dataset.sort === 'price' ? `price:${state.priceProduct}` : 'distance'; state.preferencesTouched = true; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
 // El sub-toggle recuerda la elección aunque se vuelva a «Más cerca», así que
 // quien compara Premium no tiene que volver a decirlo en cada vuelta.
 document.querySelectorAll('[data-price-product]').forEach((button) => button.addEventListener('click', () => { state.priceProduct = button.dataset.priceProduct; if (state.sort.startsWith('price:')) state.sort = `price:${state.priceProduct}`; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
 nodes.offers.addEventListener('click', (event) => { const button = event.target.closest('[data-detail]'); if (button) toggleDetail(button); });
 // Filtrado local sobre datos ya cargados: no hay red, así que `input` responde
 // mientras se arrastra sin costo perceptible; al soltar, la lista vuelve arriba.
-nodes['radius-input'].addEventListener('input', () => { state.radiusKm = Number(nodes['radius-input'].value); state.visibleCount = PAGE_SIZE; renderOffers(); });
+nodes['radius-input'].addEventListener('input', () => { state.radiusKm = Number(nodes['radius-input'].value); state.preferencesTouched = true; state.visibleCount = PAGE_SIZE; renderOffers(); });
 nodes['radius-input'].addEventListener('change', () => controls.scrollToTop());
 nodes['load-more'].addEventListener('click', () => {
   const pintadas = nodes.offers.children.length;
@@ -266,9 +339,45 @@ nodes['load-more'].addEventListener('click', () => {
   // primera tarjeta nueva, que es justo lo que se acaba de pedir.
   nodes.offers.children[pintadas]?.focus();
 });
-nodes['refresh-location'].addEventListener('click', refreshLocation);
-nodes['refresh-location-compact'].addEventListener('click', refreshLocation);
-nodes['retry-location-update'].addEventListener('click', refreshLocation);
-$('change-origin').addEventListener('click', () => { state.locationAttempt += 1; state.updatingLocation = false; show('start-step'); $('use-location').focus(); }); $('retry-load').addEventListener('click', () => location.reload());
+nodes['refresh-location'].addEventListener('click', placeAction);
+nodes['refresh-location-compact'].addEventListener('click', placeAction);
+
+// Menú de puntos: disclosure simple, sin `role="menu"`, para que Tab recorra los
+// ítems sin gestión de foco propia. `Escape` cierra primero el menú y solo el
+// segundo llega al card de controles, que es quien lo colapsa.
+const menuAbierto = () => !nodes['place-menu'].hidden;
+function closePlaceMenu({ devolverFoco = false } = {}) {
+  if (!menuAbierto()) return;
+  nodes['place-menu'].hidden = true;
+  nodes['place-more'].setAttribute('aria-expanded', 'false');
+  if (devolverFoco) nodes['place-more'].focus();
+}
+nodes['place-more'].addEventListener('click', () => {
+  if (menuAbierto()) { closePlaceMenu({ devolverFoco: true }); return; }
+  nodes['place-menu'].hidden = false;
+  nodes['place-more'].setAttribute('aria-expanded', 'true');
+  nodes['place-menu'].querySelector('button:not(:disabled)')?.focus();
+});
+addEventListener('keydown', (event) => {
+  if (!menuAbierto()) return;
+  // `stopImmediatePropagation` y no `stopPropagation`: si el evento tiene como
+  // destino la propia ventana, ambos listeners corren en la misma fase y el
+  // card colapsaría con el mismo Escape que solo debía cerrar el menú.
+  if (event.key === 'Escape') { event.stopImmediatePropagation(); closePlaceMenu({ devolverFoco: true }); return; }
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const items = [...nodes['place-menu'].querySelectorAll('button:not(:disabled)')];
+  const paso = event.key === 'ArrowDown' ? 1 : items.length - 1;
+  event.preventDefault();
+  items[(items.indexOf(document.activeElement) + paso + items.length) % items.length]?.focus();
+}, true);
+addEventListener('pointerdown', (event) => { if (!nodes['place-menu'].contains(event.target) && !nodes['place-more'].contains(event.target)) closePlaceMenu(); });
+// Al colapsarse el card por scroll el panel se esconde; el menú no puede quedar
+// abierto y sin dueño detrás.
+addEventListener('scroll', () => closePlaceMenu(), { passive: true });
+$('menu-districts').addEventListener('click', () => { closePlaceMenu(); chooseDistrict(); });
+// Volver al inicio conserva radio y criterio: son preferencias, no consecuencias
+// del origen. Solo se suelta la posición en vuelo, si había una.
+$('menu-home').addEventListener('click', () => { closePlaceMenu(); state.locationAttempt += 1; state.updatingLocation = false; show('start-step'); $('use-location').focus(); });
+$('retry-load').addEventListener('click', () => location.reload());
 initTheme();
 initialize();

@@ -16,8 +16,14 @@ export function initControlsCard({ card, slot, scrim, summaryButton, doneButton,
     summaryButton.setAttribute('aria-expanded', String(open));
     doneButton.setAttribute('aria-expanded', String(open));
     scrim.hidden = state !== 'overlay';
-    // Nadie se queda enfocado dentro de un panel que acaba de cerrarse.
-    if (!open && card.contains(document.activeElement)) summaryButton.focus({ preventScroll: true });
+    // Nadie se queda enfocado dentro de un panel que acaba de cerrarse. En la
+    // pantalla de distritos «Ajustar» no existe —no hay nada que desplegar—, así
+    // que el foco va al primer control que sí queda visible en la barra.
+    if (!open && card.contains(document.activeElement)) {
+      const visible = (el) => el && el.offsetParent !== null;
+      const destino = visible(summaryButton) ? summaryButton : [...card.querySelectorAll('.controls__bar button')].find(visible);
+      destino?.focus({ preventScroll: true });
+    }
     if (state === 'overlay') {
       const from = scrollY;
       overlayWatch = () => { if (scrollY - from > 32) setState('compact'); };

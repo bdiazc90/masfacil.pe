@@ -22,7 +22,7 @@
     <div class="controls-slot" id="controls-slot">
       <section class="controls plate" id="controls" data-state="full" data-screen="other" aria-label="Controles de búsqueda">
         <div class="controls__bar">
-          <button class="controls__quick" id="refresh-location-compact" type="button" aria-label="Actualizar ubicación" title="Actualizar ubicación" hidden><svg class="controls__quick-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg></button>
+          <button class="controls__quick" id="refresh-location-compact" type="button" aria-label="Actualizar ubicación" title="Actualizar ubicación"><svg class="controls__quick-icon" data-place-icon="refresh" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"/><path d="M20.5 4v4.8h-4.8"/></svg><svg class="controls__quick-icon" data-place-icon="gps" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span class="controls__quick-label" id="refresh-location-compact-label">Actualizar</span></button>
           <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
             <img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">
             <span class="controls__text"><span class="controls__place" id="sum-place"></span><span class="controls__criteria" id="sum-criteria"></span></span>
@@ -39,14 +39,23 @@
                 <button data-theme-choice="dark" aria-pressed="false" aria-label="Tema oscuro" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg></button>
               </div>
             </header>
+            <!-- Arriba dónde estás, abajo qué puedes hacer. El nombre del lugar
+                 nunca es pulsable: sigue siendo el encabezado de los resultados. -->
             <div class="place">
-              <div class="place__where">
-                <span class="place__label">Lugar</span>
-                <h2 class="place__value" id="compare-title" tabindex="-1"><svg id="place-icon" class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span id="place-name">Mi ubicación</span></h2>
-              </div>
-              <div class="place__actions">
-                <button id="refresh-location" class="button--text" type="button" hidden>Actualizar ubicación</button>
-                <button id="change-origin" class="button--text" type="button">Cambiar</button>
+              <h2 class="place__value" id="compare-title" tabindex="-1"><svg id="place-icon" class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span id="place-name">Mi ubicación</span></h2>
+              <div class="place__row">
+                <button id="refresh-location" class="place__action" type="button">
+                  <svg class="place__action-icon" data-place-icon="refresh" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"/><path d="M20.5 4v4.8h-4.8"/></svg>
+                  <svg class="place__action-icon" data-place-icon="gps" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg>
+                  <span id="place-action-label">Actualizar ubicación</span>
+                </button>
+                <button id="place-more" class="place__more" type="button" aria-expanded="false" aria-controls="place-menu" aria-label="Más opciones" title="Más opciones"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/></svg></button>
+                <div id="place-menu" class="place__menu" hidden>
+                  <button id="menu-districts" class="place__menu-item" data-menu-screen="compare" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Ver distritos</button>
+                  <button id="menu-back-results" class="place__menu-item" data-menu-screen="district" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg>Volver a los resultados</button>
+                  <button id="menu-history" class="place__menu-item" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.3V12l3.2 1.9"/></svg>Ver historial<span class="chip-soon">próximo</span></button>
+                  <button id="menu-home" class="place__menu-item place__menu-item--home" type="button"><img class="brand__logo" src="/icons/logo.svg" alt="" width="20" height="21">Volver al inicio</button>
+                </div>
               </div>
             </div>
             <div id="radius-control" class="radius" hidden>
@@ -63,24 +72,23 @@
     <div class="controls-scrim" id="controls-scrim" hidden></div>
     <section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">
       <h1 id="start-title">Encuentra gasolina cerca de ti</h1>
-      <button id="use-location" class="button button--primary" type="button" disabled>Usar mi ubicación</button>
-      <button id="choose-district" class="button--text" type="button" disabled>Elegir distrito</button>
+      <button id="use-location" class="button button--primary" type="button" disabled>Ver en mi ubicación</button>
+      <button id="choose-district" class="button--text" type="button" disabled>Ver distritos</button>
       <p id="location-status" class="privacy-line" role="status" aria-live="polite">No guardamos tu ubicación.</p>
       <p id="data-status" class="hint" role="status" aria-live="polite">Cargando precios…</p>
     </section>
-    <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button--text" type="button">Elegir distrito</button></div></section>
-    <section id="district-step" class="screen-flow district-step" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o reintenta.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div><button id="district-show-all" class="button--text" type="button">Ver todos los distritos</button><button id="retry-location" class="button--text" type="button">Reintentar ubicación</button></section>
+    <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button--text" type="button">Ver distritos</button></div></section>
+    <section id="district-step" class="screen-flow district-step" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o vuelve a intentarlo.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div></section>
     <section id="compare-step" class="screen-flow screen-flow--results" aria-labelledby="compare-title" hidden>
       <p id="offline-note" class="offline-note" role="status" hidden></p>
       <div id="location-update" class="location-update" hidden>
-        <p id="location-update-text" class="location-update__text" role="status" aria-live="polite" tabindex="-1"></p>
-        <button id="retry-location-update" class="button--text" type="button" hidden>Reintentar</button>
+        <p id="location-update-text" class="location-update__text" role="status" aria-live="polite"></p>
       </div>
       <ol id="offers" class="offers"></ol>
       <section id="radius-empty" class="plate empty" hidden><h2>Ningún grifo en este radio</h2><p class="lede">Amplía el radio de búsqueda para encontrar estaciones más lejanas.</p></section>
       <button id="load-more" class="button button--ghost" type="button" hidden></button>
       <p id="offers-status" class="sr-only" role="status"></p>
-      <section id="empty-state" class="plate empty" hidden><p class="eyebrow">Sin datos recientes</p><h2>No tenemos precios recientes</h2><p class="lede">No mostramos precios de más de 30 días porque ya no sirven para decidir.</p><a id="official-source" class="button button--primary" target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a></section>
+      <section id="empty-state" class="plate empty" hidden><p class="eyebrow">Sin precios recientes</p><h2>Ningún grifo reportó precio en los últimos 30 días</h2><p class="lede">Los grifos siguen ahí, pero hoy ninguno tiene un precio que sirva para decidir.</p><a id="official-source" class="button button--primary" target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a></section>
       <details class="about plate"><summary>Sobre los datos</summary><div id="source-content"></div></details>
     </section>
     <section id="fatal-state" class="screen-flow" aria-labelledby="fatal-title" hidden><div class="plate"><p class="eyebrow">No hay datos disponibles</p><h2 id="fatal-title">No se pudieron cargar las opciones</h2><p id="fatal-message" class="lede"></p><button id="retry-load" class="button button--primary" type="button">Reintentar</button></div></section>

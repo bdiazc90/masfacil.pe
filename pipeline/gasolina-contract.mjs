@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 
-export const GASOLINA_MANIFEST_VERSION = '2.4.0';
+export const GASOLINA_MANIFEST_VERSION = '2.5.0';
 export const LEGACY_GASOLINA_MANIFEST_VERSION = '2.0.0';
-export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0']);
+export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0', '2.5.0']);
 export const CONFIDENCE_LEVELS = Object.freeze(['verified', 'nearby']);
 export const GASOLINA_SCOPE = Object.freeze({ department: 'LIMA', province: 'LIMA' });
 export const GASOLINA_KEYS = Object.freeze(['regular', 'premium']);
@@ -25,11 +25,16 @@ export function validateGasolinaDataset(dataset) {
   if (!text(dataset?.provenance?.source_url) || !text(dataset?.provenance?.attribution)) errors.push('procedencia inválida');
   if (!Array.isArray(dataset?.offers)) errors.push('ofertas inválidas');
   const conIdentidad = version !== LEGACY_GASOLINA_MANIFEST_VERSION;
-  const conDireccion = ['2.2.0', '2.3.0', '2.4.0'].includes(version);
-  const conConfianza = ['2.3.0', '2.4.0'].includes(version);
+  const conDireccion = ['2.2.0', '2.3.0', '2.4.0', '2.5.0'].includes(version);
+  const conConfianza = ['2.3.0', '2.4.0', '2.5.0'].includes(version);
   // 2.4.0 añade si la bandera está acreditada. Es lo único que habilita el logo:
   // el dato nunca lleva una URL, solo dice si esa marca pasó evidencia y auditoría.
-  const conMarcaAcreditada = version === '2.4.0';
+  const conMarcaAcreditada = ['2.4.0', '2.5.0'].includes(version);
+  // 2.5.0 no cambia la FORMA de la oferta: cambia su POBLACIÓN. Hasta 2.4.0 toda
+  // oferta del bundle tenía menos de 30 días; desde 2.5.0 también viajan las
+  // vencidas, con su fecha real, para que la tarjeta del grifo no desaparezca.
+  // La versión sube para que un cliente viejo rechace el bundle y siga con su
+  // copia guardada, en vez de pintar un precio vencido como si fuera de hoy.
   for (const offer of dataset?.offers ?? []) {
     const expectedFields = conDireccion ? PUBLIC_OFFER_FIELDS
       : conIdentidad ? PUBLIC_OFFER_FIELDS.filter((field) => field !== 'address')

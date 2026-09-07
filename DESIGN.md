@@ -87,8 +87,11 @@ producto. Se puede mejorar **cómo se comunican**, nunca eliminarlas.
 - **Sin stock, disponibilidad ni condición presente.** Solo lo que la fuente observó.
 - **Sin scoring oculto.** Solo órdenes explicables. Nada de «recomendado para ti».
 - **Frescura visible y recalculada al consultar**, también sin conexión.
-- **Ventana de vigencia por ruta.** Fuera de ella el dato no se muestra: un estado vacío
-  honesto que deriva a la fuente oficial es preferible a un dato viejo.
+- **Ventana de vigencia por ruta.** Fuera de ella el PRECIO no se muestra: un dato viejo es
+  peor que ninguno. Lo que no caduca es el establecimiento; el Registro oficial lo sigue
+  autorizando, así que su tarjeta permanece sin precios y dice desde cuándo calla. Borrarla
+  afirmaría que cerró, y eso el dato no lo dice. Cuando no queda ningún precio comparable,
+  entonces sí manda el estado vacío honesto que deriva a la fuente oficial.
 - **Ausencia no es juicio.** Lo no evaluado, no cubierto o no reportado se dice así; nunca
   se presenta como resultado negativo. Un producto sin precio vigente muestra «—», no cero.
 - **La ubicación no sale del dispositivo.** Los servicios externos reciben solo el
@@ -298,7 +301,7 @@ exige un hallazgo material medido, no una opinión.
 | Etiqueta «Regular más barata en 1.5 km» sobre la más barata del radio; doble cuando también es la más cercana | sin decirlo, la interfaz inventaría un contraste que no existe |
 | Paginación que duplica: 6 → 12 → 24 → todo; si quedan ≤ 4, se muestran sin botón | Lima Cercado a 5 km son 120 estaciones: cinco toques en vez de 38 |
 | Card de controles fijo con tres estados en vez de un header pegajoso de 200 px | el header fijo ocupaba un cuarto de la pantalla; la fila compacta de 52 px conserva lugar, radio y criterio |
-| Ventana de frescura: 30 días | fuera de ella el precio ya no sirve para decidir |
+| Ventana de frescura: 30 días | fuera de ella el precio ya no sirve para decidir; el grifo se queda sin precio, porque desaparecer diría que cerró |
 | Ubicación de alta precisión | un error de 300 m reordena las tarjetas y el producto mentiría sin saberlo |
 | Sin ubicación: elegir distrito, sin distancia ni radio, ordenado por precio | no se confunde límite distrital con cercanía |
 | Nombre de estación solo desde el catálogo verificado; «por confirmar» con cercanía comprobada; la dirección oficial siempre | 54 revisiones del owner sin errores: cota inferior 89 % y 86 %, declarada en «Sobre los datos» |

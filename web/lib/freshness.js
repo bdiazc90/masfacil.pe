@@ -12,11 +12,17 @@ export function evaluateOfferFreshness(offer, { now, cutoffAt }) {
   if (age_days < 0) return { visible: false, age_days, reason: 'future_reported_at' };
   return age_days <= MAX_OFFER_AGE_DAYS ? { visible: true, age_days, reason: 'recent' } : { visible: false, age_days, reason: 'expired' };
 }
+// La ventana de 30 días sigue decidiendo qué PRECIO se pinta, no qué grifo
+// existe. Por eso lo vencido ya no se tira: se devuelve aparte, para que la
+// tarjeta permanezca sin precio en vez de desaparecer. Lo que nunca se muestra
+// es un reporte del futuro o con fecha ilegible: eso sí se descarta.
 export function filterFreshOffers(offers, { now, cutoffAt }) {
   if (!Array.isArray(offers)) throw new TypeError('La colección de ofertas debe ser un arreglo');
   const queried_at = new Date(clock(now)).toISOString(); const cutoff_at = new Date(timestamp(cutoffAt, 'El corte del snapshot')).toISOString();
   if (Date.parse(queried_at) < Date.parse(cutoff_at)) throw new FreshnessVerificationError('No se puede verificar la vigencia: el reloj es anterior al corte del snapshot');
   const evaluated = offers.map((offer) => ({ offer, freshness: evaluateOfferFreshness(offer, { now: () => queried_at, cutoffAt }) }));
-  const fresh = evaluated.filter(({ freshness }) => freshness.visible).map(({ offer, freshness }) => ({ ...offer, age_days: freshness.age_days }));
-  return { offers: fresh, queried_at, cutoff_at, total_offers: offers.length, fresh_offers: fresh.length };
+  const conEdad = ({ offer, freshness }) => ({ ...offer, age_days: freshness.age_days });
+  const fresh = evaluated.filter(({ freshness }) => freshness.visible).map(conEdad);
+  const expired = evaluated.filter(({ freshness }) => freshness.reason === 'expired').map(conEdad);
+  return { offers: fresh, expired, queried_at, cutoff_at, total_offers: offers.length, fresh_offers: fresh.length, expired_offers: expired.length };
 }
