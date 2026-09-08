@@ -1,12 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 520" role="img" aria-labelledby="logo-title">
   <title id="logo-title">masfacil.pe</title>
   <defs>
-    <!-- ARO / MARCADOR -->
-    <linearGradient id="ringGradient" x1="250" y1="20" x2="250" y2="515" gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#c6ccaa"/>
-      <stop offset="45%"  stop-color="#948a63"/>
-      <stop offset="100%" stop-color="#352d21"/>
-    </linearGradient>
 
     <!-- FRANJAS ROJO PERÚ -->
     <linearGradient id="peruRedLeft" x1="115" y1="130" x2="165" y2="355" gradientUnits="userSpaceOnUse">
@@ -21,7 +15,7 @@
     </linearGradient>
 
     <!-- M -->
-    <linearGradient id="mGradient" x1="250" y1="142" x2="250" y2="354" gradientUnits="userSpaceOnUse">
+    <linearGradient id="mGradient" x1="250" y1="124" x2="250" y2="340" gradientUnits="userSpaceOnUse">
       <stop offset="0%"   stop-color="#FFC800"/>
       <stop offset="45%"  stop-color="#FF9B00"/>
       <stop offset="100%" stop-color="#F26200"/>
@@ -29,7 +23,7 @@
   </defs>
 
   <!-- 1. MARCADOR EXTERIOR (Grosor base 60px) -->
-  <path fill="url(#ringGradient)" d="
+  <path fill="#333" d="
     M250 20
     C128.5 20 30 118.5 30 240
     C30 339.2 94.7 423.2 185.5 453.8
@@ -56,24 +50,16 @@
 
   <!-- 3. FRANJAS ROJAS (Arcos exactos sobre el círculo R=160 de la cavidad) -->
   <path fill="url(#peruRedLeft)" d="
-    M140 128
-    A156 160 0 0 0 140 356
+    M150 128
+    A166 160 0 0 0 150 356
     Z"/>
   <path fill="url(#peruRedRight)" d="
-    M360 128
-    A156 160 0 0 1 360 356
+    M350 128
+    A166 160 0 0 1 350 356
     Z"/>
 
-  <!-- 4. M (Geometría con reflejo espejo matemáticamente puro) -->
-  <path fill="url(#mGradient)" d="
-    M148 297
-    L182 158 Q185 142 194 158
-    L243 230 Q250 240 257 230
-    L306 158 Q315 142 318 158
-    L352 297 Q358 314 344 307
-    L302 251 Q295 241 288 251
-    L256 340 Q250 354 244 340
-    L212 251 Q205 241 198 251
-    L156 307 Q142 314 148 297
-    Z"/>
+  <!-- 4. M rounded sans (trazo 36 con remates y uniones redondeadas; margen 10.5px hacia las franjas) -->
+  <path fill="none" stroke="url(#mGradient)" stroke-width="24"
+        stroke-linecap="round" stroke-linejoin="round" d="
+    M 184 312.0 L 215 200 Q 192 150 216.0 200 L 243.6 255.0 Q 250.0 270 256.4 255.0 L 284.0 200 Q 272.0 150 285 200 L 316 312.0"/>
 </svg>
