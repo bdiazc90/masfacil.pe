@@ -110,7 +110,7 @@ export function staleBrandEvidence(catalog, now = new Date()) {
     .sort((left, right) => left.evidenced_at.localeCompare(right.evidenced_at));
 }
 
-export function buildCommercialCatalogIndex(catalog, { registryIds, offerIds, approvedBrandMethods = new Set() }) {
+export function buildCommercialCatalogIndex(catalog, { registryIds, offerIds }) {
   const registry = registryIds instanceof Set ? registryIds : new Set(registryIds);
   const offers = offerIds instanceof Set ? offerIds : new Set(offerIds);
   if (!registry.size) throw new Error('Universo del Registro vacío: no se valida identidad comercial sin referencia oficial');
@@ -119,22 +119,20 @@ export function buildCommercialCatalogIndex(catalog, { registryIds, offerIds, ap
   // del bundle— así que nombrarlo en el error convierte un fallo de CI en una
   // pista accionable sin reproducir la corrida.
   if (unknown.length) throw new Error(`Catálogo comercial contiene establishment_id fuera del Registro oficial: ${unknown.length} (${listado(unknown.map((entry) => entry.establishment_id))})`);
-  const approved = approvedBrandMethods instanceof Set ? approvedBrandMethods : new Set(approvedBrandMethods);
-  const byAnchor = new Map(); let pending = 0; let withBrand = 0; let accredited = 0; const withoutOffer = [];
+  const byAnchor = new Map(); let pending = 0; let withBrand = 0; let withEvidence = 0; const withoutOffer = [];
   for (const entry of catalog.entries) {
     if (!isPublicCommercialEntry(entry)) { pending += 1; continue; }
     if (!offers.has(entry.establishment_id)) { withoutOffer.push(entry.establishment_id); continue; }
-    // Marca identificada y marca acreditada son dos cosas: la primera se publica
-    // como texto igual que hasta ahora; solo la segunda —evidencia de bandera con
-    // su grupo auditado por encima del umbral— habilita el logo.
-    const brandAccredited = Boolean(entry.brand) && Boolean(entry.brand_evidence) && approved.has(entry.brand_evidence.method);
     if (entry.brand) withBrand += 1;
-    if (brandAccredited) accredited += 1;
-    byAnchor.set(entry.establishment_id, Object.freeze({ brand: entry.brand, public_site_name: entry.public_site_name, confidence: entry.confidence, brand_accredited: brandAccredited }));
+    if (entry.brand && entry.brand_evidence) withEvidence += 1;
+    byAnchor.set(entry.establishment_id, Object.freeze({ brand: entry.brand, public_site_name: entry.public_site_name, confidence: entry.confidence }));
   }
   return Object.freeze({
     byAnchor,
     withoutOffer: Object.freeze(withoutOffer.sort()),
-    metrics: Object.freeze({ entries: catalog.entries.length, registry_universe: registry.size, offer_universe: offers.size, projected: byAnchor.size, pending, without_current_offer: withoutOffer.length, unknown_anchors: 0, projected_with_brand: withBrand, projected_with_accredited_brand: accredited }),
+    // `projected_with_brand` es lo que se publica; `with_brand_evidence` dice
+    // cuántas de esas traen además expediente de bandera. El logo ya no depende
+    // de la segunda: quién lo pinta es la lista controlada del cliente.
+    metrics: Object.freeze({ entries: catalog.entries.length, registry_universe: registry.size, offer_universe: offers.size, projected: byAnchor.size, pending, without_current_offer: withoutOffer.length, unknown_anchors: 0, projected_with_brand: withBrand, with_brand_evidence: withEvidence }),
   });
 }

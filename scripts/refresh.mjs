@@ -98,7 +98,7 @@ function refreshBaseline() {
     const errors = validateGasolinaRefreshState(state, { revision_id: state.revision_id });
     if (errors.length) throw new Error(`Refresh-state público inválido: ${errors.join('; ')}`);
     return {
-      active: { snapshot_id: snapshotIdFromGasolinaRevision(state.revision_id), validators: state.validators },
+      active: { snapshot_id: state.snapshot_id ?? snapshotIdFromGasolinaRevision(state.revision_id), validators: state.validators },
       localValidators: state.validators,
       previousEvidence: null,
       previousProducts: state.products,
@@ -114,7 +114,11 @@ function refreshBaseline() {
   if (fs.existsSync(localStatePath)) {
     const state = readJson(localStatePath);
     const errors = validateGasolinaRefreshState(state, { revision_id: state.revision_id });
-    if (!errors.length && snapshotIdFromGasolinaRevision(state.revision_id) === active.snapshot_id) {
+    // Antes se comparaba recortando el `revision_id`, y como el recorte nunca
+    // quitaba el sufijo la igualdad era siempre falsa: `previousProducts` quedaba
+    // en null y los guardrails de caída de ofertas y de cobertura no llegaban a
+    // evaluarse. Ahora el snapshot viene declarado.
+    if (!errors.length && (state.snapshot_id ?? snapshotIdFromGasolinaRevision(state.revision_id)) === active.snapshot_id) {
       previousProducts = state.products;
       previousSourceMaxReportedAt = state.source_max_reported_at;
     }

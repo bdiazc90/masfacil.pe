@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 
-export const GASOLINA_MANIFEST_VERSION = '2.5.0';
+export const GASOLINA_MANIFEST_VERSION = '2.6.0';
 export const LEGACY_GASOLINA_MANIFEST_VERSION = '2.0.0';
-export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0', '2.5.0']);
+export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0']);
 export const CONFIDENCE_LEVELS = Object.freeze(['verified', 'nearby']);
 export const GASOLINA_SCOPE = Object.freeze({ department: 'LIMA', province: 'LIMA' });
 export const GASOLINA_KEYS = Object.freeze(['regular', 'premium']);
@@ -25,10 +25,11 @@ export function validateGasolinaDataset(dataset) {
   if (!text(dataset?.provenance?.source_url) || !text(dataset?.provenance?.attribution)) errors.push('procedencia inválida');
   if (!Array.isArray(dataset?.offers)) errors.push('ofertas inválidas');
   const conIdentidad = version !== LEGACY_GASOLINA_MANIFEST_VERSION;
-  const conDireccion = ['2.2.0', '2.3.0', '2.4.0', '2.5.0'].includes(version);
-  const conConfianza = ['2.3.0', '2.4.0', '2.5.0'].includes(version);
-  // 2.4.0 añade si la bandera está acreditada. Es lo único que habilita el logo:
-  // el dato nunca lleva una URL, solo dice si esa marca pasó evidencia y auditoría.
+  const conDireccion = ['2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0'].includes(version);
+  const conConfianza = ['2.3.0', '2.4.0', '2.5.0', '2.6.0'].includes(version);
+  // 2.4.0 y 2.5.0 llevaban `brand_accredited`, una segunda puerta que solo
+  // servía para pintar el logo. Desde 2.6.0 no existe: la marca y su logo son la
+  // misma afirmación, así que el dato vuelve a describir identidad y nada más.
   const conMarcaAcreditada = ['2.4.0', '2.5.0'].includes(version);
   // 2.5.0 no cambia la FORMA de la oferta: cambia su POBLACIÓN. Hasta 2.4.0 toda
   // oferta del bundle tenía menos de 30 días; desde 2.5.0 también viajan las
@@ -67,7 +68,12 @@ export function validateGasolinaManifest(manifest) {
 
 export function validateGasolinaRefreshState(state, manifest) {
   const errors = [];
-  if (!sameKeys(state, ['schema_version', 'revision_id', 'validators', 'source_max_reported_at', 'products'])) errors.push('campos refresh-state inválidos');
+  // Desde 2.6.0 el snapshot se declara; antes se deducía recortando el
+  // `revision_id`, y ese recorte nunca quitó el sufijo, así que la comparación
+  // que apagaba o encendía los guardrails de caída era siempre falsa.
+  const conSnapshot = ['2.6.0'].includes(state?.schema_version);
+  if (!sameKeys(state, conSnapshot ? ['schema_version', 'revision_id', 'snapshot_id', 'validators', 'source_max_reported_at', 'products'] : ['schema_version', 'revision_id', 'validators', 'source_max_reported_at', 'products'])) errors.push('campos refresh-state inválidos');
+  if (conSnapshot && !text(state?.snapshot_id)) errors.push('snapshot_id refresh-state inválido');
   if (!GASOLINA_VERSIONS.includes(state?.schema_version) || (manifest?.schema_version && state?.schema_version !== manifest.schema_version) || state?.revision_id !== manifest?.revision_id) errors.push('revisión refresh-state inválida');
   if (!timestamp(state?.source_max_reported_at)) errors.push('máximo temporal refresh-state inválido');
   if (!state?.validators || !Object.hasOwn(state.validators, 'etag') || !Object.hasOwn(state.validators, 'last_modified')) errors.push('validadores refresh-state inválidos');

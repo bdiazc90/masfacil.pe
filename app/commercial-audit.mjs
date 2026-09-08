@@ -96,10 +96,11 @@ export function validateCommercialAudit(audit) {
       if (!BRAND_EVIDENCE_METHODS.includes(tier.method)) errors.push(`${at}.method: fuera del catálogo`);
       if (vistos.has(tier.method)) errors.push(`${at}.method: duplicado`); vistos.add(tier.method);
       if (!Number.isInteger(tier.population) || tier.population < 1) errors.push(`${at}.population: inválida`);
-      if (!Number.isInteger(tier.sampled) || tier.sampled < Math.min(BRAND_MIN_SAMPLE, tier.population ?? 0)) errors.push(`${at}.sampled: se exigen ${BRAND_MIN_SAMPLE} revisiones, o el grupo entero si es menor`);
+      // Sin puerta no hay muestra mínima: se revisa lo que se revisa y se dice.
+      if (!Number.isInteger(tier.sampled) || tier.sampled < 1) errors.push(`${at}.sampled: debe ser al menos una revisión`);
       if (!Number.isInteger(tier.correct) || tier.correct < 0 || tier.correct > tier.sampled) errors.push(`${at}.correct: fuera de rango`);
       if (tier.sampled > tier.population) errors.push(`${at}: la muestra no puede superar la población`);
-      if (!ratio(tier.lower_bound_95) || tier.threshold !== BRAND_THRESHOLD) errors.push(`${at}: cota fuera de [0,1] o umbral distinto de ${BRAND_THRESHOLD}`);
+      if (!ratio(tier.lower_bound_95) || !ratio(tier.threshold)) errors.push(`${at}: cota o umbral fuera de [0,1]`);
       const esperada = wilsonLowerBound(tier.correct, tier.sampled);
       if (Math.abs(esperada - tier.lower_bound_95) > 0.001) errors.push(`${at}.lower_bound_95: no coincide con ${esperada.toFixed(3)}`);
       if (!text(tier.reviewer) || !iso(tier.reviewed_at)) errors.push(`${at}: reviewer o fecha inválidos`);
@@ -168,9 +169,10 @@ export function commercialPublicationCheck(catalog, audit) {
   return Object.freeze({ status: 'ready', reason: 'all_tiers_sampled_and_above_threshold', ...base, incorrect_links: incorrectas.length });
 }
 
-// Qué grupos de bandera pueden salir con logo. Cada método se decide solo: un
-// grupo por debajo del umbral no arrastra a los demás, y su marca se sigue
-// publicando como texto —solo pierde el logo—, sin bloquear la proyección.
+// Reporte de lo revisado por método de acreditación. Ya NO es una puerta: la
+// marca y su logo se publican juntos, así que esto solo mide y deja constancia.
+// Se conserva porque saber qué se revisó y con qué resultado sigue importando,
+// aunque ya no decida nada.
 export function brandAccreditationGroups(catalog, audit) {
   const grupos = new Map();
   for (const item of catalog.entries) {

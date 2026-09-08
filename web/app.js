@@ -1,7 +1,7 @@
 import { loadGasolina } from './data-client.js';
 import { haversineKm, initialRadiusKm, nextVisibleCount, orderOffers, radiusIsInert, withinRadius, PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM, SHOW_ALL_THRESHOLD } from './lib/haversine.js';
 import { decisionTag, formatRadius } from './lib/decision-view.js';
-import { filterFreshOffers } from './lib/freshness.js';
+import { filterFreshOffers, MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
 import { mergeOfferRows } from './lib/merge-products.js';
 import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
 import { visibleDistricts } from './district-list.js';
@@ -11,7 +11,7 @@ import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
 
-const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false, preferencesTouched: false };
+const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false, preferencesTouched: false, freshUntil: 0 };
 const $ = (id) => document.getElementById(id);
 const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
@@ -50,6 +50,23 @@ function currentRows() {
 // Lo que de verdad se puede comparar. Lo consultan el estado vacío, el radio
 // inicial y los controles que solo tienen sentido con más de un precio.
 const conPrecio = (filas) => filas.filter((row) => row.has_price);
+const DIA_MS = 86_400_000;
+// La vigencia se congela en el instante en que se calcula, así que hay que
+// volver a mirarla cada vez que se rearma la lista: un precio de 29 días y 23
+// horas cruza los 30 mientras la app sigue abierta. No hace falta recomputar en
+// cada frame —la vigencia solo cambia cuando un precio cruza la ventana, y ese
+// instante se puede calcular— así que se guarda cuál es el próximo y hasta
+// entonces se reutiliza lo que ya hay.
+function refrescarVigencia({ forzar = false } = {}) {
+  if (!forzar && Date.now() < state.freshUntil) return;
+  state.fresh = currentRows();
+  const edades = state.fresh.flatMap((row) => GASOLINA_KEYS.map((key) => row.prices[key]?.age_days)).filter(Number.isFinite);
+  // El precio más viejo que hoy se ve es el primero en vencer. Sin ninguno
+  // visible ya no queda nada que pueda caducar.
+  const masViejo = edades.reduce((mayor, edad) => Math.max(mayor, edad), -Infinity);
+  state.freshUntil = edades.length ? Date.now() + (MAX_OFFER_AGE_DAYS - masViejo) * DIA_MS : Infinity;
+  if (state.origin) state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
+}
 function renderRadiusControl() {
   const inerte = radiusIsInert(state.located);
   nodes['radius-control'].hidden = false;
@@ -63,9 +80,11 @@ function renderRadiusControl() {
     : `${formatRadius(state.radiusKm)} · ${total} ${total === 1 ? 'estación' : 'estaciones'}`;
 }
 // Resumen del card compacto: el lugar puede truncar; el criterio nunca.
-function renderSummary() {
+function renderSummary(hayPrecios = true) {
   const porPrecio = state.sort.startsWith('price:') || !state.origin;
-  const criterio = porPrecio ? `${PRODUCTOS[state.priceProduct]} más barata` : 'Más cerca';
+  // Sin un solo precio vigente, anunciar un criterio de precio promete un orden
+  // que no existe: el resumen dice lo que pasa, no lo que ordenaría.
+  const criterio = !hayPrecios ? 'Sin precios recientes' : porPrecio ? `${PRODUCTOS[state.priceProduct]} más barata` : 'Más cerca';
   const partes = state.origin ? [formatRadius(state.radiusKm), criterio] : [criterio];
   // Con GPS el icono de la barra ya dice «mi ubicación»: repetirlo en texto solo
   // le robaba ancho al criterio, que nunca debe truncar.
@@ -73,15 +92,19 @@ function renderSummary() {
 }
 
 function renderOffers() {
+  refrescarVigencia();
   const noOrigin = !state.origin;
-  const porPrecio = state.sort.startsWith('price:');
+  // Sin nada que comparar, ordenar por precio no significa nada: se cae a
+  // cercanía sin tocar la preferencia guardada de la persona.
+  const hayPrecios = conPrecio(state.fresh).length > 0;
+  const porPrecio = hayPrecios && state.sort.startsWith('price:');
   const producto = state.priceProduct;
   // Con ubicación: el radio filtra, el toggle solo ordena y la lista pagina.
   // Cada control hace una cosa.
   state.pool = noOrigin ? [] : withinRadius(state.located, state.radiusKm);
   const ordenadas = noOrigin
     ? orderOffers(state.fresh.filter((row) => row.district === state.district), `price:${producto}`)
-    : orderOffers(state.pool, state.sort);
+    : orderOffers(state.pool, porPrecio ? state.sort : 'distance');
   // Si lo que falta cabe en el umbral se muestra entero: un botón para cuatro
   // tarjetas cuesta más de lo que ahorra.
   const pedidas = Math.min(state.visibleCount, ordenadas.length);
@@ -92,6 +115,9 @@ function renderOffers() {
   const activeProduct = porPrecio || noOrigin ? producto : null;
   nodes.offers.innerHTML = items.map((offer) => renderOfferCard(offer, { withDistance: !noOrigin, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: showTag ? decisionTag(offer, state.pool, state.radiusKm, producto) : null, activeProduct })).join('');
   nodes.offers.hidden = items.length === 0;
+  // El aviso de «sin precios recientes» acompaña a las tarjetas mudas, no las
+  // sustituye: el grifo sigue existiendo aunque hoy no diga a cuánto vende.
+  nodes['empty-state'].hidden = hayPrecios;
   nodes['sort-toggle'].hidden = noOrigin || comparables < 2;
   // El sub-toggle solo aparece cuando el orden depende del producto: en «Más
   // cerca» no ordena nada y sería un control que no hace lo que promete.
@@ -111,7 +137,7 @@ function renderOffers() {
   nodes['offers-status'].textContent = ordenadas.length > items.length || ordenadas.length > PAGE_SIZE + SHOW_ALL_THRESHOLD ? `Se muestran ${items.length} de ${ordenadas.length} estaciones.` : '';
   document.querySelectorAll('[data-sort]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.sort === (porPrecio ? 'price' : 'distance'))));
   document.querySelectorAll('[data-price-product]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.priceProduct === producto)));
-  renderSummary();
+  renderSummary(hayPrecios);
 }
 
 // Los dos precios ya viajan en la fila, así que el panel se abre sin pedir nada
@@ -128,15 +154,8 @@ function toggleDetail(button) {
 }
 
 function renderResults() {
-  state.fresh = currentRows();
+  refrescarVigencia({ forzar: true });
   nodes['official-source'].href = state.dataset.provenance.source_url;
-  // Con las mudas siempre presentes, la cantidad de filas dejó de ser señal: un
-  // apagón total de la fuente se vería como 800 tarjetas sin precio y sin
-  // explicación. Lo que decide el estado vacío es que no quede nada que comparar.
-  const comparables = conPrecio(state.fresh);
-  nodes['empty-state'].hidden = comparables.length > 0;
-  nodes.offers.hidden = comparables.length === 0;
-  nodes['sort-toggle'].hidden = comparables.length === 0 || !state.origin;
   // El nombre del lugar es el encabezado de los resultados: dice desde dónde se
   // compara, y por eso nunca es un botón.
   const lugar = state.origin ? 'Mi ubicación' : displayDistrict(state.district);
@@ -146,10 +165,11 @@ function renderResults() {
   // escribir el atributo o el icono se queda visible en los dos modos.
   nodes['place-icon'].toggleAttribute('hidden', !state.origin);
   renderPlaceAction('idle');
-  if (comparables.length === 0) return;
+  // Sin precios vigentes ya no se corta aquí: las tarjetas mudas se siguen
+  // pintando y los controles se recalculan en renderOffers. Cortar dejaba el
+  // radio y el resumen con los números de la búsqueda anterior.
   state.visibleCount = PAGE_SIZE;
   if (state.origin) {
-    state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
     // El radio se abre donde caben seis PRECIOS. Medirlo sobre todas las filas
     // lo dejaría estrecho y lleno de tarjetas mudas. Si la persona ya eligió
     // radio o criterio, esa elección sobrevive a volver al inicio y a cambiar
@@ -251,7 +271,10 @@ function renderLocationUpdate(status, message = null) {
 // criterio: si el radio conservado queda vacío, se ve el estado vacío y la
 // persona decide si lo amplía.
 function applyUpdatedOrigin() {
-  state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
+  // Forzado: cambió el origen, así que las distancias hay que rehacerlas aunque
+  // ningún precio haya vencido todavía. De paso reevalúa la vigencia, que es lo
+  // que faltaba: se recalculaban distancias sobre precios congelados al entrar.
+  refrescarVigencia({ forzar: true });
   state.visibleCount = PAGE_SIZE;
   renderOffers();
 }
@@ -300,7 +323,7 @@ function applyLoaded(dataset) {
   $('choose-district').disabled = false;
   nodes['data-status'].textContent = `${conPrecio(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
-  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>Un grifo que lleva más de 30 días sin reportar aparece igual, sin precios y diciendo desde cuándo calla: sigue existiendo en el Registro, pero no podemos decir a cuánto vende.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado. Las marcas y sus logos pertenecen a sus titulares y se muestran solo para identificar la estación.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos una muestra aleatoria y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 85 % en los marcados <b>por confirmar</b>. La marca y su logo se acreditan aparte, contra el directorio oficial de la cadena, y solo aparecen cuando esa comprobación pasa su propia auditoría. Si ves un nombre o una marca equivocada, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
+  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>Un grifo que lleva más de 30 días sin reportar aparece igual, sin precios y diciendo desde cuándo calla: sigue existiendo en el Registro, pero no podemos decir a cuánto vende.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado. Las marcas y sus logos pertenecen a sus titulares y se muestran solo para identificar la estación.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos una muestra aleatoria y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 85 % en los marcados <b>por confirmar</b>.</p><p>La marca sale del operador que declara el Registro o del directorio oficial de la cadena, y su logo acompaña siempre a la marca que publicamos: son la misma afirmación. Revisamos una muestra mirando el letrero; donde encontramos un error, retiramos esa marca. No revisamos las 277 una por una, así que si ves una equivocada, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
 async function hasGrantedLocationPermission() {
   try { return (await navigator.permissions?.query({ name: 'geolocation' }))?.state === 'granted'; }
@@ -379,5 +402,8 @@ $('menu-districts').addEventListener('click', () => { closePlaceMenu(); chooseDi
 // del origen. Solo se suelta la posición en vuelo, si había una.
 $('menu-home').addEventListener('click', () => { closePlaceMenu(); state.locationAttempt += 1; state.updatingLocation = false; show('start-step'); $('use-location').focus(); });
 $('retry-load').addEventListener('click', () => location.reload());
+// Volver a la app tras un rato no dispara ningún gesto: sin esto, un precio que
+// venció mientras estaba en segundo plano seguiría en pantalla hasta tocar algo.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.dataset && !nodes['compare-step'].hidden) renderOffers(); });
 initTheme();
 initialize();

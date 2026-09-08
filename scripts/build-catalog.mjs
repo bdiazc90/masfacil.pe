@@ -203,13 +203,32 @@ const catalogo = {
 
 // La auditoría solo puede hablar de entradas que existan en el catálogo.
 const porAnchor = new Map(entradas.map((e) => [e.establishment_id, e]));
+// Los veredictos del owner se aplican ANTES de auditar, pero el hash se toma de
+// la entrada TAL COMO SE REVISÓ: corregirla no puede borrar lo que se observó.
+const marcaRevisada = new Map(entradas.filter((e) => e.brand).map((e) => [e.establishment_id, commercialClaimSha256(e, 'brand')]));
+// También el método TAL COMO ERA al revisar: si el veredicto retira la marca,
+// el error tiene que contarse en el grupo que la propuso, no caer en otro.
+const metodoRevisado = new Map(entradas.filter((e) => e.brand).map((e) => [e.establishment_id, e.brand_evidence?.method ?? 'operador_del_registro']));
+const corregidas = [];
+for (const v of veredictosMarca.filter((x) => x.result === 'incorrect')) {
+  const entrada = porAnchor.get(v.establishment_id);
+  if (!entrada?.brand) continue;
+  corregidas.push({ establishment_id: entrada.establishment_id, marca_retirada: entrada.brand, conservaba_nombre: Boolean(entrada.public_site_name) });
+  entrada.brand = null;
+  entrada.brand_evidence = null;
+}
+// Una entrada que solo publicaba bandera se queda sin nada que decir: sale del
+// catálogo en vez de quedar como una fila vacía que el contrato rechazaría.
+const vacias = new Set(entradas.filter((e) => !e.brand && !e.public_site_name).map((e) => e.establishment_id));
+if (vacias.size) { for (let i = entradas.length - 1; i >= 0; i -= 1) if (vacias.has(entradas[i].establishment_id)) entradas.splice(i, 1); }
+
 const veredictoA = (v, claim, revisadoEn) => {
   const entrada = porAnchor.get(v.establishment_id);
   return {
     establishment_id: v.establishment_id,
     // El hash cubre solo los campos de esta afirmación: incorporar una marca no
     // hereda el visto bueno del nombre ni al revés.
-    entry_sha256: commercialClaimSha256(entrada, claim),
+    entry_sha256: claim === 'brand' ? marcaRevisada.get(v.establishment_id) : commercialClaimSha256(entrada, claim),
     claim,
     confidence: entrada.confidence,
     selection_reason: v.selection_reason ?? 'random_sample',
@@ -221,14 +240,18 @@ const veredictoA = (v, claim, revisadoEn) => {
 const revisadas = [
   // Un veredicto de nombre solo vale sobre una entrada que publica nombre.
   ...[...veredictos, ...veredictosCandidatos].filter((v) => porAnchor.get(v.establishment_id)?.public_site_name).map((v) => veredictoA(v, 'name', REVISADO)),
-  ...veredictosMarca.filter((v) => porAnchor.get(v.establishment_id)?.brand_evidence).map((v) => veredictoA(v, 'brand', REVISADO_MARCA)),
+  // Todo veredicto de bandera cuenta, tenga o no expediente: desde que marca y
+  // logo son la misma afirmación, la revisión mide la marca publicada, no el
+  // método por el que llegó.
+  ...veredictosMarca.filter((v) => marcaRevisada.has(v.establishment_id)).map((v) => veredictoA(v, 'brand', REVISADO_MARCA)),
 ];
 
 // El tier de nombre mide precisión de NOMBRES: una entrada que solo publica
 // bandera no tiene nombre que auditar y no entra en su población.
 const tiers = ['verified', 'nearby'].map((confidence) => {
   const poblacion = entradas.filter((e) => e.confidence === confidence && e.public_site_name).length;
-  const muestra = revisadas.filter((r) => r.confidence === confidence);
+  // Solo veredictos de NOMBRE: un error de bandera no es un error de sede.
+  const muestra = revisadas.filter((r) => r.claim === 'name' && r.confidence === confidence);
   const correctas = muestra.filter((r) => r.result === 'verified').length;
   return {
     confidence,
@@ -242,12 +265,13 @@ const tiers = ['verified', 'nearby'].map((confidence) => {
   };
 }).filter((t) => t.population > 0);
 
-// Tiers de bandera: uno por método de acreditación, con umbral fijo de 90 % y
-// muestra mínima de 35 —o el grupo entero si es menor—. Un grupo que no llega
-// no bloquea a los demás: su marca se publica como texto, sin logo.
-const brandTiers = [...new Set(entradas.filter((e) => e.brand_evidence).map((e) => e.brand_evidence.method))].map((method) => {
-  const poblacion = entradas.filter((e) => e.brand_evidence?.method === method).length;
-  const muestra = revisadas.filter((r) => r.claim === 'brand' && porAnchor.get(r.establishment_id)?.brand_evidence?.method === method);
+// Tiers de bandera: ya no son una puerta. Reportan qué se revisó y con qué
+// resultado; ni el umbral ni el tamaño de muestra deciden si algo se publica.
+const metodoDe = (id) => metodoRevisado.get(id) ?? 'operador_del_registro';
+const metodos = [...new Set(entradas.filter((e) => e.brand).map((e) => e.brand_evidence?.method ?? 'operador_del_registro'))];
+const brandTiers = metodos.filter((m) => m !== 'operador_del_registro').map((method) => {
+  const poblacion = entradas.filter((e) => e.brand && e.brand_evidence?.method === method).length;
+  const muestra = revisadas.filter((r) => r.claim === 'brand' && metodoDe(r.establishment_id) === method);
   const correctas = muestra.filter((r) => r.result === 'verified').length;
   return {
     method,
@@ -278,11 +302,13 @@ process.stdout.write(`Catálogo         ${entradas.length} entradas de 717 (${(e
 Marca publicada  ${conMarca}   (razón social del operador o directorio oficial)
 Nombres limpiados ${limpiados}  (marca sin respaldo retirada del nombre)
 
-Auditoría de nombre
+AUDITORÍA DE NOMBRE  (mide si la sede publicada es la correcta; es una puerta)
 ${tiers.map((t) => `  ${t.confidence.padEnd(9)} ${t.correct}/${t.sampled} correctos · cota ${(t.lower_bound_95 * 100).toFixed(1)} % · umbral ${(t.threshold * 100).toFixed(0)} % ${t.lower_bound_95 >= t.threshold ? '✅' : '❌'}`).join('\n')}
 
-Marca con evidencia ${entradas.filter((e) => e.brand_evidence).length}   (logo solo si su grupo pasa la auditoría de bandera)
-Solo bandera      ${soloMarca.length}   (del padrón oficial, sin nombre de sede publicable)
-Conflictos marca  ${conflictosDeMarca.length}   ${conflictosDeMarca.map((c) => `${c.catalogo}≠${c.directorio}`).join(', ')}
-${brandTiers.length ? brandTiers.map((t) => `  ${t.method.padEnd(24)} ${t.correct}/${t.sampled} de ${t.population} · cota ${(t.lower_bound_95 * 100).toFixed(1)} % · umbral ${(t.threshold * 100).toFixed(0)} % · mínimo ${Math.min(BRAND_MIN_SAMPLE, t.population)} ${t.lower_bound_95 >= t.threshold && t.sampled >= Math.min(BRAND_MIN_SAMPLE, t.population) ? '✅' : '❌'}`).join('\n') : '  (sin evidencia de bandera todavía; ninguna marca obtiene logo)'}
+REVISIÓN DE MARCA    (mide la bandera publicada; NO es una puerta)
+  con evidencia  ${entradas.filter((e) => e.brand_evidence).length} de ${conMarca}   (el resto sale del operador del Registro)
+  solo bandera   ${soloMarca.filter((e) => entradas.includes(e)).length}   (del padrón oficial, sin nombre de sede publicable)
+  conflictos     ${conflictosDeMarca.length}   ${conflictosDeMarca.map((c) => `${c.catalogo}≠${c.directorio}`).join(', ')}
+  corregidas     ${corregidas.length}   ${corregidas.map((c) => `−${c.marca_retirada}${c.conservaba_nombre ? '' : ' (entrada retirada)'}`).join(', ')}
+${revisadas.filter((r) => r.claim === 'brand').length ? [...brandTiers.map((t) => `  ${t.method.padEnd(24)} ${t.correct}/${t.sampled} revisadas de ${t.population}`), `  ${'operador_del_registro'.padEnd(24)} ${revisadas.filter((r) => r.claim === 'brand' && metodoDe(r.establishment_id) === 'operador_del_registro' && r.result === 'verified').length}/${revisadas.filter((r) => r.claim === 'brand' && metodoDe(r.establishment_id) === 'operador_del_registro').length} revisadas de ${entradas.filter((e) => e.brand && !e.brand_evidence).length}`].join('\n') : '  (sin revisiones del owner todavía)'}
 `);

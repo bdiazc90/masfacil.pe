@@ -6,9 +6,9 @@
 // saneado e instalado con `scripts/install-brand-logo.mjs`. Se sirve local y se
 // referencia con <img>, de modo que no ejecuta scripts ni pide nada a terceros.
 //
-// Sin entrada aquí —Petroperú hoy solo publica su logo en PNG— la tarjeta usa
-// presentación neutral: el nombre de siempre, sin logo. Marca identificada y
-// logo disponible son dos conteos distintos y no se mezclan.
+// Sin entrada aquí —Petroperú hoy solo publica su logo en PNG— la tarjeta
+// muestra la marca en texto y ya. Marca identificada y logo disponible siguen
+// siendo dos conteos distintos y no se mezclan.
 
 const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLocaleLowerCase('es-PE');
 
@@ -43,12 +43,11 @@ export const brandLogoPath = (slug) => `/icons/brands/${slug}.svg`;
 
 /**
  * Devuelve el logo de una identidad comercial, o null.
- * `brand_accredited` es la única llave: lo pone la proyección cuando esa bandera
- * tiene evidencia propia —directorio oficial vigente o letrero observado— y su
- * grupo pasó la auditoría. Un nombre «por confirmar» no lo concede por sí solo,
- * y una marca sin acreditar se publica como texto, sin logo.
+ * La marca y su logo son la misma afirmación: si publicamos «Primax» en texto,
+ * publicamos su logo. La única condición es tener el archivo en esta lista, y
+ * por eso una marca sin SVG —Petroperú hoy— se queda en texto sin más.
  */
 export function brandLogoFor(identity) {
-  if (!identity?.brand || identity.brand_accredited !== true) return null;
+  if (!identity?.brand) return null;
   return BRAND_LOGOS[normalize(identity.brand)] ?? null;
 }

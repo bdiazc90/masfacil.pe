@@ -64,24 +64,37 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
   const catalogIndex = buildCommercialCatalogIndex(commercialCatalog, {
     registryIds: GASOLINA_KEYS.flatMap((key) => [...results[key].registryAnchors]),
     offerIds: GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)),
-    approvedBrandMethods: brandGroups.approved,
   });
-  const revisionId = `gasolina-${pointer.snapshot_id}-identity-v4`;
+  // La revisión sale del contenido, no de un sufijo que había que subir a mano y
+  // que se olvidaba: mismo contenido, misma revisión; contenido distinto,
+  // revisión nueva, y los snapshots siguen siendo inmutables porque un contenido
+  // distinto aterriza en otra ruta.
+  //
+  // Del hash se excluye solo `revision_id`, que es el único campo circular. No
+  // se excluye nada más: un campo fuera del hash pero variable en el body daría
+  // misma revisión con bytes distintos, y esa ruta la cachean los clientes un
+  // año como inmutable.
+  const contenido = (key) => ({
+    schema_version: GASOLINA_MANIFEST_VERSION,
+    product: { key, canonical: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, display_unit: 'Galones' },
+    scope: GASOLINA_SCOPE,
+    snapshot_date: pointer.snapshot_date,
+    cutoff_at: input.cutoffAt,
+    source_max_reported_at: input.sourceMaxReportedAt,
+    provenance: { source: 'Osinergmin', source_url: pointer.source_url, attribution: 'Datos de precios y coordenadas: Osinergmin.' },
+    offers: results[key].offers.map((offer) => ({ ...offer, commercial_identity: catalogIndex.byAnchor.get(offer.establishment_id) ?? null })),
+  });
+  // Una sola huella para los dos productos: el contrato exige que regular y
+  // premium declaren la misma revisión.
+  const revisionId = `gasolina-${pointer.snapshot_id}-${sha256(GASOLINA_KEYS.map((key) => stable(contenido(key))).join('')).slice(0, 12)}`;
   const datasets = {};
   const bodies = {};
   const descriptors = {};
   for (const key of GASOLINA_KEYS) {
-    const result = results[key];
     const data = {
       schema_version: GASOLINA_MANIFEST_VERSION,
       revision_id: revisionId,
-      product: { key, canonical: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, display_unit: 'Galones' },
-      scope: GASOLINA_SCOPE,
-      snapshot_date: pointer.snapshot_date,
-      cutoff_at: input.cutoffAt,
-      source_max_reported_at: input.sourceMaxReportedAt,
-      provenance: { source: 'Osinergmin', source_url: pointer.source_url, attribution: 'Datos de precios y coordenadas: Osinergmin.' },
-      offers: result.offers.map((offer) => ({ ...offer, commercial_identity: catalogIndex.byAnchor.get(offer.establishment_id) ?? null })),
+      ...contenido(key),
     };
     const body = stable(data);
     const relative = `data/gasolina/snapshots/${revisionId}/${key}.json`;
@@ -93,6 +106,9 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
   const refreshState = {
     schema_version: GASOLINA_MANIFEST_VERSION,
     revision_id: revisionId,
+    // Declarado, no deducido del identificador: recortarlo nunca funcionó y
+    // apagaba en silencio los guardrails de caída.
+    snapshot_id: pointer.snapshot_id,
     validators: pointer.validators,
     source_max_reported_at: input.sourceMaxReportedAt,
     products: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, { ...results[key].metrics, cutoff_at: input.cutoffAt }])),
@@ -162,5 +178,5 @@ export async function projectGasolina({ root = rootFromModule, outputRoot = path
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) projectGasolina()
-  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca, ${result.catalog.projected_with_accredited_brand} con logo, ${result.catalog.without_current_offer} sin reporte en el Registro\n`))
+  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca (${result.catalog.with_brand_evidence} con expediente), ${result.catalog.without_current_offer} sin reporte en el Registro\n`))
   .catch((error) => { process.stderr.write(`No se publicó gasolina: ${error.message}\n`); process.exitCode = 1; });

@@ -40,6 +40,9 @@ export function evidenceFromRefreshState(state) {
   return { metrics: { funnel: { within_30_days: { offers: state.guardrails.fresh_offers }, contract_ready_with_provisional_identity: { offers: state.guardrails.contract_ready } }, coverage: { offers: { percent: state.guardrails.coverage_percent } }, exceptions: state.guardrails.exceptions }, temporal_semantics: { values: { source_max_reported_at: state.guardrails.source_max_reported_at } } };
 }
 
+// Solo para refresh-states anteriores a 2.6.0, que no declaraban `snapshot_id`.
+// Nunca quitó el sufijo del identificador, así que su resultado no es fiable:
+// existe para no romper un bundle viejo, no para confiar en él.
 export function snapshotIdFromGasolinaRevision(revisionId) {
   if (typeof revisionId !== 'string' || !revisionId.startsWith('gasolina-') || revisionId.length === 'gasolina-'.length) throw new Error('Revisión gasolina inválida');
   return revisionId.slice('gasolina-'.length);
