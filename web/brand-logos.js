@@ -9,9 +9,9 @@
 // locales y se referencian con <img>, así que no ejecutan scripts ni piden nada
 // a terceros.
 //
-// Sin entrada aquí —Petroperú hoy solo publica su logo en PNG— la tarjeta
-// muestra la marca en texto y ya. Marca identificada y logo disponible siguen
-// siendo dos conteos distintos y no se mezclan.
+// Sin entrada aquí la tarjeta muestra la marca en texto y ya. Marca
+// identificada y logo disponible siguen siendo dos conteos distintos y no se
+// mezclan.
 
 const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLocaleLowerCase('es-PE');
 
@@ -43,6 +43,15 @@ export const BRAND_LOGOS = Object.freeze({
     source_url: 'aportado por el owner',
     retrieved_at: '2026-09-07',
   }),
+  petroperu: Object.freeze({
+    slug: 'petroperu',
+    brand: 'Petroperú',
+    width: 16,
+    height: 15,
+    source_kind: 'faithful_recreation',
+    source_url: 'recreación fiel desde la referencia oficial de Petroperú',
+    retrieved_at: '2026-09-08',
+  }),
 });
 
 export const brandLogoPath = (slug) => `/icons/brands/${slug}.svg`;
@@ -51,7 +60,7 @@ export const brandLogoPath = (slug) => `/icons/brands/${slug}.svg`;
  * Devuelve el logo de una identidad comercial, o null.
  * La marca y su logo son la misma afirmación: si publicamos «Primax» en texto,
  * publicamos su logo. La única condición es tener el archivo en esta lista, y
- * por eso una marca sin SVG —Petroperú hoy— se queda en texto sin más.
+ * por eso una marca sin SVG registrado se queda en texto sin más.
  */
 export function brandLogoFor(identity) {
   if (!identity?.brand) return null;

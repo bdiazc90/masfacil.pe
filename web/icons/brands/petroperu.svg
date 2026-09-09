@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 450 434"
+     width="450"
+     height="434"
+     preserveAspectRatio="xMidYMid meet"
+     shape-rendering="geometricPrecision">
+
+  <defs>
+    <linearGradient id="blue"
+                    gradientUnits="userSpaceOnUse"
+                    x1="87" y1="0"
+                    x2="433" y2="0">
+      <stop offset="0%" stop-color="#469DDE"/>
+      <stop offset="60%" stop-color="#3579C0"/>
+      <stop offset="100%" stop-color="#3579C0"/>
+    </linearGradient>
+
+    <linearGradient id="green"
+                    gradientUnits="userSpaceOnUse"
+                    x1="118" y1="0"
+                    x2="284" y2="0">
+      <stop offset="0%" stop-color="#4BA67F"/>
+      <stop offset="31%" stop-color="#4BA67F"/>
+      <stop offset="100%" stop-color="#52B486"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rojo -->
+  <path
+    d="M 14 24
+       L 367 61
+       C 379 62 388 68 394 80
+       L 433 161
+       L 91 161
+       C 77 161 66 153 59 140
+       Z"
+    fill="#E93327"/>
+
+  <!-- Azul -->
+  <path
+    d="M 433 162
+       L 111 190
+       C 95 191 87 199 87 211
+       L 117 287
+       L 354 287
+       C 368 287 376 279 382 268
+       L 433 162
+       Z"
+    fill="url(#blue)"/>
+
+  <!-- Verde -->
+  <path
+    d="M 118 289
+       L 236 309
+       C 248 311 254 318 258 330
+       L 284 403
+       L 186 403
+       C 171 403 160 395 154 381
+       L 118 289
+       Z"
+    fill="url(#green)"/>
+</svg>
