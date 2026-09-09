@@ -6,13 +6,9 @@ sistema visual de **todas** las rutas.
 Agnóstico al stack: hoy se implementa en HTML, CSS y JavaScript sin dependencias; debe
 seguir siendo válido cuando la interfaz se construya con un framework.
 
-**Autoridad.** Si este documento y el código discrepan, gana el código que pasa sus
-pruebas, y este documento se corrige en el mismo commit. Un principio que no se puede
-falsificar es decoración: por eso cada uno declara **cómo se detecta que se violó**.
-
-**Referencia visual vigente:** `mockup.html` en la raíz del repo, aprobado por el owner el
-25 de agosto de 2026. Es la maqueta de la pantalla de resultados; este documento es el
-contrato que la generaliza.
+Cada principio declara **cómo se detecta que se violó**: uno que no se puede falsificar
+es decoración. `mockup.html`, en la raíz, es la maqueta histórica de la pantalla de
+resultados; sirve de referencia, no de autoridad.
 
 ---
 
@@ -156,11 +152,6 @@ sistema, solo para chips), `--radius` 36 px, `--radius-small` 12 px, tamaños
 8 px, `--controls-ease` 200 ms, `--controls-fixed-fill` 90 %) y los degradados derivados
 `--surface` y `--rim`.
 
-**Calibración respecto del mockup.** El mockup lleva la tinta secundaria a L 48 % (claro) y
-la tinta a 75/72 % (oscuro). Medido sobre el card fijo, ese gris quedaba en 4.19:1 y
-4.06:1. El código usa 46 % y 78/75 %: mismo aspecto, 4.60:1 y 4.52:1. Es la única
-diferencia de tokens entre la maqueta y producción.
-
 **Vidrio.** El canto se lee por diferencia con lo que hay detrás, y solo en la dirección
 que la superficie deja libre: tarjeta oscura sobre fondo oscuro → **el canto es luz**;
 tarjeta clara sobre fondo claro → **el canto es sombra**. El relleno nunca separa la
@@ -189,39 +180,27 @@ Android de gama baja se paga solo si mejora la decisión.
 
 ## 7 · Componentes
 
-| Componente | Reglas |
-|---|---|
-| **Card de controles** | un solo plate con tres estados: `full` (en flujo, arriba: marca, tema, lugar, radio, orden), `compact` (fijo, una fila de 52 px: logo, lugar, criterios y «Ajustar») y `overlay` (fijo y desplegado sobre la lista, cierra con «Listo», tocando fuera o con Escape). Baja de 96 px → compact; vuelve a 8 px del tope → full; entre ambos no cambia. Cambiar un filtro estando abajo vuelve arriba. Fuera de resultados solo muestra la barra de marca y no se fija |
-| Barra de marca | logo, «masfacil» en `--brand` y «.pe» en tinta a la izquierda; selector de tema a la derecha; nunca empuja la decisión fuera de pantalla |
-| Selector de tema | tres botones con `aria-pressed` (claro, sistema, oscuro); el activo se distingue por relleno, color y sombra |
-| Fila «Lugar» | etiqueta en mayúsculas, icono de mira solo cuando el origen es la ubicación, el nombre del lugar es el encabezado de resultados y recibe el foco; «Cambiar» como botón de texto |
-| Radio | etiqueta y lectura («1.5 km · 13 estaciones») en una fila; `<input type="range">` de 1 a 5 km en pasos de 0.5. Si moverlo no cambia nada, se deshabilita y lo dice |
-| Selector de dos opciones | dos `<button>` con `aria-pressed`, nunca un `<select>`; el activo se distingue por relleno, color y peso. El sub-selector de producto (Regular / Premium) solo aparece bajo «Más barata» o sin ubicación |
-| Botón | primario (relleno, ≥ 52 px como llamada de pantalla, ≥ 48 px dentro de una tarjeta), de contorno (secundario, ≥ 48 px), de texto (subrayado, ≥ 44 px) |
-| Chip de producto | `REG` / `PRE` / `DIST` en 8 px mono, fondo del color del producto al 16 % sobre el card, borde al 38 %; en reposo desaturado, activo «strong» y en negrita; apagado (opacidad .5) cuando no ordena o no hay precio |
-| **Tarjeta de opción** | la unidad de comparación de cualquier ruta; ver anatomía abajo |
-| Etiqueta de tarjeta | explica en pocas palabras por qué esa opción destaca; usa `--accent`, nunca el color de acción |
-| Panel de detalle | se despliega bajo la tarjeta con «Ver detalle» / «Ocultar»; una fila por producto (chip, precio, fecha y hora), coordenada oficial, atribución y enlace a Street View. Solo datos del bundle: funciona sin conexión |
-| Placa | superficie para texto que no vive en una tarjeta |
-| Chips de zona | lista de distritos; se despliega por búsqueda o por acción explícita, no de golpe |
-| Filtro con buscador | etiqueta visible, `type="search"`, estado vacío con mensaje propio |
-| «Ver más» | botón de contorno a todo el ancho que dice cuántas trae y cuántas quedan; el foco pasa a la primera tarjeta nueva |
-| «Sobre los datos» | `<details>` cerrado: procedencia, límites, no afiliación y enlace a la fuente |
-| Estado vacío / de fallo | encabezado, explicación en una línea y una salida útil |
-| Nota de estado | una línea para offline o contexto; nunca un banner permanente |
+Principios, no catálogo. Un inventario cerrado de componentes con sus reglas
+exige mantener a mano una copia del código y envejece en cada cambio de UI; lo
+que sigue vigente es cómo debe comportarse cualquier control de esta interfaz.
+El detalle de cada componente vive en `web/*.js` y `web/styles.css`.
 
-**Anatomía de la tarjeta de opción**, de arriba abajo:
-
-1. etiqueta opcional — por qué destaca;
-2. **los datos que deciden** en una sola fila: un bloque por producto (chip arriba, cifra
-   abajo) y la distancia a la derecha con su chip. Con orden por precio, el producto que
-   ordena va en su color «strong» y el otro en gris; con orden por cercanía, los dos en
-   tinta. Sin precio vigente: «—», apagado;
-3. identidad — verificada, «· por confirmar» o marcador neutral — y, a la derecha, la
-   dirección;
-4. frescura — «Hace N h / N días» — y, a la derecha, el distrito;
-5. dos acciones al final: «Ver detalle» de contorno y «Cómo llegar» primaria. Solo la
-   segunda lleva el color de acción.
+- **Un control, una cosa.** Ordenar no filtra; filtrar no ordena. Un control cuyo
+  efecto no se puede nombrar en una línea está haciendo dos cosas.
+- **Estado visible sin depender del color.** Un elemento activo se distingue por
+  relleno, peso o forma además del color, y lo declara en el marcado
+  (`aria-pressed`, `aria-current`), no solo en el estilo.
+- **Elección binaria con botones, no con `<select>`.** Dos opciones se tocan; no
+  se despliegan.
+- **Si un control no cambia nada, se deshabilita y lo dice.** No se deja activo
+  fingiendo que hay algo que ajustar.
+- **Objetivos táctiles:** llamada principal de pantalla ≥ 52 px, acción dentro de
+  una tarjeta ≥ 48 px, botón de texto ≥ 44 px.
+- **Nada se repite.** Lo que la tarjeta ya dice no se anuncia encima de la lista.
+- **La tarjeta de resultado ordena de arriba abajo por lo que decide:** primero lo
+  que distingue una opción de otra, después lo que la identifica, y al final las
+  acciones. La ausencia de un dato se dice —«—», «por confirmar», marcador
+  neutral—, nunca se oculta la fila.
 
 ## 8 · Accesibilidad
 
@@ -266,7 +245,7 @@ Piso no negociable, verificado y no asumido.
 5. Los nueve estados de la sección 5 están diseñados y escritos.
 6. Los órdenes disponibles son explicables y no ocultan un ranking.
 7. La acción final es una, y es práctica.
-8. Reutiliza los componentes de la sección 7; si necesita uno nuevo, se agrega aquí.
+8. Reutiliza los componentes existentes y respeta los principios de la sección 7.
 9. Recorrido medido en taps y segundos hasta la decisión, a 320 y a 390 px.
 10. Contraste verificado en ambos temas y accesibilidad de la sección 8 comprobada.
 11. Atribución, límites y no afiliación visibles sin buscarlos.
@@ -288,31 +267,31 @@ clases solo se adopta si se mapea a estos tokens y se prohíben los valores arbi
 
 ## 12 · Decisiones cerradas de gasolina
 
-Primera ruta. Medidas sobre los bundles públicos de Lima provincia del 25 de agosto de 2026
-(Regular 714 ofertas, Premium 700, 697 grifos con los dos productos). Reabrir cualquiera
-exige un hallazgo material medido, no una opinión.
+Primera ruta. Reabrir cualquiera exige un hallazgo material medido, no una
+opinión. Las cifras que las justificaron se midieron sobre bundles concretos y no
+se copian aquí: envejecen y el motivo no.
 
-| Decisión | Evidencia |
+| Decisión | Por qué |
 |---|---|
 | `/` es la app; sin pantalla de elegir producto. Las rutas viejas (`/gasolina/…`) responden 301 | los dos bundles son idénticos salvo precio y fecha: elegir producto antes de ver nada era un tap sin información |
-| Una tarjeta por grifo con Regular y Premium; «—» cuando falta uno | 682 de 697 grifos reportan los dos productos a la vez; se decide comparándolos frente al surtidor |
-| Radio de búsqueda de 1 a 5 km en pasos de 0.5; arranca en el menor que llena seis tarjetas | en Lima urbana cae en 1–1.5 km; en zonas dispersas sube solo. Un pool fijo de 20 mandaba a 19 km por S/ 1.20 |
+| Una tarjeta por grifo con Regular y Premium; «—» cuando falta uno | la gran mayoría de los grifos reporta los dos productos a la vez, y se decide comparándolos frente al surtidor |
+| Radio de búsqueda de 1 a 5 km en pasos de 0.5; arranca en el menor que llena seis tarjetas | en Lima urbana cae en 1–1.5 km y en zonas dispersas sube solo. Un pool fijo mandaba a kilómetros de distancia por céntimos |
 | «Más cerca» y «Más barata» solo ordenan; el sub-selector fija el producto de «Más barata» y recuerda la elección | cada control hace una cosa; en «Más cerca» el producto no ordena nada y el sub-selector se oculta |
 | Etiqueta «Regular más barata en 1.5 km» sobre la más barata del radio; doble cuando también es la más cercana | sin decirlo, la interfaz inventaría un contraste que no existe |
-| Paginación que duplica: 6 → 12 → 24 → todo; si quedan ≤ 4, se muestran sin botón | Lima Cercado a 5 km son 120 estaciones: cinco toques en vez de 38 |
-| Card de controles fijo con tres estados en vez de un header pegajoso de 200 px | el header fijo ocupaba un cuarto de la pantalla; la fila compacta de 52 px conserva lugar, radio y criterio |
+| Paginación que duplica: 6 → 12 → 24 → todo; si quedan ≤ 4, se muestran sin botón | un distrito grande a 5 km son más de cien estaciones: pocos toques en vez de decenas |
+| Card de controles fijo con tres estados en vez de un header pegajoso alto | el header fijo ocupaba un cuarto de la pantalla; la fila compacta conserva lugar, radio y criterio |
 | Ventana de frescura: 30 días | fuera de ella el precio ya no sirve para decidir; el grifo se queda sin precio, porque desaparecer diría que cerró |
 | Ubicación de alta precisión | un error de 300 m reordena las tarjetas y el producto mentiría sin saberlo |
 | Sin ubicación: elegir distrito, sin distancia ni radio, ordenado por precio | no se confunde límite distrital con cercanía |
-| Nombre de estación solo desde el catálogo verificado; «por confirmar» con cercanía comprobada; la dirección oficial siempre | 54 revisiones del owner sin errores: cota inferior 89 % y 86 %, declarada en «Sobre los datos» |
+| Nombre de estación solo desde el catálogo con respaldo; «por confirmar» con cercanía comprobada; la dirección oficial siempre | la precisión medida se declara en «Sobre los datos», con la cifra de la corrida vigente |
 | Handoff a Google Maps con solo el destino, tras un tap | es navegación, no carga de recurso; la ubicación no sale del dispositivo |
 
 ## 13 · Cómo se cambia este documento
 
-Un cambio de diseño es **un solo commit** que trae: la evidencia que lo justifica
-(medición o captura), el token o el componente modificado, las pruebas en verde y este
-documento corregido. No se crean documentos de diseño por evento.
+Este documento se corrige cuando cambia un principio, un anclaje, la honestidad
+del dato o un estado obligatorio. Una decisión reversible de copy, de orden de
+pantallas o de presentación no lo toca y no necesita ceremonia.
 
-Una decisión reversible de copy, orden de pantallas o presentación no necesita ceremonia;
-un cambio en los anclajes, en la honestidad del dato o en los estados obligatorios sí, y
-lo decide el owner.
+Si el documento y el código discrepan, gana el código que funciona; el documento
+se corrige cuando alguien lo note, no en un commit obligatorio por cada cambio de
+UI.

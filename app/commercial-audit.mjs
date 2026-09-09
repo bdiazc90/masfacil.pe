@@ -13,13 +13,12 @@ import { BRAND_EVIDENCE_METHODS, CONFIDENCE_LEVELS, hasBrandEvidenceContract, is
 export const AUDIT_SCHEMA_VERSION = '3.0.0';
 // 2.0.0 sigue siendo válido mientras el secret en CI no se recargue: sus
 // veredictos hablan solo del nombre y se comparan con la semántica de hash
-// antigua. Sin veredictos de marca no hay grupo aprobado, así que tampoco logo.
+// antigua. Sin veredictos de marca no hay grupo aprobado en el informe, pero el
+// logo no depende de eso: desde el contrato 2.6.0 la marca y su logo son la
+// misma afirmación y se publican juntos.
 export const LEGACY_AUDIT_SCHEMA_VERSION = '2.0.0';
 export const AUDIT_SCHEMA_VERSIONS = Object.freeze([LEGACY_AUDIT_SCHEMA_VERSION, AUDIT_SCHEMA_VERSION]);
 export const MIN_SAMPLE = 20;
-// Con cero errores, 35 revisiones son las que llevan la cota de Wilson al 90 %.
-// Un grupo más pequeño que eso se revisa entero.
-export const BRAND_MIN_SAMPLE = 35;
 export const BRAND_THRESHOLD = 0.90;
 export const CLAIMS = Object.freeze(['name', 'brand']);
 
@@ -128,45 +127,94 @@ export function validateCommercialAudit(audit) {
 
 export function loadValidatedCommercialAudit(path) { const audit = JSON.parse(fs.readFileSync(path, 'utf8')); const errors = validateCommercialAudit(audit); if (errors.length) throw new Error(`Auditoría comercial fuera de contrato:\n- ${errors.join('\n- ')}`); return audit; }
 
-export function commercialPublicationCheck(catalog, audit) {
+/**
+ * Respaldo de la afirmación de NOMBRE, entrada por entrada.
+ *
+ * Antes esto era una puerta de todo o nada: una sola entrada revisada cuyo hash
+ * ya no coincidía dejaba sin publicar el bundle entero, precios incluidos. Lo
+ * que la evidencia sostiene o deja de sostener es cada afirmación por separado,
+ * así que aquí se devuelve QUIÉN tiene respaldo y QUÉ falta, y quien llama
+ * decide. La marca nunca estuvo en esta puerta: sus veredictos solo miden.
+ *
+ * Un tier cae entero cuando su garantía estadística no aplica —falta, la
+ * población no coincide o la cota queda bajo el umbral—, porque las entradas no
+ * muestreadas se apoyan justo en esa garantía. Dentro de un tier válido, una
+ * entrada pierde el respaldo solo si su propia revisión quedó rancia o pendiente.
+ *
+ * Un veredicto `incorrect` retira ese nombre. Aunque el error se corrija al
+ * reconstruir el catálogo, mientras el veredicto siga vigente contra el mismo
+ * hash la afirmación no tiene respaldo; la cota del tier ya lo descuenta, pero
+ * eso mide el tier, no salva a la entrada.
+ */
+export function commercialNameBacking(catalog, audit) {
   const targets = catalog.entries.filter(isPublicCommercialEntry);
-  const resumen = { required: targets.length, tiers: 0, sampled: 0, incorrect_links: null };
-  if (!targets.length) return Object.freeze({ status: 'not_required', reason: 'catalog_empty_or_pending', ...resumen });
-  if (!audit || audit.catalog_id !== catalog.catalog_id) return Object.freeze({ status: 'pending', reason: 'audit_missing_or_catalog_mismatch', ...resumen });
+  // Una entrada que solo publica bandera no tiene nombre que medir.
+  const conNombre = targets.filter((item) => item.public_site_name);
+  const approved = new Set();
+  const problems = [];
+  const base = { approved, problems, required: targets.length, named: conNombre.length, sampled: audit?.entries?.length ?? 0, incorrect_links: null };
+  const sinRespaldo = (reason) => { problems.push({ scope: 'name', reason, affected: conNombre.length }); return base; };
 
-  const porTier = new Map(audit.tiers.map((tier) => [tier.confidence, tier]));
-  const poblaciones = new Map();
-  // Solo las entradas que publican NOMBRE entran en la población del tier de
-  // nombre: una entrada que solo publica bandera no tiene nombre que medir.
-  for (const target of targets) if (target.public_site_name) poblaciones.set(target.confidence, (poblaciones.get(target.confidence) ?? 0) + 1);
-
-  const base = { ...resumen, tiers: poblaciones.size, sampled: audit.entries.length };
+  if (!targets.length || !conNombre.length) return base;
+  if (!audit || audit.catalog_id !== catalog.catalog_id) return sinRespaldo('audit_missing_or_catalog_mismatch');
   // Un catálogo con contrato de evidencia de marca exige una auditoría que sepa
   // hablar de afirmaciones: mezclarlos compararía hashes de semánticas distintas.
   const legado = audit.schema_version === LEGACY_AUDIT_SCHEMA_VERSION;
-  if (legado && hasBrandEvidenceContract(catalog)) return Object.freeze({ status: 'pending', reason: 'audit_schema_behind_catalog', ...base });
+  if (legado && hasBrandEvidenceContract(catalog)) return sinRespaldo('audit_schema_behind_catalog');
+
+  const porAnchor = new Map(catalog.entries.map((item) => [item.establishment_id, item]));
   const soloNombre = audit.entries.filter((row) => (row.claim ?? 'name') === 'name');
-  const hashDeNombre = legado ? (target) => commercialEntrySha256(target) : (target) => commercialClaimSha256(target, 'name');
+  // Un veredicto sobre algo que no está en el catálogo no habla de este
+  // catálogo: la auditoría entera deja de describirlo.
+  if (soloNombre.some((row) => !porAnchor.has(row.establishment_id))) return sinRespaldo('audit_entry_outside_catalog');
+
+  const poblaciones = new Map();
+  for (const target of conNombre) poblaciones.set(target.confidence, (poblaciones.get(target.confidence) ?? 0) + 1);
+  const porTier = new Map(audit.tiers.map((tier) => [tier.confidence, tier]));
+  const tiersValidos = new Set();
   for (const [confidence, poblacion] of poblaciones) {
     const tier = porTier.get(confidence);
-    if (!tier) return Object.freeze({ status: 'pending', reason: `audit_missing_tier_${confidence}`, ...base });
-    if (tier.population !== poblacion) return Object.freeze({ status: 'pending', reason: `audit_population_mismatch_${confidence}`, ...base });
-    if (tier.lower_bound_95 < tier.threshold) return Object.freeze({ status: 'pending', reason: `audit_below_threshold_${confidence}`, ...base });
+    const falla = !tier ? `audit_missing_tier_${confidence}`
+      : tier.population !== poblacion ? `audit_population_mismatch_${confidence}`
+        : tier.lower_bound_95 < tier.threshold ? `audit_below_threshold_${confidence}`
+          : null;
+    if (falla) problems.push({ scope: 'name', reason: falla, affected: poblacion });
+    else tiersValidos.add(confidence);
   }
 
   // Cada entrada revisada debe seguir describiendo lo mismo que se revisó: si el
-  // catálogo cambió, su hash deja de coincidir y la auditoría queda obsoleta.
-  const porAnchor = new Map(catalog.entries.map((item) => [item.establishment_id, item]));
-  const revisadas = soloNombre.map((row) => ({ row, target: porAnchor.get(row.establishment_id) }));
-  const huerfanas = revisadas.filter(({ target }) => !target);
-  if (huerfanas.length) return Object.freeze({ status: 'pending', reason: 'audit_entry_outside_catalog', ...base });
-  const rancias = revisadas.filter(({ row, target }) => hashDeNombre(target) !== row.entry_sha256);
-  if (rancias.length) return Object.freeze({ status: 'pending', reason: 'audit_stale', ...base, incorrect_links: 0 });
-  const incorrectas = revisadas.filter(({ row }) => row.result === 'incorrect');
-  const pendientes = revisadas.filter(({ row }) => row.result === 'pending');
-  if (pendientes.length) return Object.freeze({ status: 'pending', reason: 'audit_pending', ...base, incorrect_links: incorrectas.length });
+  // catálogo cambió, su hash deja de coincidir y ese veredicto queda obsoleto.
+  const hashDeNombre = legado ? (target) => commercialEntrySha256(target) : (target) => commercialClaimSha256(target, 'name');
+  const rancias = new Set();
+  const pendientes = new Set();
+  const incorrectas = new Set();
+  for (const row of soloNombre) {
+    const target = porAnchor.get(row.establishment_id);
+    if (hashDeNombre(target) !== row.entry_sha256) rancias.add(row.establishment_id);
+    else if (row.result === 'pending') pendientes.add(row.establishment_id);
+    else if (row.result === 'incorrect') incorrectas.add(row.establishment_id);
+  }
+  if (rancias.size) problems.push({ scope: 'name', reason: 'audit_stale', affected: rancias.size });
+  if (pendientes.size) problems.push({ scope: 'name', reason: 'audit_pending', affected: pendientes.size });
+  if (incorrectas.size) problems.push({ scope: 'name', reason: 'audit_incorrect', affected: incorrectas.size });
 
-  return Object.freeze({ status: 'ready', reason: 'all_tiers_sampled_and_above_threshold', ...base, incorrect_links: incorrectas.length });
+  for (const target of conNombre) {
+    if (!tiersValidos.has(target.confidence)) continue;
+    if (rancias.has(target.establishment_id) || pendientes.has(target.establishment_id) || incorrectas.has(target.establishment_id)) continue;
+    approved.add(target.establishment_id);
+  }
+  base.incorrect_links = incorrectas.size;
+  return base;
+}
+
+/** Resumen legible del respaldo de nombre; el detalle vive en `commercialNameBacking`. */
+export function commercialPublicationCheck(catalog, audit) {
+  const backing = commercialNameBacking(catalog, audit);
+  const tiers = new Set(catalog.entries.filter(isPublicCommercialEntry).filter((item) => item.public_site_name).map((item) => item.confidence)).size;
+  const resumen = { required: backing.required, tiers, sampled: backing.sampled, incorrect_links: backing.incorrect_links };
+  if (!backing.required) return Object.freeze({ status: 'not_required', reason: 'catalog_empty_or_pending', ...resumen, tiers: 0, sampled: 0 });
+  if (backing.problems.length) return Object.freeze({ status: 'pending', reason: backing.problems[0].reason, ...resumen });
+  return Object.freeze({ status: 'ready', reason: 'all_tiers_sampled_and_above_threshold', ...resumen });
 }
 
 // Reporte de lo revisado por método de acreditación. Ya NO es una puerta: la
@@ -205,11 +253,3 @@ export function brandAccreditationGroups(catalog, audit) {
   }
   return Object.freeze({ approved, groups: [...grupos.values()].map((grupo) => Object.freeze({ ...grupo })) });
 }
-
-export function assertCommercialPublicationReady(catalog, audit) {
-  const check = commercialPublicationCheck(catalog, audit);
-  if (check.status === 'ready' || check.status === 'not_required') return check;
-  throw new Error(`Auditoría comercial impide proyectar (${check.reason})`);
-}
-
-export function auditCommercialCatalog(catalog, audit) { return commercialPublicationCheck(catalog, audit); }

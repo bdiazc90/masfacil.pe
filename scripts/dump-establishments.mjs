@@ -11,14 +11,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildGasolinaProjectionForPointer } from '../pipeline/project-gasolina.mjs';
-import { csvRows } from '../pipeline/gasolina-products.mjs';
+import { buildGasolinaProjectionForPointer, resolveGasolinaRaw } from '../pipeline/project-gasolina.mjs';
+import { RAW_FIELDS, assertHeader, clean, csvRows, normalizeHeader } from '../pipeline/csv.mjs';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
-import { resolveGasolinaRaw } from '../pipeline/project-gasolina.mjs';
+import { readActivePointer } from '../app/snapshot-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const clean = (value) => String(value ?? '').replace(/\r/g, '').trim();
-const rawFields = ['ID3', 'ACTIVIDAD', 'REGISTRO_DE_HIDROCARBUROS', 'RUC', 'RAZON_SOCIAL', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'DIRECCION', 'FECHA_DE_REGISTRO', 'PRODUCTO', 'PRECIO_DE_VENTA_SOLES', 'UNIDAD'];
 
 const limaTime = (iso) => {
   if (!iso) return '';
@@ -33,7 +31,8 @@ const cell = (value) => {
 };
 
 async function main() {
-  const pointer = JSON.parse(fs.readFileSync(path.join(root, '.local-cache', 'snapshots', 'active.json'), 'utf8'));
+  const pointer = readActivePointer(root);
+  if (!pointer) throw new Error('No hay pointer de snapshot activo');
   process.stdout.write(`Snapshot activo: ${pointer.snapshot_id}\nProyectando Regular y Premium...\n`);
 
   const candidate = await buildGasolinaProjectionForPointer({ root, pointer });
@@ -63,11 +62,7 @@ async function main() {
   let header;
   let pending = new Set(byAnchor.keys());
   for await (const row of csvRows(rawPath)) {
-    if (!header) {
-      header = row.map((value) => clean(value).normalize('NFD').replace(/[̀-ͯ]/g, '').replaceAll(' ', '_').replace(/[^A-Z0-9_]/g, ''));
-      if (JSON.stringify(header) !== JSON.stringify(rawFields)) throw new Error('Schema raw inesperado');
-      continue;
-    }
+    if (!header) { header = row.map(normalizeHeader); assertHeader(header, RAW_FIELDS, rawPath); continue; }
     if (!pending.size) break;
     const registro = clean(row[2]);
     if (!registro) continue;

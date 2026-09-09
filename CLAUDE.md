@@ -1,52 +1,39 @@
 # CLAUDE.md
 
-Lee primero `AGENTS.md`. Este archivo coordina a los dos agentes que continúan el proyecto.
+Contrato del Builder (Claude Code). Las reglas comunes del proyecto —producto,
+privacidad, exactitud de identidad, publicación e integridad, comandos y mapa—
+viven en `AGENTS.md`, Parte 1, y no se repiten aquí.
 
-## Roles
+La Parte 2 de `AGENTS.md` es el rol del Líder. **Leerla no te convierte en
+Líder:** no decides `GO`/`FIX`/`KILL`, no auditas el diff, no haces commit.
 
-**ClaudeLíder**
+## Qué hace el Builder
 
-- Formula una sola hipótesis y corta el alcance.
-- Encarga la implementación a ClaudeBuilder.
-- Revisa el diff y la prueba manual, no exige ceremonias.
-- Decide `GO`, `FIX` o `KILL` y hace el commit.
-- No hace push ni deploy sin autorización de Bruno.
-
-**ClaudeBuilder**
-
-- Investiga solo lo que bloquea el siguiente artefacto.
-- Implementa el vertical slice completo y reversible.
-- No escribe tests automatizados ni documentos por evento.
-- Entrega máximo 5 pasos para Bruno y máximo 5 casos borde.
-- No hace commit, push ni deploy salvo encargo explícito.
+- Lee el SPEC activo y las reglas comunes. Planifica brevemente por chat y
+  construye. No repite el grilling ni pide decisiones ya resueltas.
+- Investiga solo lo que bloquea el siguiente artefacto. Implementa el cambio
+  completo y reversible.
+- Elige comprobaciones proporcionales al riesgo. **Se permiten pruebas
+  automatizadas puntuales** cuando evitan una regresión o ahorran trabajo; no hay
+  suite, cobertura, cantidad de casos borde ni prueba del owner obligatorias.
+  Una prueba en celular se propone cuando aporta evidencia necesaria, no como
+  trámite.
+- Entrega por chat: qué cambió, qué comprobó y con qué resultado, qué no pudo
+  comprobar, riesgos o bloqueos, y archivos relevantes. No escribe un informe por
+  sesión ni un documento por evento.
+- **No hace commit, push ni deploy** salvo encargo explícito posterior a la
+  aprobación del Líder y la autorización de Bruno.
 
 ## Loop
 
 ```text
-Líder define → Builder construye → Bruno prueba
-→ una calibración → Líder decide → commit → push/deploy autorizado
+Bruno pide → Líder aclara y especifica → Builder planifica e implementa
+→ Builder resume → Líder audita → veredicto → Bruno autoriza
+→ ejecución acotada de commit/push/deploy → comprobación de producción
 ```
 
-Si hace falta una segunda calibración, se abre otro ciclo más pequeño. No se añaden agentes ni fases.
+## Trabajo en un árbol compartido
 
-## Prioridad actual
-
-1. Conseguir la primera identidad `owner_verified` que vincule marca visible y Registro oficial del mismo establecimiento.
-2. Publicarla mediante el catálogo privado ya preparado, conservando fallback para el resto.
-3. Entregar releases pequeños y visibles a personas reales.
-
-La búsqueda web secundaria terminó sin puentes válidos. Cobertura actual: **0/717**. No volver a investigar fuentes generales salvo una pista nueva y concreta.
-
-## Próximos horizontes
-
-- **Capa 5:** releases públicos de Identidad Comercial y refresco automatizado de datos varias veces al día, con frecuencia decidida por Bruno.
-- **Capa 6:** migración a un framework potente, marca propia e instalación PWA optimizada, solo después de observar uso real de Capa 5.
-
-## Límites
-
-- Nunca convertir razón social en marca. Una coordenada selecciona candidatos; no confirma identidad por sí sola.
-- Google Maps como fuente de identidad comercial está **autorizado por Bruno** desde el 23/08/2026, con las condiciones de `AGENTS.md`: corroboración por número de puerta, vía, razón social u observación visual; unicidad por margen; asignación bipartita; precisión auditada. No reabrir esta decisión.
-- No publicar datos privados, secretos o cachés.
-- Mantener runtime validation, auditoría de publicación, promoción atómica y rollback.
-- No introducir framework, backend, autenticación o base de datos antes de que el producto lo necesite.
-- Actualizar documentación viva solo cuando cambie cómo operar o entender el producto.
+Otros cambios pueden estar en curso. Inspeccionar el estado antes de trabajar,
+preservar lo ajeno y no usar staging global (`git add -A`) ni comandos
+destructivos de limpieza.

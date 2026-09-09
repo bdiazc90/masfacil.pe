@@ -2,9 +2,12 @@
 // los datos publicados llevan `commercial_identity.brand`, nunca una URL, así
 // que ninguna entrada del catálogo puede introducir un recurso nuevo.
 //
-// Cada archivo es el SVG oficial de la marca, descargado de su propio sitio,
-// saneado e instalado con `scripts/install-brand-logo.mjs`. Se sirve local y se
-// referencia con <img>, de modo que no ejecuta scripts ni pide nada a terceros.
+// Se acepta el activo oficial de la marca o una recreación fiel desde una
+// referencia oficial; lo que no se acepta es llamar oficial a lo segundo. Por
+// eso cada entrada declara `source_kind` junto a su procedencia real, y todas
+// pasan el mismo saneamiento de `app/shell-assets.mjs` al instalarse: se sirven
+// locales y se referencian con <img>, así que no ejecutan scripts ni piden nada
+// a terceros.
 //
 // Sin entrada aquí —Petroperú hoy solo publica su logo en PNG— la tarjeta
 // muestra la marca en texto y ya. Marca identificada y logo disponible siguen
@@ -18,6 +21,7 @@ export const BRAND_LOGOS = Object.freeze({
     brand: 'Primax',
     width: 41,
     height: 15,
+    source_kind: 'official_asset',
     source_url: 'https://creaturuta.primax.com.pe/img/svg/logo-primax-footer.svg',
     retrieved_at: '2026-09-06',
   }),
@@ -26,6 +30,7 @@ export const BRAND_LOGOS = Object.freeze({
     brand: 'Repsol',
     width: 60,
     height: 14,
+    source_kind: 'official_asset',
     source_url: 'https://www.repsol.pe/content/dam/global/logotipos/repsol/logo-repsol.svg',
     retrieved_at: '2026-09-06',
   }),
@@ -34,6 +39,7 @@ export const BRAND_LOGOS = Object.freeze({
     brand: 'AVA',
     width: 17,
     height: 15,
+    source_kind: 'owner_supplied',
     source_url: 'aportado por el owner',
     retrieved_at: '2026-09-07',
   }),

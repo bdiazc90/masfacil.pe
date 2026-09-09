@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOG_SCHEMA_VERSION } from '../app/commercial-catalog.mjs';
-import { AUDIT_SCHEMA_VERSION, BRAND_MIN_SAMPLE, BRAND_THRESHOLD, commercialClaimSha256, wilsonLowerBound } from '../app/commercial-audit.mjs';
+import { AUDIT_SCHEMA_VERSION, BRAND_THRESHOLD, commercialClaimSha256, wilsonLowerBound } from '../app/commercial-audit.mjs';
 import { OFFICIAL_ANCHOR_SCHEME } from '../app/official-anchor.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -295,14 +295,17 @@ fs.writeFileSync(path.join(identidad, 'commercial-identity-audit.json'), `${JSON
 const conMarca = entradas.filter((e) => e.brand).length;
 if (conflictosDeMarca.length) fs.writeFileSync(path.join(identidad, 'brand-conflicts.json'), `${JSON.stringify({ generated_at: new Date().toISOString(), conflictos: conflictosDeMarca }, null, 2)}\n`, { mode: 0o600 });
 const limpiados = publicables.filter((r) => marcaEnNombre(r.nombre_maps) && !(marcaDelOperador(r.razon_social) && sinTildes(marcaEnNombre(r.nombre_maps)) === sinTildes(marcaDelOperador(r.razon_social)))).length;
-process.stdout.write(`Catálogo         ${entradas.length} entradas de 717 (${(entradas.length / 717 * 100).toFixed(1)} %)
+// El universo sale del propio cruce, no de un número escrito a mano: el padrón
+// cambia y un denominador fijo convierte el informe en una cifra falsa.
+const universo = matches.establecimientos;
+process.stdout.write(`Catálogo         ${entradas.length} entradas de ${universo} (${(entradas.length / universo * 100).toFixed(1)} %)
   verified       ${entradas.filter((e) => e.confidence === 'verified').length}
   nearby         ${entradas.filter((e) => e.confidence === 'nearby').length}
 
 Marca publicada  ${conMarca}   (razón social del operador o directorio oficial)
 Nombres limpiados ${limpiados}  (marca sin respaldo retirada del nombre)
 
-AUDITORÍA DE NOMBRE  (mide si la sede publicada es la correcta; es una puerta)
+AUDITORÍA DE NOMBRE  (mide si la sede publicada es la correcta; decide qué nombres se publican, ya no los precios)
 ${tiers.map((t) => `  ${t.confidence.padEnd(9)} ${t.correct}/${t.sampled} correctos · cota ${(t.lower_bound_95 * 100).toFixed(1)} % · umbral ${(t.threshold * 100).toFixed(0)} % ${t.lower_bound_95 >= t.threshold ? '✅' : '❌'}`).join('\n')}
 
 REVISIÓN DE MARCA    (mide la bandera publicada; NO es una puerta)

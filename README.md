@@ -2,75 +2,78 @@
 
 PWA independiente para comparar Gasohol Regular y Premium en Lima provincia por precio reportado, cercanía y frescura. No está afiliada, aprobada ni producida por Osinergmin, Facilito ni el Estado peruano.
 
-## Estado
-
-- Primera versión desplegada en Cloudflare Pages y funcionando.
-- Rutas: `/gasolina/`, `/gasolina/regular/` y `/gasolina/premium/`.
-- 714 establecimientos Regular, 700 Premium y 717 en la unión actual.
-- Identidad Comercial preparada en el bundle 2.1, pero todavía en **0/717**.
-- Sin identidad verificada se muestra `Estación sin nombre verificado`.
+Una sola ruta, `/`, con los dos productos en la misma tarjeta. Las rutas antiguas `/gasolina/…` redirigen ahí.
 
 La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de más de 30 días no se muestran ni compiten al ordenar; el grifo permanece en una tarjeta compacta que dice desde cuándo calla.
+
+## Cómo decide la interfaz
+
+- Con ubicación: fija un pool de estaciones cercanas y muestra las primeras, ordenables por cercanía o precio.
+- Sin ubicación: permite elegir distrito y no fabrica distancia.
+- La edad del precio se recalcula en el navegador.
+- `Cómo llegar` abre Google Maps con el destino tras una acción explícita.
+- La ubicación de quien usa la app no se envía a servidores de masfacil.pe.
+- Cada tarjeta muestra la marca cuando el catálogo la respalda, con su logo si está en la lista controlada del cliente. Sin identidad con respaldo se muestra `Estación sin nombre verificado`.
 
 ## Uso local
 
 Requiere Node.js.
 
 ```bash
-npm run serve
+npm run serve          # http://127.0.0.1:4173
 ```
 
-Abre <http://127.0.0.1:4173>. La proyección requiere los inputs privados
-autorizados de `.local-cache/`:
+Para ver datos reales hace falta el bundle. Dos formas:
 
 ```bash
-npm run project
-npm run serve
+npm run fetch:live -- https://masfacil.pe   # trae el bundle público ya validado
+npm run project                              # o proyecta desde .local-cache/ autorizado
 ```
 
-`web/data/` se genera localmente y no vive en Git.
-
-## Cómo decide la interfaz
-
-- Con ubicación: fija un pool de 20 estaciones cercanas y muestra 4, ordenables por cercanía o precio.
-- Sin ubicación: permite elegir distrito y no fabrica distancia.
-- La edad se recalcula en el navegador.
-- `Cómo llegar` abre Google Maps con el destino tras una acción explícita.
-- La ubicación del usuario no se envía a servidores de masfacil.pe.
-
-## Identidad Comercial
-
-El pipeline ya admite `{brand, public_site_name}` unido a `establishment_id`. La investigación web terminó sin un puente válido: una razón social no se convierte en marca y no se une por dirección, coordenada o similitud.
-
-El siguiente release necesita una primera observación `owner_verified` que muestre en el mismo establecimiento:
-
-1. marca visible;
-2. Registro oficial exacto;
-3. fecha y responsable de verificación.
-
-El expediente permanece privado; el JSON público contiene solo la identidad mínima.
+`web/data/` y `web/shell-manifest.js` se generan y nunca viven en Git. El
+segundo es la precache del service worker: `npm run serve` y `npm run publish`
+la derivan del contenido, así que cambiar un CSS o registrar un logo no exige
+recordar ningún número de versión.
 
 ## Operación
+
+Cuatro caminos, y el workflow elige el que corresponde según lo que cambió:
+
+| Qué cambió | Qué pasa |
+| --- | --- |
+| Solo documentación | Se comprueba y no se publica nada. |
+| Interfaz o assets | Se recupera el último bundle público válido, se comprueba que el cliente nuevo lo acepte y se publica. **No se consulta la fuente de datos.** |
+| Refresco programado | Se adquiere, valida y promueve un snapshot nuevo; Regular y Premium van juntos. |
+| Código de proyección o catálogo | Se reproyecta desde el snapshot privado ya restaurado, **sin consultar la fuente**; solo si falta ese snapshot se refresca, y lo dice. |
 
 ```bash
 npm run refresh                # refresca y promueve snapshot privado
 npm run project                # proyecta Regular + Premium
-npm run publish                # prepara publicación automatizada
+npm run publish                # prepara la entrega según ROUTE
+npm run verify:web             # bundle, compatibilidad de cliente y logos
+npm run verify:web -- --origin https://masfacil.pe   # además, contra producción
 npm run rollback -- <snapshot-id>
 npm run audit                  # bloquea material privado
-npm run dump:establishments    # vuelca los 717 con dirección y coordenada
+npm run dump:establishments    # vuelca los establecimientos con dirección y coordenada
 ```
 
-El workflow `.github/workflows/refresh-pages.yml` comprueba cambios y despliega ambos productos juntos. Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
+Recuperar: `npm run rollback -- <snapshot-id>` reconstruye y valida ambos productos **antes** de mover el pointer, y restaura el anterior si algo falla. Un fallo de identidad comercial no impide recuperar.
+
+El workflow `.github/workflows/refresh-pages.yml` tiene tres jobs: `verify` (auditoría), `prepare` (resuelve la ruta y prepara el sitio, sin hacer cola: un cambio de interfaz no espera a que termine un refresco de datos) y `deploy` (serializado, dura segundos: revalida contra lo publicado y contra la punta de `main` —ninguna ruta retrocede código ni datos— y sube). Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
+
+## Identidad comercial
+
+El bundle público lleva `{brand, public_site_name}` unido a `establishment_id`, nunca el expediente. La identidad es opcional para publicar: si el catálogo o su auditoría fallan, se retira la afirmación sin respaldo y **los precios se publican igual**, con el marcador neutral donde corresponda. La corrida lo dice con conteos y motivos.
+
+Detalle de fuentes, permisos y degradación: [docs/datos.md](docs/datos.md).
 
 ## Proyecto
 
 ```text
 web/         PWA estática
 pipeline/    transformación a snapshots públicos
-app/         contratos, validación en runtime y catálogo privado
+app/         contratos, validación en runtime, política de ruta y catálogo privado
 scripts/     refresh, publicación, auditoría y rollback
-fixtures/    dataset sintético para los controles negativos
 docs/        fuentes, decisiones y roadmap
 ```
 
@@ -79,12 +82,11 @@ y `web/data/`, ambos ignorados por Git:
 
 ```text
 .local-cache/raw/        originales descargados
-.local-cache/datasets/   datasets privados construidos
 .local-cache/snapshots/  snapshots promovidos + active.json
 .local-cache/identity/   catálogo, auditoría y volcados de identidad comercial
 .local-cache/publish/    seed y artefactos de publicación
 ```
 
-Diseño: [DESIGN.md](DESIGN.md). Fuentes y límites: [docs/datos.md](docs/datos.md). Próximos releases: [docs/roadmap.md](docs/roadmap.md).
+Diseño: [DESIGN.md](DESIGN.md). Fuentes y límites: [docs/datos.md](docs/datos.md). Backlog: [docs/roadmap.md](docs/roadmap.md).
 
 Código original bajo Apache-2.0. La licencia no cubre datos o materiales de terceros; ver [NOTICE](NOTICE).

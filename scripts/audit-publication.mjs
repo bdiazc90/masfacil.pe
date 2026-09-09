@@ -6,12 +6,14 @@ import { fileURLToPath } from 'node:url';
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MAX_TRACKED_BYTES = 256 * 1024;
 
-// El único artefacto grande permitido es evidencia agregada, descrita en docs/datos.md.
-export const LARGE_FILE_ALLOWLIST = Object.freeze(new Set(['evidence/feasibility-2026-08-14.json']));
+// Nada grande está permitido: la evidencia agregada que justificaba la única
+// excepción ya no se produce ni se versiona.
+export const LARGE_FILE_ALLOWLIST = Object.freeze(new Set());
 export const FORBIDDEN_PATHS = Object.freeze([
   /^\.local-cache\//,
   /^data\//,
   /^web\/data\//,
+  /^web\/shell-manifest\.js$/,
   /(^|\/)\.env(?:\.|$)/,
   /(^|\/)fetch-gis\.mjs$/,
   /(^|\/)gis-osinergmin\.json$/,
@@ -21,6 +23,7 @@ export const REQUIRED_IGNORES = Object.freeze([
   ['data/minimized/audit-sentinel.csv.gz', '/data/'],
   ['data/derived/audit-sentinel.json', '/data/'],
   ['web/data/audit-sentinel.json', '/web/data/'],
+  ['web/shell-manifest.js', '/web/shell-manifest.js'],
   ['fetch-gis.mjs', '/fetch-gis.mjs'],
   ['gis-osinergmin.json', '/gis-osinergmin.json'],
 ]);

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { GIS_FIELDS as GIS_HEADER, REGISTRY_FIELDS as REGISTRY_HEADER, csvLine } from '../pipeline/csv.mjs';
 
 export const ROOT_FIELDS = Object.freeze(['schema_version', 'reference_snapshot_date', 'registry_fields', 'gis_fields', 'registry', 'gis']);
 export const REGISTRY_FIELDS = Object.freeze(['source_activity', 'registro', 'department', 'province', 'district']);
@@ -51,18 +52,10 @@ export function decodeSeed(encoded, manifest) {
   return payload;
 }
 
-function csvLine(values) {
-  return `${values.map((value) => {
-    const textValue = String(value);
-    return /[;"\n\r]/.test(textValue) ? `"${textValue.replaceAll('"', '""')}"` : textValue;
-  }).join(';')}\n`;
-}
-
+/** Las tablas sanitizadas que el seed materializa usan el encabezado del módulo CSV. */
 export function materializeSeedTables(payload) {
-  const registryHeader = ['SOURCE_ACTIVITY', 'REGISTRO', 'CODIGO_OSINERGMIN', 'CODIGO', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'ACTIVIDAD'];
-  const gisHeader = ['LAYER', 'OBJECTID', 'N', 'COD_OSINERGMIN', 'CODIGO_DGH', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'LONGITUDE', 'LATITUDE'];
   return {
-    registry: `${csvLine(registryHeader)}${payload.registry.map(([activity, registration, department, province, district]) => csvLine([activity, registration, '', '', department, province, district, ''])).join('')}`,
-    gis: `${csvLine(gisHeader)}${payload.gis.map((row) => csvLine(['35', '', row[0], '', '', ...row.slice(1)])).join('')}`,
+    registry: `${csvLine([...REGISTRY_HEADER])}${payload.registry.map(([activity, registration, department, province, district]) => csvLine([activity, registration, '', '', department, province, district, ''])).join('')}`,
+    gis: `${csvLine([...GIS_HEADER])}${payload.gis.map((row) => csvLine(['35', '', row[0], '', '', ...row.slice(1)])).join('')}`,
   };
 }

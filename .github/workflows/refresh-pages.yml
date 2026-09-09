@@ -22,13 +22,19 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: masfacil-pages-refresh-deploy
-  cancel-in-progress: false
+# Tres jobs con tres colas distintas. `verify` se cancela entre PRs de la misma
+# rama. `prepare` no hace cola: un cambio de interfaz se prepara en un minuto
+# aunque el cron esté a mitad de una descarga de 1,2 GB. Solo `deploy` está
+# serializado, dura segundos, y revalida el estado justo antes de subir porque
+# dos corridas serializadas no terminan necesariamente en el orden en que
+# empezaron.
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    concurrency:
+      group: masfacil-verify-${{ github.event_name }}-${{ github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -36,17 +42,21 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22.20.0
-      - run: npm run audit
+      # Una sola auditoría: el checkout de CI deja el índice idéntico a HEAD, así
+      # que auditar `:` y luego `HEAD` revisaba dos veces el mismo árbol. Esta
+      # cubre además el historial, que la otra no miraba.
       - run: node scripts/audit-publication.mjs --treeish HEAD --strict-history
 
-  refresh_and_deploy:
+  prepare:
     needs: verify
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     environment: pages-production
+    outputs:
+      deploy: ${{ steps.prepare.outputs.deploy }}
+      route: ${{ steps.route.outputs.route }}
+      route_reason: ${{ steps.route.outputs.route_reason }}
     env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
       # Origen público canónico (https://masfacil.pe). Si falta, cae al pages.dev del proyecto.
       PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
@@ -62,95 +72,126 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22.20.0
-      - name: Rechazar configuración incompleta
-        run: |
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_PAGES_PROJECT"
-          test -n "$BOOTSTRAP_SEED_B64"
+
+      # La ruta se decide antes de pedir nada: publicar la interfaz no debe
+      # exigir el seed privado ni el expediente de identidad, y la clasificación
+      # mira TODOS los commits del push, no solo el último.
+      - name: Resolver la ruta de publicación
+        id: route
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RANGE_BEFORE: ${{ github.event.before }}
+          RANGE_AFTER: ${{ github.sha }}
+          INPUT_DEPLOY_SHELL: ${{ inputs.deploy_shell && '1' || '0' }}
+          INPUT_FORCE_PROJECT: ${{ inputs.force_project && '1' || '0' }}
+        run: node scripts/resolve-route.mjs
+
+      - name: Rechazar bootstrap ausente
+        if: steps.route.outputs.needs_seed == 'true'
+        run: test -n "$BOOTSTRAP_SEED_B64"
+
       - name: Recuperar el bundle público ya verificado (~500 KB)
+        if: steps.route.outputs.fetch_live == 'true'
         run: npm run fetch:live -- "${PUBLIC_ORIGIN:-https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev}"
       - name: Instalar bootstrap privado mínimo
+        if: steps.route.outputs.needs_seed == 'true'
         run: npm run seed:install -- --target "$RUNNER_TEMP/seed-reference"
+      # Un fallo de identidad comercial ya no mata el job: el instalador deja
+      # constancia del problema y la proyección publica precios con identidad
+      # degradada o ausente, que es visible en el resumen de abajo.
       - name: Instalar identidad comercial verificada
-        if: env.COMMERCIAL_IDENTITY_B64 != ''
+        if: steps.route.outputs.needs_identity == 'true' && env.COMMERCIAL_IDENTITY_B64 != ''
         run: npm run identity:install
-      - name: Calcular cambio de shell
-        id: shell
-        env:
-          DEPLOY_SHELL: ${{ inputs.deploy_shell && '1' || '0' }}
-        run: |
-          # Shell = solo web/ (sin web/data). Si el push toca además código de
-          # proyección, el bundle publicado podría no corresponder al shell nuevo:
-          # no se despliega solo y se pide force_project.
-          changed=0
-          if [ "${{ github.event_name }}" = "push" ]; then
-            if ! git diff --quiet HEAD^ HEAD -- web ':!web/data'; then
-              if git diff --quiet HEAD^ HEAD -- pipeline app scripts bootstrap package.json; then
-                changed=1
-              else
-                echo "::notice::El push toca web/ y también código fuera de web/; no se despliega el shell solo. Publica con force_project=true (o deploy_shell=true si lo de fuera no afecta la proyección)."
-              fi
-            fi
-          elif [ "$DEPLOY_SHELL" = "1" ]; then
-            changed=1
-          fi
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      # El snapshot privado restaurado permite reproyectar sin consultar la
+      # fuente (ruta `project`). Sin él, `publish` cae al refresco y lo dice.
       - name: Restaurar el snapshot activo entre corridas
+        if: steps.route.outputs.needs_refresh == 'true'
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.3
         with:
           path: .local-cache/snapshots
           key: snapshots-${{ hashFiles('bootstrap/seed.manifest.json') }}-${{ github.run_id }}
           restore-keys: |
             snapshots-${{ hashFiles('bootstrap/seed.manifest.json') }}-
-      - name: Refrescar, proyectar y verificar si corresponde
+
+      # Un solo programa. `publish` decide, escribe `prepare-result.json` y anexa
+      # `deploy=` a GITHUB_OUTPUT; si muere sin escribirlo no hay output, el
+      # job falla y el deployment vigente se conserva.
+      - name: Preparar la entrega según la ruta
         id: prepare
         env:
           REFRESH_STATE_PATH: ${{ github.workspace }}/web/data/gasolina/refresh-state.json
           REFERENCE_MINIMIZED_ROOT: ${{ runner.temp }}/seed-reference
-          SHELL_CHANGED: ${{ steps.shell.outputs.changed }}
-          FORCE_PROJECT: ${{ inputs.force_project && '1' || '0' }}
-          REFRESH_RESULT: ${{ runner.temp }}/refresh-result.json
-        run: |
-          set +e
-          npm run publish > "$RUNNER_TEMP/publish-stdout.txt" 2> "$RUNNER_TEMP/publish-stderr.txt"
-          status=$?
-          cat "$RUNNER_TEMP/publish-stdout.txt"
-          cat "$RUNNER_TEMP/publish-stderr.txt" >&2
-          # El resultado del refresco manda; si por lo que sea no llegó a
-          # escribirse, se informa eso sin tapar la salida original de publish.
-          if [ -f "$REFRESH_RESULT" ]; then
-            # Un archivo ilegible no puede dejar el paso en verde: sin try/catch el
-            # lector moría sin escribir `deploy` y, si publish había salido 0, el
-            # rechazo quedaba invisible. Aquí siempre se decide y siempre se explica.
-            if ! node --input-type=module -e '
-              import fs from "node:fs";
-              const salida = (deploy) => fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${deploy}\n`);
-              try {
-                const result = JSON.parse(fs.readFileSync(process.env.REFRESH_RESULT, "utf8"));
-                const refresh = result.refresh ?? {};
-                const decision = result.decision ?? {};
-                if (typeof decision.deploy !== "boolean") throw new Error("sin decision.deploy");
-                console.log(`refresh=${refresh.status}; action=${decision.action}; motivo=${decision.reason}`);
-                if (refresh.error) console.log(`causa=${refresh.error}`);
-                if (refresh.detection?.reason) console.log(`deteccion: ${refresh.detection.reason}`);
-                for (const motivo of refresh.quality?.reasons ?? []) console.log(`guardrail: ${motivo}`);
-                if (result.execution?.error) console.log(`fallo en ${result.execution.stage}: ${result.execution.error}`);
-                salida(decision.deploy);
-              } catch (error) {
-                console.log(`::error::refresh-result.json ilegible (${error.message}); se conserva el deployment anterior. Revisa la salida de arriba.`);
-                salida(false);
-                process.exitCode = 1;
-              }
-            '; then
-              status=1
-            fi
-          else
-            echo "::error::publish no dejó refresh-result.json; se conserva el deployment anterior. Revisa la salida de arriba."
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            [ "$status" -eq 0 ] && status=1
-          fi
-          exit "$status"
-      - name: Direct Upload a Cloudflare Pages
+          ROUTE: ${{ steps.route.outputs.route }}
+          ROUTE_REASON: ${{ steps.route.outputs.route_reason }}
+          FORCE_PROJECT: ${{ steps.route.outputs.force_project == 'true' && '1' || '0' }}
+          PREPARE_RESULT: ${{ runner.temp }}/prepare-result.json
+        run: npm run publish
+
+      # «Prevista», no «hecha»: lo efectivo lo dice el job `deploy`.
+      - name: Resumen de la preparación
+        if: always()
+        env:
+          SUMMARY_STAGE: prepare
+          PREPARE_RESULT: ${{ runner.temp }}/prepare-result.json
+          ROUTE: ${{ steps.route.outputs.route }}
+          ROUTE_REASON: ${{ steps.route.outputs.route_reason }}
+        run: node scripts/publication-summary.mjs
+
+      - name: Guardar el sitio preparado
         if: steps.prepare.outputs.deploy == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: site-${{ github.run_id }}
+          path: web
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    needs: prepare
+    if: needs.prepare.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    environment: pages-production
+    concurrency:
+      group: masfacil-pages-deploy
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+      PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN || format('https://{0}.pages.dev', vars.CLOUDFLARE_PAGES_PROJECT) }}
+      ROUTE: ${{ needs.prepare.outputs.route }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.20.0
+      - name: Recuperar el sitio preparado
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: site-${{ github.run_id }}
+          path: web
+      - name: Rechazar configuración de publicación incompleta
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_PAGES_PROJECT"
+      # Ninguna ruta puede retroceder código ni datos: se compara con lo publicado
+      # y con la punta de main. Abortar aquí es un no-op explicado, no un fallo.
+      - name: Revalidar el estado antes de subir
+        id: preflight
+        run: node scripts/preflight-deploy.mjs
+      - name: Direct Upload a Cloudflare Pages
+        id: upload
+        if: steps.preflight.outputs.deploy == 'true'
         run: npx --yes wrangler@4.31.0 pages deploy web --project-name "$CLOUDFLARE_PAGES_PROJECT" --branch main
+      - name: Resumen de la publicación
+        if: always()
+        env:
+          SUMMARY_STAGE: deploy
+          PREFLIGHT_DEPLOY: ${{ steps.preflight.outputs.deploy }}
+          PREFLIGHT_REASON: ${{ steps.preflight.outputs.preflight_reason }}
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+        run: node scripts/publication-summary.mjs

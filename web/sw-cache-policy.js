@@ -1,4 +1,4 @@
-export const SHELL_CACHE = 'masfacil-shell-v22';
+// SHELL_CACHE ya no vive aquí: se deriva del contenido en web/shell-manifest.js.
 export const DATA_CACHE = 'masfacil-data-v3';
 export async function cacheFirst({ request, cache, fetchImpl }) {
   const cached = await cache.match(request); if (cached) return { response: cached, source: 'cache' };

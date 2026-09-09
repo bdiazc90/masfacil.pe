@@ -1,7 +1,11 @@
-import { SHELL_CACHE, DATA_CACHE, cacheFirst } from './sw-cache-policy.js';
+// La lista de la precache y su versión son generadas: salen de las referencias
+// del árbol y de la huella de esos bytes. El navegador reinstala el service
+// worker cuando cambian los bytes de sus imports, así que importar el módulo
+// generado ES el mecanismo de actualización.
+import { SHELL, SHELL_CACHE } from './shell-manifest.js';
+import { DATA_CACHE, cacheFirst } from './sw-cache-policy.js';
 import { GASOLINA_KEYS, validGasolinaBundle, validateGasolinaManifest } from './gasolina-contract.js';
 
-const SHELL = ['/', '/styles.css', '/app.js', '/theme.js', '/controls-card.js', '/service-worker-ready.js', '/data-client.js', '/gasolina-contract.js', '/district-list.js', '/offer-card.js', '/brand-logos.js', '/sw-cache-policy.js', '/lib/haversine.js', '/lib/decision-view.js', '/lib/freshness.js', '/lib/directions.js', '/lib/merge-products.js', '/manifest.webmanifest', '/icons/logo.svg', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-512-maskable.png', '/icons/apple-touch-icon.png', '/icons/icon-512.svg', '/icons/brands/primax.svg', '/icons/brands/repsol.svg', '/icons/brands/ava.svg'];
 const active = new Map();
 const pairRequest = (key) => new Request(`/__masfacil-gasolina-pair/${key}`);
 const tagged = (response, mode) => { const headers = new Headers(response.headers); headers.set('X-Masfacil-Data-Mode', mode); return new Response(response.body, { status: response.status, statusText: response.statusText, headers }); };

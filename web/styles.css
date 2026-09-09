@@ -254,8 +254,9 @@ h3{font-size:16px;margin-bottom:6px}
 .offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
 .offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
 .offer__identity{font-size:16px;font-weight:700;line-height:1.35}
-/* Logo oficial sin retocar, sobre una placa clara: así conserva sus colores
-   de marca y se lee igual en tema claro y en oscuro. */
+/* Logo sin retocar —activo oficial o recreación fiel, según declare su
+   procedencia— sobre una placa clara: así conserva sus colores de marca y se
+   lee igual en tema claro y en oscuro. */
 .offer__brand{display:inline-block;vertical-align:-3px;margin-right:6px;padding:2px 4px;border-radius:4px;background:#fff;box-shadow:0 0 0 1px color-mix(in srgb,var(--border) 18%,transparent)}
 .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
 .offer__address{font-size:14.5px;line-height:1.35;text-align:right}

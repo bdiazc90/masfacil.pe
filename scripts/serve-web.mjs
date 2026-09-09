@@ -3,9 +3,13 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeShellManifest } from '../pipeline/shell-manifest.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = path.join(root, 'web');
+// La precache se genera al arrancar: en local nunca hay que acordarse de nada
+// para que el service worker vea el shell que se está editando.
+const shell = writeShellManifest({ root });
 const port = Number(process.env.PORT ?? 4173);
 const types = new Map([['.html','text/html; charset=utf-8'],['.js','text/javascript; charset=utf-8'],['.css','text/css; charset=utf-8'],['.json','application/json; charset=utf-8'],['.webmanifest','application/manifest+json'],['.svg','image/svg+xml']]);
 const server = http.createServer((request,response) => {
@@ -19,4 +23,4 @@ const server = http.createServer((request,response) => {
   const headers = {'Content-Type':types.get(path.extname(file)) ?? 'application/octet-stream','Cache-Control':relative === 'data/manifest.json' || relative === 'data/gasolina/manifest.json' ? 'no-store' : relative.startsWith('data/snapshots/') || relative.startsWith('data/gasolina/snapshots/') ? 'public, max-age=31536000, immutable' : 'no-cache','Service-Worker-Allowed':'/','X-Content-Type-Options':'nosniff'};
   response.writeHead(200,headers); if(request.method==='GET')fs.createReadStream(file).pipe(response); else response.end();
 });
-server.listen(port,'127.0.0.1',()=>process.stdout.write(`masfacil.pe local en http://127.0.0.1:${port}\n`));
+server.listen(port,'127.0.0.1',()=>process.stdout.write(`masfacil.pe local en http://127.0.0.1:${port}\nPrecache derivada: ${shell.cache} · ${shell.entries.length} entradas\n`));

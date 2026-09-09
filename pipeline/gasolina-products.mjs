@@ -1,17 +1,14 @@
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import { createGunzip } from 'node:zlib';
-import { Transform } from 'node:stream';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
+import { GIS_FIELDS, MINIMIZED_FIELDS, RAW_FIELDS, REGISTRY_FIELDS, assertHeader, clean, csvRows, normalizeHeader, parseTimestamp, readTable } from './csv.mjs';
 
 export const GASOLINA_PRODUCTS = Object.freeze({
   regular: Object.freeze({ canonical: 'GASOHOL REGULAR', label: 'Gasohol Regular' }),
   premium: Object.freeze({ canonical: 'GASOHOL PREMIUM', label: 'Gasohol Premium' }),
 });
+export const GASOLINA_PRODUCT_KEYS = Object.freeze(Object.keys(GASOLINA_PRODUCTS));
 const activities = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GNV': '05', 'EE.SS con GLP y GNV': '06' });
 const sep = '\u001f';
-
-const clean = (value) => String(value ?? '').replace(/\r/g, '').trim();
 
 // La dirección del Registro viene en mayúsculas y mezcla la vía con la
 // descripción del predio: manzana, lote, urbanización, referencias. Para la
@@ -46,38 +43,8 @@ export function direccionParaPantalla(bruta) {
   if (salida.length > 46) salida = `${salida.slice(0, 45).replace(/[\s,]+\S*$/, '')}…`;
   return salida || null;
 }
-function timestamp(value) {
-  const match = clean(value).match(/^(\d{4})[-/](\d{2})[-/](\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?)?$/);
-  return match ? new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4] ?? '00'}:${match[5] ?? '00'}:${match[6] ?? '00'}-05:00`) : null;
-}
-export async function* csvRows(file) {
-  let source = fs.createReadStream(file, { highWaterMark: 1024 * 1024 });
-  if (file.endsWith('.gz')) source = source.pipe(createGunzip());
-  source = source.pipe(new Transform({ transform(chunk, encoding, callback) { callback(null, chunk); } })).setEncoding('utf8');
-  let row = []; let value = ''; let quoted = false; let quoteAtEnd = false; let first = true;
-  for await (const chunk of source) for (let index = 0; index < chunk.length; index += 1) {
-    const char = chunk[index]; if (first) { first = false; if (char === '\uFEFF') continue; }
-    if (quoteAtEnd) { quoteAtEnd = false; if (char === '"') { value += '"'; continue; } quoted = false; }
-    if (quoted) { if (char === '"') { if (index === chunk.length - 1) quoteAtEnd = true; else if (chunk[index + 1] === '"') { value += '"'; index += 1; } else quoted = false; } else value += char; }
-    else if (char === '"') quoted = true;
-    else if (char === ';') { row.push(value); value = ''; }
-    else if (char === '\n') { row.push(value.replace(/\r$/, '')); yield row; row = []; value = ''; }
-    else value += char;
-  }
-  if (quoted || quoteAtEnd) throw new Error(`CSV incompleto: ${file}`);
-  if (value || row.length) { row.push(value.replace(/\r$/, '')); yield row; }
-}
-async function table(file, expected) {
-  let header; const rows = [];
-  for await (const row of csvRows(file)) { if (!header) { header = row.map(clean); if (JSON.stringify(header) !== JSON.stringify(expected)) throw new Error(`Schema inesperado: ${file}`); } else { if (row.length !== header.length) throw new Error(`Fila inválida: ${file}`); rows.push(Object.fromEntries(header.map((key, index) => [key, clean(row[index])]))); } }
-  return rows;
-}
-const priceFields = ['ID3','ACTIVIDAD','REGISTRO_DE_HIDROCARBUROS','DEPARTAMENTO','PROVINCIA','DISTRITO','FECHA_DE_REGISTRO','PRODUCTO','PRECIO_DE_VENTA_SOLES','UNIDAD'];
-const registryFields = ['SOURCE_ACTIVITY','REGISTRO','CODIGO_OSINERGMIN','CODIGO','DEPARTAMENTO','PROVINCIA','DISTRITO','ACTIVIDAD'];
-const gisFields = ['LAYER','OBJECTID','N','COD_OSINERGMIN','CODIGO_DGH','DEPARTAMENTO','PROVINCIA','DISTRITO','LONGITUDE','LATITUDE'];
-const rawFields = ['ID3','ACTIVIDAD','REGISTRO_DE_HIDROCARBUROS','RUC','RAZON_SOCIAL','DEPARTAMENTO','PROVINCIA','DISTRITO','DIRECCION','FECHA_DE_REGISTRO','PRODUCTO','PRECIO_DE_VENTA_SOLES','UNIDAD'];
+
 const lima = (row) => row.DEPARTAMENTO === 'LIMA' && row.PROVINCIA === 'LIMA';
-const rawHeaderName = (value) => clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replaceAll(' ', '_').replace(/[^A-Z0-9_]/g, '').replace('PRECIO_DE_VENTA_SOLES', 'PRECIO_DE_VENTA_SOLES').replace('PRECIO_DE_VENTA_SOLES', 'PRECIO_DE_VENTA_SOLES');
 
 function seedRows(seed, name, fields, mapRow) {
   if (!seed || !Array.isArray(seed[name])) return null;
@@ -92,23 +59,39 @@ function seedRows(seed, name, fields, mapRow) {
   });
 }
 
-export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath, cutoffAt, snapshotId, sourceMaxReportedAt, sourceUrl, bootstrapSeed = null }) {
+/**
+ * Precios minimizados, Registro y GIS: las tres tablas que comparten los dos
+ * productos, cargadas UNA vez.
+ *
+ * De la misma pasada sale `sourceMaxReportedAt`: el máximo de
+ * `FECHA_DE_REGISTRO` sobre TODAS las filas, antes de cualquier filtro. Lo
+ * calculaba el constructor privado; ahora se calcula donde ya se recorre el
+ * archivo y viaja en el pointer del snapshot.
+ */
+export async function loadGasolinaSources({ minimizedRoot, bootstrapSeed = null }) {
+  let maximo = null;
+  const prices = await readTable(`${minimizedRoot}/prices/liquid-current.csv.gz`, MINIMIZED_FIELDS, {
+    onRow: (row) => { const time = parseTimestamp(row.FECHA_DE_REGISTRO); if (time && (!maximo || time > maximo)) maximo = time; },
+  });
+  const registry = seedRows(bootstrapSeed, 'registry', REGISTRY_FIELDS, (row, index) => [row[0], row[1], '', '', row[2], row[3], row[4], ''][index])
+    ?? await readTable(`${minimizedRoot}/registry/authorizations.csv.gz`, REGISTRY_FIELDS);
+  const gis = seedRows(bootstrapSeed, 'gis', GIS_FIELDS, (row, index) => ['35', '', row[0], '', '', row[1], row[2], row[3], row[4], row[5]][index])
+    ?? await readTable(`${minimizedRoot}/gis/features.csv.gz`, GIS_FIELDS);
+  return { prices, registry, gis, sourceMaxReportedAt: maximo ? maximo.toISOString() : null };
+}
+
+/**
+ * Embudo de un producto hasta el cruce geográfico. No toca el original de 1,2 GB:
+ * solo declara qué ID3 necesita de él.
+ */
+function selectProductCandidates({ sources, productKey, cutoffAt }) {
   const product = GASOLINA_PRODUCTS[productKey]; if (!product) throw new Error(`Producto gasolina no permitido: ${productKey}`);
-  const prices = await table(`${minimizedRoot}/prices/liquid-current.csv.gz`, priceFields);
-  const registry = seedRows(bootstrapSeed, 'registry', registryFields, (row, index) => {
-    const values = [row[0], row[1], '', '', row[2], row[3], row[4], ''];
-    return values[index];
-  }) ?? await table(`${minimizedRoot}/registry/authorizations.csv.gz`, registryFields);
-  const gis = seedRows(bootstrapSeed, 'gis', gisFields, (row, index) => {
-    const values = ['35', '', row[0], '', '', row[1], row[2], row[3], row[4], row[5]];
-    return values[index];
-  }) ?? await table(`${minimizedRoot}/gis/features.csv.gz`, gisFields);
-  const byRegistry = new Map(); for (const row of registry) { const key = `${row.SOURCE_ACTIVITY}${sep}${row.REGISTRO}`; byRegistry.set(key, [...(byRegistry.get(key) ?? []), row]); }
-  const byGis = new Map(); for (const row of gis.filter((item) => item.LAYER === '35')) byGis.set(row.N, [...(byGis.get(row.N) ?? []), row]);
+  const byRegistry = new Map(); for (const row of sources.registry) { const key = `${row.SOURCE_ACTIVITY}${sep}${row.REGISTRO}`; byRegistry.set(key, [...(byRegistry.get(key) ?? []), row]); }
+  const byGis = new Map(); for (const row of sources.gis.filter((item) => item.LAYER === '35')) byGis.set(row.N, [...(byGis.get(row.N) ?? []), row]);
   const grouped = new Map(); let sourceRows = 0;
-  for (const row of prices) {
+  for (const row of sources.prices) {
     if (!Object.hasOwn(activities, row.ACTIVIDAD) || row.PRODUCTO !== product.canonical || row.UNIDAD !== 'Galones') continue;
-    sourceRows += 1; const time = timestamp(row.FECHA_DE_REGISTRO); const key = [row.REGISTRO_DE_HIDROCARBUROS, row.ACTIVIDAD, row.PRODUCTO, row.UNIDAD].join(sep); const current = grouped.get(key) ?? { rows: [], max: null };
+    sourceRows += 1; const time = parseTimestamp(row.FECHA_DE_REGISTRO); const key = [row.REGISTRO_DE_HIDROCARBUROS, row.ACTIVIDAD, row.PRODUCTO, row.UNIDAD].join(sep); const current = grouped.get(key) ?? { rows: [], max: null };
     const numericPrice = Number(row.PRECIO_DE_VENTA_SOLES.replace(',', '.')); const candidate = { ...row, time, numericPrice };
     if (time && (!current.max || time > current.max)) { current.max = time; current.rows = [candidate]; } else if (time && current.max && time.getTime() === current.max.getTime()) current.rows.push(candidate);
     grouped.set(key, current);
@@ -135,18 +118,53 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   const motivoNoFresco = (item) => motivoNoPublicable(item) ?? (vencido(item) ? 'reporte_vencido' : null);
   const publicables = latestLima.filter((item) => !motivoNoPublicable(item));
   const fresh = publicables.filter(fresco);
-  const registered = publicables.map((item) => ({ ...item, matches: byRegistry.get(`${activities[item.selected.ACTIVIDAD]}${sep}${item.selected.REGISTRO_DE_HIDROCARBUROS}`) ?? [] })).filter((item) => item.matches.length === 1 && lima(item.matches[0]) && item.matches[0].DISTRITO === item.selected.DISTRITO);
-  const geo = registered.map((item) => { const matches = byGis.get(item.selected.REGISTRO_DE_HIDROCARBUROS) ?? []; const coordinate = matches.length === 1 ? matches[0] : null; const longitude = Number(coordinate?.LONGITUDE); const latitude = Number(coordinate?.LATITUDE); return { ...item, coordinate, longitude, latitude }; }).filter((item) => item.coordinate && lima(item.coordinate) && item.coordinate.DISTRITO === item.selected.DISTRITO && Number.isFinite(item.longitude) && item.longitude >= -82 && item.longitude <= -68 && Number.isFinite(item.latitude) && item.latitude >= -19 && item.latitude <= 1);
-  const targetIds = new Set(geo.map((item) => item.selected.ID3)); const identities = new Map(); let rawHeader;
+  // Cardinalidad ≠ 1 excluye y se cuenta; nunca `matches[0]`. Elegir una fila
+  // arbitraria de un cruce ambiguo publicaría una identidad que la fuente no
+  // afirma.
+  const conCruceRegistro = publicables.map((item) => ({ ...item, matches: byRegistry.get(`${activities[item.selected.ACTIVIDAD]}${sep}${item.selected.REGISTRO_DE_HIDROCARBUROS}`) ?? [] }));
+  const registryAmbiguous = conCruceRegistro.filter((item) => item.matches.length > 1).length;
+  const registered = conCruceRegistro.filter((item) => item.matches.length === 1 && lima(item.matches[0]) && item.matches[0].DISTRITO === item.selected.DISTRITO);
+  const conCruceGis = registered.map((item) => {
+    const matches = byGis.get(item.selected.REGISTRO_DE_HIDROCARBUROS) ?? [];
+    const coordinate = matches.length === 1 ? matches[0] : null;
+    return { ...item, gisMatches: matches, coordinate, longitude: Number(coordinate?.LONGITUDE), latitude: Number(coordinate?.LATITUDE) };
+  });
+  const gisAmbiguous = conCruceGis.filter((item) => item.gisMatches.length > 1).length;
+  const geo = conCruceGis.filter((item) => item.coordinate && lima(item.coordinate) && item.coordinate.DISTRITO === item.selected.DISTRITO && Number.isFinite(item.longitude) && item.longitude >= -82 && item.longitude <= -68 && Number.isFinite(item.latitude) && item.latitude >= -19 && item.latitude <= 1);
+  return { product, sourceRows, latest, latestLima, publicables, fresh, registered, geo, fresco, vencido, motivoNoFresco, registryAmbiguous, gisAmbiguous, registry: sources.registry };
+}
+
+/**
+ * Una sola pasada por el original para los DOS productos: la identidad de un
+ * ID3 no depende del producto que lo trajo. Antes el archivo de 1,2 GB se leía
+ * dos veces por proyección.
+ *
+ * Un `ID3` que aparece más de una vez dentro del alcance se marca: no hay forma
+ * de saber cuál de las filas describe al establecimiento, y quedarse con «la
+ * última» era elegir por orden de archivo.
+ */
+export async function readRawIdentities({ rawPath, targetIds }) {
+  const identities = new Map();
+  const duplicates = new Set();
+  let header;
   for await (const row of csvRows(rawPath)) {
-    if (!rawHeader) {
-      rawHeader = row.map(rawHeaderName);
-      if (JSON.stringify(rawHeader) !== JSON.stringify(rawFields)) throw new Error('Schema raw inesperado');
-      continue;
-    }
-    if (!targetIds.has(clean(row[0]))) continue; const item = Object.fromEntries(rawFields.map((key, index) => [key, clean(row[index])])); identities.set(item.ID3, item);
+    if (!header) { header = row.map(normalizeHeader); assertHeader(header, RAW_FIELDS, rawPath); continue; }
+    const id = clean(row[0]);
+    if (!targetIds.has(id)) continue;
+    if (identities.has(id)) { duplicates.add(id); continue; }
+    identities.set(id, Object.fromEntries(RAW_FIELDS.map((key, index) => [key, clean(row[index])])));
   }
-  const ready = geo.filter((item) => { const identity = identities.get(item.selected.ID3); return identity?.RAZON_SOCIAL && identity?.DIRECCION; });
+  return { identities, duplicates };
+}
+
+function finishProduct({ candidates, productKey, identities, duplicates, snapshotId, cutoffAt, sourceMaxReportedAt, sourceUrl }) {
+  const { product, geo, registered, publicables, latestLima, fresh, latest, fresco, vencido, motivoNoFresco, sourceRows } = candidates;
+  const repetidos = geo.filter((item) => duplicates.has(item.selected.ID3));
+  const ready = geo.filter((item) => {
+    if (duplicates.has(item.selected.ID3)) return false;
+    const identity = identities.get(item.selected.ID3);
+    return identity?.RAZON_SOCIAL && identity?.DIRECCION;
+  });
   const offers = ready.map((item) => ({
     id: `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`,
     establishment_id: officialAnchorFromRegistration(item.selected.REGISTRO_DE_HIDROCARBUROS),
@@ -161,7 +179,7 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   // El universo del Registro es la referencia oficial contra la que se valida
   // la identidad comercial. No depende de que hoy haya precio vigente: una
   // estación que deja de reportar sigue existiendo en el Registro.
-  const registryAnchors = new Set(registry.map((row) => clean(row.REGISTRO)).filter(Boolean).map(officialAnchorFromRegistration));
+  const registryAnchors = new Set(candidates.registry.map((row) => clean(row.REGISTRO)).filter(Boolean).map(officialAnchorFromRegistration));
   // Que una identidad no llegue a oferta ya no bloquea, pero sigue mereciendo
   // explicación: sin esta traza el hueco solo se ve como un número y no se puede
   // decidir si sobra la identidad o falta el dato. Se anota la etapa MÁS profunda
@@ -171,7 +189,7 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   const publicados = anchorsDe(ready);
   const noFrescos = new Map();
   for (const item of latestLima) { const anchor = anchorDe(item); const motivo = motivoNoFresco(item); if (anchor && motivo && !noFrescos.has(anchor)) noFrescos.set(anchor, motivo); }
-  const etapas = [['sin_razon_social_o_direccion', anchorsDe(geo)], ['sin_gis_unico', anchorsDe(registered)], ['no_cruza_registro', anchorsDe(publicables)]];
+  const etapas = [['id_repetido_en_el_raw', anchorsDe(repetidos)], ['sin_razon_social_o_direccion', anchorsDe(geo)], ['sin_gis_unico', anchorsDe(registered)], ['no_cruza_registro', anchorsDe(publicables)]];
   const exclusions = new Map();
   for (const anchor of registryAnchors) {
     if (publicados.has(anchor)) continue;
@@ -182,5 +200,53 @@ export async function buildGasolinaProduct({ productKey, minimizedRoot, rawPath,
   // por publicar más, y los guardrails de caída siguen comparando lo mismo entre
   // corridas. Lo publicado de más se cuenta aparte.
   const registeredFresco = registered.filter(fresco); const geoFresco = geo.filter(fresco); const readyFresco = ready.filter(fresco);
-  return { product, offers, registryAnchors, exclusions, metrics: { exact_scope_source_rows: sourceRows, latest_offers: metric(latest), latest_lima_lima: metric(latestLima), fresh_0_30_days: metric(fresh), registry_exact: metric(registeredFresco), gis_safe: metric(geoFresco), contract_ready: metric(readyFresco), coverage_percent: fresh.length ? Number((readyFresco.length / fresh.length * 100).toFixed(3)) : 0, published: metric(ready), silent_over_30_days: metric(ready.filter(vencido)), conflicts: { latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length, latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length, registry_excluded: fresh.length - registeredFresco.length, gis_excluded: registeredFresco.length - geoFresco.length, identity_excluded: geoFresco.length - readyFresco.length } }, context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl } };
+  return {
+    product,
+    offers,
+    registryAnchors,
+    exclusions,
+    metrics: {
+      exact_scope_source_rows: sourceRows,
+      latest_offers: metric(latest),
+      latest_lima_lima: metric(latestLima),
+      fresh_0_30_days: metric(fresh),
+      registry_exact: metric(registeredFresco),
+      gis_safe: metric(geoFresco),
+      contract_ready: metric(readyFresco),
+      coverage_percent: fresh.length ? Number((readyFresco.length / fresh.length * 100).toFixed(3)) : 0,
+      published: metric(ready),
+      silent_over_30_days: metric(ready.filter(vencido)),
+      conflicts: {
+        latest_price_conflicts: latestLima.filter((item) => item.priceConflict).length,
+        latest_territory_conflicts: latestLima.filter((item) => item.territoryConflict).length,
+        // Exclusiones por cardinalidad, medidas sobre la población que sí se
+        // habría publicado. El esquema público admite claves nuevas dentro de
+        // `conflicts`, así que no sube de versión.
+        registry_ambiguous: candidates.registryAmbiguous,
+        gis_ambiguous: candidates.gisAmbiguous,
+        raw_duplicate: repetidos.length,
+        registry_excluded: fresh.length - registeredFresco.length,
+        gis_excluded: registeredFresco.length - geoFresco.length,
+        identity_excluded: geoFresco.length - readyFresco.length,
+      },
+    },
+    context: { snapshot_id: snapshotId, cutoff_at: cutoffAt, source_max_reported_at: sourceMaxReportedAt, source_url: sourceUrl },
+  };
+}
+
+/**
+ * Regular y Premium desde las mismas tablas y la misma pasada de original.
+ *
+ * @param {object} entrada
+ * @param {object} [entrada.sources]  tablas ya cargadas; si faltan se cargan aquí
+ */
+export async function buildGasolinaProducts({ sources = null, minimizedRoot, rawPath, cutoffAt, snapshotId, sourceMaxReportedAt, sourceUrl, bootstrapSeed = null, productKeys = GASOLINA_PRODUCT_KEYS }) {
+  const tablas = sources ?? await loadGasolinaSources({ minimizedRoot, bootstrapSeed });
+  const candidates = Object.fromEntries(productKeys.map((key) => [key, selectProductCandidates({ sources: tablas, productKey: key, cutoffAt })]));
+  const targetIds = new Set(productKeys.flatMap((key) => candidates[key].geo.map((item) => item.selected.ID3)));
+  const { identities, duplicates } = await readRawIdentities({ rawPath, targetIds });
+  const results = Object.fromEntries(productKeys.map((key) => [key, finishProduct({
+    candidates: candidates[key], productKey: key, identities, duplicates, snapshotId, cutoffAt, sourceMaxReportedAt, sourceUrl,
+  })]));
+  return { sources: tablas, results };
 }

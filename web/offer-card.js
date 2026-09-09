@@ -45,9 +45,10 @@ export function isUnconfirmedIdentity(offer) {
   return offer?.commercial_identity?.confidence === 'nearby';
 }
 
-// El logo es refuerzo visual de una marca que el nombre ya dice; por eso va con
-// `alt` vacío, para que un lector de pantalla no la repita. Sin marca acreditada
-// —o con nombre «por confirmar»— no hay logo y la tarjeta queda neutral.
+// El logo es refuerzo visual de una marca que la tarjeta ya dice en texto; por
+// eso va con `alt` vacío, para que un lector de pantalla no la repita. Sin marca
+// publicada, o con una marca que no está en la lista controlada, no hay logo y
+// la tarjeta se queda en texto.
 export function brandLogoHtml(offer) {
   const logo = brandLogoFor(offer?.commercial_identity);
   if (!logo) return '';

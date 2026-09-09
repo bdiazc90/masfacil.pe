@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decodeSeed } from '../app/bootstrap-seed.mjs';
-import { buildGasolinaProduct, GASOLINA_PRODUCTS } from './gasolina-products.mjs';
+import { readActivePointer } from '../app/snapshot-manifest.mjs';
+import { buildGasolinaProducts, GASOLINA_PRODUCTS } from './gasolina-products.mjs';
 import { GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, sha256, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from './gasolina-contract.mjs';
-import { buildCommercialCatalogIndex, emptyCommercialCatalog, loadValidatedCommercialCatalog, staleBrandEvidence } from '../app/commercial-catalog.mjs';
-import { assertCommercialPublicationReady, brandAccreditationGroups, loadValidatedCommercialAudit } from '../app/commercial-audit.mjs';
+import { buildCommercialCatalogIndex, staleBrandEvidence } from '../app/commercial-catalog.mjs';
+import { brandAccreditationGroups } from '../app/commercial-audit.mjs';
+import { absentCommercialResolution, commercialIdentityReport, resolveCommercialIdentity } from '../app/commercial-resolution.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stable = (value) => `${JSON.stringify(value)}\n`;
@@ -19,9 +21,28 @@ function atomic(file, content) {
 }
 
 function active(root) {
-  const pointer = JSON.parse(fs.readFileSync(path.join(root, '.local-cache', 'snapshots', 'active.json'), 'utf8'));
-  if (!pointer?.snapshot_id || !pointer.dataset_path) throw new Error('Pointer de snapshot inválido; no se publica fixture');
+  const pointer = readActivePointer(root);
+  if (!pointer) throw new Error('No hay pointer de snapshot activo; no hay nada que proyectar');
   return pointer;
+}
+
+/**
+ * Los dos campos temporales que el bundle público publica.
+ *
+ * Un snapshot nuevo los declara en su pointer. Uno anterior a este cambio los
+ * lleva en su dataset legado y se leen de ahí tal cual, sin validarlos contra
+ * un schema que ya no existe: el objetivo es poder revertir a él, no revivir el
+ * experimento.
+ */
+export function temporalContextForPointer(root = rootFromModule, pointer) {
+  const declarado = pointer?.temporal_context;
+  if (declarado?.cutoff_at && declarado?.source_max_reported_at) {
+    return { cutoff_at: declarado.cutoff_at, source_max_reported_at: declarado.source_max_reported_at, snapshot_date: declarado.snapshot_date ?? pointer.snapshot_date };
+  }
+  if (!pointer?.dataset_path) throw new Error(`Snapshot ${pointer?.snapshot_id ?? 'sin identificador'} sin temporal_context ni dataset legado`);
+  const legado = JSON.parse(fs.readFileSync(path.join(root, pointer.dataset_path), 'utf8'))?.temporal_context ?? {};
+  if (!legado.cutoff_at || !legado.source_max_reported_at) throw new Error(`Dataset legado de ${pointer.snapshot_id} sin contexto temporal utilizable`);
+  return { cutoff_at: legado.cutoff_at, source_max_reported_at: legado.source_max_reported_at, snapshot_date: legado.snapshot_date ?? pointer.snapshot_date };
 }
 
 export function resolveGasolinaRaw(root, pointer) {
@@ -48,18 +69,21 @@ function optionalSeed(root) {
   return decodeSeed(fs.readFileSync(encoded, 'utf8'), manifest);
 }
 
-export async function buildGasolinaProjectionCandidate({ pointer, privateDataset, minimizedRoot, rawPath, bootstrapSeed = null, commercialCatalog = emptyCommercialCatalog(), commercialAudit = null }) {
-  assertCommercialPublicationReady(commercialCatalog, commercialAudit);
+export async function buildGasolinaProjectionCandidate({ pointer, temporalContext, sources = null, minimizedRoot, rawPath, bootstrapSeed = null, commercialResolution = absentCommercialResolution() }) {
+  // La identidad comercial ya no es una puerta: llega resuelta, con lo que tiene
+  // respaldo y lo que no. Antes esta función empezaba comprobando la auditoría y
+  // un nombre pendiente impedía construir un solo precio.
+  const commercialCatalog = commercialResolution.catalog;
+  const commercialAudit = commercialResolution.audit;
   const input = {
-    minimizedRoot,
-    rawPath,
-    cutoffAt: privateDataset.temporal_context.cutoff_at,
+    cutoffAt: temporalContext.cutoff_at,
     snapshotId: pointer.snapshot_id,
-    sourceMaxReportedAt: privateDataset.temporal_context.source_max_reported_at,
+    sourceMaxReportedAt: temporalContext.source_max_reported_at,
     sourceUrl: pointer.source_url,
-    bootstrapSeed,
   };
-  const results = Object.fromEntries(await Promise.all(GASOLINA_KEYS.map(async (key) => [key, await buildGasolinaProduct({ ...input, productKey: key })])));
+  // Regular y Premium salen de las mismas tablas y de UNA sola pasada por el
+  // original de 1,2 GB: la identidad de un ID3 no depende del producto.
+  const { results } = await buildGasolinaProducts({ ...input, sources, minimizedRoot, rawPath, bootstrapSeed, productKeys: GASOLINA_KEYS });
   const brandGroups = brandAccreditationGroups(commercialCatalog, commercialAudit);
   const catalogIndex = buildCommercialCatalogIndex(commercialCatalog, {
     registryIds: GASOLINA_KEYS.flatMap((key) => [...results[key].registryAnchors]),
@@ -119,27 +143,53 @@ export async function buildGasolinaProjectionCandidate({ pointer, privateDataset
   // Cada identidad sin oferta viene con la etapa en la que se perdió por producto:
   // Regular y Premium pueden caerse por motivos distintos, así que se anotan los dos.
   const catalogWithoutOffer = catalogIndex.withoutOffer.map((id) => Object.fromEntries([['id', id], ...GASOLINA_KEYS.map((key) => [key, results[key].exclusions.get(id) ?? 'fuera_del_registro_del_producto'])]));
-  return { manifest, refreshState, datasets, bodies, results, catalog: catalogIndex.metrics, catalogWithoutOffer, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
+  return { manifest, refreshState, datasets, bodies, results, identity: commercialIdentityReport(commercialResolution), isolatedEntries: commercialResolution.isolated ?? [], catalog: catalogIndex.metrics, catalogWithoutOffer, catalogUnknownAnchors: catalogIndex.unknownAnchors, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
 }
 
-export function loadCommercialPublicationInputs(root) {
-  const catalogPath = path.join(root, '.local-cache', 'identity', 'commercial-identity-catalog.json');
-  const auditPath = path.join(root, '.local-cache', 'identity', 'commercial-identity-audit.json');
+/** Dónde vive el expediente. `IDENTITY_ROOT` permite trabajar sobre una copia. */
+export function commercialIdentityRoot(root, identityRoot = process.env.IDENTITY_ROOT) {
+  return identityRoot ? path.resolve(root, identityRoot) : path.join(root, '.local-cache', 'identity');
+}
+
+export function loadCommercialPublicationInputs(root, { identityRoot } = {}) {
+  const identidad = commercialIdentityRoot(root, identityRoot);
   return {
-    commercialCatalog: fs.existsSync(catalogPath) ? loadValidatedCommercialCatalog(catalogPath) : emptyCommercialCatalog(),
-    commercialAudit: fs.existsSync(auditPath) ? loadValidatedCommercialAudit(auditPath) : null,
+    commercialResolution: resolveCommercialIdentity({
+      catalogPath: path.join(identidad, 'commercial-identity-catalog.json'),
+      auditPath: path.join(identidad, 'commercial-identity-audit.json'),
+    }),
   };
 }
 
-export async function buildGasolinaProjectionForPointer({ root = rootFromModule, pointer, bootstrapSeed } = {}) {
-  const privateDataset = JSON.parse(fs.readFileSync(path.join(root, pointer.dataset_path), 'utf8'));
+/**
+ * ¿Hay un snapshot privado con el que reproyectar sin consultar la fuente?
+ *
+ * Una reproyección forzada —cambio de contrato, de catálogo o de código— no
+ * necesita precios nuevos. Antes pagaba igual el sondeo a Osinergmin y, sin
+ * caché, la descarga completa. Si falta un input se dice cuál, y quien llama
+ * cae al refresco. No se reproyecta un snapshot más viejo que el publicado.
+ */
+export function usablePrivateSnapshot(root = rootFromModule, { publishedSnapshotId = null } = {}) {
+  let pointer;
+  try { pointer = readActivePointer(root); } catch (error) { return { ok: false, snapshot_id: null, missing: [`pointer activo: ${error.message}`] }; }
+  if (!pointer) return { ok: false, snapshot_id: null, missing: ['pointer activo ausente (.local-cache/snapshots/active.json)'] };
+  const missing = [];
+  const dir = path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id);
+  if (!fs.existsSync(path.join(dir, 'snapshot-manifest.json'))) missing.push('snapshot-manifest.json');
+  if (!fs.existsSync(path.join(dir, 'minimized'))) missing.push('minimized/');
+  try { resolveGasolinaRaw(root, pointer); } catch (error) { missing.push(`raw: ${error.message}`); }
+  if (publishedSnapshotId && pointer.snapshot_id < publishedSnapshotId) missing.push(`snapshot ${pointer.snapshot_id} anterior al publicado ${publishedSnapshotId}`);
+  return { ok: !missing.length, snapshot_id: pointer.snapshot_id, missing };
+}
+
+export async function buildGasolinaProjectionForPointer({ root = rootFromModule, pointer, bootstrapSeed, identityRoot } = {}) {
   return buildGasolinaProjectionCandidate({
     pointer,
-    privateDataset,
+    temporalContext: temporalContextForPointer(root, pointer),
     minimizedRoot: path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized'),
     rawPath: resolveGasolinaRaw(root, pointer),
     bootstrapSeed: bootstrapSeed === undefined ? optionalSeed(root) : bootstrapSeed,
-    ...loadCommercialPublicationInputs(root),
+    ...loadCommercialPublicationInputs(root, { identityRoot }),
   });
 }
 
@@ -162,8 +212,11 @@ export function writeCommercialCoverage(candidate, root = rootFromModule) {
   const report = {
     revision_id: candidate.manifest.revision_id,
     generated_at: candidate.manifest.generated_at,
+    identity: candidate.identity ?? null,
+    isolated_entries: candidate.isolatedEntries ?? [],
     metrics: candidate.catalog,
     without_current_offer: candidate.catalogWithoutOffer ?? [],
+    unknown_anchors: candidate.catalogUnknownAnchors ?? [],
     brand_groups: candidate.brandGroups ?? [],
     brand_evidence_review_queue: candidate.brandEvidenceQueue ?? [],
   };
@@ -172,8 +225,8 @@ export function writeCommercialCoverage(candidate, root = rootFromModule) {
   return file;
 }
 
-export async function projectGasolina({ root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina') } = {}) {
-  const candidate = await buildGasolinaProjectionForPointer({ root, pointer: active(root) });
+export async function projectGasolina({ root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot } = {}) {
+  const candidate = await buildGasolinaProjectionForPointer({ root, pointer: active(root), identityRoot });
   return writeGasolinaProjection(candidate, { root, outputRoot });
 }
 

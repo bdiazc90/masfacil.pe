@@ -13,7 +13,7 @@ Lo que aportaban está recogido como hecho medido en este documento:
 - resultado de detección y de refresco del **18/08/2026**, con hashes y decisiones operativas; no sustituían los raws locales;
 - una observación acotada del producto público de Facilito del **14/08/2026**; no probaba arquitectura, afiliación ni equivalencia.
 
-La evidencia agregada es reproducible, no archivada: `scripts/build-dataset.mjs` vuelve a emitirla al ejecutarse, con ruta configurable mediante `EVIDENCE_OUTPUT`. Los scripts operativos reproducen las transformaciones cuando existen los inputs autorizados en `.local-cache/`. Un clon limpio conserva el schema del dataset (`app/dataset-schema.mjs`) y un fixture sintético de cuatro ofertas (`fixtures/dataset.synthetic.json`) que el propio builder valida, pero no puede reconstruir un snapshot real ni presentar un fixture como dato real.
+Ese conjunto agregado **ya no se produce**: el constructor privado que lo emitía se retiró junto con el dataset experimental y su schema, porque nada de lo que construía llegaba al público salvo dos campos temporales, que hoy viajan en el pointer del snapshot. Un snapshot nuevo no contiene dataset ni evidencia. Los scripts operativos siguen reproduciendo las transformaciones que sí se publican cuando existen los inputs autorizados en `.local-cache/`; un clon limpio no puede reconstruir un snapshot real.
 
 ## Fuentes de precio reproducidas
 
@@ -190,9 +190,50 @@ Aquel overlay separaba siempre exactitud del vínculo (`verification_status`) de
 
 **Límite del contrato histórico.** El schema del overlay describía ese piloto y se conservó sin modificar mientras existió. Su forma solo admitía el método que el piloto usó: `discovery_method` estaba congelado en `normalized_address_exact`, `integration_method` en `official_anchor_exact`, y `source.url` exigía patrón `^https://` incluso cuando `source.kind` era `owner_verified`. Una verificación presencial del owner no tiene URL y, por lo tanto, **no era representable** en ese contrato. El bloqueo de identidad no fue solo una decisión de criterio: quedó codificado en el artefacto. Ese schema nunca se mutó para simular lo contrario; en su lugar se escribió un contrato sucesor capaz de representar evidencia observada sin URL obligatoria, y el histórico ya no se conserva en el repositorio.
 
-**Límite de la política de publicación.** Existió un módulo de matriz de publicación campo por campo, que trataba `unknown` como campo suprimible. Bajo el método vigente `unknown` es una cola accionable y no un veredicto terminal, así que esa matriz requería migración. Hoy ese módulo ya no se conserva en el repositorio y su función quedó repartida en dos artefactos vivos: la **allowlist cerrada** del contrato público (`PUBLIC_OFFER_FIELDS` en `pipeline/gasolina-contract.mjs`), que rechaza cualquier campo fuera del conjunto exacto, y la **puerta de catálogo y auditoría** (`app/commercial-catalog.mjs`, `app/commercial-audit.mjs`), donde `publication.status` distingue `publishable`, `pending` y `not_publishable`. El límite en sí no desapareció: razón social y dirección siguen sin decisión de permiso, y su registro vive ahora únicamente en la tabla de [factibilidad.md](factibilidad.md), no en un artefacto ejecutable.
+**Límite de la política de publicación.** Existió un módulo de matriz de publicación campo por campo, que trataba `unknown` como campo suprimible. Bajo el método vigente `unknown` es una cola accionable y no un veredicto terminal, así que esa matriz requería migración. Hoy ese módulo ya no se conserva en el repositorio y su función quedó repartida en dos artefactos vivos: la **allowlist cerrada** del contrato público (`PUBLIC_OFFER_FIELDS` en `pipeline/gasolina-contract.mjs`), que rechaza cualquier campo fuera del conjunto exacto, y el **contrato de catálogo** (`app/commercial-catalog.mjs`), donde `publication.status` distingue `publishable`, `pending` y `not_publishable`. El registro del permiso campo por campo no está codificado en ningún artefacto ejecutable: es esta tabla.
 
-**Estado hoy:** ninguna identidad comercial se publica. La tarjeta pública usa el marcador honesto y no muestra ni infiere nombre.
+#### Permiso de publicación campo por campo
+
+El permiso no es uniforme: se evalúa campo por campo, contra la licencia real de su fuente.
+
+| Campo | Veredicto | Base |
+| --- | --- | --- |
+| Precio, fecha de reporte, frescura, distrito | publicable | ODC-By declarado en las fichas de los datasets de precio |
+| Coordenada | publicable | aprobación explícita del owner para el contrato público downstream; se conserva procedencia y atribución a Osinergmin |
+| Distancia derivada | publicable | Haversine local a partir de coordenada cuya publicación fue aprobada |
+| Dirección de la vía | publicable | admitida por el contrato público vigente, acotada a texto corto para la tarjeta |
+| Razón social, RUC, representante | no se publica | la declaración ODC-By observada describe los datasets de precio, no columnas de identidad legal; además una razón social no es una marca |
+| Identidad comercial (`brand`, `public_site_name`) | gobernada por el catálogo | entrada por entrada, con evidencia privada, vínculo exacto y fecha de verificación |
+
+**`no se publica` no es un veredicto terminal para todo:** es la decisión vigente mientras el catálogo cubra mejor la necesidad. El precedente es la coordenada, que estuvo sin decisión y salió por una decisión explícita del owner con procedencia y atribución conservadas. Ese es el circuito previsto, no una excepción.
+
+**Estado hoy.** El bundle público lleva identidad comercial para la mayoría de los establecimientos con oferta vigente, con marca cuando existe y nombre de sede cuando la auditoría lo respalda. Los conteos exactos cambian en cada corrida y viven en el reporte privado `.local-cache/publish/commercial-identity-coverage.json`; este documento no los copia. Una oferta sin identidad usa el marcador honesto y la tarjeta no infiere nombre.
+
+### Registro ≠ conjunto de ofertas vigentes
+
+Son dos cosas distintas y confundirlas ya congeló la publicación una vez: durante 27 corridas seguidas, una estación que dejaba de reportar precio salía de la unión de IDs con oferta, pasaba a «ID desconocido» y tumbaba la corrida entera, precios incluidos.
+
+La regla vigente:
+
+- La identidad se **valida** contra el universo del Registro oficial —el seed de CI o las tablas oficiales locales—, nunca contra el conjunto de ofertas del día.
+- La identidad se **proyecta** solo sobre las ofertas que hoy existen.
+- Una estación registrada que dejó de reportar precio no es un fallo del catálogo: se conserva en privado y su tarjeta queda sin precio, diciendo desde cuándo calla.
+- Un ID comercial ajeno al Registro no crea una estación ni invalida sus precios: se descarta esa atribución y se cuenta en `unknown_anchors`.
+- Un universo de Registro vacío sí bloquea: sin referencia oficial no hay nada contra lo que validar.
+
+### Identidad completa, degradada y ausente
+
+El enriquecimiento comercial dejó de ser un prerrequisito de los precios. `app/commercial-resolution.mjs` resuelve tres estados y `pipeline/project-gasolina.mjs` publica con cualquiera de ellos:
+
+| Estado | Cuándo | Qué se publica |
+| --- | --- | --- |
+| `complete` | catálogo y auditoría válidos y correspondientes | precios + marcas + nombres respaldados |
+| `degraded` | falta la auditoría, no corresponde al catálogo, un tier no alcanza su cota, una entrada quedó rancia, pendiente o con veredicto `incorrect`, o el catálogo traía entradas defectuosas o duplicadas que se aislaron | precios + marcas + los nombres que sí tienen respaldo |
+| `absent` | no hay catálogo utilizable: paquete indecodificable, ausente o fuera de contrato | precios, con el marcador neutral en todas las tarjetas |
+
+Lo que se retira es la afirmación sin respaldo, no la entrada entera: una marca válida se conserva aunque falle el nombre, y una entrada que queda sin marca y sin nombre desaparece del catálogo utilizable en vez de publicarse vacía. Un duplicado no se resuelve eligiendo una copia: se retiran todas las entradas con ese `establishment_id`. Al instalar el expediente en CI, la pareja anterior se aparta a `replaced/`: una instalación fallida deja la identidad ausente de verdad y un catálogo nuevo nunca convive con una auditoría vieja. La degradación nunca es silenciosa: sale con conteos y motivos en el resumen de la corrida, y el detalle queda en el reporte privado.
+
+Lo que **sigue bloqueando** la publicación: Registro vacío, dataset o contrato inválido, errores de precio o de fecha, integridad rota, fuga de datos privados y los guardrails de caída. Un fallo comercial aísla identidades; nunca relaja la verdad de los precios.
 
 ## Catálogo canónico de entidades
 
@@ -200,7 +241,7 @@ El contrato sucesor puede registrar evidencia `owner_verified`, `first_party`, `
 
 ### Clave y universo
 
-La clave del catálogo es la **entidad oficial**, no la oferta. El anchor ya existe en el pipeline: `establishment_id` se deriva exclusivamente del código de Registro (`app/official-anchor.mjs`, `officialAnchorFromRegistration`, usado por `scripts/build-dataset.mjs`), de modo que un establecimiento con varios productos es una sola entrada.
+La clave del catálogo es la **entidad oficial**, no la oferta. El anchor ya existe en el pipeline: `establishment_id` se deriva exclusivamente del código de Registro (`app/official-anchor.mjs`, `officialAnchorFromRegistration`, usado por `pipeline/gasolina-products.mjs`), de modo que un establecimiento con varios productos es una sola entrada.
 
 Medición sobre los snapshots privados autorizados, contando entidades y no ofertas:
 
@@ -236,11 +277,11 @@ Una revisión manual ocasional es una red de seguridad, no garantía de vigencia
 
 ### Catálogo sucesor y cobertura inicial
 
-`app/commercial-catalog.mjs` sucede al contrato histórico sin mutarlo: fija `CATALOG_SCHEMA_VERSION = '1.1.0'` y valida en JS lo que antes describía un schema JSON aparte. Separa procedencia y adquisición de la fuente, vínculo exacto a la entidad, frescura y permiso de publicación. Permite marca, sede pública o ambas; la proyección v2.1 solo permite `establishment_id` e identidad `{brand, public_site_name}` y nunca exporta expediente ni entidad legal. `app/commercial-audit.mjs` (`AUDIT_SCHEMA_VERSION = '1.0.0'`) define la auditoría privada por entrada.
+`app/commercial-catalog.mjs` sucede al contrato histórico sin mutarlo: declara su `CATALOG_SCHEMA_VERSION` y valida en JS lo que antes describía un schema JSON aparte. Separa procedencia y adquisición de la fuente, vínculo exacto a la entidad, frescura y permiso de publicación. Permite marca, sede pública o ambas; la proyección v2.1 solo permite `establishment_id` e identidad `{brand, public_site_name}` y nunca exporta expediente ni entidad legal. `app/commercial-audit.mjs` define la auditoría privada. Las versiones vigentes de ambos contratos viven en el código, no aquí: copiarlas a un documento solo produce una cifra que envejece.
 
 Cada fila de auditoría conserva el SHA-256 de la representación canónica de la entrada completa. Si cambia identidad, fuente, vínculo, frescura o publicación, la auditoría pasa a `pending`; si no hay entradas publicables, informa `not_required`. El seam privado de candidatos existió como módulo aparte y separaba `commercial_identity_claim` de `legal_entity_claim`; ese módulo ya no se conserva en el repositorio, pero la regla que imponía sigue vigente dentro del catálogo, cuyo `entity_link.status` distingue `verified`, `pending` y `conflict`: una razón social y un Registro exacto pueden seguir como candidato o conflicto, pero **no se convierten en marca**. Solo identidad comercial explícita, anchor derivado exactamente del Registro, evidencia comercial específica y revisión permiten `verified`, y solo una entrada `verified` puede llegar a `publishable`. Ningún candidato se proyecta por esa vía.
 
-La medición se hizo con el raw privado del runner limpio y el seed autorizado de Registro/GIS. El resultado sanitizado midió 714 establecimientos Regular, 700 Premium, una unión de **717** y solapamiento de **697**; ese archivo agregado ya no se conserva en el repositorio y queda en el historial de Git. La infraestructura de catálogo está lista, pero continúa en **0/717 (0 %)** y la auditoría informa `not_required` porque no hay entradas. Las tres waves públicas no encontraron un puente comercial válido; el siguiente paso es una primera observación `owner_verified`.
+La medición se hizo con el raw privado del runner limpio y el seed autorizado de Registro/GIS. El resultado sanitizado midió 714 establecimientos Regular, 700 Premium, una unión de **717** y solapamiento de **697**; ese archivo agregado ya no se conserva en el repositorio y queda en el historial de Git. La unión de **717** y el solapamiento de **697** describen ese corte, no el universo de hoy: el conteo vigente sale del propio cruce en cada corrida. Las tres waves públicas no encontraron un puente comercial válido; la cobertura actual se construyó después, con la fuente de identidad autorizada el 23/08/2026.
 
 Los 11 vínculos Repsol del piloto siguen siendo antecedentes privados con fuente stale y permiso de publicación `unknown`; no se trasladan silenciosamente al sucesor. Además **ya no son recuperables desde el repositorio**: el overlay se eliminó y el `establishment_id` cambió de derivación, de modo que sus anchors antiguos no corresponden a los actuales. Para incorporarlos o añadir cualquier identidad hace falta revalidación autorizada que complete el expediente nuevo y un `publication_status=publishable`. La cobertura por distrito puede usarse como diagnóstico si aparece un sesgo material, pero no es una puerta para publicar la primera cobertura parcial con fallback.
 
@@ -270,7 +311,7 @@ J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique
 | Precios de referencia PR1/PR2 | semanal | condicional | promedios nacionales, no por grifo |
 | ArcGIS de Osinergmin | — | — | `gis.osinergmin.gob.pe` no resuelve; `gisem` 404 |
 
-**Decisión.** Se mantiene el CSV semanal y la app declara la cadencia (fecha del registro en cada tarjeta y fecha del archivo sobre la lista). Dos caminos legítimos hacia ≤ 24 h, ninguno técnico: pedir a Osinergmin la publicación diaria del reporte o un acceso al módulo PRICE, y los aportes de usuarios como evidencia junto al precio oficial (`docs/aportes.md`). El cron sigue sondeando 4×/día: sus logs registran `Last-Modified` y confirmarán si la cadencia es martes fijo.
+**Decisión.** Se mantiene el CSV semanal y la app declara la cadencia (fecha del registro en cada tarjeta y fecha del archivo sobre la lista). Dos caminos legítimos hacia ≤ 24 h, ninguno técnico: pedir a Osinergmin la publicación diaria del reporte o un acceso al módulo PRICE, y los aportes de quien usa la app como evidencia junto al precio oficial, nunca en su lugar (backlog en [roadmap.md](roadmap.md)). El cron sigue sondeando 4×/día: sus logs registran `Last-Modified` y confirmarán si la cadencia es martes fijo.
 
 ## Modelo útil
 
@@ -296,7 +337,7 @@ El catálogo canónico se ancla al **establecimiento físico mediante su código
 
 ## Procedencia, privacidad y reproducción
 
-Los originales grandes o con datos personales viven solo en `.local-cache/`: `raw/` guarda las adquisiciones, `datasets/` los datasets privados, `snapshots/` los snapshots promovidos con su pointer, `identity/` el catálogo y la auditoría comercial, y `publish/` los artefactos de publicación. Los snapshots versionados eliminan RUC, razón social, dirección, representante, teléfono, correo y placa. Un manifiesto previo sella lista, tamaño y SHA-256; la verificación falla ante archivos nuevos, alterados o ausentes.
+Los originales grandes o con datos personales viven solo en `.local-cache/`: `raw/` guarda las adquisiciones, `snapshots/` los snapshots promovidos con su pointer, `identity/` el catálogo y la auditoría comercial, y `publish/` los artefactos de publicación. Los snapshots versionados eliminan RUC, razón social, dirección, representante, teléfono, correo y placa. Un manifiesto previo sella lista, tamaño y SHA-256; la verificación falla ante archivos nuevos, alterados o ausentes.
 
 La auditoría de publicación comprueba que nada de eso llegue a Git —rutas prohibidas, ignores requeridos y tamaño máximo por archivo rastreado:
 

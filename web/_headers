@@ -24,3 +24,6 @@
 
 /sw.js
   Cache-Control: no-cache
+
+/shell-manifest.js
+  Cache-Control: no-cache

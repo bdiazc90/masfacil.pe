@@ -1,6 +1,16 @@
 # AGENTS.md
 
-Contrato operativo corto. La prioridad es lanzar mejoras útiles, no producir ceremonia.
+Reglas comunes del proyecto y rol del Líder. La prioridad es lanzar mejoras
+útiles, no producir ceremonia.
+
+El contrato del Builder vive en `CLAUDE.md` y **no se repite aquí**: leer este
+archivo no convierte al Builder en Líder.
+
+---
+
+# Parte 1 · Reglas comunes
+
+Valen para los dos agentes, en todo cambio.
 
 ## Producto
 
@@ -8,33 +18,16 @@ PWA estática para decidir en segundos dónde cargar Gasohol Regular o Premium e
 
 Proyecto independiente. **No está afiliado, aprobado ni producido por Osinergmin, Facilito ni el Estado peruano.** Toda documentación se escribe en español neutro.
 
-## Equipo
+Solo el Owner (Bruno) decide producto y autoriza publicación, credenciales, push y deploy.
 
-- **ClaudeLíder:** define una hipótesis, delimita el cambio, revisa el diff, emite `GO`, `FIX` o `KILL` y hace el commit.
-- **ClaudeBuilder:** investiga lo mínimo, planifica, implementa y entrega el cambio funcionando con instrucciones de prueba.
-- **Owner (Bruno):** prueba en celular, decide producto y autoriza publicación, credenciales, push y deploy.
-
-El contrato compartido de los dos agentes vive en `CLAUDE.md`.
-
-## Loop MVP
-
-1. Una hipótesis falsable.
-2. Discovery solo si bloquea; máximo 45 minutos y 3 subagentes.
-3. Implementación sin tests automatizados.
-4. Prueba del owner en máximo 5 pasos.
-5. Máximo 5 casos borde manuales, elegidos por daño.
-6. Una calibración.
-7. Veredicto `GO`, `FIX` o `KILL`.
-8. Con `GO`: commit; push y deploy solo con autorización del owner.
-
-No hay gates de proceso, revisores adicionales, documentos por sesión ni suites de tests.
-
-## Seguridad funcional
+## Exactitud de la identidad
 
 - Una razón social no es una marca. Una coordenada nunca basta por sí sola para atribuir identidad.
 - No inferir stock, horario, descuento ni disponibilidad.
 - `establishment_id` deriva únicamente del Registro oficial.
-- Sin identidad verificada se muestra el fallback neutral.
+- El universo del Registro y el conjunto de ofertas vigentes son cosas distintas: la identidad se valida contra el Registro y se proyecta sobre las ofertas que existen hoy.
+- Sin identidad con respaldo se muestra el fallback neutral. Una identidad defectuosa se aísla; nunca congela precios válidos.
+- Marca publicada y SVG disponible implican logo visible: no hay segunda puerta de acreditación del logo.
 
 ### Identidad comercial desde Google Maps — autorizado por Bruno
 
@@ -67,11 +60,32 @@ y nunca se commitea. Raspar Google Maps contraviene sus términos de servicio;
 Bruno asume esa decisión con conocimiento de causa. Para el dato **publicado** se
 prefiere una vía redistribuible —OpenStreetMap (ODbL) o la observación directa
 del owner— y en el catálogo se registra `source.kind` real de cada entrada.
-- Raws, seeds, cachés, credenciales, RUC, razón social, dirección y expedientes privados no entran en Git.
+
+Para el logo se acepta el activo oficial de la marca o una recreación fiel desde
+referencia oficial. Se registra la procedencia real: una recreación no se declara
+oficial. El saneamiento del SVG no se relaja.
+
+## Privacidad
+
+- Raws, seeds, cachés, credenciales, RUC, razón social, dirección, representante y expedientes privados no entran en Git.
+- Datos privados y generados, siempre fuera de Git:
+
+```text
+.local-cache/{raw,snapshots,identity,publish}/
+web/data/
+web/shell-manifest.js
+```
+
+## Publicación e integridad
+
 - Los contratos se validan al proyectar y en el navegador. Es runtime, no testing.
-- Regular y Premium se promueven juntos; el manifest se escribe al final.
-- `npm run audit` y rollback se conservan.
+- Regular y Premium se promueven juntos; el manifest se escribe al final; los snapshots son inmutables y la revisión sale del contenido.
+- La precache del service worker también sale del contenido: su lista se deriva de las referencias del árbol y del registro de marcas, y su versión de la huella de esos bytes. No hay número que subir a mano.
+- Publicar la interfaz no depende de la fuente de datos: la ruta `shell` reutiliza el último bundle público válido y comprueba que el cliente nuevo lo acepte.
+- `npm run audit`, `npm run verify:web` y el rollback se conservan.
 - Los precios de más de 30 días no se muestran ni compiten al ordenar. El grifo sí: queda en una tarjeta compacta que dice desde cuándo calla, porque sigue existiendo en el Registro.
+- No introducir framework, backend, autenticación o base de datos antes de que el producto lo necesite.
+- Actualizar la documentación viva solo cuando cambie cómo operar o entender el producto.
 
 ## Comandos
 
@@ -82,6 +96,7 @@ npm run refresh
 npm run publish
 npm run rollback
 npm run audit
+npm run verify:web
 npm run dump:establishments
 npm run brand:directory -- fetch <marca>
 npm run brand:directory -- match
@@ -94,15 +109,29 @@ npm run brand:logo -- <slug> <archivo.svg> <url> <AAAA-MM-DD>
 ```text
 web/         PWA Vanilla ESM
 pipeline/    proyección privada a bundle público
-app/         contratos, validación de runtime y catálogo privado
+app/         contratos, validación de runtime, política de ruta y catálogo privado
 scripts/     operación, publicación y rollback
-fixtures/    dataset sintético para controles negativos
 docs/        fuentes, decisiones y roadmap
 ```
 
-Datos privados y generados, siempre fuera de Git:
+---
 
-```text
-.local-cache/{raw,datasets,snapshots,identity,publish}/
-web/data/
-```
+# Parte 2 · Rol del Líder
+
+Solo para el Líder (ChatGPT). El Builder no ejecuta esta parte.
+
+- Usa grilling solo para decisiones realmente pendientes: **máximo cinco preguntas por cambio, no una cuota de cinco**. Busca los hechos por su cuenta; no pide a Bruno información que pueda inspeccionar. No reabre permisos ni decisiones ya confirmadas. Si faltase una decisión indispensable al alcanzar el límite, delimita lo pendiente; no inventa autorización.
+- Crea un SPEC técnico proporcional al cambio y explica el resultado a Bruno en lenguaje ultra sencillo. El SPEC es el único artefacto de encargo: no se encadenan documentos de discovery, diseño, planning, aceptación y handoff.
+- Audita la implementación con subagentes económicos y sondas acotadas: cada uno recibe una pregunta verificable sobre el diff y su riesgo. Sin cuotas de revisores, auditorías exhaustivas por defecto ni duplicación de exploraciones.
+- Usa el modelo económico adecuado a la sonda, sin fijar nombres ni precios de modelos en el repo. Escala el análisis solo si la evidencia lo exige.
+- Emite `GO`, `FIX` o `KILL`, explicando en sencillo los problemas reales, cuándo ocurrirían y la corrección concreta. Distingue bloqueos de mejoras opcionales.
+- Con `FIX`, devuelve correcciones al Builder y reaudita lo afectado. No abre obligatoriamente otra hipótesis, SPEC, calibración ni ciclo completo.
+- Con `GO`, pregunta **una vez** si Bruno autoriza commit, push y deploy del alcance auditado. Conformidad con un plan no es permiso para publicar.
+
+## Ejecución del release, ya autorizado
+
+- Una sonda o ejecutor económico realiza las operaciones deterministas aprobadas. No rediseña, no corrige código ni amplía el alcance durante el release.
+- Comprueba que el diff sigue siendo el auditado e incorpora solo archivos autorizados. Un cambio ajeno o nuevo se revisa; no se ignora ni se incluye por comodidad.
+- Usa las credenciales configuradas para el destino aprobado. Credenciales nuevas, cambios de permisos u operaciones destructivas requieren autorización específica. Nunca imprime secretos.
+- Comprueba que la ejecución terminó y que producción sirve lo esperado. Una corrida verde sin deploy no es un release. Si falla, informa la causa y conserva el último deployment válido.
+- El cron de actualización de datos ya autorizado sigue automático: no se pide aprobación por cada reporte nuevo de la fuente.

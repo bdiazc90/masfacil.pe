@@ -1,8 +1,10 @@
 import { GASOLINA_KEYS } from '../gasolina-contract.js';
 
-// Los dos bundles describen el mismo universo de grifos —697 de 717 aparecen en
+// Los dos bundles describen el mismo universo de grifos —la mayoría aparece en
 // ambos— y solo difieren en precio y fecha. Fusionarlos deja una tarjeta por
 // grifo con los dos precios, que es como se decide parado frente al surtidor.
+// Un grifo presente en un solo producto conserva su tarjeta con el precio que sí
+// reportó.
 export function mergeProducts(...cargados) {
   const porProducto = new Map(cargados.map((item) => [item.key, item]));
   const base = porProducto.get(GASOLINA_KEYS[0]) ?? cargados[0];

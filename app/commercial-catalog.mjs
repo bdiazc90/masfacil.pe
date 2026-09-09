@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import { OFFICIAL_ANCHOR_SCHEME } from './official-anchor.mjs';
 
 export const CATALOG_SCHEMA_VERSION = '1.3.0';
-// 1.2.0 sigue siendo válido: es el formato del secret que hoy está en CI. Sin
-// `brand_evidence` una marca se publica como texto y nunca obtiene logo, que es
-// exactamente el comportamiento actual. Así el contrato nuevo no obliga a
-// recargar el secret para seguir publicando precios.
+// 1.2.0 sigue siendo válido: es el formato del secret que hoy está en CI. Una
+// marca sin `brand_evidence` se publica igual, con su logo si está en la lista
+// controlada del cliente: la marca y su logo son la misma afirmación. Así el
+// contrato nuevo no obliga a recargar el secret para seguir publicando precios.
 export const CATALOG_SCHEMA_VERSIONS = Object.freeze(['1.2.0', CATALOG_SCHEMA_VERSION]);
 
 // Dos niveles de evidencia sobre el NOMBRE, no sobre el vínculo con la entidad:
@@ -17,8 +17,8 @@ export const CONFIDENCE_LEVELS = Object.freeze(['verified', 'nearby']);
 // Evidencia de BANDERA, distinta de la evidencia del nombre. Solo dos vías la
 // acreditan: el directorio oficial vigente de la propia cadena o el letrero
 // observado. La razón social, el proveedor o una compra empresarial no bastan.
-// `brand_evidence` es opcional: una marca sin ella se sigue publicando como
-// texto —es lo que ya está en producción— pero no obtiene logo.
+// `brand_evidence` es opcional: sirve para saber CÓMO se acreditó la bandera y
+// cuándo conviene volver a mirarla, no para decidir si se pinta el logo.
 export const BRAND_EVIDENCE_METHODS = Object.freeze(['official_directory', 'storefront_observation']);
 export const BRAND_EVIDENCE_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -90,6 +90,46 @@ export function validateCommercialCatalog(catalog) {
 }
 
 export function loadValidatedCommercialCatalog(catalogPath) { const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8')); const errors = validateCommercialCatalog(catalog); if (errors.length) throw new Error(`Catálogo comercial fuera de contrato:\n- ${errors.join('\n- ')}`); return catalog; }
+/**
+ * Aísla las entradas defectuosas de un catálogo y conserva el resto.
+ *
+ * `validateCommercialCatalog` ya dice en qué entrada está cada defecto
+ * (`catalog.entries[i]…`). Antes cualquier defecto rechazaba el catálogo entero
+ * y toda la identidad quedaba neutral por una sola fila. Un defecto de nivel
+ * catálogo —versión, identificador, esquema de anchors— no se puede aislar y
+ * devuelve null.
+ *
+ * Un duplicado no se resuelve eligiendo una copia: se retiran TODAS las
+ * entradas con ese establishment_id, porque sin volver a la evidencia no hay
+ * forma de saber cuál es la buena.
+ */
+export function isolateCommercialCatalog(catalog) {
+  const errors = validateCommercialCatalog(catalog);
+  if (!errors.length) return { catalog, dropped: [], problems: [] };
+  const porEntrada = /^catalog\.entries\[(\d+)\](.*)$/;
+  if (errors.some((error) => !porEntrada.test(error))) return null;
+  const motivos = new Map();
+  const duplicados = new Set();
+  for (const error of errors) {
+    const [, indice, resto] = porEntrada.exec(error);
+    const motivo = resto.replace(/^[.:]\s*/, '').trim();
+    motivos.set(Number(indice), [...(motivos.get(Number(indice)) ?? []), motivo]);
+    const id = catalog.entries[Number(indice)]?.establishment_id;
+    if (/duplicado o conflicto/.test(motivo) && typeof id === 'string') duplicados.add(id);
+  }
+  const dropped = [];
+  const entries = [];
+  catalog.entries.forEach((entry, indice) => {
+    const razones = [...(motivos.get(indice) ?? [])];
+    if (duplicados.has(entry?.establishment_id) && !razones.some((razon) => /duplicado/.test(razon))) razones.push('establishment_id: duplicado o conflicto');
+    if (razones.length) { dropped.push({ establishment_id: entry?.establishment_id ?? null, reasons: razones }); return; }
+    entries.push(entry);
+  });
+  const derivado = { ...catalog, entries };
+  if (validateCommercialCatalog(derivado).length) return null;
+  return { catalog: derivado, dropped, problems: [{ scope: 'catalog', reason: 'entradas_aisladas', affected: dropped.length }] };
+}
+
 export function emptyCommercialCatalog() { return { schema_version: CATALOG_SCHEMA_VERSION, catalog_id: 'commercial-identity-catalog-pending', anchor_scheme: OFFICIAL_ANCHOR_SCHEME, entries: [] }; }
 export function hasBrandEvidenceContract(catalog) { return catalog?.schema_version === CATALOG_SCHEMA_VERSION; }
 export function isPublicCommercialEntry(entry) { return entry.entity_link.status === 'verified' && entry.publication.status === 'publishable'; }
@@ -113,14 +153,17 @@ export function staleBrandEvidence(catalog, now = new Date()) {
 export function buildCommercialCatalogIndex(catalog, { registryIds, offerIds }) {
   const registry = registryIds instanceof Set ? registryIds : new Set(registryIds);
   const offers = offerIds instanceof Set ? offerIds : new Set(offerIds);
+  // Un Registro vacío sí es un defecto de precios: sin referencia oficial no hay
+  // nada contra lo que validar, y eso sigue bloqueando.
   if (!registry.size) throw new Error('Universo del Registro vacío: no se valida identidad comercial sin referencia oficial');
-  const unknown = catalog.entries.filter((entry) => !registry.has(entry.establishment_id));
-  // Un conteo no se puede investigar. El anchor es público —viaja en cada oferta
-  // del bundle— así que nombrarlo en el error convierte un fallo de CI en una
-  // pista accionable sin reproducir la corrida.
-  if (unknown.length) throw new Error(`Catálogo comercial contiene establishment_id fuera del Registro oficial: ${unknown.length} (${listado(unknown.map((entry) => entry.establishment_id))})`);
+  // Un ID comercial ajeno al Registro tampoco crea una estación ni invalida sus
+  // precios: se descarta ESA atribución y se cuenta. Antes bastaba uno para
+  // tumbar la proyección entera. El anchor es público —viaja en cada oferta del
+  // bundle— así que nombrarlo convierte el conteo en una pista accionable.
+  const unknown = catalog.entries.filter((entry) => !registry.has(entry.establishment_id)).map((entry) => entry.establishment_id);
   const byAnchor = new Map(); let pending = 0; let withBrand = 0; let withEvidence = 0; const withoutOffer = [];
   for (const entry of catalog.entries) {
+    if (!registry.has(entry.establishment_id)) continue;
     if (!isPublicCommercialEntry(entry)) { pending += 1; continue; }
     if (!offers.has(entry.establishment_id)) { withoutOffer.push(entry.establishment_id); continue; }
     if (entry.brand) withBrand += 1;
@@ -130,9 +173,11 @@ export function buildCommercialCatalogIndex(catalog, { registryIds, offerIds }) 
   return Object.freeze({
     byAnchor,
     withoutOffer: Object.freeze(withoutOffer.sort()),
+    unknownAnchors: Object.freeze(unknown.sort()),
+    unknownSample: unknown.length ? listado(unknown) : null,
     // `projected_with_brand` es lo que se publica; `with_brand_evidence` dice
     // cuántas de esas traen además expediente de bandera. El logo ya no depende
     // de la segunda: quién lo pinta es la lista controlada del cliente.
-    metrics: Object.freeze({ entries: catalog.entries.length, registry_universe: registry.size, offer_universe: offers.size, projected: byAnchor.size, pending, without_current_offer: withoutOffer.length, unknown_anchors: 0, projected_with_brand: withBrand, with_brand_evidence: withEvidence }),
+    metrics: Object.freeze({ entries: catalog.entries.length, registry_universe: registry.size, offer_universe: offers.size, projected: byAnchor.size, pending, without_current_offer: withoutOffer.length, unknown_anchors: unknown.length, projected_with_brand: withBrand, with_brand_evidence: withEvidence }),
   });
 }

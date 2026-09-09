@@ -52,7 +52,10 @@ export async function prepareServiceWorker({
 } = {}) {
   if (!serviceWorker?.register) return { available: false, controlled: false, reason: 'unsupported' };
   try {
-    const registration = await serviceWorker.register('/sw.js', { type: 'module' });
+    // `updateViaCache: 'none'` obliga a revalidar sw.js Y sus imports contra la
+    // red. Sin esto el navegador podía servir `shell-manifest.js` desde su caché
+    // HTTP y no ver nunca la versión nueva del shell.
+    const registration = await serviceWorker.register('/sw.js', { type: 'module', updateViaCache: 'none' });
     const activated = await whenActivated(registration, timeoutMs, setTimer, clearTimer);
     if (!activated) return { available: true, controlled: false, reason: 'activation_timeout' };
     const controlled = await whenControlled(serviceWorker, timeoutMs, setTimer, clearTimer);
