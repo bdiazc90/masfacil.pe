@@ -22,6 +22,8 @@ const OPERATOR_ONLY = Object.freeze([
   'identity-pack.mjs',
   'install-brand-logo.mjs',
   'match-identities.mjs',
+  'observe-history.mjs',
+  'probe-historico.mjs',
   'rollback.mjs',
   'serve-web.mjs',
 ]);
@@ -51,6 +53,12 @@ export function classifyPath(rawPath) {
   if (head === 'web') return 'shell';
   if (head === 'docs') return 'docs';
   if (head === 'scripts' && rest.length === 1 && OPERATOR_ONLY.includes(rest[0])) return 'operator';
+  // El histórico observa DESDE FUERA lo que ya sirve producción: nada de
+  // `pipeline/history/` se ejecuta durante refresh, project o publish, así que
+  // tocarlo no puede disparar una reproyección de precios.
+  // Norma: si un módulo de aquí llega a importarse desde el camino de precios,
+  // deja de pertenecer a este directorio.
+  if (head === 'pipeline' && rest[0] === 'history') return 'operator';
   if (parts.length === 1 && (DOCS_FILES.includes(head) || head.endsWith('.md'))) return 'docs';
   return 'projection';
 }

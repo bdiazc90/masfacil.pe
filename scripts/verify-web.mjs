@@ -20,6 +20,7 @@ import { GASOLINA_KEYS, validateGasolinaBundle, validateGasolinaManifest, valida
 import { validateGasolinaManifest as clienteAceptaManifest, validGasolinaBundle as clienteAceptaBundle } from '../web/gasolina-contract.js';
 import { BRAND_LOGOS } from '../web/brand-logos.js';
 import { shellManifestProblems } from '../pipeline/shell-manifest.mjs';
+import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { brandAssetProblems, serviceWorkerUpdateProblems } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -79,7 +80,19 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     },
   }));
 
-  // 5. Contra el origen público: una ruta inexistente puede responder 200 con
+  // 5. El origen del histórico vive en DOS sitios —la constante que usa el
+  // cliente y la CSP que lo autoriza— y si divergen el gráfico funciona en local
+  // y muere en producción con un error de consola que nadie ve. Se cruzan, igual
+  // que el paso 2 cruza cliente y datos.
+  const cabeceras = fs.readFileSync(path.join(root, 'web', '_headers'), 'utf8');
+  const connectSrc = /connect-src ([^;]+);/.exec(cabeceras)?.[1] ?? '';
+  if (!connectSrc.split(/\s+/).includes(HISTORY_ORIGIN)) errors.push(`web/_headers no autoriza ${HISTORY_ORIGIN} en connect-src; el navegador bloquearía el histórico`);
+  // Y tiene que ser CROSS-ORIGIN: es lo que hace que el service worker lo ignore
+  // (web/sw.js descarta lo que no es del propio origen) y que un JSON que cambia
+  // cada pocas horas no acabe cacheado como si fuera parte del shell.
+  if (origin && new URL(HISTORY_ORIGIN).origin === new URL(origin).origin) errors.push('el histórico no puede servirse desde el mismo origen que la app: el service worker lo cachearía como shell');
+
+  // 6. Contra el origen público: una ruta inexistente puede responder 200 con
   // HTML, así que se mira el tipo y el contenido, no solo que llegue respuesta.
   if (origin) {
     const respuestas = new Map();

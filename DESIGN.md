@@ -93,7 +93,7 @@ producto. Se puede mejorar **cómo se comunican**, nunca eliminarlas.
 - **La ubicación no sale del dispositivo.** Los servicios externos reciben solo el
   destino, y solo tras un tap explícito.
 - **Atribución y enlace a la fuente en cada ruta**, sin insinuar afiliación oficial.
-- **Sin cuenta, login, favoritos, historial, alertas, backend ni analítica de terceros.**
+- **Sin cuenta, login, favoritos, historial personal, alertas, backend ni analítica de terceros.**
 
 ## 5 · Estados obligatorios de una ruta
 
@@ -273,7 +273,7 @@ se copian aquí: envejecen y el motivo no.
 
 | Decisión | Por qué |
 |---|---|
-| `/` es la app; sin pantalla de elegir producto. Las rutas viejas (`/gasolina/…`) responden 301 | los dos bundles son idénticos salvo precio y fecha: elegir producto antes de ver nada era un tap sin información |
+| `/` es la app; sin pantalla de elegir producto. `/gasolina/historial` reescribe a la misma portada con el gráfico del histórico enfocado; las rutas viejas de producto (`/gasolina/regular`, `/gasolina/premium`) responden 301 | los dos bundles son idénticos salvo precio y fecha: elegir producto antes de ver nada era un tap sin información; el historial es contexto de la portada, no otra pantalla, y su URL existe solo para poder enlazarlo |
 | Una tarjeta por grifo con Regular y Premium; «—» cuando falta uno | la gran mayoría de los grifos reporta los dos productos a la vez, y se decide comparándolos frente al surtidor |
 | Radio de búsqueda de 1 a 5 km en pasos de 0.5; arranca en el menor que llena seis tarjetas | en Lima urbana cae en 1–1.5 km y en zonas dispersas sube solo. Un pool fijo mandaba a kilómetros de distancia por céntimos |
 | «Más cerca» y «Más barata» solo ordenan; el sub-selector fija el producto de «Más barata» y recuerda la elección | cada control hace una cosa; en «Más cerca» el producto no ordena nada y el sub-selector se oculta |

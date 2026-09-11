@@ -53,7 +53,7 @@
                 <div id="place-menu" class="place__menu" hidden>
                   <button id="menu-districts" class="place__menu-item" data-menu-screen="compare" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Ver distritos</button>
                   <button id="menu-back-results" class="place__menu-item" data-menu-screen="district" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg>Volver a los resultados</button>
-                  <button id="menu-history" class="place__menu-item" type="button" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.3V12l3.2 1.9"/></svg>Ver historial<span class="chip-soon">próximo</span></button>
+                  <button id="menu-history" class="place__menu-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.3V12l3.2 1.9"/></svg>Ver historial</button>
                   <button id="menu-home" class="place__menu-item place__menu-item--home" type="button"><img class="brand__logo" src="/icons/logo.svg" alt="" width="20" height="21">Volver al inicio</button>
                 </div>
               </div>
@@ -76,6 +76,14 @@
       <button id="choose-district" class="button--text" type="button" disabled>Ver distritos</button>
       <p id="location-status" class="privacy-line" role="status" aria-live="polite">No guardamos tu ubicación.</p>
       <p id="data-status" class="hint" role="status" aria-live="polite">Cargando precios…</p>
+      <!-- Contexto, no acción: va después de los botones y de la línea de
+           privacidad, que pertenece al botón de ubicación. Reserva su alto desde
+           el primer pintado para que la portada no salte cuando llegue el dato. -->
+      <section id="history-chart" class="history plate" aria-labelledby="history-title" data-state="loading">
+        <h2 id="history-title" tabindex="-1">Precio promedio en Lima</h2>
+        <p class="history__sub">S/ por galón · Al último corte de cada día</p>
+        <div id="history-body"></div>
+      </section>
     </section>
     <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button--text" type="button">Ver distritos</button></div></section>
     <section id="district-step" class="screen-flow district-step" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o vuelve a intentarlo.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div></section>

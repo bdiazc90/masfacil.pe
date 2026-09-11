@@ -1,3 +1,6 @@
+# Reescrituras primero: el historial es la misma portada con el gráfico enfocado.
+/gasolina/historial /index.html 200
+/gasolina/historial/ /index.html 200
 /gasolina / 301
 /gasolina/ / 301
 /gasolina/regular / 301

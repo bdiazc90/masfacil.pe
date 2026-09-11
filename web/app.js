@@ -10,9 +10,13 @@ import { GASOLINA_KEYS } from './gasolina-contract.js';
 import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
+import { mountHistoryChart } from './history-chart.js';
 
 const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false, preferencesTouched: false, freshUntil: 0 };
 const $ = (id) => document.getElementById(id);
+// La única ruta además de `/`: la misma portada con el gráfico enfocado.
+// `_redirects` la reescribe a `index.html`; aquí solo se enfoca y se historia.
+const HISTORY_ROUTE = /^\/gasolina\/historial\/?$/;
 const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
@@ -29,6 +33,9 @@ const controls = initControlsCard({
 
 function show(name) {
   for (const key of ['start-step', 'loading-step', 'district-step', 'compare-step', 'fatal-state']) nodes[key].hidden = key !== name;
+  // La ruta del historial describe la portada con el gráfico; al salir de ella
+  // la URL vuelve a `/` sin añadir entradas al historial del navegador.
+  if (name !== 'start-step' && HISTORY_ROUTE.test(location.pathname)) history.replaceState(null, '', '/');
   $('main').setAttribute('aria-busy', String(name === 'loading-step'));
   // Tres valores, no dos: en distritos la tarjeta conserva la píldora y se fija.
   const pantalla = name === 'compare-step' ? 'compare' : name === 'district-step' ? 'district' : 'other';
@@ -333,7 +340,8 @@ async function initialize() {
   try {
     await prepareServiceWorker();
     applyLoaded(await loadGasolina());
-    if (await hasGrantedLocationPermission()) locate();
+    // Un enlace al historial pide el gráfico, no una búsqueda: no se localiza solo.
+    if (!HISTORY_ROUTE.test(location.pathname) && await hasGrantedLocationPermission()) locate();
   } catch (error) { fatal(error); }
 }
 
@@ -407,3 +415,17 @@ $('retry-load').addEventListener('click', () => location.reload());
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.dataset && !nodes['compare-step'].hidden) renderOffers(); });
 initTheme();
 initialize();
+// Sentencia aparte y fuera del `try` de `initialize()`: el histórico se pide en
+// paralelo con los precios, no retrasa el GPS, y si falla se cuenta dentro de su
+// propio bloque en vez de mandar la app a `fatal-state`.
+const historyChart = mountHistoryChart({ mount: $('history-chart'), body: $('history-body') });
+// «Ver historial» no es otra pantalla: es la portada con el gráfico enfocado, y
+// tiene URL propia para poder enlazarla y volver a ella con «atrás».
+function showHistory({ push = true } = {}) {
+  closePlaceMenu(); state.locationAttempt += 1; state.updatingLocation = false; show('start-step');
+  if (push && !HISTORY_ROUTE.test(location.pathname)) history.pushState(null, '', '/gasolina/historial');
+  historyChart.focus();
+}
+$('menu-history').addEventListener('click', () => showHistory());
+addEventListener('popstate', () => { if (HISTORY_ROUTE.test(location.pathname)) showHistory({ push: false }); });
+if (HISTORY_ROUTE.test(location.pathname)) historyChart.focus();

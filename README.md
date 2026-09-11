@@ -2,7 +2,7 @@
 
 PWA independiente para comparar Gasohol Regular y Premium en Lima provincia por precio reportado, cercanía y frescura. No está afiliada, aprobada ni producida por Osinergmin, Facilito ni el Estado peruano.
 
-Una sola ruta, `/`, con los dos productos en la misma tarjeta. Las rutas antiguas `/gasolina/…` redirigen ahí.
+Una sola pantalla, `/`, con los dos productos en la misma tarjeta. `/gasolina/historial` abre esa misma portada con el gráfico del histórico enfocado; las rutas antiguas de producto (`/gasolina/regular`, `/gasolina/premium`) redirigen a `/`.
 
 La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de más de 30 días no se muestran ni compiten al ordenar; el grifo permanece en una tarjeta compacta que dice desde cuándo calla.
 
@@ -58,6 +58,29 @@ npm run dump:establishments    # vuelca los establecimientos con dirección y co
 ```
 
 Recuperar: `npm run rollback -- <snapshot-id>` reconstruye y valida ambos productos **antes** de mover el pointer, y restaura el anterior si algo falla. Un fallo de identidad comercial no impide recuperar.
+
+## Histórico de precios
+
+Un observador aparte mira lo que **ya sirve producción**, archiva esos bytes y anota el promedio diario de Regular y Premium. La portada lo muestra en dos líneas. Si el histórico cae, buscar gasolina, actualizar GPS, publicar precios y hacer rollback siguen funcionando igual: son workflows distintos y no hay dependencia entre ellos.
+
+```bash
+npm run history:observe    # observa el bundle público, archiva y reconstruye el resumen
+npm run history:summary    # solo reconstruye el resumen desde las observaciones
+```
+
+El archivo vive en un bucket S3 (hoy Neon Object Storage; el código no sabe cuál) bajo el prefijo `gasolina/`, y el navegador lee el resumen directamente de la URL pública del bucket. Variables. Sin las cinco del almacén el histórico es local, en `.local-cache/history/`, y lo dice:
+
+| Variable | Para qué |
+| --- | --- |
+| `PUBLIC_ORIGIN` | origen público que se observa |
+| `DATOS_S3_ENDPOINT`, `DATOS_S3_REGION`, `DATOS_S3_BUCKET` | el bucket compartido de datos públicos (path-style, SigV4); las mismas para cualquier utilitario |
+| `DATOS_S3_ACCESS_KEY_ID`, `DATOS_S3_SECRET_ACCESS_KEY` | credenciales de escritura, **solo** en el workflow del histórico |
+| `HISTORY_S3_PREFIX` | prefijo de este utilitario dentro del bucket; `gasolina/` si no se define |
+| `HISTORY_STORE=fs`, `HISTORY_STORE_ROOT` | forzar el almacén local, para probar sin credenciales |
+
+Diagnóstico. `npm run history:observe` imprime una línea JSON con `observation` (`new`/`reused`/`none`), `archive` (`stored`/`reused`), `summary_write` y los conteos por producto. Reconstruir el resumen es siempre seguro: sale de las observaciones guardadas, nunca del resumen anterior, y no se escribe si retrocedería la serie o si faltara una observación que ya estaba publicada.
+
+El archivo es inmutable **por código**, no por el proveedor: el bucket no versiona ni tiene object-lock, y el almacén no tiene `delete`. Repetir los mismos bytes no escribe; encontrar bytes distintos bajo la misma clave es un error que se informa, nunca una sobrescritura.
 
 El workflow `.github/workflows/refresh-pages.yml` tiene tres jobs: `verify` (auditoría), `prepare` (resuelve la ruta y prepara el sitio, sin hacer cola: un cambio de interfaz no espera a que termine un refresco de datos) y `deploy` (serializado, dura segundos: revalida contra lo publicado y contra la punta de `main` —ninguna ruta retrocede código ni datos— y sube). Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
 

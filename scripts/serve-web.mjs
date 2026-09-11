@@ -15,7 +15,9 @@ const types = new Map([['.html','text/html; charset=utf-8'],['.js','text/javascr
 const server = http.createServer((request,response) => {
   if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405); response.end(); return; }
   const url = new URL(request.url, `http://127.0.0.1:${port}`);
-  // Reproduce en local los 301 de Cloudflare: las rutas viejas llevan a la raíz.
+  // Reproduce en local `_redirects`: el historial reescribe a la portada sin
+  // cambiar la URL; las rutas viejas de producto llevan a la raíz con 301.
+  if (/^\/gasolina\/historial\/?$/.test(url.pathname)) url.pathname = '/';
   if (/^\/gasolina(?:\/(?:regular|premium)?\/?)?$/.test(url.pathname)) { response.writeHead(301, { Location: '/' }); response.end(); return; }
   const route = url.pathname === '/' ? '/index.html' : url.pathname;
   const relative = path.posix.normalize(route).replace(/^\/+/, ''); const file = path.join(webRoot, relative);

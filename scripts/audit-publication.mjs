@@ -14,6 +14,7 @@ export const FORBIDDEN_PATHS = Object.freeze([
   /^data\//,
   /^web\/data\//,
   /^web\/shell-manifest\.js$/,
+  /^node_modules\//,
   /(^|\/)\.env(?:\.|$)/,
   /(^|\/)fetch-gis\.mjs$/,
   /(^|\/)gis-osinergmin\.json$/,
@@ -24,6 +25,7 @@ export const REQUIRED_IGNORES = Object.freeze([
   ['data/derived/audit-sentinel.json', '/data/'],
   ['web/data/audit-sentinel.json', '/web/data/'],
   ['web/shell-manifest.js', '/web/shell-manifest.js'],
+  ['node_modules/audit-sentinel.js', '/node_modules/'],
   ['fetch-gis.mjs', '/fetch-gis.mjs'],
   ['gis-osinergmin.json', '/gis-osinergmin.json'],
 ]);

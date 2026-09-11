@@ -56,5 +56,8 @@ self.addEventListener('fetch', (event) => {
       catch (error) { const pair = await cachedPair(resolved); if (!pair || pair.manifest.products[resolved].dataset_url !== url.pathname.slice(1)) throw error; return tagged(pair.snapshot, 'saved'); }
     })()); return;
   }
-  event.respondWith(cacheFirst({ request: event.request, cache: { match: async (request) => (await caches.open(SHELL_CACHE)).match(request), put: async (request, response) => (await caches.open(SHELL_CACHE)).put(request, response) }, fetchImpl: (request) => fetch(request) }).then(({ response }) => response));
+  // `/gasolina/historial` es la misma portada: se sirve la `/` precacheada, así
+  // que el enlace profundo funciona también sin red y sin una entrada extra.
+  const request = event.request.mode === 'navigate' && /^\/gasolina\/historial\/?$/.test(url.pathname) ? new Request('/') : event.request;
+  event.respondWith(cacheFirst({ request, cache: { match: async (request) => (await caches.open(SHELL_CACHE)).match(request), put: async (request, response) => (await caches.open(SHELL_CACHE)).put(request, response) }, fetchImpl: (request) => fetch(request) }).then(({ response }) => response));
 });

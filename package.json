@@ -3,6 +3,7 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "start": "node scripts/serve-web.mjs",
     "serve": "node scripts/serve-web.mjs",
@@ -23,6 +24,11 @@
     "build:catalog": "node scripts/build-catalog.mjs",
     "brand:directory": "node scripts/brand-directory.mjs",
     "brand:sample": "node scripts/brand-sample.mjs",
-    "brand:logo": "node scripts/install-brand-logo.mjs"
+    "brand:logo": "node scripts/install-brand-logo.mjs",
+    "history:observe": "node scripts/observe-history.mjs",
+    "history:summary": "node scripts/observe-history.mjs --summary-only"
+  },
+  "dependencies": {
+    "aws4fetch": "1.0.20"
   }
 }
