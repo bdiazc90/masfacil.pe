@@ -299,7 +299,8 @@ de escritura sí.
   de estar deshabilitado, pierde la etiqueta «próximo» y lleva el foco al
   gráfico, tercer bloque de la portada tras «Ver mi ubicación» y «Ver
   distritos». Tiene ruta propia `/gasolina/historial`, servida por reescritura
-  a `index.html` (línea `/gasolina/historial /index.html 200` en `web/_redirects`
+  a la portada (línea `/gasolina/historial / 200` en `web/_redirects`; el destino
+  es `/` porque Pages normaliza `/index.html` a `/` con un 308
   antes de los 301, reproducida en `scripts/serve-web.mjs`); `app.js` abre con
   el gráfico enfocado cuando `location.pathname` es esa ruta y usa `pushState`
   al pulsar el menú. Sin HTML nuevo ni entrada extra en la precache. Actualizar

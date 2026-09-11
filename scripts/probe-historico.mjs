@@ -991,7 +991,7 @@ test('10 · la leyenda lleva el n del último punto con dato, y el resumen se re
 
 test('12 · /gasolina/historial es la portada con el gráfico: en _redirects, en local y sin red', async () => {
   const reglas = fs.readFileSync(path.join(root, 'web', '_redirects'), 'utf8').split('\n').filter((linea) => linea && !linea.startsWith('#'));
-  assert.deepEqual(reglas.slice(0, 2), ['/gasolina/historial /index.html 200', '/gasolina/historial/ /index.html 200'], 'las reescrituras van antes de los 301');
+  assert.deepEqual(reglas.slice(0, 2), ['/gasolina/historial / 200', '/gasolina/historial/ / 200'], 'las reescrituras van antes de los 301, con destino / y no /index.html');
   assert.ok(reglas.slice(2).every((linea) => / 301$/.test(linea)), 'y las rutas viejas siguen siendo 301');
 
   const html = fs.readFileSync(path.join(root, 'web', 'index.html'), 'utf8');

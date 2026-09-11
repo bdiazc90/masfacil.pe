@@ -1,6 +1,8 @@
 # Reescrituras primero: el historial es la misma portada con el gráfico enfocado.
-/gasolina/historial /index.html 200
-/gasolina/historial/ /index.html 200
+# El destino es `/`, no `/index.html`: Pages normaliza `/index.html` a `/` con un
+# 308 y ese redirect se colaría en la reescritura.
+/gasolina/historial / 200
+/gasolina/historial/ / 200
 /gasolina / 301
 /gasolina/ / 301
 /gasolina/regular / 301
