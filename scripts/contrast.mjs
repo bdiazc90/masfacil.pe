@@ -1,7 +1,8 @@
 // Contraste medido en el peor caso real (DESIGN.md §8). Copia de los tokens de
 // web/styles.css en los mismos términos: knobs OKLCH para los neutros y hex
 // para el resto. Mover un color obliga a actualizar las dos.
-// Ejecutar: node web/contrast.mjs → imprime las razones y falla bajo el mínimo.
+// Ejecutar: node scripts/contrast.mjs → imprime las razones y falla bajo el mínimo.
+// Vive en `scripts/` y no en `web/`: `web/` es exactamente lo que se publica.
 const HUE = 130, PAPER = 0.01, PAPER_DARK = 0.02, INK = 0.010;
 
 function oklch(L, C, H) {

@@ -12,9 +12,10 @@
  * mete su SVG en la precache; cambiar un byte de `styles.css` ya cambia la
  * versión. No hay segundo paso que olvidar.
  *
- * Se deriva de REFERENCIAS y de REGLAS, nunca del directorio: `web/icons/`
- * contiene un `icon-192.svg` que nada referencia y un `petroperu.svg` sin
- * registrar, y ninguno de los dos debe viajar.
+ * Se deriva de REFERENCIAS y de REGLAS, nunca del directorio: un archivo suelto
+ * dentro de `web/` no viaja por estar ahí. Un SVG de marca entra solo si su
+ * slug está en `BRAND_LOGOS`, y un icono solo si lo referencia `index.html` o
+ * el manifiesto de la PWA.
  */
 
 import crypto from 'node:crypto';
@@ -33,7 +34,7 @@ const FUERA_DE_LA_PRECACHE = new Set(['sw.js', 'shell-manifest.js']);
 
 const ordenar = (valores) => [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'en'));
 
-/** `.js` sí, `.mjs` no: `web/contrast.mjs` es herramienta de desarrollo, no shell. */
+/** `.js` sí, `.mjs` no: una herramienta suelta en `web/` no sería shell. */
 function modulosDelCliente(webRoot) {
   const raiz = fs.readdirSync(webRoot, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.js') && !FUERA_DE_LA_PRECACHE.has(entry.name))

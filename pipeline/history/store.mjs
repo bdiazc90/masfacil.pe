@@ -85,7 +85,7 @@ export async function listAll(store, prefix, { limit } = {}) {
 }
 
 /** Raíz por defecto de las copias de trabajo locales; siempre fuera de Git. */
-export function defaultHistoryRoot(root = rootFromModule) {
+function defaultHistoryRoot(root = rootFromModule) {
   return path.join(root, '.local-cache', 'history');
 }
 

@@ -84,3 +84,26 @@ export function shellEntryFile(entry) {
 export function serviceWorkerUpdateProblems(swSource) {
   return /from\s+['"]\.\/shell-manifest\.js['"]/.test(swSource) ? [] : ['sw.js no importa ./shell-manifest.js: un shell nuevo no reinstalaría el service worker'];
 }
+
+/** Texto que identifica la página 404 propia, también cuando se lee desde el origen público. */
+export const NOT_FOUND_MARKER = 'No encontramos esta página';
+
+/**
+ * La página 404 tiene que funcionar bajo la CSP del sitio (`style-src 'self'`,
+ * `script-src 'self'`): un estilo o un script en línea no daría error de
+ * publicación, solo una página rota en silencio. Y tiene que llevar a la
+ * portada: para eso existe.
+ *
+ * @param {string} html  contenido de web/404.html
+ * @returns {string[]}
+ */
+export function notFoundPageProblems(html) {
+  const problems = [];
+  if (!html.includes(NOT_FOUND_MARKER)) problems.push(`404.html no contiene «${NOT_FOUND_MARKER}»`);
+  if (!/href="\/"/.test(html)) problems.push('404.html no enlaza a la portada (href="/")');
+  if (!/href="\/styles\.css"/.test(html)) problems.push('404.html no carga /styles.css');
+  if (!/src="\/404\.js"/.test(html)) problems.push('404.html no carga /404.js: quedaría sin tema');
+  if (/<style\b/i.test(html) || /\sstyle\s*=/i.test(html)) problems.push('404.html lleva estilos en línea; la CSP los bloquearía');
+  if (/<script\b(?![^>]*\bsrc=)/i.test(html)) problems.push('404.html lleva un script en línea; la CSP lo bloquearía');
+  return problems;
+}

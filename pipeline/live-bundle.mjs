@@ -22,7 +22,7 @@ const espera = (ms) => new Promise((listo) => setTimeout(listo, ms));
 const REINTENTOS_MS = Object.freeze([250, 750]);
 
 /** Base normalizada; HTTP solo en pruebas locales, como siempre. */
-export function liveBundleBase(baseUrl, { testMode = process.env.TEST_MODE === '1' } = {}) {
+function liveBundleBase(baseUrl, { testMode = process.env.TEST_MODE === '1' } = {}) {
   const localHttp = testMode && /^http:\/\/127\.0\.0\.1(?::\d+)?\/?$/.test(baseUrl ?? '');
   if (!baseUrl || (!/^https:\/\//.test(baseUrl) && !localHttp)) throw new Error('Se requiere URL HTTPS de Pages (HTTP solo en test local)');
   const base = new URL(baseUrl);

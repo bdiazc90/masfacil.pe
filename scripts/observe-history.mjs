@@ -36,26 +36,8 @@ try {
   salida.problems.push(error.message);
 }
 
-// Mismo patrón que `scripts/resolve-route.mjs`: el guion escribe sus propias
-// salidas y el YAML solo las encadena.
-const outputs = {
-  ok: salida.ok,
-  observation: salida.observation,
-  observation_id: salida.observation_id ?? '',
-  archive: salida.archive,
-  archive_hash: salida.archive_hash ?? '',
-  revision_id: salida.revision_id ?? '',
-  observed_at: salida.observed_at ?? '',
-  local_date: salida.local_date ?? '',
-  n_regular: salida.products?.regular?.n ?? '',
-  n_premium: salida.products?.premium?.n ?? '',
-  mean_regular: salida.products?.regular?.mean ?? '',
-  mean_premium: salida.products?.premium?.mean ?? '',
-  summary_write: salida.summary_write,
-  days_with_observation: salida.days_with_observation ?? '',
-};
-if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${Object.entries(outputs).map(([clave, valor]) => `${clave}=${valor}`).join('\n')}\n`);
-
+// Sin `GITHUB_OUTPUT`: este job es un solo paso y nada encadena después. Lo que
+// se lee es el resumen de la corrida, la línea JSON y el código de salida.
 if (process.env.GITHUB_STEP_SUMMARY) {
   const lineas = [`## Histórico · ${salida.local_date || 'sin observación'}`, ''];
   lineas.push('| campo | valor |', '| --- | --- |');

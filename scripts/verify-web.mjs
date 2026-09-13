@@ -21,7 +21,7 @@ import { validateGasolinaManifest as clienteAceptaManifest, validGasolinaBundle 
 import { BRAND_LOGOS } from '../web/brand-logos.js';
 import { shellManifestProblems } from '../pipeline/shell-manifest.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
-import { brandAssetProblems, serviceWorkerUpdateProblems } from '../app/shell-assets.mjs';
+import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -92,9 +92,29 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // cada pocas horas no acabe cacheado como si fuera parte del shell.
   if (origin && new URL(HISTORY_ORIGIN).origin === new URL(origin).origin) errors.push('el histórico no puede servirse desde el mismo origen que la app: el service worker lo cachearía como shell');
 
-  // 6. Contra el origen público: una ruta inexistente puede responder 200 con
-  // HTML, así que se mira el tipo y el contenido, no solo que llegue respuesta.
+  // 6. La página 404 propia: sin ella Pages sirve la portada con 200 para toda
+  // ruta desconocida. Tiene que existir, respetar la CSP y llevar su módulo en
+  // la precache derivada.
+  const notFoundPath = path.join(root, 'web', '404.html');
+  if (!fs.existsSync(notFoundPath)) errors.push('falta web/404.html: Pages serviría la portada con 200 para cualquier ruta desconocida');
+  else errors.push(...notFoundPageProblems(fs.readFileSync(notFoundPath, 'utf8')));
+  if (!shell.derived.entries.includes('/404.js')) errors.push('/404.js no está en la precache derivada');
+
+  // 7. Contra el origen público. Se mira el tipo y el contenido de cada
+  // respuesta, no solo que llegue: un 200 con HTML donde iba un SVG es un fallo.
   if (origin) {
+    // Una ruta que no existe tiene que responder 404 con la página propia; si
+    // responde 200 con la portada, el 404.html no llegó al deploy.
+    const inexistente = `/__verify-web/no-existe-${Date.now().toString(36)}`;
+    try {
+      const response = await fetch(new URL(inexistente, origin), { redirect: 'error', cache: 'no-store' });
+      const tipo = response.headers.get('content-type') ?? '';
+      const cuerpo = await response.text();
+      if (response.status !== 404) errors.push(`origen público · ${inexistente} respondió ${response.status} en vez de 404`);
+      if (!tipo.startsWith('text/html')) errors.push(`origen público · la página 404 respondió ${tipo || 'sin tipo'} en vez de text/html`);
+      if (!cuerpo.includes(NOT_FOUND_MARKER)) errors.push('origen público · la respuesta 404 no es la página 404 propia');
+    } catch (error) { errors.push(`origen público · no se pudo comprobar la página 404: ${error.message}`); }
+
     const respuestas = new Map();
     for (const entry of Object.values(BRAND_LOGOS)) {
       const ruta = `/icons/brands/${entry.slug}.svg`;

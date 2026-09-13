@@ -2,7 +2,7 @@
 
 PWA independiente para comparar Gasohol Regular y Premium en Lima provincia por precio reportado, cercanía y frescura. No está afiliada, aprobada ni producida por Osinergmin, Facilito ni el Estado peruano.
 
-Una sola pantalla, `/`, con los dos productos en la misma tarjeta. `/gasolina/historial` abre esa misma portada con el gráfico del histórico enfocado; las rutas antiguas de producto (`/gasolina/regular`, `/gasolina/premium`) redirigen a `/`.
+Una sola pantalla, `/`, con los dos productos en la misma tarjeta. `/gasolina/historial` abre esa misma portada con el gráfico del histórico enfocado; las rutas antiguas de producto (`/gasolina/regular`, `/gasolina/premium`) redirigen a `/`. Cualquier otra ruta responde 404 con una página mínima que devuelve a la portada.
 
 La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de más de 30 días no se muestran ni compiten al ordenar; el grifo permanece en una tarjeta compacta que dice desde cuándo calla.
 
@@ -17,10 +17,12 @@ La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de 
 
 ## Uso local
 
-Requiere Node.js.
+Requiere Node.js. Servir la PWA y proyectar datos no necesita dependencias; el
+observador del histórico sí, porque firma peticiones S3:
 
 ```bash
 npm run serve          # http://127.0.0.1:4173
+pnpm install           # solo para npm run history:observe
 ```
 
 Para ver datos reales hace falta el bundle. Dos formas:

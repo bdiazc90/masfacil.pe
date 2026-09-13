@@ -42,7 +42,7 @@ const espera = (ms) => new Promise((listo) => setTimeout(listo, ms));
 const codigoS3 = (texto) => /<Code>([A-Za-z]{1,64})<\/Code>/.exec(String(texto ?? ''))?.[1] ?? null;
 
 /** Un prefijo es vacío o una ruta de segmentos simples terminada en `/`. */
-export function validatePrefix(prefix) {
+function validatePrefix(prefix) {
   const valor = String(prefix ?? '');
   if (valor === '') return '';
   const partes = valor.split('/');

@@ -86,7 +86,6 @@ jobs:
           test -n "$DATOS_S3_SECRET_ACCESS_KEY"
 
       - name: Observar y reconstruir el resumen
-        id: observe
         env:
           SUMMARY_ONLY: ${{ inputs.summary_only && '1' || '0' }}
         run: node scripts/observe-history.mjs

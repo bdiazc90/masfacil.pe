@@ -19,7 +19,7 @@ const ARCHIVE_HASH_PREFIX = 'masfacil-history-archive-v1';
 const ARCHIVE_FILES = Object.freeze(['manifest.json', 'premium.json', 'regular.json']);
 
 /** Los tres cuerpos públicos, por nombre de archivo. */
-export function archiveObjects({ manifestText, bodies }) {
+function archiveObjects({ manifestText, bodies }) {
   return { 'manifest.json': manifestText, 'premium.json': bodies.premium, 'regular.json': bodies.regular };
 }
 

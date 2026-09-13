@@ -18,7 +18,6 @@ const DAY_MS = 86_400_000;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export const HISTORY_SCHEMA_VERSION = 'history-daily-1';
-export const HISTORY_SCHEMA_VERSIONS = Object.freeze(['history-daily-1']);
 export const HISTORY_TIMEZONE = 'America/Lima';
 export const HISTORY_CURRENCY = 'PEN';
 export const HISTORY_UNIT = 'Galones';
@@ -147,7 +146,7 @@ export function validateDailySummary(summary, { bytes = null } = {}) {
   const problems = [];
   if (Number.isFinite(bytes) && bytes > HISTORY_MAX_BYTES) problems.push(`resumen de ${bytes} bytes; el tope es ${HISTORY_MAX_BYTES}`);
   if (!sameKeys(summary, SUMMARY_FIELDS)) return [...problems, 'resumen: campos inesperados o ausentes'];
-  if (!HISTORY_SCHEMA_VERSIONS.includes(summary.schema_version)) problems.push(`resumen: versión de esquema desconocida (${summary.schema_version})`);
+  if (summary.schema_version !== HISTORY_SCHEMA_VERSION) problems.push(`resumen: versión de esquema desconocida (${summary.schema_version})`);
   if (!text(summary.method_version)) problems.push('resumen: method_version inválido');
   if (summary.timezone !== HISTORY_TIMEZONE) problems.push(`resumen: el calendario debe ser ${HISTORY_TIMEZONE}`);
   if (JSON.stringify(summary.scope) !== JSON.stringify(HISTORY_SCOPE)) problems.push('resumen: ámbito distinto de LIMA/LIMA');

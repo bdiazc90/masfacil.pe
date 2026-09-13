@@ -21,8 +21,13 @@ const server = http.createServer((request,response) => {
   if (/^\/gasolina(?:\/(?:regular|premium)?\/?)?$/.test(url.pathname)) { response.writeHead(301, { Location: '/' }); response.end(); return; }
   const route = url.pathname === '/' ? '/index.html' : url.pathname;
   const relative = path.posix.normalize(route).replace(/^\/+/, ''); const file = path.join(webRoot, relative);
-  if (!file.startsWith(`${webRoot}${path.sep}`) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { response.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}); response.end('No encontrado'); return; }
-  const headers = {'Content-Type':types.get(path.extname(file)) ?? 'application/octet-stream','Cache-Control':relative === 'data/manifest.json' || relative === 'data/gasolina/manifest.json' ? 'no-store' : relative.startsWith('data/snapshots/') || relative.startsWith('data/gasolina/snapshots/') ? 'public, max-age=31536000, immutable' : 'no-cache','Service-Worker-Allowed':'/','X-Content-Type-Options':'nosniff'};
+  if (!file.startsWith(`${webRoot}${path.sep}`) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    // Como Pages: la página 404 propia, con su código de estado; sin ella, texto.
+    const notFound = path.join(webRoot, '404.html');
+    if (fs.existsSync(notFound)) { response.writeHead(404, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}); if (request.method === 'GET') fs.createReadStream(notFound).pipe(response); else response.end(); return; }
+    response.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}); response.end('No encontrado'); return;
+  }
+  const headers = {'Content-Type':types.get(path.extname(file)) ?? 'application/octet-stream','Cache-Control':relative === 'data/gasolina/manifest.json' ? 'no-store' : relative.startsWith('data/gasolina/snapshots/') ? 'public, max-age=31536000, immutable' : 'no-cache','Service-Worker-Allowed':'/','X-Content-Type-Options':'nosniff'};
   response.writeHead(200,headers); if(request.method==='GET')fs.createReadStream(file).pipe(response); else response.end();
 });
 server.listen(port,'127.0.0.1',()=>process.stdout.write(`masfacil.pe local en http://127.0.0.1:${port}\nPrecache derivada: ${shell.cache} · ${shell.entries.length} entradas\n`));

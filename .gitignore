@@ -7,8 +7,6 @@
 
 # Artefactos de investigación y proyección: se regeneran localmente, nunca se publican en Git.
 /data/
-/fetch-gis.mjs
-/gis-osinergmin.json
 
 # Proyección pública generada desde el pointer local; nunca se versiona.
 /web/data/

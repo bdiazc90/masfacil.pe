@@ -212,7 +212,7 @@ Piso no negociable, verificado y no asumido.
   al 90 % sobre el papel liso y sobre cada mancha del glow, en los dos temas. Texto
   ≥ 4.5:1; texto grande (la cifra de 24 px a peso 800, lo único que lleva el color
   «strong») ≥ 3:1; anillo de foco y botón como forma ≥ 3:1. La prueba es
-  `node web/contrast.mjs`: imprime cada razón y falla bajo el mínimo. Se corre a mano al
+  `node scripts/contrast.mjs`: imprime cada razón y falla bajo el mínimo. Se corre a mano al
   tocar un token, no en CI. Deuda conocida: lee una copia de los tokens escrita en los
   mismos términos que `web/styles.css` (knobs OKLCH y hex); mover un color obliga a
   actualizar las dos. Fuera del piso, a propósito: la palabra «masfacil» en `--brand`
@@ -273,7 +273,7 @@ se copian aquí: envejecen y el motivo no.
 
 | Decisión | Por qué |
 |---|---|
-| `/` es la app; sin pantalla de elegir producto. `/gasolina/historial` reescribe a la misma portada con el gráfico del histórico enfocado; las rutas viejas de producto (`/gasolina/regular`, `/gasolina/premium`) responden 301 | los dos bundles son idénticos salvo precio y fecha: elegir producto antes de ver nada era un tap sin información; el historial es contexto de la portada, no otra pantalla, y su URL existe solo para poder enlazarlo |
+| `/` es la app; sin pantalla de elegir producto. `/gasolina/historial` reescribe a la misma portada con el gráfico del histórico enfocado; las rutas viejas de producto (`/gasolina/regular`, `/gasolina/premium`) responden 301; cualquier otra ruta responde 404 con una página mínima | los dos bundles son idénticos salvo precio y fecha: elegir producto antes de ver nada era un tap sin información; el historial es contexto de la portada, no otra pantalla, y su URL existe solo para poder enlazarlo; una dirección que no existe no debe fingir ser la app: un enlace roto se ve, no se disimula |
 | Una tarjeta por grifo con Regular y Premium; «—» cuando falta uno | la gran mayoría de los grifos reporta los dos productos a la vez, y se decide comparándolos frente al surtidor |
 | Radio de búsqueda de 1 a 5 km en pasos de 0.5; arranca en el menor que llena seis tarjetas | en Lima urbana cae en 1–1.5 km y en zonas dispersas sube solo. Un pool fijo mandaba a kilómetros de distancia por céntimos |
 | «Más cerca» y «Más barata» solo ordenan; el sub-selector fija el producto de «Más barata» y recuerda la elección | cada control hace una cosa; en «Más cerca» el producto no ordena nada y el sub-selector se oculta |
