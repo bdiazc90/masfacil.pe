@@ -17,7 +17,7 @@ const $ = (id) => document.getElementById(id);
 // La única ruta además de `/`: la misma portada con el gráfico enfocado.
 // `_redirects` la reescribe a `index.html`; aquí solo se enfoca y se historia.
 const HISTORY_ROUTE = /^\/gasolina\/historial\/?$/;
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'location-status', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
 
@@ -330,18 +330,23 @@ function applyLoaded(dataset) {
   $('choose-district').disabled = false;
   nodes['data-status'].textContent = `${conPrecio(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
-  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)}</p><p>Cada tarjeta muestra los dos productos. «—» significa que ese grifo no tiene precio vigente de ese producto, no que no lo venda.</p><p>Un grifo que lleva más de 30 días sin reportar aparece igual, sin precios y diciendo desde cuándo calla: sigue existiendo en el Registro, pero no podemos decir a cuánto vende.</p><p>La distancia es geodésica en línea recta. No calculamos ruta, ETA, tráfico ni costo del desvío. Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado. Las marcas y sus logos pertenecen a sus titulares y se muestran solo para identificar la estación.</p><p>Tu zona es el radio que eliges con el control, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km de tu ubicación.</p><p>Los nombres de estación se cruzan contra el Registro oficial de Osinergmin. Auditamos una muestra aleatoria y encontramos 0 errores: la precisión medida es de al menos 89 % en los nombres confirmados y 85 % en los marcados <b>por confirmar</b>.</p><p>La marca sale del operador que declara el Registro o del directorio oficial de la cadena, y su logo acompaña siempre a la marca que publicamos: son la misma afirmación. Revisamos una muestra mirando el letrero; donde encontramos un error, retiramos esa marca. No revisamos las 277 una por una, así que si ves una equivocada, escríbenos.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
+  // Lo que el producto tiene que declarar, sin justificarse: atribución, no
+  // afiliación, qué significa una ausencia, la ventana de vigencia, cómo se mide
+  // la distancia, la precisión medida y de quién son las marcas. Nada de
+  // explicar por qué se decidió cada cosa, y nada de pedir un contacto que la
+  // app no ofrece.
+  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)} Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>No guardamos tu ubicación ni sale de tu dispositivo.</p><p>«—» significa que ese grifo no publica precio vigente de ese producto, no que no lo venda. Pasados ${MAX_OFFER_AGE_DAYS} días sin reportar, su tarjeta queda sin precios y dice desde cuándo calla.</p><p>La distancia es en línea recta. Tu zona es el radio que eliges, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km.</p><p>Los nombres salen del Registro oficial: precisión medida de 89 % en los confirmados y 85 % en los <b>por confirmar</b>. Marcas y logos son de sus titulares, solo para identificar la estación.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
-async function hasGrantedLocationPermission() {
-  try { return (await navigator.permissions?.query({ name: 'geolocation' }))?.state === 'granted'; }
-  catch { return false; }
-}
+// La app NUNCA se localiza sola. Antes, si el permiso ya estaba concedido, la
+// portada llamaba a `locate()` al cargar; como el navegador guarda ese permiso
+// de forma persistente, desde la primera concesión la portada dejaba de ser
+// alcanzable: no se podía mirar el histórico ni elegir distrito sin que la
+// localización secuestrara la pantalla. Un permiso concedido una vez no es una
+// orden permanente. Localizar es siempre un gesto.
 async function initialize() {
   try {
     await prepareServiceWorker();
     applyLoaded(await loadGasolina());
-    // Un enlace al historial pide el gráfico, no una búsqueda: no se localiza solo.
-    if (!HISTORY_ROUTE.test(location.pathname) && await hasGrantedLocationPermission()) locate();
   } catch (error) { fatal(error); }
 }
 

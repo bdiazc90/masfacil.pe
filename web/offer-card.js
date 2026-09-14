@@ -1,4 +1,4 @@
-import { brandLogoFor, brandLogoPath } from './brand-logos.js';
+import { brandAssetFor } from './brand-logos.js';
 
 export const UNVERIFIED_STATION_LABEL = 'Estación sin nombre verificado';
 
@@ -45,14 +45,28 @@ export function isUnconfirmedIdentity(offer) {
   return offer?.commercial_identity?.confidence === 'nearby';
 }
 
-// El logo es refuerzo visual de una marca que la tarjeta ya dice en texto; por
-// eso va con `alt` vacío, para que un lector de pantalla no la repita. Sin marca
-// publicada, o con una marca que no está en la lista controlada, no hay logo y
-// la tarjeta se queda en texto.
-export function brandLogoHtml(offer) {
-  const logo = brandLogoFor(offer?.commercial_identity);
-  if (!logo) return '';
-  return `<img class="offer__brand" src="${escapeHtml(brandLogoPath(logo.slug))}" alt="" width="${logo.width}" height="${logo.height}" loading="lazy" decoding="async">`;
+// La marca es la firma visual de la tarjeta: un isotipo amplio y traslúcido que
+// sangra por la esquina superior derecha, con un halo tenue de su color. Es
+// DECORACIÓN —`aria-hidden` y `alt` vacío—, porque la tarjeta ya dice la marca en
+// texto: un lector de pantalla no debe oírla dos veces. No captura eventos ni
+// añade paradas de teclado.
+//
+// El recurso sale del registro controlado, nunca de los datos publicados: estos
+// solo pueden elegir una marca conocida. Sin marca publicada, o con una marca sin
+// variante registrada, no hay capa y la tarjeta se queda en superficie neutral.
+export function brandMarkHtml(offer) {
+  const variante = brandAssetFor(offer?.commercial_identity, 'mark');
+  if (!variante) return '';
+  const { asset, path } = variante;
+  return `<div class="offer__brandmark" aria-hidden="true"><img src="${escapeHtml(path)}" alt="" width="${asset.width}" height="${asset.height}" loading="lazy" decoding="async"></div>`;
+}
+
+// El identificador va al marcado para que el CSS elija el halo de esa marca sin
+// un estilo en línea: la CSP del sitio es `style-src 'self'`. Solo puede tomar
+// uno de los slugs del registro.
+export function brandAttr(offer) {
+  const variante = brandAssetFor(offer?.commercial_identity, 'mark');
+  return variante ? ` data-brand="${escapeHtml(variante.key)}"` : '';
 }
 
 export function displayDistrict(district) {
@@ -121,11 +135,14 @@ function renderSilentCard(offer, { withDistance, directionsUrl, includeDirection
   // distancia baja a la columna derecha, junto al distrito, y la tarjeta se
   // queda en dos filas.
   const ubicacion = [withDistance ? kilometers(offer.distance_km) : '', displayDistrict(offer.district)].filter(Boolean).join(' · ');
-  return `<li class="offer offer--silent glass" tabindex="-1"><div class="offer__grid"><h3 class="offer__identity">${brandLogoHtml(offer)}${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address}</p><p class="offer__silence"><time${desde}>Sin precio ${escapeHtml(calladoDesde(offer.silent_days))}</time></p><p class="offer__district">${escapeHtml(ubicacion)}</p></div>${actions}${detailSlot}</li>`;
+  return `<li class="offer offer--silent glass"${brandAttr(offer)} tabindex="-1">${brandMarkHtml(offer)}<div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address}</p><p class="offer__silence"><time${desde}>Sin precio ${escapeHtml(calladoDesde(offer.silent_days))}</time></p><p class="offer__district">${escapeHtml(ubicacion)}</p></div>${actions}${detailSlot}</li>`;
 }
 
 export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null } = {}) {
   if (offer.has_price === false) return renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail });
+  // La distancia se alinea con los precios en vez de anclarse a la derecha: así
+  // los tres datos que se comparan se leen de un barrido y la esquina superior
+  // derecha queda libre para la marca. Sin píldora: el espacio ya la separa.
   const distance = withDistance ? `<p class="offer__distance"><span class="chip chip--distance" role="img" aria-label="Distancia">DIST</span><b>${escapeHtml(kilometers(offer.distance_km))}</b></p>` : '';
   const precios = Object.keys(PRODUCTOS).map((key) => priceCell(offer, key, activeProduct)).join('');
   const detail = includeDetail
@@ -140,7 +157,9 @@ export function renderOfferCard(offer, { withDistance = true, directionsUrl = nu
   // La columna derecha ubica —dirección y distrito— y la izquierda identifica.
   // Sin dirección publicable, el distrito sube para que la fila no quede coja.
   // El `tabindex="-1"` no entra al tabulador: es el destino de foco al paginar.
+  // La capa de marca va primera en el marcado y detrás en pintura: nunca se
+  // interpone entre el contenido y quien lo toca.
   const address = offer.address ? escapeHtml(offer.address) : '';
   const frescura = ago(offer.age_days);
-  return `<li class="offer glass" tabindex="-1">${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${brandLogoHtml(offer)}${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${frescura[0].toLocaleUpperCase('es-PE')}${frescura.slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
+  return `<li class="offer glass"${brandAttr(offer)} tabindex="-1">${brandMarkHtml(offer)}${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${frescura[0].toLocaleUpperCase('es-PE')}${frescura.slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
 }

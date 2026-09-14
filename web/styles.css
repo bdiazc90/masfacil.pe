@@ -1,62 +1,138 @@
-/* ═══════════════════════════════════════════════════════════════════
-   TOKENS · fuente de verdad del sistema visual (DESIGN.md §6).
-   Dos bloques: claro en :root, oscuro en :root[data-theme="dark"]; el tema lo
-   fija web/theme.js y siempre queda en light|dark. Los neutros salen de tres
-   knobs OKLCH (matiz y croma del papel y de la tinta); cambia los knobs, no
-   los colores. Escala de espaciado: --s1 4 · --s2 8 · --s3 12 · --s4 16 · --s5 24.
-   ═══════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   masfacil.pe · CSS nativo, escrito a mano y servido tal cual.
+
+   Orden: TEMA · SUPERFICIES · BASE · y después un bloque por componente, cada
+   uno con sus variantes, sus estados y sus adaptaciones juntos. No hay una capa
+   final de parches: el override vive debajo de la regla que modifica.
+
+   Qué conserva un nombre de variable y qué se escribe directo:
+     · cambia de verdad con el tema  → variable (los colores de abajo);
+     · es contrato con JavaScript    → variable (--expand-at, --controls-slot-h);
+     · lo mide scripts/contrast.mjs  → variable, porque es una decisión que el
+       CSS comparte con su comprobación;
+     · se reutiliza entre reglas     → variable, en el ámbito donde se reutiliza
+       (--product, --serie, --brand-halo, la escala de espaciado);
+     · cualquier otra medida         → el valor, junto a su propiedad.
+   Un número repetido por casualidad no obliga a crear un token.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Tema ──────────────────────────────────────────────────────────────
+   Los neutros son `oklch()` con sus tres valores escritos: para saber de qué
+   color es una superficie se lee aquí, no se resuelve una cadena de knobs.
+   `web/theme.js` fija `data-theme` en claro u oscuro, así que el CSS nunca
+   depende de `prefers-color-scheme`.
+   `node scripts/contrast.mjs` lee ESTE bloque: no guarda una segunda paleta. */
 :root{
   color-scheme:light;
-  --paper-hue:130;--paper-chroma:.01;--ink-chroma:.010;
-  --background:oklch(95% var(--paper-chroma) var(--paper-hue));
-  --foreground:oklch(30% var(--ink-chroma) var(--paper-hue));
-  --muted-foreground:oklch(46% var(--ink-chroma) var(--paper-hue)); /* 48 % en el mockup; a 46 % llega a 4.5:1 sobre el card fijo */
-  --card:oklch(98% var(--paper-chroma) var(--paper-hue));
-  --card-2:oklch(90% var(--paper-chroma) var(--paper-hue));
-  --border:oklch(40% var(--ink-chroma) var(--paper-hue));
-  --border-2:oklch(30% var(--ink-chroma) var(--paper-hue));
-  --primary:#074b3f;--primary-foreground:#ffffff;--accent:#17615d;--ring:#2e7d32;
-  --brand:#b8071b;
-  --product-regular:#708d3a;--product-regular-strong:#207461;
-  --product-premium:#4a78a8;--product-premium-strong:#1d4e8e;
-  --glow-1:#bfb6a7;--glow-2:#d7d2c3;--glow-3:#bb9978;--glow-alpha:.6;--glow-blur:80px;
-  --logo-halo:transparent;
-  --blur:30px;--glass-saturate:35%;
-  --price-size:24px;--distance-size:18px;--chip-size:8px;--radius:36px;--radius-small:12px;
-  --controls-top:var(--s4);--controls-compact-h:52px;--collapse-at:96px;--expand-at:8px;--controls-ease:200ms;
-  --controls-fixed-fill:90%;--controls-fixed-shadow:0 8px 24px -10px rgb(0 0 0 / .75);
-  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;
-  /* Alto reservado del histórico: la portada no salta cuando llega el dato. */
-  --chart-h:236px;
+
+  /* Papel y tinta */
+  --background:oklch(96.3% 0.002 197.1);
+  --foreground:oklch(30% 0.01 130);
+  --muted-foreground:oklch(46% 0.01 130); /* 46 % y no 48: es lo que llega a 4.5:1 sobre el card fijo */
+  --card:oklch(98% 0.01 130);
+  --card-2:oklch(90% 0.01 130);
+  --border:oklch(40% 0.01 130);
+  --border-2:oklch(30% 0.01 130);
+
+  /* Acción: una sola por pantalla */
+  --primary:#074b3f;
+  --primary-foreground:#ffffff;
+  --accent:#17615d;
+  --ring:#2e7d32;
+
+  /* Identidad de masfacil. Exenta del piso de contraste: es la marca. */
+  --brand:#e0581e;
+  --logo-halo:transparent; /* contorno del logo para que el aro no se funda con el fondo */
+
+  /* Combustible: el tono base tiñe rellenos, `-strong` es siempre la tinta */
+  --product-regular:#708d3a;
+  --product-regular-strong:#207461;
+  --product-premium:#4a78a8;
+  --product-premium-strong:#1d4e8e;
+
+  /* Fondo: tres manchas difusas bajo el vidrio */
+  --glow-1:oklch(95.3% 0.051 180.801);
+  --glow-2:oklch(95.1% 0.026 236.824);
+  --glow-3:oklch(95.6% 0.045 203.388);
+  --glow-alpha:.6;
+
+  /* Marca del grifo. Tinte, no color pleno: va en la dirección que ALEJA la
+     superficie de la tinta —claro sobre papel, oscuro sobre carbón—, porque con
+     el color pleno el texto de esa esquina perdía hasta punto y medio de
+     contraste. El color real de la marca lo lleva el isotipo. */
+  --halo-primax:#f2c2a6;
+  --halo-repsol:#899ccd;
+  --halo-ava:#e3c2eb;
+  --halo-petroperu:#ffbbbb;
+  --brand-halo-alpha:.38;
+
+  /* Gráfico: tope del degradado de área */
+  --chart-fill-alpha:.28;
+
+  /* Vidrio: desenfoque y cuánto glow deja pasar */
+  --blur:30px;
+  --glass-saturate:35%;
+
+  /* Compartidos de forma y ritmo */
+  --radius-small:12px;
+  --s1:4px;
+  --s2:8px;
+  --s3:12px;
+  --s4:16px;
+  --s5:24px;
   --font:Roboto,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
-  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  /* Contrato con controls-card.js: lo lee de `documentElement` con `parseFloat`,
+     así que el valor tiene que llevar px. `--collapse-at` no la lee JS: dimensiona
+     el sentinel que observa el IntersectionObserver. */
+  --collapse-at:96px;
+  --expand-at:8px;
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --paper-chroma:.02;
-  --background:oklch(20% var(--paper-chroma) var(--paper-hue));
-  --foreground:oklch(78% var(--ink-chroma) var(--paper-hue)); /* 75/72 % en el mockup; +3 % para que el gris secundario pase 4.5:1 sobre el card fijo */
-  --muted-foreground:oklch(75% var(--ink-chroma) var(--paper-hue));
-  --card:oklch(30% var(--paper-chroma) var(--paper-hue));
-  --card-2:oklch(23% var(--paper-chroma) var(--paper-hue));
-  --border:oklch(62% var(--ink-chroma) var(--paper-hue));
-  --border-2:oklch(85% var(--ink-chroma) var(--paper-hue));
-  --primary:#32b988;--primary-foreground:#052611;--accent:#63d0c9;--ring:#4caf50;
-  --product-regular:#7fc9a0;--product-regular-strong:#8fe3b3;
-  --product-premium:#8fb4e0;--product-premium-strong:#a4c6f2;
-  --glow-1:#815a48;--glow-2:#585b48;--glow-3:#8d6c5e;
+  --background:oklch(21.8% 0.008 223.9);
+  --foreground:oklch(78% 0.01 130); /* +3 % sobre el mockup: es lo que sube el gris secundario a 4.5:1 */
+  --muted-foreground:oklch(76% 0.01 130); /* 76 % y no 75: con el fondo oscuro a L21.8 el gris secundario caía a 4.42:1 */
+  --card:oklch(30% 0.02 130);
+  --card-2:oklch(23% 0.02 130);
+  --border:oklch(62% 0.01 130);
+  --border-2:oklch(85% 0.01 130);
+  --primary:#32b988;
+  --primary-foreground:#052611;
+  --accent:#63d0c9;
+  --ring:#4caf50;
   --logo-halo:rgb(255 255 255 / .45);
+  --product-regular:#7fc9a0;
+  --product-regular-strong:#8fe3b3;
+  --product-premium:#8fb4e0;
+  --product-premium-strong:#a4c6f2;
+  --glow-1:#815a48;
+  --glow-2:#585b48;
+  --glow-3:#8d6c5e;
+  --halo-primax:#171a52;
+  --halo-repsol:#5a2a0c;
+  --halo-ava:#3a1244;
+  --halo-petroperu:#0d3b29;
+  --chart-fill-alpha:.18; /* el relleno claro sobre carbón tapaba la referencia del promedio */
 }
-/* Derivados: recetas, no colores. */
+
+/* ── Superficies compartidas ───────────────────────────────────────────
+   Dos recetas para todo el vidrio. Sus paradas y sus pesos se leen aquí mismo;
+   la sonda de contraste saca de `--surface` los tres pesos que compone. */
 :root{
   --surface:linear-gradient(115deg,color-mix(in srgb,var(--card) 20%,transparent),color-mix(in srgb,var(--card-2) 14%,transparent) 52%,color-mix(in srgb,var(--card) 8%,transparent));
   --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 30%,transparent),color-mix(in srgb,var(--border) 15%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 22%,transparent) 100%);
 }
 
-/* ── Base ──────────────────────────────────────────────────────────── */
+/* ── Base ──────────────────────────────────────────────────────────────── */
 *{box-sizing:border-box}
 /* Solo html pinta el fondo: si body también lo pinta, tapa el glow (z-index:-1). */
-html{background:var(--background);color:var(--foreground);font-family:var(--font);font-variant-numeric:tabular-nums}
+html{
+  background:var(--background);
+  color:var(--foreground);
+  font-family:var(--font);
+  font-variant-numeric:tabular-nums;
+}
 body{margin:0;min-width:280px;min-height:100vh}
 button,a{font:inherit;min-height:44px}
 button{touch-action:manipulation;cursor:pointer}
@@ -64,55 +140,146 @@ h1,h2,h3,p{margin-top:0}
 :focus-visible{outline:3px solid var(--ring);outline-offset:3px}
 [hidden]{display:none!important}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.skip-link{position:fixed;left:10px;top:10px;transform:translateY(-160%);z-index:10;background:var(--primary);color:var(--primary-foreground);padding:10px}
+.skip-link{
+  position:fixed;
+  left:10px;
+  top:10px;
+  z-index:10;
+  padding:10px;
+  transform:translateY(-160%);
+  background:var(--primary);
+  color:var(--primary-foreground);
+}
 .skip-link:focus{transform:none}
 
-/* ── Fondo: ground sólido (html) + tres manchas. Sin velo encima. ─── */
+/* ── Fondo: ground sólido (html) + tres manchas. Sin velo encima. ─────── */
 .glow{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-.glow i{position:absolute;display:block;border-radius:50%;filter:blur(var(--glow-blur));opacity:var(--glow-alpha)}
+.glow i{position:absolute;display:block;border-radius:50%;filter:blur(80px);opacity:var(--glow-alpha)}
 .glow i:nth-child(1){width:60vw;height:60vw;max-width:520px;max-height:520px;right:-14vw;top:-16vw;background:var(--glow-1)}
 .glow i:nth-child(2){width:70vw;height:70vw;max-width:600px;max-height:600px;left:-24vw;bottom:-26vw;background:var(--glow-2)}
-.glow i:nth-child(3){width:34vw;height:34vw;max-width:300px;max-height:300px;left:48%;top:42%;background:var(--glow-3);opacity:calc(var(--glow-alpha)*.6)}
+.glow i:nth-child(3){width:34vw;height:34vw;max-width:300px;max-height:300px;left:48%;top:42%;background:var(--glow-3);opacity:.36}
 
-/* ── Vidrio ────────────────────────────────────────────────────────── */
+/* ── Vidrio ────────────────────────────────────────────────────────────
+   El canto no es un `border`: es un pseudo-elemento enmascarado, para que se
+   lea por diferencia con lo que hay detrás y solo en la dirección que la
+   superficie deja libre. */
 .app-shell{position:relative;width:min(100%,520px);margin:auto;padding:var(--s4) var(--s4) 48px}
-.glass,.plate,.toggle{position:relative;border-radius:var(--radius-small);background:var(--surface);backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));-webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate))}
-.glass:after,.plate:after,.toggle:after{content:"";position:absolute;inset:0;border-radius:inherit;padding:.9px;background:var(--rim);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;pointer-events:none}
-.glass{border-radius:var(--radius);padding:var(--s5);box-shadow:0 2px 6px #0000000d}
+.glass,.plate,.toggle{
+  position:relative;
+  border-radius:var(--radius-small);
+  background:var(--surface);
+  backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
+}
+.glass:after,.plate:after,.toggle:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  padding:.9px;
+  border-radius:inherit;
+  background:var(--rim);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  pointer-events:none;
+}
+.glass{border-radius:36px;padding:var(--s5);box-shadow:0 2px 6px #0000000d}
 .plate{padding:var(--s4) var(--s5)}
+@media(max-width:340px){.glass{padding:var(--s4)}}
+/* En colores forzados el pseudo-canto se descarta: vuelve un borde real. */
+@media(forced-colors:active){.glass,.plate,.toggle{border:2px solid ButtonText}}
 
-/* ── Appbar ────────────────────────────────────────────────────────── */
+/* ── Appbar ────────────────────────────────────────────────────────────── */
 .appbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s3)}
 .brand{color:var(--brand);font-weight:700;text-decoration:none;letter-spacing:-.01em;display:flex;align-items:center}
 .brand em{font-style:normal;color:var(--foreground)}
 .brand__logo{display:block;width:28px;height:auto;flex-shrink:0;filter:drop-shadow(0 0 1.5px var(--logo-halo))}
 .brand .brand__logo{margin-right:var(--s2)}
-.theme-toggle{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;min-height:44px;padding:3px;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));-webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate))}
+.theme-toggle{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:3px;
+  min-height:44px;
+  padding:3px;
+  border:1px solid color-mix(in srgb,var(--border) 32%,transparent);
+  border-radius:999px;
+  background:color-mix(in srgb,var(--card) 42%,transparent);
+  backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
+}
 .theme-toggle button{display:grid;place-items:center;width:36px;min-height:38px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground)}
 .theme-toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);box-shadow:0 1px 4px #0002}
 .theme-toggle svg,.place__icon,.controls__chevron{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
-/* ── Card de Controles: un solo plate con tres estados (DESIGN.md §7). ──
+/* ── Card de controles ─────────────────────────────────────────────────
+   Un solo plate con tres estados (DESIGN.md §7).
    full: en flujo, arriba del todo (marca + tema + filtros).
-   compact: fixed, fila resumen; el hueco (.controls-slot) conserva su alto para que la lista no salte.
-   overlay: fixed y desplegado sobre la lista. Nunca cambia el flujo estando scrolleado:
-   así no entra el scroll anchoring del navegador ni se empujan las tarjetas.
-   Sentinels absolutos (sin layout) + IntersectionObserver con histéresis:
-   sale el de --collapse-at → compact · entra el de --expand-at → full.
+   compact: fixed, fila resumen; el hueco (.controls-slot) conserva su alto para
+   que la lista no salte.
+   overlay: fixed y desplegado sobre la lista. Nunca cambia el flujo estando
+   scrolleado: así no entra el scroll anchoring del navegador ni se empujan las
+   tarjetas.
+   Sentinels absolutos (sin layout) + IntersectionObserver con histéresis: sale
+   el de --collapse-at → compact · entra el de --expand-at → full.
    Fuera de resultados solo se ve la appbar y el card no se fija. */
+.controls{
+  padding:0 var(--s3);
+  /* Alto de la fila resumen. La usan el propio resumen y el `scroll-margin` de
+     la tarjeta: si cambia aquí, el foco al paginar sigue cayendo donde debe. */
+  --controls-compact-h:64px;
+  /* Las cuatro transiciones del colapso duran lo mismo o se ve roto. */
+  --controls-ease:200ms;
+  --controls-shadow:0 8px 24px -10px rgb(0 0 0 / .75);
+}
 .controls-sentinel{position:absolute;left:0;top:0;width:1px;pointer-events:none;visibility:hidden}
 .controls-sentinel--collapse{height:var(--collapse-at)}
 .controls-sentinel--expand{height:var(--expand-at)}
+/* Lo escribe controls-card.js sobre este elemento; el fallback vale hasta que llegue. */
 .controls-slot{min-height:var(--controls-slot-h,auto)}
-.controls{padding:0 var(--s3)}
-.controls[data-state="compact"],.controls[data-state="overlay"]{position:fixed;top:var(--controls-top);left:50%;transform:translateX(-50%);width:min(100% - 2*var(--s4),520px - 2*var(--s4));z-index:5;background:color-mix(in srgb,var(--card) var(--controls-fixed-fill),transparent);box-shadow:var(--controls-fixed-shadow)}
+.controls[data-state="compact"],.controls[data-state="overlay"]{
+  position:fixed;
+  top:var(--s4);
+  left:50%;
+  z-index:5;
+  width:min(100% - 2*var(--s4),488px);
+  transform:translateX(-50%);
+  /* Fijo sí se rellena y lleva sombra: aquí sí hay que separarlo de la lista
+     que pasa por debajo. Es el 90 % que mide la sonda de contraste. */
+  background:color-mix(in srgb,var(--card) 90%,transparent);
+  box-shadow:var(--controls-shadow);
+}
 .controls-scrim{position:fixed;inset:0;z-index:4}
 .controls__bar{display:flex;align-items:center;gap:var(--s1)}
-.controls__summary{display:flex;align-items:center;gap:var(--s2);flex:1;min-width:0;min-height:var(--controls-compact-h);padding:0;border:0;background:transparent;color:var(--foreground);text-align:left;border-radius:inherit}
+.controls__summary{
+  display:flex;
+  align-items:center;
+  gap:var(--s2);
+  flex:1;
+  min-width:0;
+  min-height:var(--controls-compact-h);
+  padding:0;
+  border:0;
+  border-radius:inherit;
+  background:transparent;
+  color:var(--foreground);
+  text-align:left;
+}
 /* Acceso directo a «Actualizar ubicación» en la barra compacta: botón propio,
    no anidado dentro de «Ajustar», con etiqueta accesible y área de 44 px. Ocupa
    el sitio del logo, que ahí solo decoraba, para no comerle ancho al resumen. */
-.controls__quick{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex-shrink:0;min-width:44px;min-height:44px;padding:0 var(--s3) 0 11px;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:color-mix(in srgb,var(--card) 42%,transparent);color:var(--accent)}
+.controls__quick{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  flex-shrink:0;
+  min-width:44px;
+  min-height:44px;
+  padding:0 var(--s3) 0 11px;
+  border:1px solid color-mix(in srgb,var(--border) 32%,transparent);
+  border-radius:999px;
+  background:color-mix(in srgb,var(--card) 42%,transparent);
+  color:var(--accent);
+}
 .controls__quick-label{font-size:13px;font-weight:700;white-space:nowrap}
 /* Con distrito elegido el resumen ya carga el nombre del distrito y el criterio;
    la etiqueta no cabe y el botón vuelve a icono, con su nombre accesible intacto. */
@@ -145,16 +312,36 @@ h1,h2,h3,p{margin-top:0}
 /* Un solo menú para las dos pantallas: cada ítem declara dónde vive. */
 .controls[data-screen="district"] [data-menu-screen="compare"],
 .controls:not([data-screen="district"]) [data-menu-screen="district"]{display:none}
-/* Arriba dónde estás —encabezado pequeño, nunca pulsable—, abajo qué puedes
-   hacer. Un solo botón ancho: el uso real es en movimiento y el blanco tiene que
-   acertarse con el pulgar sin mirar. */
+@media(prefers-reduced-motion:no-preference){
+  .controls__panel{transition:grid-template-rows var(--controls-ease) ease}
+  .controls__inner{transition:padding var(--controls-ease) ease}
+  .controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--controls-ease) ease,visibility 0s var(--controls-ease)}
+}
+
+/* ── Lugar y sus acciones ──────────────────────────────────────────────
+   Arriba dónde estás —encabezado pequeño, nunca pulsable—, abajo qué puedes
+   hacer. Un solo botón ancho: el uso real es en movimiento y el blanco tiene
+   que acertarse con el pulgar sin mirar. */
 .place{display:grid;gap:var(--s2);padding:0 2px}
-.radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .place__value{display:flex;align-items:center;gap:5px;margin:0;min-width:0;font-size:13px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
 .place__value span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .place__icon{width:15px;height:15px;flex-shrink:0;color:var(--accent)}
 .place__row{position:relative;display:flex;align-items:center;gap:var(--s2)}
-.place__action{flex:1;min-width:0;min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);padding:10px 16px;border:1.5px solid transparent;border-radius:999px;font-size:15px;font-weight:700;letter-spacing:.02em}
+.place__action{
+  flex:1;
+  min-width:0;
+  min-height:48px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:var(--s2);
+  padding:10px 16px;
+  border:1.5px solid transparent;
+  border-radius:999px;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:.02em;
+}
 .place__action span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .place__action[data-variant="solid"]{background:var(--primary);color:var(--primary-foreground)}
 /* Outline dice «no estás aquí»: el relleno se reserva para cuando ya lo estás. */
@@ -167,33 +354,67 @@ h1,h2,h3,p{margin-top:0}
 /* `.controls__inner` recorta para animar el colapso; el recorte se abre solo
    mientras el menú está desplegado, que es cuando el panel ya está expandido. */
 .controls__inner:has(.place__menu:not([hidden])){overflow:visible}
-.place__menu{position:absolute;top:calc(100% + var(--s1));right:0;z-index:6;display:grid;min-width:214px;padding:var(--s1);border:1px solid color-mix(in srgb,var(--border) 26%,transparent);border-radius:16px;background:var(--card);box-shadow:var(--controls-fixed-shadow)}
+.place__menu{
+  position:absolute;
+  top:calc(100% + var(--s1));
+  right:0;
+  z-index:6;
+  display:grid;
+  min-width:214px;
+  padding:var(--s1);
+  border:1px solid color-mix(in srgb,var(--border) 26%,transparent);
+  border-radius:16px;
+  background:var(--card);
+  box-shadow:var(--controls-shadow);
+}
 .place__menu-item{display:flex;align-items:center;gap:var(--s2);min-height:44px;padding:0 var(--s2);border:0;border-radius:12px;background:transparent;color:var(--foreground);font-size:15px;font-weight:600;text-align:left}
 .place__menu-item svg{color:var(--accent)}
 .place__menu-item:disabled{color:var(--muted-foreground);cursor:default;opacity:1}
 .place__menu-item:disabled svg{color:var(--muted-foreground)}
 .place__menu-item--home{margin-top:var(--s1);padding-top:var(--s1);border-top:1px solid color-mix(in srgb,var(--border) 18%,transparent);border-radius:0 0 12px 12px}
 .place__menu-item--home .brand__logo{flex-shrink:0}
+
+/* ── Radio y selectores ────────────────────────────────────────────────── */
 .radius{display:grid;gap:2px}
 .radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
+.radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .radius__readout{margin:0;font-size:14px;font-weight:700}
 .radius__input{width:100%;height:40px;margin:0;accent-color:var(--primary);cursor:pointer}
 .radius__input:disabled{cursor:not-allowed;opacity:.45}
 .toggle{display:flex;gap:var(--s1);padding:3px;border-radius:999px;margin:0}
 .toggle button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);font-size:15px;font-weight:500}
+/* El activo se dice con relleno, color y peso: dos de las tres no dependen del fondo. */
 .toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);font-weight:700}
 .toggle--sub button{font-size:14px}
+@media(prefers-reduced-motion:no-preference){
+  .toggle button{transition:color .15s,background-color .15s,opacity .15s}
+}
 
-/* ── Botones ───────────────────────────────────────────────────────── */
-.button{min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);padding:10px 18px;border-radius:999px;border:0;font-size:15px;font-weight:700;letter-spacing:.04em;text-align:center;text-decoration:none}
+/* ── Botones ───────────────────────────────────────────────────────────── */
+.button{
+  min-height:48px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:var(--s2);
+  padding:10px 18px;
+  border:0;
+  border-radius:999px;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:.04em;
+  text-align:center;
+  text-decoration:none;
+}
 .button--ghost{border:1.5px solid color-mix(in srgb,var(--border) 35%,transparent);background:transparent;color:var(--foreground)}
 .button--primary{background:var(--primary);color:var(--primary-foreground)}
 .button--text{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-underline-offset:4px;font-weight:700;letter-spacing:0;min-height:44px;padding:var(--s2) 2px}
 .button:disabled{cursor:wait;opacity:.65}
+@media(forced-colors:active){.button{border:2px solid ButtonText}}
 
-/* ── Pantallas fuera de resultados ─────────────────────────────────── */
-.screen-flow{display:grid;gap:var(--s3);margin-top:var(--s4)}
-.screen-flow .button--primary,.screen-flow>.button--text{width:100%}
+/* ── Pantallas fuera de resultados ─────────────────────────────────────── */
+.screen-flow{display:grid;gap:var(--s4);margin-top:var(--s4)}
+.screen-flow .button--primary,.screen-flow>.button--ghost,.screen-flow>.button--text{width:100%}
 .screen-flow>.button--primary{min-height:52px}
 .eyebrow{margin:0 0 var(--s3);color:var(--accent);font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
 h2{font-size:25px;letter-spacing:-.03em;line-height:1.1}
@@ -202,22 +423,34 @@ h3{font-size:16px;margin-bottom:6px}
 .hint,.lede{font-size:14px;line-height:1.45;margin-bottom:0}
 .start-step{padding-top:var(--s2);text-align:center}
 .start-step h1{margin:0 0 var(--s2);font-size:25px;font-weight:700;letter-spacing:-.03em;line-height:1.14}
-.privacy-line{margin:0;color:var(--muted-foreground);font-size:12px;line-height:1.4}
 .center{text-align:center}
 .loading{min-height:55vh;place-content:center}
 .dot{display:block;width:14px;height:14px;margin:0 auto var(--s4);border-radius:50%;background:var(--primary)}
+@media(prefers-reduced-motion:no-preference){
+  .dot{animation:breathe 2.6s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:.28}50%{opacity:1}}
+}
 .district-step h2{margin:0 0 2px}
 .district-filter{display:grid;gap:6px}
 .district-filter label{color:var(--muted-foreground);font-size:14px;font-weight:600}
-.district-filter input{width:100%;min-height:44px;border:1px solid color-mix(in srgb,var(--border) 46%,transparent);border-radius:var(--radius-small);background:var(--surface);color:var(--foreground);padding:10px 14px;font:inherit}
+.district-filter input{
+  width:100%;
+  min-height:44px;
+  padding:10px 14px;
+  border:1px solid color-mix(in srgb,var(--border) 46%,transparent);
+  border-radius:var(--radius-small);
+  background:var(--surface);
+  color:var(--foreground);
+  font:inherit;
+}
 .district-filter input::placeholder{color:var(--muted-foreground);opacity:1}
 .chips{display:flex;flex-wrap:wrap;gap:var(--s3)}
 .chips button{border:0;border-radius:999px;background:var(--surface);color:var(--foreground);padding:0 var(--s4);font-weight:600;backdrop-filter:blur(var(--blur))}
 .empty h2{margin-bottom:var(--s3)}
-.about summary{min-height:44px;display:flex;align-items:center;color:var(--accent);font-weight:600;cursor:pointer}
+.about summary{min-height:44px;display:flex;align-items:center;color:var(--muted-foreground);font-weight:400;cursor:pointer}
 .about p:last-child{margin-bottom:0}
 
-/* ── Resultados ────────────────────────────────────────────────────── */
+/* ── Resultados ────────────────────────────────────────────────────────── */
 .screen-flow--results{display:block}
 .offline-note{margin:var(--s4) 2px 0;color:var(--muted-foreground);font-size:13px;line-height:1.4}
 /* Aviso de «Actualizar ubicación»: la lista sigue debajo, con o sin éxito. */
@@ -229,48 +462,123 @@ h3{font-size:16px;margin-bottom:6px}
 .screen-flow--results .empty,.about{margin-top:var(--s4)}
 #load-more{width:100%;margin-top:var(--s3)}
 /* El foco al paginar cae en una tarjeta nueva; sin esto quedaría bajo el card fijo. */
-.offer{scroll-margin-top:calc(var(--controls-top) + var(--controls-compact-h) + var(--s3))}
+.offer{scroll-margin-top:calc(var(--s4) + var(--controls-compact-h,64px) + var(--s3))}
 
-/* ── Tarjeta ───────────────────────────────────────────────────────── */
+/* ── Tarjeta de oferta ─────────────────────────────────────────────────── */
 .offer__tag{margin:0 0 var(--s2);color:var(--accent);font-size:13px;font-weight:700}
-.offer__topline{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s2);margin-bottom:var(--s3)}
-.offer__price{display:grid;gap:6px;margin:0;justify-items:start;min-width:0}
-/* Un solo sitio decide el color de producto: el chip suelto (detalle) o el bloque de precio. */
+/* Los tres datos que se comparan, en una fila y repartidos: precio Regular,
+   precio Premium y distancia se leen de un barrido, y la esquina superior
+   derecha queda libre para que la marca sangre sin pisar ningún dato. */
+.offer__topline{display:flex;justify-content: space-around;align-items:center;gap:var(--s2);margin-bottom:var(--s3)}
+@media(max-width:340px){.offer__topline{gap:var(--s1)}}
+.offer__price{display:grid;gap:var(--s1);margin:0;justify-items:start;min-width:0}
+.offer__price b{font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1;white-space:nowrap;color:var(--foreground)}
+.offer__price b small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
+@media(max-width:340px){.offer__price b{font-size:21px}}
+.offer__distance{display:grid;gap:var(--s1);justify-items:start;margin:0}
+.offer__distance b{font-size:18px;font-weight:600;color:var(--muted-foreground);line-height:1;white-space:nowrap}
+@media(max-width:340px){.offer__distance b{font-size:16px}}
+
+/* Un solo sitio decide el color de producto: el chip suelto (detalle) o el
+   bloque de precio. El tono base tiñe el relleno, `-strong` es la tinta. */
 .chip--regular,[data-key="regular"]{--product:var(--product-regular);--product-strong:var(--product-regular-strong)}
 .chip--premium,[data-key="premium"]{--product:var(--product-premium);--product-strong:var(--product-premium-strong)}
-.chip{font-family:var(--mono);display:inline-block;padding:2px 4px 1px;border-radius:4px;font-size:var(--chip-size);font-weight:400;letter-spacing:.08em;line-height:1;background:color-mix(in srgb,var(--product) 16%,var(--card));color:var(--product);border:1px solid color-mix(in srgb,var(--product) 38%,transparent)}
-.chip--distance{--product:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
-.offer__price b{font-size:var(--price-size);font-weight:800;letter-spacing:-.035em;line-height:1;white-space:nowrap;color:var(--foreground)}
-.offer__price b small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
-/* Énfasis: en «Más barata» el producto elegido pinta cifra y chip con «strong»;
-   el otro (--muted) baja a gris y su chip se apaga. Sin precio (--absent) siempre apagado.
-   En «Más cerca» no hay énfasis: los dos en tinta. */
+/* El chip es texto de lectura, no una marca decorativa: 12 px y contraste
+   exigido en todos sus estados. Pintar tinta y relleno con el mismo token
+   dejaba dos valores del mismo color sin separar, en 3.01:1. El estado lo
+   llevan el peso y el borde, nunca una opacidad que hunda los dos a la vez.
+   El 12 % de este relleno lo lee scripts/contrast.mjs. */
+.chip{
+  display:inline-block;
+  padding:2px 5px 1px;
+  border:1px solid color-mix(in srgb,var(--product) 38%,transparent);
+  border-radius:4px;
+  background:color-mix(in srgb,var(--product) 12%,var(--card));
+  color:var(--product-strong);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:12px;
+  font-weight:400;
+  letter-spacing:.08em;
+  line-height:1;
+}
+.chip--distance{--product-strong:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
+@media(forced-colors:active){.chip{border:2px solid ButtonText}}
+@media(prefers-reduced-motion:no-preference){
+  .chip,.offer__price b{transition:color .15s,background-color .15s,opacity .15s}
+}
+/* Énfasis: en «Más barata» el producto elegido pinta la cifra con «strong» y su
+   chip sube de peso y de borde; el otro (--muted) baja a gris. Sin precio
+   (--absent) siempre apagado. En «Más cerca» no hay énfasis: los dos en tinta.
+   Subirle el relleno al chip activo lo devolvía a 3.70:1. */
 .offer__price--on b{color:var(--product-strong)}
 .offer__price--on b small{color:color-mix(in srgb,var(--product-strong) 70%,var(--muted-foreground))}
-.offer__price--on .chip{--product:var(--product-strong);font-weight:700;background:color-mix(in srgb,var(--product) 26%,var(--card));border-color:color-mix(in srgb,var(--product) 65%,transparent)}
+.offer__price--on .chip{font-weight:700;border-color:color-mix(in srgb,var(--product) 65%,transparent)}
 .offer__price--muted b,.offer__price--absent b{color:var(--muted-foreground);font-weight:600}
-.offer__price--muted .chip,.offer__price--absent .chip{opacity:.5}
-.offer__distance{display:grid;gap:6px;justify-items:end;margin:0}
-.offer__distance b{font-size:var(--distance-size);font-weight:600;color:var(--muted-foreground);line-height:1;white-space:nowrap}
+.offer__price--muted .chip,.offer__price--absent .chip{--product-strong:var(--muted-foreground);border-color:color-mix(in srgb,var(--product) 24%,transparent)}
+
 .offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
 .offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
 .offer__identity{font-size:16px;font-weight:700;line-height:1.35}
-/* Logo sin retocar —activo oficial o recreación fiel, según declare su
-   procedencia— sobre una placa clara: así conserva sus colores de marca y se
-   lee igual en tema claro y en oscuro. */
-.offer__brand{display:inline-block;vertical-align:-3px;margin-right:6px;padding:2px 4px;border-radius:4px;background:#fff;box-shadow:0 0 0 1px color-mix(in srgb,var(--border) 18%,transparent)}
 .offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
 .offer__address{font-size:14.5px;line-height:1.35;text-align:right}
 .offer__freshness,.offer__district{color:var(--muted-foreground);font-size:13.5px}
-/* Tarjeta muda: la misma tarjeta sin su fila de precios, que es la más alta.
-   Reutiliza --muted-foreground, ya auditado a 4.5:1 en los dos temas. */
+.offer__district{text-align:right}
+.offer__silence{color:var(--muted-foreground);font-size:13.5px;font-weight:600}
+.offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+@media(max-width:340px){.offer__actions .button{padding-inline:10px;font-size:14px;letter-spacing:.02em}}
+/* La tarjeta muda es la misma sin su fila de precios, que es la más alta. */
 .offer--silent{padding:var(--s4) var(--s5)}
 .offer--silent .offer__grid{margin-bottom:var(--s3)}
-.offer__silence{color:var(--muted-foreground);font-size:13.5px;font-weight:600}
-.offer__district{text-align:right}
-.offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
 
-/* ── Panel de detalle ──────────────────────────────────────────────── */
+/* ── Capa de marca: la firma visual de la tarjeta ──────────────────────
+   Isotipo amplio y traslúcido que sangra por la esquina superior derecha, con
+   un halo tenue de su color. Va DETRÁS del contenido y no lo tiñe.
+   El `overflow:hidden` vive en la capa y no en el `<li>`: el anillo de foco
+   (`outline-offset:3px`) y el detalle desplegado quedan fuera y no se recortan.
+   El color lo elige un slug del registro controlado, nunca un dato publicado:
+   la CSP del sitio es `style-src 'self'` y aquí no hay estilo en línea. */
+.offer{--brand-mark-size:132px;--brand-mark-opacity:.34}
+.offer[data-brand="primax"]{--brand-halo:var(--halo-primax)}
+.offer[data-brand="repsol"]{--brand-halo:var(--halo-repsol)}
+.offer[data-brand="ava"]{--brand-halo:var(--halo-ava)}
+.offer[data-brand="petroperu"]{--brand-halo:var(--halo-petroperu)}
+/* Sin fila de precios la identidad sube a donde el isotipo es más denso. */
+.offer--silent{--brand-mark-size:96px;--brand-mark-opacity:.22}
+@media(max-width:340px){.offer{--brand-mark-size:118px}}
+.offer__brandmark{
+  position:absolute;
+  inset:0;
+  z-index:0;
+  overflow:hidden;
+  border-radius:inherit;
+  pointer-events:none;
+  background:radial-gradient(circle at 100% 0%,color-mix(in srgb,var(--brand-halo,transparent) calc(var(--brand-halo-alpha) * 100%),transparent),transparent 54%);
+}
+/* Caja cuadrada con `contain`: cuatro isotipos de proporciones muy distintas
+   pesan lo mismo en la composición sin recortarse ni deformarse. */
+.offer__brandmark img{
+  position:absolute;
+  top:calc(var(--brand-mark-size) * -.22);
+  right:calc(var(--brand-mark-size) * -.3);
+  width:var(--brand-mark-size);
+  height:var(--brand-mark-size);
+  object-fit:contain;
+  object-position:top right;
+  opacity:var(--brand-mark-opacity);
+  -webkit-mask-image:linear-gradient(to bottom left,#000 40%,transparent 88%);
+  mask-image:linear-gradient(to bottom left,#000 40%,transparent 88%);
+}
+/* El contenido sube sobre la capa. `.glass:after` —el canto— sigue encima de todo. */
+.offer>*:not(.offer__brandmark){position:relative;z-index:1}
+@media(forced-colors:active){.offer__brandmark{display:none}}
+/* Sin vidrio no hay desenfoque que atenúe la decoración contra el glow: la
+   marca y su halo bajan para que el dato siga mandando. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .offer{--brand-mark-opacity:.13}
+  :root{--brand-halo-alpha:.13}
+}
+
+/* ── Panel de detalle ──────────────────────────────────────────────────── */
 .offer__detail{margin-top:var(--s4);padding-top:var(--s4);border-top:1.5px solid color-mix(in srgb,var(--border) 28%,transparent);display:grid;gap:var(--s2)}
 .detail__row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s3);align-items:baseline}
 .detail__row .chip{align-self:center}
@@ -282,54 +590,89 @@ h3{font-size:16px;margin-bottom:6px}
 .detail__meta b{font-weight:600;color:var(--foreground)}
 .offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:40px}
 
-/* ── Adaptaciones ──────────────────────────────────────────────────── */
-@media(max-width:340px){:root{--price-size:21px;--distance-size:16px}.glass{padding:var(--s4)}.offer__topline{gap:var(--s1)}.offer__actions .button{padding-inline:10px;font-size:14px;letter-spacing:.02em}}
-@media(forced-colors:active){.glass,.plate,.toggle,.button,.chip{border:2px solid ButtonText}}
-@media(prefers-reduced-motion:no-preference){
-  .toggle button,.chip,.offer__price b{transition:color .15s,background-color .15s,opacity .15s}
-  .controls__panel{transition:grid-template-rows var(--controls-ease) ease}
-  .controls__inner{transition:padding var(--controls-ease) ease}
-  .controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--controls-ease) ease,visibility 0s var(--controls-ease)}
-  .dot{animation:breathe 2.6s ease-in-out infinite}
-  @keyframes breathe{0%,100%{opacity:.28}50%{opacity:1}}
+/* ── Firma ─────────────────────────────────────────────────────────────
+   Pie del documento, fuera de `main`: aparece en la portada y en el 404 porque
+   vive fuera de los pasos que se ocultan. */
+.firma{
+  width:min(100%,520px);
+  margin:0 auto;
+  padding:0 var(--s4) var(--s5);
+  color:var(--muted-foreground);
+  font-size:12.5px;
+  line-height:1.5;
+  text-align:center;
 }
+.firma a{color:var(--accent);text-underline-offset:4px}
 
-/* Histórico de precios. Bloque de contexto en la portada: no compite con las
-   acciones, no depende de GPS y nunca manda la app a un estado fatal. */
-.history{text-align:left;min-height:var(--chart-h);display:grid;gap:var(--s2);align-content:start}
-/* Los ítems de un grid traen `min-width:auto`: sin esto, la tabla de 30 filas
-   ensancha la fila entera y el bloque desborda su tarjeta a 320 px. */
+/* ── Pulso de precios ──────────────────────────────────────────────────
+   Bloque de contexto en la portada: no compite con las acciones, no depende de
+   GPS y nunca manda la app a un estado fatal.
+   Un plano y cuatro líneas. Las dos series comparten calendario y una sola
+   escala en soles reales. El COLOR dice el producto —el mismo de su chip en la
+   tarjeta— y el TRAZO dice la función: continuo lo observado, discontinuo el
+   promedio del periodo. Ninguna curva depende del color para reconocerse:
+   lleva su nombre junto al último punto. */
+.history{
+  margin-top:var(--s3);
+  display:grid;
+  gap:var(--s3);
+  align-content:start;
+  text-align:left;
+  /* El lienzo escala con el ancho, así que la etiqueta sube de unidades para
+     seguir midiendo 12 px reales cuando el trazado se encoge. */
+  --chart-label-size:12.5px;
+  --chart-reserva:470px;
+}
+@media(max-width:340px){.history{--chart-label-size:16px;--chart-reserva:440px}}
+/* El alto se reserva solo cuando va a llegar un gráfico: así la portada no salta
+   al cargar, y un bloque que acaba en una línea de error no deja un hueco. */
+.history:not([data-state=error]):not([data-state=empty]){min-height:var(--chart-reserva)}
+/* Los ítems de un grid traen `min-width:auto`: sin esto el SVG no se encoge y
+   el bloque desborda su tarjeta a 320 px. */
 .history>*{min-width:0}
-.history h2{font-size:15px;margin:0}
-.history__sub{margin:0;color:var(--muted-foreground);font-size:12px}
-.history__nota{margin:0;color:var(--muted-foreground);font-size:12px}
-.history__ventanas{justify-self:start}
-.history__ventanas button{white-space:nowrap;padding:0 var(--s3);flex:0 0 auto}
-.history__svg{width:100%;height:auto;display:block;touch-action:pan-y}
-.history__svg:focus-visible{outline:2px solid var(--ring);outline-offset:3px;border-radius:var(--radius-small)}
-.history__tick line{stroke:var(--border);stroke-width:.6}
-.history__tick text,.history__eje-x{fill:var(--muted-foreground);font-size:8px;font-family:var(--font)}
-.history__guia{stroke:var(--muted-foreground);stroke-width:.8;stroke-dasharray:2 2}
-.history__linea{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-[data-serie=regular] .history__linea,[data-serie=regular] .history__solo{stroke:var(--product-regular-strong)}
-[data-serie=premium] .history__linea,[data-serie=premium] .history__solo{stroke:var(--product-premium-strong)}
-[data-serie=regular]{fill:var(--product-regular-strong);stroke:var(--product-regular-strong)}
-[data-serie=premium]{fill:var(--product-premium-strong);stroke:var(--product-premium-strong)}
-.history__solo{fill:none;stroke-width:1.8}
-.history__activo{fill:var(--card);stroke-width:2}
-.history__leyenda{list-style:none;margin:0;padding:0;display:flex;gap:var(--s4);font-size:12px;color:var(--muted-foreground)}
-.history__leyenda li{display:flex;align-items:center;gap:var(--s1)}
-.history__leyenda svg{width:20px;height:10px;stroke-width:1.8}
-.history__n{margin-left:var(--s1);font-variant-numeric:tabular-nums;color:var(--muted-foreground)}
-.history__lectura{margin:0;font-size:12px;min-height:2.4em}
-.history__curso{color:var(--muted-foreground);font-size:11px}
-.history__tabla summary,.history__como summary{cursor:pointer;font-size:12px;color:var(--muted-foreground);min-height:44px;display:flex;align-items:center}
-.history__como p{margin:0 0 var(--s2);font-size:12px;color:var(--muted-foreground)}
-/* Treinta filas no caben a 360 px: la tabla se desplaza dentro de su caja y la
-   página nunca gana una barra horizontal. */
-.history__scroll{overflow-x:auto;max-height:280px;overflow-y:auto}
-.history__tabla table{border-collapse:collapse;font-size:12px;width:100%}
-.history__tabla th,.history__tabla td{padding:var(--s1) var(--s2);text-align:right;white-space:nowrap;border-bottom:1px solid var(--border)}
-.history__tabla th[scope=row]{text-align:left;font-weight:500}
-.history__tabla thead th{color:var(--muted-foreground);font-weight:500}
-.history[data-state=loading] .history__svg,.history[data-state=error] .history__svg{display:none}
+.history h2{font-size:16px;margin:0}
+.history__sub{margin:0;color:var(--muted-foreground);font-size:12.5px}
+/* Las dos lecturas en columnas sobre el trazado. */
+.history__lecturas{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+/* Un solo sitio decide el color de cada serie, igual que `[data-key]` en la
+   tarjeta: la lectura y su grupo del SVG heredan `--serie`. */
+[data-serie="regular"]{--serie:var(--product-regular-strong)}
+[data-serie="premium"]{--serie:var(--product-premium-strong)}
+.history__lectura-producto{display:grid;gap:2px;min-width:0}
+.history__producto{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--serie)}
+/* El último promedio se lee en reposo, sin tocar nada: es la lectura principal. */
+.history__valor{margin:0;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:1.1;color:var(--foreground)}
+.history__valor small{font-size:14px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
+.history__valor--vacio{color:var(--muted-foreground);font-weight:600}
+.history__meta{margin:0;font-size:12.5px;color:var(--muted-foreground)}
+.history__svg{width:100%;height:auto;display:block;margin-top:var(--s1);touch-action:pan-y;overflow:visible}
+.history__svg:focus-visible{outline:3px solid var(--ring);outline-offset:3px;border-radius:var(--radius-small)}
+.history__tick line{stroke:var(--border);stroke-width:.7;opacity:.45}
+.history__tick text,.history__eje-x{fill:var(--muted-foreground);font-size:var(--chart-label-size);font-family:var(--font)}
+/* El número del día manda sobre su abreviatura de semana. */
+.history__eje-dia{font-weight:700}
+@media(max-width:340px){.history__eje-x[data-alterna="1"]{display:none}}
+.history__guia{stroke:var(--muted-foreground);stroke-width:1;stroke-dasharray:2 3}
+.history__linea{fill:none;stroke:var(--serie);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.history__solo{fill:none;stroke:var(--serie);stroke-width:2.2}
+.history__area{stroke:none}
+/* El degradado es decoración: se apaga a poca distancia de su propia curva y
+   nunca llega al territorio de la otra serie. */
+.history__fill-alto{stop-color:var(--serie);stop-opacity:var(--chart-fill-alpha)}
+.history__fill-medio{stop-color:var(--serie);stop-opacity:calc(var(--chart-fill-alpha) * .35)}
+.history__fill-bajo{stop-color:var(--serie);stop-opacity:0}
+/* El discontinuo está reservado al promedio del periodo: ninguna serie observada
+   lo usa. Su color es el de la serie tirado hacia la tinta: el color pleno cae a
+   2.41:1 contra el relleno de su propia serie, que es justo lo que puede cruzar.
+   El 72 % lo lee scripts/contrast.mjs. */
+.history__promedio{--serie-ref:color-mix(in srgb,var(--serie) 72%,var(--foreground))}
+.history__promedio line{stroke:var(--serie-ref);stroke-width:1.4;stroke-dasharray:6 4}
+.history__promedio text{fill:var(--serie-ref);font-size:var(--chart-label-size);font-family:var(--font);font-weight:600}
+/* El nombre del producto junto a su último punto: la señal que sustituye a las
+   franjas separadas cuando las dos curvas comparten plano. */
+.history__serie-nombre{fill:var(--serie);font-size:var(--chart-label-size);font-family:var(--font);font-weight:700;letter-spacing:.06em}
+.history__ultimo{fill:var(--serie);stroke:var(--card);stroke-width:1.8}
+.history__activo{fill:var(--card);stroke:var(--serie);stroke-width:2.4}
+.history__lectura{margin:0;font-size:12.5px;color:var(--foreground);min-height:1.5em}
+.history__nota,.history__cargando{margin:0;color:var(--muted-foreground);font-size:12.5px}
+.history[data-state=loading] .history__lectura,.history[data-state=error] .history__lectura{display:none}

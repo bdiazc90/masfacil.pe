@@ -13,16 +13,17 @@
  * versión. No hay segundo paso que olvidar.
  *
  * Se deriva de REFERENCIAS y de REGLAS, nunca del directorio: un archivo suelto
- * dentro de `web/` no viaja por estar ahí. Un SVG de marca entra solo si su
- * slug está en `BRAND_LOGOS`, y un icono solo si lo referencia `index.html` o
- * el manifiesto de la PWA.
+ * dentro de `web/` no viaja por estar ahí. Un SVG de marca entra solo si es una
+ * variante registrada en `BRAND_LOGOS` —el mismo recorrido `brandAssets()` que
+ * usan el verificador y la tarjeta—, y un icono solo si lo referencia
+ * `index.html` o el manifiesto de la PWA.
  */
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BRAND_LOGOS, brandLogoPath } from '../web/brand-logos.js';
+import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
 import { shellEntryFile, svgProblems } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,11 +67,10 @@ export function deriveShell({ root = rootFromModule } = {}) {
   const webRoot = path.join(root, 'web');
   const problems = [];
   const marcas = [];
-  for (const [clave, entry] of Object.entries(BRAND_LOGOS)) {
-    const ruta = brandLogoPath(entry.slug);
+  for (const { key, role, path: ruta } of brandAssets(BRAND_LOGOS)) {
     const archivo = path.join(root, shellEntryFile(ruta));
-    if (!fs.existsSync(archivo)) { problems.push(`${clave}: ${ruta} está registrado y no existe en el árbol`); continue; }
-    for (const motivo of svgProblems(fs.readFileSync(archivo, 'utf8'))) problems.push(`${clave}: ${ruta} ${motivo}`);
+    if (!fs.existsSync(archivo)) { problems.push(`${key}.${role}: ${ruta} está registrado y no existe en el árbol`); continue; }
+    for (const motivo of svgProblems(fs.readFileSync(archivo, 'utf8'))) problems.push(`${key}.${role}: ${ruta} ${motivo}`);
     marcas.push(ruta);
   }
   const entries = ['/', '/styles.css', '/manifest.webmanifest', ...modulosDelCliente(webRoot), ...iconosReferenciados(webRoot), ...ordenar(marcas)];

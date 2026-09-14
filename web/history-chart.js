@@ -1,138 +1,323 @@
 /**
- * Precio promedio en Lima: dos líneas en la pantalla inicial.
+ * Pulso de precios: un plano y cuatro líneas en la pantalla inicial.
  *
  * Se monta fuera del arranque de precios y NUNCA rechaza: si el resumen no
  * llega, no vale o todavía no hay días, el bloque lo cuenta dentro de sí mismo.
  * Buscar gasolina no puede fallar porque un gráfico de contexto no cargue.
  *
+ * Los dos combustibles comparten trazado, calendario y **una sola escala en
+ * soles reales**: es el precio que de verdad tienen, así que la brecha entre
+ * Regular y Premium se lee tal cual. El coste está aceptado y declarado: con los
+ * dos dentro, cada curva recorre menos altura que cuando tenía su propio eje.
+ *
+ * Cuatro líneas, dos señales para distinguirlas. El COLOR dice el producto —el
+ * mismo de su chip en la tarjeta— y el TRAZO dice la función: continuo para lo
+ * observado, discontinuo para el promedio del periodo. Además cada curva lleva
+ * su nombre junto al último punto, así que nadie depende del color solo ni tiene
+ * que consultar una leyenda.
+ *
+ * Aquí no se interpreta: fechas, producto, unidad, promedio y estados de datos
+ * son etiquetas informativas. Ninguna frase dice si el precio está alto, bajo o
+ * si conviene cargar.
+ *
  * El SVG se arma con plantillas de string, como las tarjetas de oferta: con
- * sesenta puntos, repintar entero al cambiar de ventana sale más barato —y se
- * lee mucho mejor— que mantener nodos vivos.
+ * siete puntos, repintar entero sale más barato —y se lee mucho mejor— que
+ * mantener nodos vivos. Lo que NO se repinta es ni la región viva ni el nodo que
+ * tiene el foco: la selección de un día solo reescribe sus dos capas, para que
+ * un lector de pantalla anuncie lo que la persona eligió y no toda la gráfica.
  */
 
-import { HISTORY_ORIGIN, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from './lib/history-contract.js';
-import { DEFAULT_WINDOW, HISTORY_WINDOWS, STALE_HOURS, demoSummary, frameWindow, lastCounts, segments, sharedScale, staleHours } from './lib/history-series.js';
+import { HISTORY_MAX_DAYS, HISTORY_ORIGIN, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from './lib/history-contract.js';
+import { DEFAULT_WINDOW, STALE_HOURS, areaPath, demoSummary, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, staleHours } from './lib/history-series.js';
 import { escapeHtml } from './offer-card.js';
 
 const GUARDADO = 'masfacil-history-daily-v1';
-const SOLES = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const DIA_CORTO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-const DIA_LARGO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-const HORA = new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' });
+const DIA_SEMANA = new Intl.DateTimeFormat('es-PE', { weekday: 'short', timeZone: 'UTC' });
+const DIA_NUMERO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', timeZone: 'UTC' });
+const DIA_LARGO = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 
 const PRODUCTOS = Object.freeze([
-  { key: 'regular', label: 'Regular', dash: '', marca: 'circulo' },
-  { key: 'premium', label: 'Premium', dash: '5 3', marca: 'cuadro' },
+  { key: 'regular', label: 'Regular' },
+  { key: 'premium', label: 'Premium' },
 ]);
 
-// Lienzo fijo con `viewBox`: escala a cualquier ancho sin recalcular nada y sin
-// desbordar a 320 px. Los márgenes dejan sitio a las etiquetas de los dos ejes.
-const W = 320; const H = 148; const PAD = Object.freeze({ arriba: 8, derecha: 6, abajo: 22, izquierda: 34 });
+// Lienzo único, con `viewBox`: escala a cualquier ancho sin recalcular nada y sin
+// desbordar a 320 px. El margen izquierdo deja sitio a las cifras del eje y el
+// inferior a las fechas, las dos a 12 px reales.
+//
+// El trazado sube a 220 porque ahora carga con las dos series: entre ellas hay
+// más de un sol de distancia, y con menos altura cada curva se aplanaría.
+const W = 320;
+const TRAZADO = 220;
+// El margen izquierdo lo fija la cifra más ancha del eje a su tamaño mayor:
+// bajo 340 px la etiqueta sube a 16 unidades para seguir midiendo 12 px reales,
+// y «22.80» ocupa entonces unas 44. Con menos, la cifra se saldría del lienzo.
+const PAD = Object.freeze({ arriba: 12, derecha: 10, abajo: 40, izquierda: 50 });
+const H = PAD.arriba + TRAZADO + PAD.abajo;
 const ANCHO = W - PAD.izquierda - PAD.derecha;
-const ALTO = H - PAD.arriba - PAD.abajo;
+const BASE = PAD.arriba + TRAZADO;
 
-const fecha = (date, formato = DIA_CORTO) => formato.format(new Date(`${date}T12:00:00Z`));
+// Los ids de gradiente viven en el documento de la página, no en un SVG aislado:
+// dos series y dos montajes tienen que poder convivir sin pisarse.
+let secuencia = 0;
+
+// Alto del faldón de relleno, en unidades del lienzo.
+//
+// El área ya no cierra contra el suelo del plano: con las dos series juntas, el
+// relleno de Premium taparía la curva de Regular entera y las dos tintas se
+// apilarían abajo, que es justo lo que un área por producto no debe sugerir. El
+// degradado se ancla al techo de su propia curva y muere aquí; más abajo el
+// gradiente hace `pad` con la parada transparente.
+const FALDON = 56;
+
 const numero = (valor) => (Number.isFinite(valor) ? Number(valor.toFixed(2)) : 0);
-const soles = (valor) => (Number.isFinite(valor) ? SOLES.format(valor) : '—');
+const fecha = (date, formato = DIA_CORTO) => formato.format(new Date(`${date}T12:00:00Z`));
+const dosDecimales = (valor) => valor.toFixed(2);
+const cifra = (valor) => `<small>S/</small>${escapeHtml(dosDecimales(valor))}`;
 
-function coordenadas(points, scale, days) {
+function coordenadas(scale, days) {
   const paso = days > 1 ? ANCHO / (days - 1) : 0;
   const x = (index) => numero(PAD.izquierda + (days > 1 ? index * paso : ANCHO / 2));
-  const y = (mean) => numero(PAD.arriba + ALTO - ((mean - scale.min) / (scale.max - scale.min)) * ALTO);
+  const y = (mean) => numero(PAD.arriba + TRAZADO - ((mean - scale.min) / (scale.max - scale.min)) * TRAZADO);
   return { x, y, paso };
 }
 
-function pintarSerie(points, scale, days, producto) {
-  const { x, y } = coordenadas(points, scale, days);
-  const tramos = segments(points, producto.key);
-  const piezas = tramos.map((tramo) => {
-    if (tramo.length === 1) return `<circle class="history__solo" cx="${x(tramo[0].index)}" cy="${y(tramo[0].mean)}" r="3.2"/>`;
-    return `<path class="history__linea" d="${tramo.map((punto, indice) => `${indice ? 'L' : 'M'}${x(punto.index)} ${y(punto.mean)}`).join(' ')}" stroke-dasharray="${producto.dash}"/>`;
-  });
-  return `<g class="history__serie" data-serie="${producto.key}" aria-hidden="true">${piezas.join('')}</g>`;
+/** Fechas del eje: todas con siete días; espaciadas desde el final con catorce. */
+function marcasX(points, days) {
+  const paso = days <= 7 ? 1 : 3;
+  const indices = [];
+  for (let i = days - 1; i >= 0; i -= paso) indices.push(i);
+  return indices.reverse().map((index) => points[index]).filter(Boolean);
 }
 
-function pintarMarcadores(points, scale, days, producto) {
-  const { x, y } = coordenadas(points, scale, days);
-  const marcas = points.filter((punto) => punto[producto.key]).map((punto) => (producto.marca === 'cuadro'
-    ? `<rect x="${numero(x(punto.index) - 2.4)}" y="${numero(y(punto[producto.key].mean) - 2.4)}" width="4.8" height="4.8"/>`
-    : `<circle cx="${x(punto.index)}" cy="${y(punto[producto.key].mean)}" r="2.6"/>`));
-  return `<g class="history__marcas" data-serie="${producto.key}" aria-hidden="true">${marcas.join('')}</g>`;
+/**
+ * Una fecha del eje, en dos renglones: día de semana arriba y número abajo.
+ *
+ * Con siete días etiquetados y el mínimo de 12 px reales, «lun 7» en una línea
+ * ocupa casi toda su ranura y las etiquetas se tocan. Partiéndola cada una mide
+ * la mitad, se etiquetan los siete días y el día de semana sigue leyéndose.
+ */
+function etiquetaX(punto, days) {
+  const x = punto.x;
+  const arriba = punto.isToday ? 'Hoy' : fecha(punto.date, days <= 7 ? DIA_SEMANA : DIA_CORTO);
+  if (days > 7) return `<text class="history__eje-x" x="${x}" y="${H - 22}" text-anchor="${punto.ancla}">${escapeHtml(arriba)}</text>`;
+  // Bajo 340 px el lienzo se encoge y las siete no caben: el CSS esconde una de
+  // cada dos contando desde hoy, que es la que nunca se va. Se decide por ancho
+  // real, no por una consulta de medios desde JavaScript.
+  const alterna = (days - 1 - punto.index) % 2 === 1 ? ' data-alterna="1"' : '';
+  return `<text class="history__eje-x" x="${x}" y="${H - 24}" text-anchor="${punto.ancla}"${alterna}>${escapeHtml(arriba)}</text>`
+    + `<text class="history__eje-x history__eje-dia" x="${x}" y="${H - 8}" text-anchor="${punto.ancla}"${alterna}>${escapeHtml(fecha(punto.date, DIA_NUMERO))}</text>`;
 }
 
-function pintarEjes(points, scale, days, seleccion) {
-  const { x, y } = coordenadas(points, scale, days);
-  const marcasY = scale.ticks.map((valor) => `<g class="history__tick"><line x1="${PAD.izquierda}" y1="${y(valor)}" x2="${W - PAD.derecha}" y2="${y(valor)}"/><text x="${PAD.izquierda - 5}" y="${numero(y(valor) + 3)}" text-anchor="end">${valor.toFixed(2)}</text></g>`).join('');
-  // Solo tres etiquetas en X: con 30 días, una por punto sería ilegible.
-  const indices = days > 2 ? [0, Math.floor((days - 1) / 2), days - 1] : points.map((punto) => punto.index);
-  const marcasX = [...new Set(indices)].map((index) => {
-    const punto = points[index];
-    const ancla = index === 0 ? 'start' : index === days - 1 ? 'end' : 'middle';
-    return `<text class="history__eje-x" x="${x(index)}" y="${H - 6}" text-anchor="${ancla}">${escapeHtml(punto.isToday ? 'Hoy' : fecha(punto.date))}</text>`;
+function pintarEjes(points, scale, days, { x, y }, alturasPromedio = []) {
+  // La cifra de una marca que cae encima de una referencia se calla: la línea
+  // sigue ahí, pero dos números pegados a la misma altura no se leen. Nunca se
+  // deja al lado dos cifras sin decir qué es cada una.
+  const marcasY = scale.ticks.map((valor) => {
+    const altura = y(valor);
+    const choca = alturasPromedio.some((suya) => Math.abs(altura - suya) < 7);
+    return `<g class="history__tick"><line x1="${PAD.izquierda}" y1="${altura}" x2="${W - PAD.derecha}" y2="${altura}"/>${choca ? '' : `<text x="${PAD.izquierda - 6}" y="${numero(altura + 4)}" text-anchor="end">${dosDecimales(valor)}</text>`}</g>`;
   }).join('');
-  const guia = seleccion === null ? '' : `<line class="history__guia" x1="${x(seleccion)}" y1="${PAD.arriba}" x2="${x(seleccion)}" y2="${PAD.arriba + ALTO}"/>`;
-  return `${marcasY}${guia}${marcasX}`;
+  const etiquetas = marcasX(points, days).map((punto) => etiquetaX({
+    ...punto,
+    x: x(punto.index),
+    ancla: punto.index === 0 ? 'start' : punto.index === days - 1 ? 'end' : 'middle',
+  }, days)).join('');
+  return `${marcasY}${etiquetas}`;
 }
 
-function pintarSeleccion(points, scale, days, seleccion) {
+/**
+ * Curva, relleno y puntos de una franja.
+ *
+ * Un hueco corta los dos: ni la línea ni el área lo atraviesan. Un tramo de un
+ * solo día se pinta como punto y no arrastra relleno, porque un área de ancho
+ * cero no describe nada.
+ */
+function pintarSerie(points, key, coords, uid) {
+  const tramos = segments(points, key);
+  const areas = tramos.map((tramo) => (tramo.length > 1 ? `<path class="history__area" d="${areaPath(tramo, coords.x, coords.y, BASE)}" fill="url(#${uid}-fill-${key})"/>` : '')).join('');
+  const lineas = tramos.map((tramo) => (tramo.length > 1
+    ? `<path class="history__linea" d="${monotonePath(tramo, coords.x, coords.y)}"/>`
+    : `<circle class="history__solo" cx="${coords.x(tramo[0].index)}" cy="${coords.y(tramo[0].mean)}" r="3.4"/>`)).join('');
+  return `${areas}${lineas}`;
+}
+
+/**
+ * El gradiente del faldón de una serie, anclado a su propia curva.
+ *
+ * `userSpaceOnUse` desde el punto más alto de la serie hasta `FALDON` más abajo.
+ * El `d` del área sigue cerrando contra el suelo; lo que cambia es dónde muere
+ * el color, y por eso una serie no puede teñir el territorio de la otra.
+ */
+function faldon(points, key, coords, uid) {
+  const alturas = points.map((punto) => punto[key]?.mean).filter(Number.isFinite).map(coords.y);
+  if (!alturas.length) return '';
+  const techo = Math.min(...alturas);
+  // Tres paradas: sin la intermedia el degradado se apaga de golpe y se le ve
+  // el corte, porque el faldón es corto.
+  return `<linearGradient id="${uid}-fill-${key}" x1="0" y1="${numero(techo)}" x2="0" y2="${numero(techo + FALDON)}" gradientUnits="userSpaceOnUse"><stop class="history__fill-alto" offset="0"/><stop class="history__fill-medio" offset=".55"/><stop class="history__fill-bajo" offset="1"/></linearGradient>`;
+}
+
+/**
+ * El último día observado, destacado y con el nombre de su producto al lado.
+ *
+ * La etiqueta es la señal que sustituye a las franjas separadas: con las dos
+ * curvas en el mismo plano, distinguirlas no puede depender solo del color.
+ * Va sobre el punto y anclada a la derecha, al extremo opuesto de la cifra del
+ * promedio, para que las dos etiquetas de un producto nunca se crucen.
+ */
+function pintarUltimo(ultimo, label, coords) {
+  if (!ultimo) return '';
+  const x = coords.x(ultimo.index);
+  const y = coords.y(ultimo.mean);
+  const arriba = y > PAD.arriba + 20;
+  return `<text class="history__serie-nombre" x="${numero(x + 2)}" y="${numero(arriba ? y - 11 : y + 20)}" text-anchor="end">${escapeHtml(label.toLocaleUpperCase('es-PE'))}</text>`
+    + `<circle class="history__ultimo" cx="${x}" cy="${y}" r="4.6"/>`;
+}
+
+/**
+ * La recta del promedio del periodo, discontinua y con su valor.
+ *
+ * El patrón discontinuo está RESERVADO a esta referencia: las dos curvas son
+ * continuas, así que una línea a trazos solo puede significar «promedio».
+ * Con un solo día válido no se dibuja: repetiría el mismo número.
+ */
+function pintarPromedio(promedio, coords) {
+  if (!promedio || promedio.k < 2) return '';
+  const y = coords.y(promedio.mean);
+  // La etiqueta sube o baja según dónde caiga la recta, para no salirse del
+  // trazado ni chocar con la cifra del último punto cuando ambos coinciden.
+  const arriba = y > PAD.arriba + 22;
+  return `<g class="history__promedio"><line x1="${PAD.izquierda}" y1="${y}" x2="${W - PAD.derecha}" y2="${y}"/><text x="${PAD.izquierda + 2}" y="${numero(arriba ? y - 6 : y + 14)}">Prom. ${escapeHtml(dosDecimales(promedio.mean))}</text></g>`;
+}
+
+/**
+ * Guía y marcador del día elegido.
+ *
+ * Viven en dos capas propias —una bajo las curvas y otra encima— para poder
+ * moverlas SIN rehacer el `<svg>`. Reconstruir el nodo que tiene el foco obliga
+ * al lector de pantalla a releer su nombre entero en cada flecha, y le devuelve
+ * el foco a un elemento que acaba de nacer.
+ */
+function pintarGuia(seleccion, coords) {
   if (seleccion === null) return '';
-  const { x, y } = coordenadas(points, scale, days);
-  const punto = points[seleccion];
-  return PRODUCTOS.filter((producto) => punto[producto.key]).map((producto) => `<circle class="history__activo" data-serie="${producto.key}" cx="${x(punto.index)}" cy="${y(punto[producto.key].mean)}" r="4.4"/>`).join('');
+  return `<line class="history__guia" x1="${coords.x(seleccion)}" y1="${PAD.arriba}" x2="${coords.x(seleccion)}" y2="${BASE}"/>`;
 }
 
-function lectura(punto) {
-  if (!punto) return 'Toca o usa las flechas para ver un día.';
-  if (!punto.observation) return `${fecha(punto.date, DIA_LARGO)}: no se pudo registrar el precio de ese día.`;
-  const partes = PRODUCTOS.map((producto) => `${producto.label} ${soles(punto[producto.key]?.mean)}${punto[producto.key] ? ` con ${punto[producto.key].n} estaciones` : ''}`);
-  const hora = HORA.format(new Date(punto.observation.observed_at));
-  return `${fecha(punto.date, DIA_LARGO)}${punto.isToday ? ' (en curso)' : ''}: ${partes.join('; ')}. Al corte de las ${hora}.`;
+function pintarActivo(points, key, seleccion, coords) {
+  if (seleccion === null) return '';
+  const dato = points[seleccion]?.[key];
+  if (!dato) return '';
+  return `<circle class="history__activo" data-serie="${key}" cx="${coords.x(seleccion)}" cy="${coords.y(dato.mean)}" r="5"/>`;
 }
 
-function pintarTabla(points) {
+/**
+ * La geometría del plano, recalculada del marco. Pura y barata.
+ *
+ * Devuelve una sola escala y unas solas coordenadas, más lo que cada serie
+ * aporta: su último punto y su promedio del periodo.
+ */
+function geometria(points, days) {
+  const series = PRODUCTOS.map((producto) => ({
+    ...producto,
+    ultimo: lastPoint(points, producto.key),
+    promedio: periodAverage(points, producto.key),
+  }));
+  const scale = planeScale(points, series.map(({ key, promedio }) => ({ key, average: promedio?.k >= 2 ? promedio.mean : null })));
+  return { series, scale, coords: coordenadas(scale, days) };
+}
+
+/**
+ * Lectura accesible de la franja: un día por elemento, sin parada de teclado.
+ *
+ * Sustituye a la tabla desplegable que se retiró. Retirar la tabla no puede
+ * quitar el acceso a los valores; un listado que solo ven las tecnologías de
+ * asistencia lo conserva sin ocupar pantalla ni añadir un tab por punto.
+ */
+function pintarLista(points, id) {
   const filas = points.map((punto) => {
-    const celdas = PRODUCTOS.map((producto) => `<td>${escapeHtml(soles(punto[producto.key]?.mean))}</td><td>${punto[producto.key] ? punto[producto.key].n : '—'}</td>`).join('');
-    const hora = punto.observation ? HORA.format(new Date(punto.observation.observed_at)) : '—';
-    return `<tr><th scope="row">${escapeHtml(fecha(punto.date))}${punto.isToday ? ' <span class="history__curso">en curso</span>' : ''}</th>${celdas}<td>${escapeHtml(hora)}</td></tr>`;
+    const dia = `${fecha(punto.date, DIA_LARGO)}${punto.isToday ? ' (hoy, en curso)' : ''}`;
+    const partes = PRODUCTOS.map((producto) => {
+      const dato = punto[producto.key];
+      return `${producto.label} ${dato ? `S/ ${dosDecimales(dato.mean)} con ${dato.n} estaciones` : 'sin dato'}`;
+    });
+    return `<li>${escapeHtml(`${dia}: ${partes.join('; ')}.`)}</li>`;
   }).join('');
-  return `<details class="history__tabla"><summary>Ver la tabla</summary><div class="history__scroll"><table><caption class="sr-only">Precio promedio por día, con cuántas estaciones lo formaron</caption><thead><tr><th scope="col">Día</th><th scope="col">Regular</th><th scope="col">n</th><th scope="col">Premium</th><th scope="col">n</th><th scope="col">Corte</th></tr></thead><tbody>${filas}</tbody></table></div></details>`;
+  // Región hermana con nombre propio, NO `aria-describedby` del gráfico: colgada
+  // del foco, el lector recitaría los catorce días cada vez que se entra en el
+  // trazado. Así el dato sigue disponible y se alcanza navegando.
+  return `<section class="sr-only" id="${id}" aria-label="Precio promedio día a día"><ul>${filas}</ul></section>`;
 }
 
-// La media nunca viaja sin su denominador: la leyenda lleva el `n` del último
-// punto con dato de cada producto, visible sin tocar ni pasar el puntero.
-function pintarLeyenda(points) {
-  const conteos = lastCounts(points);
-  return `<ul class="history__leyenda">${PRODUCTOS.map((producto) => `<li data-serie="${producto.key}"><svg viewBox="0 0 20 10" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><line x1="1" y1="5" x2="19" y2="5" stroke-dasharray="${producto.dash}"/>${producto.marca === 'cuadro' ? '<rect x="7.6" y="2.6" width="4.8" height="4.8"/>' : '<circle cx="10" cy="5" r="2.6"/>'}</svg>${producto.label}${conteos[producto.key] === null ? '' : `<span class="history__n">n ${conteos[producto.key]}</span>`}</li>`).join('')}</ul>`;
+/** Las dos lecturas grandes, una por combustible, sobre el trazado. */
+function pintarLecturas(marco) {
+  const { points } = marco;
+  return `<div class="history__lecturas">${PRODUCTOS.map((producto) => {
+    const ultimo = lastPoint(points, producto.key);
+    // Fecha y población, nada más: el subtítulo del bloque ya dice de qué
+    // ventana se habla, y la hora del corte pertenece a la lectura de un día.
+    const cuerpo = ultimo
+      ? `<p class="history__valor">${cifra(ultimo.mean)}</p><p class="history__meta"><time datetime="${escapeHtml(ultimo.observedAt ?? ultimo.date)}">${escapeHtml(fecha(ultimo.date))}</time> · ${ultimo.n} grifos</p>`
+      : '<p class="history__valor history__valor--vacio" aria-hidden="true">—</p><p class="history__meta">Sin días registrados en esta ventana.</p>';
+    return `<div class="history__lectura-producto" data-serie="${producto.key}"><h3 class="history__producto">${producto.label}</h3>${cuerpo}</div>`;
+  }).join('')}</div>`;
 }
 
-function pintarSelector(days) {
-  return `<div class="toggle toggle--sub history__ventanas" role="group" aria-label="Días a mostrar">${HISTORY_WINDOWS.map((valor) => `<button type="button" data-window="${valor}" aria-pressed="${valor === days}">${valor} d</button>`).join('')}</div>`;
-}
-
-function pintarGrafico(marco, seleccion) {
+/**
+ * El trazado: un lienzo, las dos series y sus dos referencias.
+ *
+ * Se pintan en orden `premium` → `regular` para que la curva de abajo quede
+ * encima si alguna vez se acercan. Con el faldón no llegan a tocarse —la brecha
+ * ronda los 130 de 220—, así que el orden es una red de seguridad barata, no el
+ * mecanismo que las separa.
+ *
+ * Las dos capas de selección nacen vacías y son lo ÚNICO que se reescribe al
+ * elegir un día: el `<svg>`, su nombre accesible y el foco sobreviven.
+ */
+function pintarPlano(marco, uid, listaId) {
   const { points, days } = marco;
-  const scale = sharedScale(points);
+  const { series, scale, coords } = geometria(points, days);
   if (scale.empty) return '';
-  const capas = [
-    pintarEjes(points, scale, days, seleccion),
-    ...PRODUCTOS.map((producto) => pintarSerie(points, scale, days, producto)),
-    ...PRODUCTOS.map((producto) => pintarMarcadores(points, scale, days, producto)),
-    pintarSeleccion(points, scale, days, seleccion),
-  ];
-  // El blanco táctil es el SVG entero: a 30 días cada ranura mide unos diez
-  // píxeles, y un rectángulo por punto quedaría muy por debajo de los 44 px.
-  return `<svg class="history__svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="group" tabindex="0" aria-label="Precio promedio diario de Regular y Premium en Lima. Usa las flechas para recorrer los días.">${capas.join('')}</svg>`;
+
+  const conDatos = series.filter((serie) => serie.ultimo);
+  const orden = [...series].reverse();
+  const resumen = `Precio promedio diario en Lima. ${conDatos.map((serie) => `${serie.label}: último S/ ${dosDecimales(serie.ultimo.mean)} del ${fecha(serie.ultimo.date, DIA_LARGO)} con ${serie.ultimo.n} estaciones${serie.promedio?.k >= 2 ? `, promedio de ${serie.promedio.k} días S/ ${dosDecimales(serie.promedio.mean)}` : ''}`).join('. ')}. Usa las flechas para recorrer los días.`;
+
+  // El blanco táctil es el trazado entero: a catorce días cada ranura mide unos
+  // veinte píxeles, y un rectángulo por punto quedaría muy por debajo de 44 px.
+  return `<svg class="history__svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="group" tabindex="0" aria-label="${escapeHtml(resumen)}">`
+    + `<defs>${orden.map((serie) => faldon(points, serie.key, coords, uid)).join('')}</defs>`
+    + pintarEjes(points, scale, days, coords, series.filter((serie) => serie.promedio?.k >= 2).map((serie) => coords.y(serie.promedio.mean)))
+    + '<g class="history__guia-capa"></g>'
+    + orden.map((serie) => `<g data-serie="${serie.key}">`
+      + pintarSerie(points, serie.key, coords, uid)
+      + pintarPromedio(serie.promedio, coords)
+      + pintarUltimo(serie.ultimo, serie.label, coords)
+      + '</g>').join('')
+    + '<g class="history__activo-capa"></g>'
+    + '</svg>'
+    + pintarLista(points, listaId);
 }
 
-const explicacion = `<details class="history__como"><summary>Cómo se calcula</summary><p>Cada punto es el promedio de los precios que la app podía mostrar al último corte de ese día. Cada estación pesa lo mismo y <em>n</em> dice cuántas participaron. No depende de tu ubicación, del distrito que elijas ni de la marca.</p><p>La fuente oficial publica los martes, así que verás tramos planos con escalones. Entre martes y martes el promedio se mueve por estaciones que entran o salen de la ventana de 30 días, no por precios nuevos: describe a las que participaron, no es un índice de precios ni una garantía de lo que cobra el surtidor.</p></details>`;
+/** Lo que se anuncia al elegir un día: solo esa fecha, los dos combustibles. */
+function lectura(punto) {
+  if (!punto) return '';
+  if (!punto.observation) return `${fecha(punto.date, DIA_LARGO)}: no se registró precio ese día.`;
+  const partes = PRODUCTOS.map((producto) => {
+    const dato = punto[producto.key];
+    return `${producto.label} ${dato ? `S/ ${dosDecimales(dato.mean)} con ${dato.n} estaciones` : 'sin dato'}`;
+  });
+  return `${fecha(punto.date, DIA_LARGO)}${punto.isToday ? ' (en curso)' : ''}: ${partes.join('; ')}.`;
+}
 
 /**
  * Monta el gráfico. Nunca rechaza.
  *
  * @param {object} entrada
  * @param {HTMLElement} entrada.mount   contenedor con `data-state`
- * @param {HTMLElement} entrada.body    donde se pinta
- * @returns {{setWindow: Function, destroy: Function}}
+ * @param {HTMLElement} entrada.body    donde se pintan selector y franjas
+ * @returns {{focus: Function, destroy: Function}}
  */
 export function mountHistoryChart({
   mount,
@@ -143,43 +328,66 @@ export function mountHistoryChart({
   storage = typeof localStorage === 'undefined' ? null : localStorage,
   search = typeof location === 'undefined' ? '' : location.search,
 } = {}) {
-  if (!mount || !body) return { setWindow() {}, destroy() {} };
+  if (!mount || !body) return { focus() {}, destroy() {} };
   const demo = new URLSearchParams(search).get('history-demo') === '1';
   let resumen = null;
   let estado = 'loading';
-  let dias = DEFAULT_WINDOW;
+  const dias = DEFAULT_WINDOW;
   let seleccion = null;
   let nota = '';
+  let hoy = limaDate(now());
+
+  // Persistentes: no se repintan, así que el lector anuncia lo que la persona
+  // eligió y no la gráfica entera.
+  const aviso = document.createElement('p');
+  aviso.className = 'history__nota';
+  aviso.setAttribute('role', 'status');
+  const lecturaNodo = document.createElement('p');
+  lecturaNodo.className = 'history__lectura';
+  lecturaNodo.setAttribute('role', 'status');
+  mount.append(aviso, lecturaNodo);
 
   const guardar = (texto) => { try { storage?.setItem(GUARDADO, JSON.stringify({ savedAt: new Date(now()).toISOString(), body: texto })); } catch { /* modo privado o sin cuota: no es motivo para romper nada */ } };
   const recuperar = () => { try { return JSON.parse(storage?.getItem(GUARDADO) ?? 'null'); } catch { return null; } };
 
+  /**
+   * Mueve la selección escribiendo SOLO las dos capas de cada franja.
+   *
+   * Es lo que separa elegir un día de repintar el bloque: el `<svg>` que tiene
+   * el foco no se toca, así que el lector de pantalla no vuelve a leer su
+   * nombre ni el foco salta a un nodo recién creado. La geometría se recalcula
+   * del marco, que es una función pura de catorce puntos.
+   */
+  function marcarSeleccion(marco) {
+    const guia = body.querySelector('.history__guia-capa');
+    const activo = body.querySelector('.history__activo-capa');
+    if (guia && activo) {
+      const { coords } = geometria(marco.points, marco.days);
+      guia.innerHTML = pintarGuia(seleccion, coords);
+      // Un marcador por producto, en el mismo día: la selección es una sola.
+      activo.innerHTML = PRODUCTOS.map((producto) => pintarActivo(marco.points, producto.key, seleccion, coords)).join('');
+    }
+    lecturaNodo.textContent = seleccion === null ? '' : lectura(marco.points[seleccion]);
+  }
+
   function render() {
     mount.dataset.state = estado;
-    if (estado === 'loading') { body.innerHTML = '<p class="history__nota" role="status">Cargando el histórico…</p>'; return; }
-    if (estado === 'error' || estado === 'empty') { body.innerHTML = `<p class="history__nota" role="status">${escapeHtml(nota)}</p>`; return; }
+    aviso.textContent = nota;
+    aviso.hidden = !nota;
+    if (estado === 'loading') { body.innerHTML = '<p class="history__cargando">Cargando el histórico…</p>'; return; }
+    if (estado === 'error' || estado === 'empty') { body.innerHTML = ''; return; }
 
-    const marco = frameWindow(resumen, { today: limaDate(now()), days: dias });
-    const punto = seleccion === null ? null : marco.points[seleccion];
-    const aviso = nota ? `<p class="history__nota" role="status">${escapeHtml(nota)}</p>` : '';
-    body.innerHTML = `${pintarSelector(dias)}${pintarGrafico(marco, seleccion)}${pintarLeyenda(marco.points)}<p class="history__lectura" role="status">${escapeHtml(lectura(punto))}</p>${aviso}${pintarTabla(marco.points)}${explicacion}`;
+    const marco = frameWindow(resumen, { today: hoy, days: dias });
+    const uid = `h${(secuencia += 1)}`;
+    body.innerHTML = pintarLecturas(marco) + pintarPlano(marco, uid, `${uid}-dias`);
+    marcarSeleccion(marco);
   }
 
+  /** La selección es una sola y vale para las dos franjas: misma fecha, dos datos. */
   function elegir(indice) {
-    const marco = frameWindow(resumen, { today: limaDate(now()), days: dias });
-    if (!marco.points.length) return;
-    seleccion = Math.max(0, Math.min(marco.points.length - 1, indice));
-    render();
-    body.querySelector('.history__svg')?.focus({ preventScroll: true });
-  }
-
-  function setWindow(valor) {
-    if (!HISTORY_WINDOWS.includes(valor) || valor === dias) return;
-    dias = valor;
-    // Cambiar la ventana no vuelve a pedir nada ni recalcula ninguna media:
-    // solo recorta lo que ya está.
-    seleccion = null;
-    render();
+    if (!resumen || estado === 'loading' || estado === 'error' || estado === 'empty') return;
+    seleccion = Math.max(0, Math.min(dias - 1, indice));
+    marcarSeleccion(frameWindow(resumen, { today: hoy, days: dias }));
   }
 
   function aplicar(texto, { desdeCopia = false, savedAt = null } = {}) {
@@ -189,12 +397,13 @@ export function mountHistoryChart({
     const problemas = validateDailySummary(candidato, { bytes });
     if (problemas.length) throw new Error(problemas[0]);
     resumen = candidato;
-    const marco = frameWindow(resumen, { today: limaDate(now()), days: 30 });
-    const horas = staleHours(marco.lastObservedAt, now());
-    if (!marco.daysWithObservation) { estado = 'empty'; nota = 'Estamos construyendo el histórico: 0 días registrados.'; return; }
-    if (marco.daysWithObservation < 3) { estado = 'few'; nota = `Estamos construyendo el histórico: ${marco.daysWithObservation} ${marco.daysWithObservation === 1 ? 'día registrado' : 'días registrados'}.`; return; }
+    // La antigüedad se mide contra la serie ENTERA que viajó, no contra la
+    // ventana que se está mirando: son dos recortes distintos.
+    const completo = frameWindow(resumen, { today: hoy, days: HISTORY_MAX_DAYS });
+    const horas = staleHours(completo.lastObservedAt, now());
+    if (!completo.daysWithObservation) { estado = 'empty'; nota = 'Todavía no hay días registrados en el histórico.'; return; }
     if (desdeCopia) { estado = 'saved'; nota = `Copia guardada${savedAt ? ` del ${fecha(limaDate(savedAt), DIA_LARGO)}` : ''}: puede no estar al día.`; return; }
-    if (horas !== null && horas > STALE_HOURS) { estado = 'stale'; nota = `Última actualización: ${fecha(marco.lastObservedAt.slice(0, 10), DIA_LARGO)}.`; return; }
+    if (horas !== null && horas > STALE_HOURS) { estado = 'stale'; nota = `Última actualización: ${fecha(completo.lastObservedAt.slice(0, 10), DIA_LARGO)}.`; return; }
     estado = 'ready';
     nota = '';
   }
@@ -203,10 +412,9 @@ export function mountHistoryChart({
     if (demo) {
       // La demostración no toca la red ni el almacenamiento: es evidentemente
       // una demostración y no debe dejar rastro que luego parezca un dato.
-      resumen = demoSummary({ today: limaDate(now()) });
+      resumen = demoSummary({ today: hoy });
       estado = 'demo';
       nota = 'Serie de demostración: no son precios reales.';
-      dias = 30;
       render();
       return;
     }
@@ -235,21 +443,18 @@ export function mountHistoryChart({
     render();
   }
 
-  const alPulsar = (event) => {
-    const ventana = event.target.closest('[data-window]');
-    if (ventana) { setWindow(Number(ventana.dataset.window)); return; }
-  };
   const alApuntar = (event) => {
     const svg = event.target.closest('.history__svg');
     if (!svg) return;
     const caja = svg.getBoundingClientRect();
     if (!caja.width) return;
     const relativo = ((event.clientX - caja.left) / caja.width) * W;
-    const paso = dias > 1 ? (W - PAD.izquierda - PAD.derecha) / (dias - 1) : 0;
+    const paso = dias > 1 ? ANCHO / (dias - 1) : 0;
     elegir(paso ? Math.round((relativo - PAD.izquierda) / paso) : 0);
   };
   const alTeclear = (event) => {
-    if (!event.target.closest('.history__svg')) return;
+    const svg = event.target.closest('.history__svg');
+    if (!svg) return;
     const teclas = { ArrowLeft: -1, ArrowRight: 1, Home: 'inicio', End: 'fin' };
     const accion = teclas[event.key];
     if (accion === undefined) return;
@@ -258,25 +463,37 @@ export function mountHistoryChart({
     else if (accion === 'fin') elegir(dias - 1);
     else elegir((seleccion === null ? dias - 1 : seleccion) + accion);
   };
+  // Volver de segundo plano no pide nada a la red: solo vuelve a contar los días
+  // contra el reloj. Si se cruzó la medianoche de Lima, el dato de ayer deja de
+  // etiquetarse «Hoy» y el calendario se corre un día.
+  const alVolver = () => {
+    if (document.visibilityState !== 'visible') return;
+    const ahora = limaDate(now());
+    if (ahora === hoy) return;
+    hoy = ahora;
+    seleccion = null;
+    render();
+  };
 
-  body.addEventListener('click', alPulsar);
   body.addEventListener('pointerdown', alApuntar);
   body.addEventListener('keydown', alTeclear);
+  document.addEventListener('visibilitychange', alVolver);
   render();
   // Se lanza sin esperar: los precios y el GPS no dependen de esto.
   cargar().catch(() => { estado = 'error'; nota = 'No pudimos cargar el histórico.'; render(); });
 
   return {
-    setWindow,
-    /** Lleva la vista y el foco al gráfico: es lo que hace «Ver historial» y la ruta `/gasolina/historial`. */
+    /** Lleva la vista y el foco al bloque: es lo que hace «Ver historial» y la ruta `/gasolina/historial`. */
     focus() {
       mount.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
       (body.querySelector('.history__svg') ?? mount.querySelector('#history-title') ?? mount).focus?.({ preventScroll: true });
     },
     destroy() {
-      body.removeEventListener('click', alPulsar);
       body.removeEventListener('pointerdown', alApuntar);
       body.removeEventListener('keydown', alTeclear);
+      document.removeEventListener('visibilitychange', alVolver);
+      aviso.remove();
+      lecturaNodo.remove();
     },
   };
 }

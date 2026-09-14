@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GASOLINA_KEYS, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from '../pipeline/gasolina-contract.mjs';
 import { validateGasolinaManifest as clienteAceptaManifest, validGasolinaBundle as clienteAceptaBundle } from '../web/gasolina-contract.js';
-import { BRAND_LOGOS } from '../web/brand-logos.js';
+import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
 import { shellManifestProblems } from '../pipeline/shell-manifest.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems } from '../app/shell-assets.mjs';
@@ -69,7 +69,7 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // reinstala el service worker por sus bytes y los de sus imports.
   errors.push(...serviceWorkerUpdateProblems(fs.readFileSync(path.join(root, 'web', 'sw.js'), 'utf8')));
 
-  // 4. Logos registrados: registro → archivo → SVG válido → precache.
+  // 4. Activos de marca registrados: registro → archivo → SVG válido → precache.
   errors.push(...brandAssetProblems({
     brandLogos: BRAND_LOGOS,
     shellList: shell.derived.entries,
@@ -116,8 +116,9 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     } catch (error) { errors.push(`origen público · no se pudo comprobar la página 404: ${error.message}`); }
 
     const respuestas = new Map();
-    for (const entry of Object.values(BRAND_LOGOS)) {
-      const ruta = `/icons/brands/${entry.slug}.svg`;
+    // Mismo recorrido que la precache y que la tarjeta: si una variante se
+    // registra, la sonda pública la mira sin que haya que apuntarla aquí.
+    for (const { path: ruta } of brandAssets(BRAND_LOGOS)) {
       try {
         const response = await fetch(new URL(ruta, origin), { redirect: 'error', cache: 'no-store' });
         respuestas.set(ruta, response.ok ? { ok: true, body: await response.text(), contentType: response.headers.get('content-type') ?? '' } : { ok: false });
@@ -126,7 +127,8 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     errors.push(...brandAssetProblems({ brandLogos: BRAND_LOGOS, shellList: shell.derived.entries, read: (ruta) => respuestas.get(ruta) }).map((motivo) => `origen público · ${motivo}`));
   }
 
-  const summary = `Bundles gasolina válidos: ${manifest.revision_id} · Regular ${manifest.products?.regular?.bytes} bytes · Premium ${manifest.products?.premium?.bytes} bytes · cliente compatible · ${Object.keys(BRAND_LOGOS).length} logos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)`;
+  const variantes = [...brandAssets(BRAND_LOGOS)].length;
+  const summary = `Bundles gasolina válidos: ${manifest.revision_id} · Regular ${manifest.products?.regular?.bytes} bytes · Premium ${manifest.products?.premium?.bytes} bytes · cliente compatible · ${Object.keys(BRAND_LOGOS).length} marcas y ${variantes} activos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)`;
   return { errors: [...new Set(errors)], notas, summary };
 }
 

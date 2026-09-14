@@ -73,15 +73,15 @@
     <section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">
       <h1 id="start-title">Encuentra gasolina cerca de ti</h1>
       <button id="use-location" class="button button--primary" type="button" disabled>Ver en mi ubicación</button>
-      <button id="choose-district" class="button--text" type="button" disabled>Ver distritos</button>
-      <p id="location-status" class="privacy-line" role="status" aria-live="polite">No guardamos tu ubicación.</p>
+      <button id="choose-district" class="button button--ghost" type="button" disabled>Ver distritos</button>
       <p id="data-status" class="hint" role="status" aria-live="polite">Cargando precios…</p>
-      <!-- Contexto, no acción: va después de los botones y de la línea de
-           privacidad, que pertenece al botón de ubicación. Reserva su alto desde
-           el primer pintado para que la portada no salte cuando llegue el dato. -->
+      <!-- Contexto, no acción: va después de los botones. Reserva su alto desde
+           el primer pintado para que la portada no salte cuando llegue el dato.
+           El subtítulo describe la ventana sin prometer cobertura: dice sobre qué
+           periodo se mira, no cuántos días tiene dato. -->
       <section id="history-chart" class="history plate" aria-labelledby="history-title" data-state="loading">
         <h2 id="history-title" tabindex="-1">Precio promedio en Lima</h2>
-        <p class="history__sub">S/ por galón · Al último corte de cada día</p>
+        <p class="history__sub">S/ por galón · últimos 7 días observados</p>
         <div id="history-body"></div>
       </section>
     </section>
@@ -101,6 +101,9 @@
     </section>
     <section id="fatal-state" class="screen-flow" aria-labelledby="fatal-title" hidden><div class="plate"><p class="eyebrow">No hay datos disponibles</p><h2 id="fatal-title">No se pudieron cargar las opciones</h2><p id="fatal-message" class="lede"></p><button id="retry-load" class="button button--primary" type="button">Reintentar</button></div></section>
   </main>
+  <!-- Fuera de `main`: es el pie del documento, no parte del contenido. Aparece
+       en todas las vistas porque vive fuera de los pasos que se ocultan. -->
+  <footer class="firma">Hecho con amor para el Perú, por <a href="https://brunodiaz.dev" target="_blank" rel="noopener noreferrer">brunodiaz.dev</a></footer>
   <script type="module" src="/app.js"></script>
 </body>
 </html>

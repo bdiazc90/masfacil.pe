@@ -16,6 +16,7 @@
     "fetch:live": "node scripts/fetch-live-bundle.mjs",
     "audit": "node scripts/audit-publication.mjs",
     "verify:web": "node scripts/verify-web.mjs",
+    "test": "node --test test/*.test.mjs",
     "harvest:centers": "node scripts/harvest-centers.mjs",
     "harvest:match": "node scripts/match-identities.mjs",
     "identity:install": "node scripts/identity-install.mjs",

@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2476 1796" preserveAspectRatio="xMidYMid meet" fill="none">
+    <defs>
+        <clipPath id="repsol-mark-sol">
+            <path
+                d="M1761.82 1498.05C2185.88 1129.44 2296 561.85 2007.78 230.31C1719.57 -101.23 1142.15 -71.1769 718.085 297.435C294.022 666.048 183.899 1233.63 472.118 1565.17C760.337 1896.71 1337.75 1866.66 1761.82 1498.05Z" />
+        </clipPath>
+        <linearGradient id="repsol-mark-disco" x1="1558.63" y1="-37.786" x2="772.964" y2="1790.7"
+            gradientUnits="userSpaceOnUse">
+            <stop offset="0.11" stop-color="#FFEC51" />
+            <stop offset="0.4" stop-color="#FDD243" />
+            <stop offset="1" stop-color="#ff0061" />
+        </linearGradient>
+        <linearGradient id="repsol-mark-banda" x1="2427.41" y1="1358.84" x2="1213.58" y2="1233.84"
+            gradientUnits="userSpaceOnUse">
+            <stop stop-color="#FEB342" />
+            <stop offset="1" stop-color="#FF891C" />
+        </linearGradient>
+    </defs>
+    <g clip-path="url(#repsol-mark-sol)">
+        <path
+            d="M1761.82 1498.05C2185.88 1129.44 2296 561.85 2007.78 230.31C1719.57 -101.23 1142.15 -71.1769 718.085 297.435C294.022 666.048 183.899 1233.63 472.118 1565.17C760.337 1896.71 1337.75 1866.66 1761.82 1498.05Z"
+            fill="url(#repsol-mark-disco)" />
+        <path d="M1716.35 436.484H194.608C95.5682 583.946 21.0291 736.538 0 900.328H1368.27L1716.35 436.484Z"
+            fill="#FFD537" />
+        <path d="M888.955 900.312H2475.91C2445.81 1069.93 2378.59 1222.49 2275.97 1358.82H888.955V900.312Z"
+            fill="url(#repsol-mark-banda)" />
+    </g>
+</svg>

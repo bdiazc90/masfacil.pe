@@ -7,6 +7,8 @@
  * sigue siendo publicable.
  */
 
+import { ASSET_FILE_PATTERN, brandAssets } from '../web/brand-logos.js';
+
 // Lo que se publica no debe depender de un tercero ni poder pedirle nada. El
 // bloqueo de <image> cubre además el bitmap incrustado presentado como
 // vectorización.
@@ -31,21 +33,31 @@ export function svgProblems(text) {
   return problemas;
 }
 
-/** Procedencia declarada de una entrada del registro de marcas. */
-export function provenanceProblems(entry) {
+/**
+ * Procedencia declarada de una VARIANTE del registro de marcas.
+ *
+ * El nombre de archivo también es procedencia: sale del registro y se acota para
+ * que una entrada no pueda apuntar fuera de `web/icons/brands/`.
+ */
+export function provenanceProblems(asset) {
   const problemas = [];
-  if (!SOURCE_KINDS.includes(entry?.source_kind)) return [`source_kind ausente o desconocido: ${entry?.source_kind}`];
-  if (entry.source_kind === 'official_asset' && !/^https:\/\//.test(entry.source_url ?? '')) problemas.push('declarado oficial sin URL https de origen');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(entry?.retrieved_at ?? '')) problemas.push('retrieved_at no es una fecha AAAA-MM-DD');
+  if (!SOURCE_KINDS.includes(asset?.source_kind)) return [`source_kind ausente o desconocido: ${asset?.source_kind}`];
+  if (!ASSET_FILE_PATTERN.test(asset?.file ?? '')) problemas.push(`file fuera de contrato: ${asset?.file}`);
+  if (asset.source_kind === 'official_asset' && !/^https:\/\//.test(asset.source_url ?? '')) problemas.push('declarado oficial sin URL https de origen');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asset?.retrieved_at ?? '')) problemas.push('retrieved_at no es una fecha AAAA-MM-DD');
   return problemas;
 }
 
 /**
  * Comprueba el registro contra los archivos y la precache.
  *
- * Recorre EL REGISTRO, no el directorio: un SVG presente en `web/icons/brands/`
- * y no registrado —Petroperú hoy— es correcto, no se pinta y no debe hacer
+ * Recorre EL REGISTRO con `brandAssets()`, no el directorio: un SVG presente en
+ * `web/icons/brands/` y no registrado es correcto, no se pinta y no debe hacer
  * fallar nada. Exigir lo inverso obligaría a activar marcas para pasar la sonda.
+ *
+ * Es el mismo recorrido que deriva la precache y que elige el recurso en la
+ * tarjeta: si una variante se registra, viaja, se sanea y se pinta por la misma
+ * vía. No hay una segunda lista que se pueda desincronizar.
  *
  * @param {object} entrada
  * @param {object} entrada.brandLogos  BRAND_LOGOS del cliente
@@ -55,16 +67,16 @@ export function provenanceProblems(entry) {
 export function brandAssetProblems({ brandLogos, shellList, read }) {
   const problemas = [];
   const precache = new Set(shellList);
-  for (const [clave, entry] of Object.entries(brandLogos)) {
-    const ruta = `/icons/brands/${entry.slug}.svg`;
-    for (const motivo of provenanceProblems(entry)) problemas.push(`${clave}: ${motivo}`);
-    if (!precache.has(ruta)) problemas.push(`${clave}: ${ruta} no está en la precache del service worker`);
+  for (const { key, role, asset, path: ruta } of brandAssets(brandLogos)) {
+    const donde = `${key}.${role}`;
+    for (const motivo of provenanceProblems(asset)) problemas.push(`${donde}: ${motivo}`);
+    if (!precache.has(ruta)) problemas.push(`${donde}: ${ruta} no está en la precache del service worker`);
     const recurso = read(ruta);
-    if (!recurso?.ok) { problemas.push(`${clave}: ${ruta} no se pudo leer`); continue; }
+    if (!recurso?.ok) { problemas.push(`${donde}: ${ruta} no se pudo leer`); continue; }
     // Una ruta inexistente puede responder 200 con HTML; se comprueba el tipo y
     // el contenido, no solo que la respuesta llegue.
-    if (recurso.contentType && !/image\/svg\+xml/i.test(recurso.contentType)) problemas.push(`${clave}: ${ruta} respondió ${recurso.contentType} en vez de image/svg+xml`);
-    for (const motivo of svgProblems(recurso.body ?? '')) problemas.push(`${clave}: ${ruta} ${motivo}`);
+    if (recurso.contentType && !/image\/svg\+xml/i.test(recurso.contentType)) problemas.push(`${donde}: ${ruta} respondió ${recurso.contentType} en vez de image/svg+xml`);
+    for (const motivo of svgProblems(recurso.body ?? '')) problemas.push(`${donde}: ${ruta} ${motivo}`);
   }
   return problemas;
 }

@@ -61,9 +61,16 @@ Bruno asume esa decisión con conocimiento de causa. Para el dato **publicado** 
 prefiere una vía redistribuible —OpenStreetMap (ODbL) o la observación directa
 del owner— y en el catálogo se registra `source.kind` real de cada entrada.
 
-Para el logo se acepta el activo oficial de la marca o una recreación fiel desde
-referencia oficial. Se registra la procedencia real: una recreación no se declara
-oficial. El saneamiento del SVG no se relaja.
+La selección del activo visual de una marca es editorial, a discreción del owner:
+vale el activo oficial, una recreación fiel o un aporte del propio owner, y una
+recreación puede recortarse o rehacerse para el uso que pide la interfaz. No se
+exige que todo SVG venga de una descarga oficial. Lo que no se relaja es
+declarar qué es realmente —`official_asset`, `faithful_recreation` u
+`owner_supplied`— y describir la referencia disponible sin inventar una URL
+oficial ni atribuir autoría oficial a una recreación; solo `official_asset` exige
+una URL https de origen. El saneamiento del SVG tampoco se relaja. El registro
+declara cada variante renderizable con su archivo y su función visual, y ese
+único recorrido alimenta la precache, el verificador y la tarjeta.
 
 ## Privacidad
 
@@ -104,9 +111,10 @@ npm run dump:establishments
 npm run brand:directory -- fetch <marca>
 npm run brand:directory -- match
 npm run brand:sample
-npm run brand:logo -- <slug> <archivo.svg> <url> <AAAA-MM-DD>
+npm run brand:logo -- <slug> <rol> <archivo.svg> <referencia> <AAAA-MM-DD>
 npm run history:observe      # requiere `pnpm install`: firma peticiones S3
 npm run history:summary
+npm test                     # comprobaciones puntuales, no una suite
 node scripts/contrast.mjs
 ```
 
