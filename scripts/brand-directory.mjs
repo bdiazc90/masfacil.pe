@@ -4,26 +4,28 @@
 //   node scripts/brand-directory.mjs fetch repsol     descarga y normaliza el padrón
 //   node scripts/brand-directory.mjs match            empareja y escribe brand-evidence.json
 //
-// La coordenada solo selecciona candidatos. Lo que confirma es el número de
-// puerta o el nombre de la vía, comparados contra la dirección del Registro; el
-// distrito por sí solo no basta y la proximidad tampoco. Si el segundo candidato
-// queda demasiado cerca en puntaje, el resultado es conflicto y no se acredita.
-// Todo lo cosechado vive en .local-cache/ y no se commitea.
+// La coordenada solo selecciona candidatos, y su ventana se abre según los
+// decimales que la fuente publica de verdad: una ficha con dos decimales puede
+// estar a casi un kilómetro. Lo que confirma es texto discriminante comparado con
+// el Registro —vía y puerta, vía y operador, manzana y lote—; la distancia, una
+// vía sola, la marca o un número suelto no bastan. Un distrito declarado y
+// distinto descarta el vínculo; uno ausente es desconocido y no se inventa.
+// Si el segundo candidato queda demasiado cerca en puntaje, o dos directorios
+// reclaman un mismo establecimiento con banderas distintas, el resultado es
+// conflicto y no se acredita. Todo lo cosechado vive en .local-cache/ y no se
+// commitea; `IDENTITY_ROOT` trabaja sobre una copia del expediente.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const identidad = path.join(root, '.local-cache', 'identity');
+const identidad = path.resolve(root, process.env.IDENTITY_ROOT || path.join('.local-cache', 'identity'));
 const directorios = path.join(identidad, 'directories');
 const UA = 'Mozilla/5.0 (compatible; masfacil.pe/4.3; public-data-research)';
 
-// Radio de selección: los padrones publican coordenadas aproximadas, así que se
-// abre la ventana y se exige corroboración textual dentro de ella.
-const RADIO_M = 200;
 // Margen de unicidad: el mejor candidato debe superar al segundo por esto.
-const MARGEN_MINIMO = 15;
+export const MARGEN_MINIMO = 15;
 
 const FUENTES = Object.freeze({
   repsol: {
@@ -82,7 +84,9 @@ const FUENTES = Object.freeze({
   },
 });
 
-const sinTildes = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+// Algunos padrones arrastran UTF-8 leído como CP-1252: «VIÃ‘EDOS».
+const MOJIBAKE = Object.freeze([['Ã‘', 'Ñ'], ['Ã±', 'ñ'], ['Ã¡', 'á'], ['Ã©', 'é'], ['Ã­', 'í'], ['Ã³', 'ó'], ['Ãº', 'ú'], ['Ã“', 'Ó'], ['Ã‰', 'É'], ['Ãš', 'Ú'], ['Ã¼', 'ü']]);
+const sinTildes = (value) => MOJIBAKE.reduce((texto, [roto, sano]) => texto.replaceAll(roto, sano), String(value ?? '')).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 const EARTH_M = 6371008.8;
 const rad = (deg) => deg * Math.PI / 180;
 function metros(a, b) {
@@ -92,16 +96,351 @@ function metros(a, b) {
   return 2 * EARTH_M * Math.asin(Math.sqrt(h));
 }
 
-// Palabras que no distinguen una vía de otra.
-const VACIAS = new Set(['AV', 'AVENIDA', 'JR', 'JIRON', 'CA', 'CALLE', 'MZ', 'MZA', 'LOTE', 'LT', 'URB', 'URBANIZACION', 'ASOC', 'ESQUINA', 'ESQ', 'CON', 'DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'Y', 'S/N', 'SN', 'KM', 'NRO', 'N', 'SUB', 'ETAPA', 'SECTOR', 'PARCELA', 'CUADRA', 'ALTURA', 'FRENTE', 'A', 'PANAMERICANA']);
-const palabras = (texto) => sinTildes(texto).replace(/[^A-Z0-9ÑÜ ]+/g, ' ').split(/\s+/).filter(Boolean);
-const distintivas = (texto) => new Set(palabras(texto).filter((palabra) => palabra.length >= 4 && !VACIAS.has(palabra) && !/^\d+$/.test(palabra)));
-// Número de puerta: se toman los números de 2 a 5 cifras, que es lo que suele
-// ser una numeración de vía; se descartan los de manzana y lote por su prefijo.
-const numeros = (texto) => {
-  const limpio = sinTildes(texto).replace(/\bMZ[A]?\.?\s*[A-Z0-9-]+/g, ' ').replace(/\b(?:LOTE|LT)\.?\s*[A-Z0-9-]+/g, ' ').replace(/\bKM\.?\s*[\d.]+/g, ' ');
-  return new Set((limpio.match(/\b\d{2,5}\b/g) ?? []));
+// --- Precisión de la coordenada ------------------------------------------------
+
+const decimales = (valor) => {
+  const texto = String(valor ?? '');
+  if (!Number.isFinite(Number(valor)) || /e/i.test(texto)) return 0;
+  const punto = texto.indexOf('.');
+  return punto < 0 ? 0 : texto.length - punto - 1;
 };
+/** Decimales que la ficha publica de verdad en su eje más pobre. */
+export const precisionDe = (ficha) => Math.min(decimales(ficha.latitude), decimales(ficha.longitude));
+/**
+ * Tolerancia de selección por eje, en metros. Con 4 decimales o más el redondeo
+ * es de metros y rige la ventana de siempre; con 3 añade ~55 m; con 2, ~555 m;
+ * con 1, ~5,5 km; sin decimales la coordenada no selecciona y solo queda el
+ * texto. Se mide por eje porque hay fichas con la latitud precisa y la longitud
+ * redondeada: tomar el peor de los dos abría la ventana a toda la provincia.
+ */
+export const toleranciaDe = (decimalesDelEje) => (decimalesDelEje >= 4 ? 200 : decimalesDelEje === 3 ? 300 : decimalesDelEje === 2 ? 1000 : decimalesDelEje === 1 ? 6000 : Infinity);
+const M_POR_GRADO = 111195;
+function ventanaDe(ficha) {
+  const latitud = toleranciaDe(decimales(ficha.latitude));
+  const longitud = toleranciaDe(decimales(ficha.longitude));
+  const precisa = latitud === 200 && longitud === 200;
+  return {
+    latitud_m: Number.isFinite(latitud) ? latitud : null,
+    longitud_m: Number.isFinite(longitud) ? longitud : null,
+    // Coordenada precisa: el radio de siempre. Si no, un rectángulo por eje.
+    contiene: (sitio) => (precisa
+      ? metros(ficha, sitio) <= 200
+      : Math.abs(ficha.latitude - sitio.latitude) * M_POR_GRADO <= latitud
+        && Math.abs(ficha.longitude - sitio.longitude) * M_POR_GRADO * Math.cos(rad(ficha.latitude)) <= longitud),
+  };
+}
+
+// El mismo distrito escrito de otra forma. Solo alias observados en los
+// padrones: Repsol y AVA escriben «Cercado de Lima» donde el Registro dice LIMA.
+const ALIAS_DISTRITO = Object.freeze({ 'CERCADO DE LIMA': 'LIMA' });
+const distritoCanonico = (valor) => {
+  const limpio = sinTildes(valor).replace(/\s+/g, ' ').trim();
+  return ALIAS_DISTRITO[limpio] ?? limpio;
+};
+
+/** Estrato de muestreo: cada regla de emparejamiento se audita por separado. */
+export function estratoDe(ficha) {
+  if (distritoCanonico(ficha.district)) return 'distrito_declarado';
+  const precision = precisionDe(ficha);
+  return precision >= 3 ? 'sin_distrito_coordenada_precisa' : precision === 2 ? 'sin_distrito_coordenada_aproximada' : 'sin_distrito_coordenada_inutil';
+}
+
+// --- Direcciones -----------------------------------------------------------------
+
+const PREFIJOS_VIA = new Set(['AV', 'AVENIDA', 'AVDA', 'JR', 'JIRON', 'CA', 'CAL', 'CALLE', 'PSJE', 'PASAJE', 'PJE', 'PROL', 'PROLONGACION', 'MALECON', 'OVALO', 'BLVD', 'BOULEVARD', 'VIA']);
+const PREFIJOS_CARRETERA = new Set(['CARR', 'CAR', 'CARRET', 'CARRETERA', 'AUTOPISTA', 'PAN', 'PANAM', 'PANAMERICANA']);
+// Abren la localidad: lo que sigue ubica, pero no es la vía.
+const LOCALIDAD = new Set(['URB', 'URBANIZACION', 'AAHH', 'AH', 'ASOC', 'ASOCIACION', 'COOP', 'COOPERATIVA', 'PJ', 'PUEBLO', 'PROGRAMA', 'RES', 'RESIDENCIAL', 'CONJ', 'CONJUNTO', 'CH', 'HABILITACION', 'HABILIT', 'LOTIZACION', 'FUNDO', 'FDO', 'PREDIO', 'PARCELA', 'PARC', 'PARCELACION', 'SECTOR', 'ZONA', 'GRUPO', 'ETAPA', 'COMUNIDAD', 'CP', 'ANEXO', 'BARRIO', 'APV', 'UNIDAD', 'UNID', 'SECCION', 'CASERIO']);
+// Abren otra vía: la de la esquina o el nombre anterior de la misma.
+const CRUCE = new Set(['ESQ', 'ESQUINA', 'CON', 'CRUCE', 'INTERSECCION', 'INTERSEC', 'INTER', 'Y', 'ENTRE', 'ANTES', 'EX']);
+// Una referencia («altura del paradero») no es la dirección.
+const REFERENCIA = new Set(['ALT', 'ALTURA', 'FRENTE', 'REF', 'REFERENCIA', 'PARADERO', 'COSTADO', 'ESPALDA', 'CERCA']);
+const SALTA_NUMERO = new Set(['INT', 'INTERIOR', 'PISO', 'DPTO', 'DEPARTAMENTO', 'OF', 'OFICINA', 'TIENDA', 'LOCAL', 'PUESTO', 'CDRA', 'CUADRA', 'UC', 'SUB']);
+const MANZANA = new Set(['MZ', 'MZA', 'MANZANA']);
+const LOTE = new Set(['LT', 'LTS', 'LTE', 'LOTE', 'LOTES', 'LOT', 'SUBLOTE']);
+const MESES = new Set(['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']);
+const VACIAS = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'AL', 'EN', 'SIN', 'NOMBRE']);
+// Nombres tan repetidos que solos no distinguen una vía: «Santa Rosa» y «Santa
+// Cruz» no son la misma. Cuentan solo acompañados.
+const DEBILES = new Set(['SAN', 'STA', 'STO', 'SANTA', 'SANTO', 'SENOR', 'SENORA', 'NUESTRA', 'VIRGEN', 'GENERAL', 'GRAL', 'MARISCAL', 'MCAL', 'PRESIDENTE', 'CORONEL', 'CAPITAN', 'ALMIRANTE', 'DOCTOR', 'INGENIERO', 'PADRE', 'JOSE', 'JUAN', 'MARIA', 'MANUEL', 'LUIS', 'CARLOS', 'REPUBLICA', 'PASEO', 'LIMA', 'PERU', 'INCA', 'HEROES']);
+// Describen una carretera pero no la distinguen: valen junto al kilómetro.
+const GENERICAS = new Set(['NORTE', 'SUR', 'ESTE', 'OESTE', 'CENTRAL', 'ANTIGUA', 'NUEVA', 'NUEVO', 'PRINCIPAL']);
+const ORIENTACION = new Set(['NORTE', 'SUR', 'ESTE', 'OESTE']);
+// Rubro de la localidad, no su nombre: «Programa de Vivienda», «Pueblo Joven».
+const GENERICAS_LOCALIDAD = new Set(['JOVEN', 'PROYECTO', 'ESPECIAL', 'VIVIENDA', 'VIVIENDAS', 'POBLADO', 'ASENTAMIENTO', 'HUMANO', 'AGRUPACION', 'FAMILIAR', 'PRODUCTORES', 'AGROPECUARIA', 'AGRICOLA', 'INDUSTRIAL', 'INDUSTRIALES', 'PECUARIOS', 'INMOBILIARIA', 'RUSTICO', 'SEMI', 'MIXTA', 'NUEVO', 'NUEVA', 'VILLA', 'RESIDENCIAL', 'CAMPESINA', 'CAMPESINO', 'UNIDAD', 'VECINAL', 'SUBLOTE', 'PARCELA', 'LOTIZACION', 'HABILITACION', 'URBANA', 'COMERCIAL', 'TALLER', 'CASA'].concat([...LOCALIDAD]));
+
+function normalizarDireccion(texto) {
+  return sinTildes(texto)
+    .replace(/\bA\s*\.?\s*A\s*\.?\s*H\s*\.?\s*H\b\.?/g, ' AAHH ')
+    .replace(/\bA\s*\.\s*H\s*\./g, ' AAHH ')
+    .replace(/\bP\s*\.\s*J\s*\./g, ' PJ ')
+    .replace(/\bC\s*\.\s*H\s*\./g, ' CH ')
+    .replace(/\bC\s*\.\s*P\s*\./g, ' CP ')
+    .replace(/\bU\s*\.\s*C\s*\./g, ' UC ')
+    .replace(/\bS\s*\/\s*N\b\.?/g, ' SN ')
+    .replace(/([A-Z]{3,})KM(?=[\s.\d])/g, '$1 KM ')
+    .replace(/\bN\s*[°º]/g, ' NRO ')
+    .replace(/[°º]/g, ' ')
+    .replace(/\b(?:NRO|NUMERO|NO|N)\b\.?(?=\s*\d)/g, ' NRO ')
+    .replace(/(\d)\.(?=\d)/g, '$1§')
+    .replace(/[^A-Z0-9§]+/g, ' ')
+    .replace(/§/g, '.')
+    .trim();
+}
+
+// «Q-1», «LL-1»: el guion partió el identificador de la manzana.
+function leerManzana(tokens, desde, destino) {
+  const id = tokens[desde];
+  if (!id || MANZANA.has(id) || LOTE.has(id) || LOCALIDAD.has(id) || !/^[A-Z0-9]{1,4}$/.test(id)) return desde - 1;
+  const tras = tokens[desde + 2];
+  if (/^[A-Z]{1,2}$/.test(id) && /^\d{1,2}$/.test(tokens[desde + 1] ?? '') && (tras === undefined || LOTE.has(tras) || /^(?:LOTE?S?|LTS?|LTE)\d/.test(tras))) {
+    destino.add(`${id}${Number(tokens[desde + 1])}`);
+    return desde + 1;
+  }
+  destino.add(/^\d+$/.test(id) ? String(Number(id)) : id);
+  return desde;
+}
+
+function leerLotes(tokens, desde, destino) {
+  let indice = desde;
+  for (; indice < tokens.length; indice += 1) {
+    const token = tokens[indice];
+    if (token === 'Y' || token === 'NRO' || token === 'SUB') continue;
+    if (tokens[indice + 1] === 'ETAPA') break;
+    if (/^\d{1,3}[A-Z]?$/.test(token)) { destino.add(token.replace(/^0+(?=\d)/, '')); continue; }
+    if (/^[A-Z]$/.test(token)) { destino.add(token); continue; }
+    break;
+  }
+  return indice - 1;
+}
+
+/**
+ * Lo que una dirección peruana dice de sí misma, separado por función: vías,
+ * puertas, kilómetro, manzana y lote, y localidad. Separarlo es lo que evita
+ * confundir una urbanización «Leoncio Prado» con la antigua avenida del mismo
+ * nombre, o el «28» de «Av. 28 de Julio» con un número de puerta.
+ */
+export function analizarDireccion(texto) {
+  const tokens = normalizarDireccion(texto).split(' ').filter(Boolean);
+  const r = { vias: new Set(), genericas: new Set(), localidad: new Set(), puertas: new Set(), km: new Set(), manzanas: new Set(), lotes: new Set() };
+  let modo = 'via';
+  let palabrasDeVia = 0;
+  let puertaAbierta = false;
+  const fuera = () => (modo === 'referencia' ? modo : 'resto');
+  for (let indice = 0; indice < tokens.length; indice += 1) {
+    const token = tokens[indice];
+    const siguiente = tokens[indice + 1];
+    if (token === 'SN') { modo = fuera(); puertaAbierta = false; continue; }
+    if (PREFIJOS_VIA.has(token) || PREFIJOS_CARRETERA.has(token)) {
+      if (PREFIJOS_CARRETERA.has(token)) r.genericas.add('CARRETERA');
+      if (modo !== 'referencia') { modo = 'via'; palabrasDeVia = 0; }
+      puertaAbierta = false;
+      continue;
+    }
+    if (MANZANA.has(token)) { indice = leerManzana(tokens, indice + 1, r.manzanas); modo = fuera(); puertaAbierta = false; continue; }
+    const loteJunto = /^(?:LOTE?S?|LTS?|LTE)(\d{1,3})$/.exec(token);
+    if (LOTE.has(token) || loteJunto) {
+      if (loteJunto) r.lotes.add(String(Number(loteJunto[1])));
+      indice = leerLotes(tokens, indice + 1, r.lotes);
+      modo = fuera(); puertaAbierta = false;
+      continue;
+    }
+    const kmJunto = /^KM(\d+(?:\.\d+)?)$/.exec(token);
+    if (token === 'KM' || kmJunto) {
+      const valor = kmJunto?.[1] ?? (/^\d+(?:\.\d+)?$/.test(siguiente ?? '') ? siguiente : null);
+      if (valor && modo !== 'referencia') r.km.add(String(Number(valor)));
+      if (valor && !kmJunto) indice += 1;
+      modo = fuera(); puertaAbierta = false;
+      continue;
+    }
+    if (LOCALIDAD.has(token)) { if (modo !== 'referencia') modo = 'localidad'; puertaAbierta = false; continue; }
+    if (CRUCE.has(token)) { if (modo !== 'referencia') { modo = 'via'; palabrasDeVia = 0; } puertaAbierta = false; continue; }
+    if (REFERENCIA.has(token)) { modo = 'referencia'; puertaAbierta = false; continue; }
+    if (SALTA_NUMERO.has(token)) { if (/^\d/.test(siguiente ?? '')) indice += 1; puertaAbierta = false; continue; }
+    if (token === 'NRO') { puertaAbierta = modo !== 'referencia'; continue; }
+    const numero = /^(\d+)(?:\.\d+)?(?:[A-Z]{1,4})?$/.exec(token);
+    if (numero) {
+      // «28 de Julio», «15 Julio»: el número nombra la vía, no la puerta.
+      const mes = MESES.has(siguiente) ? siguiente : (siguiente === 'DE' && MESES.has(tokens[indice + 2]) ? tokens[indice + 2] : null);
+      if (mes) {
+        if (modo === 'via') { r.vias.add(`${Number(numero[1])}${mes}`); palabrasDeVia += 1; }
+        indice += siguiente === 'DE' ? 2 : 1;
+        continue;
+      }
+      if (!puertaAbierta && siguiente === 'ETAPA') continue;  // «3 Etapa»
+      const esPuerta = modo !== 'referencia' && modo !== 'localidad' && (puertaAbierta || (modo === 'via' && palabrasDeVia > 0));
+      // «Calle 15»: un número pegado al prefijo también nombra la vía.
+      if (!esPuerta) { if (modo === 'via' && palabrasDeVia === 0) palabrasDeVia += 1; continue; }
+      const valor = String(Number(numero[1]));
+      if (valor.length >= 2 && valor.length <= 5) r.puertas.add(valor);
+      modo = 'resto';
+      puertaAbierta = true;
+      continue;
+    }
+    puertaAbierta = false;
+    if (token.length < 3 || VACIAS.has(token)) continue;
+    if (GENERICAS.has(token)) { if (modo === 'via') { r.genericas.add(token); palabrasDeVia += 1; } continue; }
+    if (modo === 'via') { r.vias.add(token); palabrasDeVia += 1; }
+    else if (modo === 'localidad' && !GENERICAS_LOCALIDAD.has(token)) r.localidad.add(token);
+  }
+  return r;
+}
+
+function viaComun(a, b) {
+  const orientacion = (analisis) => [...analisis.genericas].filter((palabra) => ORIENTACION.has(palabra));
+  const [deA, deB] = [orientacion(a), orientacion(b)];
+  // «Javier Prado Este» y «Javier Prado Oeste» son tramos distintos.
+  if (deA.length && deB.length && !deA.some((palabra) => deB.includes(palabra))) return [];
+  const comunes = [...a.vias].filter((palabra) => b.vias.has(palabra));
+  return comunes.some((palabra) => !DEBILES.has(palabra)) || comunes.length >= 2 ? comunes : [];
+}
+
+// Lo que no identifica a un operador: forma legal, rubro, la propia cadena.
+const GENERICAS_NOMBRE = new Set(['CORPORATION', 'COMPANY', 'CLUB', 'ASOCIACION', 'COOPERATIVA', 'GREMIO', 'PARQUE', 'ES', 'EESS', 'ESTACION', 'ESTACIONES', 'SERVICIO', 'SERVICIOS', 'GRIFO', 'GRIFOS', 'GASOCENTRO', 'SERVICENTRO', 'CENTRO', 'COMBUSTIBLE', 'COMBUSTIBLES', 'GAS', 'GNV', 'GLP', 'SAC', 'EIRL', 'SRL', 'SOCIEDAD', 'ANONIMA', 'CERRADA', 'EMPRESA', 'EMPRESAS', 'EMPRESARIAL', 'INVERSIONES', 'INVERSION', 'CORPORACION', 'GRUPO', 'NEGOCIACIONES', 'NEGOCIACION', 'COMERCIAL', 'COMERCIALIZADORA', 'DISTRIBUIDORA', 'GENERALES', 'MULTISERVICIOS', 'AUTOSERVICIOS', 'TRANSPORTES', 'LIMITADA', 'RESPONSABILIDAD', 'INDIVIDUAL', 'IMPORTACIONES', 'EXPORTACIONES', 'HERMANOS', 'HNOS', 'CIA', 'COMPANIA', 'ASOCIADOS', 'REPRESENTACIONES', 'OPERACIONES', 'PETROLEOS', 'PETROLEO', 'ENERGY', 'ENERGIA', 'OIL', 'TRADING', 'SERVICE', 'PERU', 'LIMA', 'PRIMAX', 'REPSOL', 'PETROPERU', 'AVA', 'COESTI', 'DEL', 'LAS', 'LOS', 'SAN', 'SANTA', 'SANTO', 'NORTE', 'SUR', 'ESTE', 'OESTE']);
+const tokensDeNombre = (texto) => new Set(sinTildes(texto).replace(/[^A-Z0-9]+/g, ' ').split(' ').filter((palabra) => palabra.length >= 3 && !/^\d+$/.test(palabra) && !GENERICAS_NOMBRE.has(palabra)));
+/** El nombre de la ficha es la razón social del operador: «CORGAS» y «CORGAS S.A.C.». */
+function nombreEnRazonSocial(nombre, razonSocial) {
+  const deRazon = tokensDeNombre(razonSocial);
+  const comunes = [...tokensDeNombre(nombre)].filter((palabra) => deRazon.has(palabra));
+  return comunes.some((palabra) => palabra.length >= 4) || comunes.length >= 2 ? comunes : [];
+}
+
+// Empresas que solo operan grifos de su propia cadena. Corroboran identidad; no
+// convierten por sí solas una razón social en bandera.
+const OPERADORES = [[/\bCOESTI\b/, 'Primax'], [/\bPERUANA DE ESTACIONES DE SERVICIOS?\b|\bPECSA\b/, 'Pecsa'], [/\bREPSOL\b/, 'Repsol'], [/\bPETROPERU\b|\bPETROLEOS DEL PERU\b/, 'Petroperú'], [/\bPRIMAX\b/, 'Primax']];
+const marcaDelOperador = (razonSocial) => OPERADORES.find(([patron]) => patron.test(sinTildes(razonSocial)))?.[1] ?? null;
+
+/**
+ * Señales de una ficha frente a un establecimiento y si alcanzan para confirmar.
+ *
+ * Con distrito declarado y coincidente rige la regla de siempre: el distrito más
+ * una señal textual. Sin distrito, la señal tiene que ser una combinación que un
+ * vecino no comparta por casualidad.
+ */
+function señalesDe(ficha, sitio, { conDistrito }) {
+  const a = ficha.analisis;
+  const b = sitio.analisis;
+  const via = viaComun(a, b);
+  const puerta = [...a.puertas].filter((valor) => b.puertas.has(valor));
+  const mismaCarretera = via.length > 0 || [...a.genericas].some((palabra) => palabra !== 'CARRETERA' && b.genericas.has(palabra));
+  const kilometro = mismaCarretera ? [...a.km].filter((valor) => b.km.has(valor)) : [];
+  const manzana = [...a.manzanas].filter((valor) => b.manzanas.has(valor));
+  const lote = [...a.lotes].filter((valor) => b.lotes.has(valor));
+  const manzanaLote = manzana.length && lote.length ? [`MZ ${manzana.join('/')}`, `LT ${lote.join('/')}`] : [];
+  const localidad = [...a.localidad].filter((palabra) => b.localidad.has(palabra) && !DEBILES.has(palabra));
+  const nombre = nombreEnRazonSocial(ficha.name, sitio.razon_social);
+  const operador = Boolean(sitio.operador) && sinTildes(sitio.operador) === sinTildes(ficha.brand);
+  const tieneVia = via.length > 0 || kilometro.length > 0;
+  const tienePuerta = puerta.length > 0 || kilometro.length > 0;
+  const tieneManzanaLote = manzanaLote.length > 0;
+  const tieneNombre = nombre.length > 0;
+  const confirma = conDistrito
+    ? tienePuerta || tieneVia || tieneManzanaLote || tieneNombre || localidad.length >= 2
+    : (tieneVia && (tienePuerta || tieneNombre || operador)) || (tieneManzanaLote && (tieneVia || localidad.length > 0 || tieneNombre)) || (tienePuerta && tieneNombre);
+  const puntaje = (tienePuerta ? 45 : 0) + (tieneVia ? 35 : 0) + (tieneNombre ? 40 : 0) + (tieneManzanaLote ? 30 : 0) + (localidad.length ? 10 : 0) + (operador ? 10 : 0) + (conDistrito ? 10 : 0);
+  return {
+    confirma,
+    puntaje,
+    señales: { numero_de_puerta: [...puerta, ...kilometro.map((valor) => `km ${valor}`)], via, manzana_lote: manzanaLote, localidad, nombre_en_razon_social: nombre, operador_de_la_marca: operador },
+  };
+}
+
+/**
+ * Empareja fichas de directorios con establecimientos del Registro. Es puro:
+ * recibe sitios y directorios ya leídos y devuelve lo acreditado, los conflictos
+ * y lo pendiente con su motivo.
+ *
+ * @param {{sitios: Array<{establishment_id: string, distrito: string, direccion: string, razon_social: string, latitude: number, longitude: number}>, directorios: Array<{archivo: string, brand: string, source_url: string, evidenced_at: string, consulted_at: string, entries: Array<{name: string, address: string, district: string, latitude: number, longitude: number}>}>, marcasActivas?: Iterable<string>}} entrada
+ */
+export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas = [] }) {
+  const activas = new Set([...marcasActivas].map(sinTildes));
+  const preparados = sitios
+    .filter((sitio) => Number.isFinite(sitio.latitude) && Number.isFinite(sitio.longitude))
+    .map((sitio) => ({ ...sitio, distritoCanonico: distritoCanonico(sitio.distrito), analisis: analizarDireccion(sitio.direccion), operador: marcaDelOperador(sitio.razon_social) }));
+  const resumen = new Map(lista.map((directorio) => [directorio.archivo, { directorio: directorio.archivo, brand: directorio.brand, fichas: directorio.entries.length, acreditadas: 0, pendientes: {} }]));
+  const pendientes = [];
+  const anotar = (pendiente) => {
+    pendientes.push(pendiente);
+    const fila = resumen.get(pendiente.ficha.split('#')[0]);
+    fila.pendientes[pendiente.motivo] = (fila.pendientes[pendiente.motivo] ?? 0) + 1;
+  };
+
+  const propuestas = [];
+  for (const directorio of lista) {
+    for (const [indice, ficha] of directorio.entries.entries()) {
+      const clave = `${directorio.archivo}#${indice}`;
+      const precision = precisionDe(ficha);
+      const ventana = ventanaDe(ficha);
+      const estrato = estratoDe(ficha);
+      const distrito = distritoCanonico(ficha.district);
+      const base = { ficha: clave, brand: directorio.brand, nombre: ficha.name, estrato };
+      const conCoordenada = Number.isFinite(ficha.latitude) && Number.isFinite(ficha.longitude);
+      const enVentana = preparados
+        .filter((sitio) => !conCoordenada || ventana.contiene(sitio))
+        .map((sitio) => ({ sitio, distancia: conCoordenada ? metros(ficha, sitio) : null }));
+      if (!enVentana.length) { anotar({ ...base, motivo: 'sin_candidato' }); continue; }
+      const compatibles = distrito ? enVentana.filter(({ sitio }) => sitio.distritoCanonico === distrito) : enVentana;
+      if (!compatibles.length) { anotar({ ...base, motivo: 'distrito_contradictorio' }); continue; }
+      const analisis = analizarDireccion(ficha.address);
+      const confirmados = compatibles
+        .map((candidato) => ({ ...candidato, ...señalesDe({ ...ficha, brand: directorio.brand, analisis }, candidato.sitio, { conDistrito: Boolean(distrito) }) }))
+        .filter((candidato) => candidato.confirma)
+        .sort((left, right) => right.puntaje - left.puntaje);
+      if (!confirmados.length) { anotar({ ...base, motivo: 'sin_corroboracion' }); continue; }
+      const [mejor, segundo] = confirmados;
+      const margen = segundo ? mejor.puntaje - segundo.puntaje : null;
+      if (segundo && margen < MARGEN_MINIMO) {
+        anotar({ ...base, motivo: 'margen_insuficiente', candidatos: confirmados.filter((candidato) => mejor.puntaje - candidato.puntaje < MARGEN_MINIMO).map((candidato) => candidato.sitio.establishment_id) });
+        continue;
+      }
+      const operador = mejor.sitio.operador;
+      propuestas.push({
+        establishment_id: mejor.sitio.establishment_id,
+        brand: directorio.brand,
+        method: 'official_directory',
+        reference: `${directorio.brand} · directorio oficial · ${ficha.name} · ${ficha.address} · ${directorio.source_url}`,
+        evidenced_at: directorio.evidenced_at,
+        consulted_at: directorio.consulted_at,
+        estrato,
+        precision_decimales: precision,
+        ventana_m: { latitud: ventana.latitud_m, longitud: ventana.longitud_m },
+        puntaje: mejor.puntaje,
+        margen,
+        distancia_m: mejor.distancia === null ? null : Math.round(mejor.distancia),
+        señales: mejor.señales,
+        // La razón social pertenece a otra cadena con directorio propio: no se
+        // decide aquí cuál de las dos fuentes quedó vieja.
+        choque_con_operador: Boolean(operador && activas.has(sinTildes(operador)) && sinTildes(operador) !== sinTildes(directorio.brand)) ? operador : null,
+        nombre_ficha: ficha.name,
+        ficha: clave,
+      });
+    }
+  }
+
+  // Un establecimiento reclamado con banderas distintas no se resuelve por
+  // puntaje, orden de archivos ni distancia: queda en conflicto.
+  const porSitio = new Map();
+  for (const propuesta of propuestas) porSitio.set(propuesta.establishment_id, [...(porSitio.get(propuesta.establishment_id) ?? []), propuesta]);
+  const aceptadas = [];
+  const conflictos = [];
+  for (const [establishmentId, grupo] of [...porSitio.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const marcas = [...new Map(grupo.map((propuesta) => [sinTildes(propuesta.brand), propuesta.brand])).values()];
+    const choque = grupo.find((propuesta) => propuesta.choque_con_operador);
+    if (marcas.length > 1 || choque) {
+      const motivo = marcas.length > 1 ? 'conflicto_entre_directorios' : 'choque_con_operador';
+      conflictos.push({ establishment_id: establishmentId, motivo, marcas: choque && marcas.length === 1 ? [...marcas, choque.choque_con_operador] : marcas, fichas: grupo.map((propuesta) => propuesta.ficha) });
+      for (const propuesta of grupo) anotar({ ficha: propuesta.ficha, brand: propuesta.brand, nombre: propuesta.nombre_ficha, estrato: propuesta.estrato, motivo, establishment_id: establishmentId });
+      continue;
+    }
+    // Varias fichas de una misma cadena sobre un grifo —la ficha repetida del
+    // padrón— acreditan una sola vez: gana la de más señales.
+    const [ganadora, ...resto] = [...grupo].sort((left, right) => right.puntaje - left.puntaje || left.ficha.localeCompare(right.ficha));
+    aceptadas.push(ganadora);
+    resumen.get(ganadora.ficha.split('#')[0]).acreditadas += 1;
+    for (const propuesta of resto) anotar({ ficha: propuesta.ficha, brand: propuesta.brand, nombre: propuesta.nombre_ficha, estrato: propuesta.estrato, motivo: 'perdio_asignacion', establishment_id: establishmentId, ganadora: ganadora.ficha });
+  }
+  return { aceptadas, conflictos, pendientes, resumen: [...resumen.values()] };
+}
 
 function establecimientos() {
   const texto = fs.readFileSync(path.join(identidad, 'establecimientos.csv'), 'utf8').replace(/^﻿/, '');
@@ -244,78 +583,34 @@ function emparejar() {
   if (!fs.existsSync(directorios)) throw new Error('No hay directorios descargados; ejecuta primero `fetch`');
   const sitios = establecimientos().map((row) => ({
     establishment_id: row.establishment_id,
-    distrito: sinTildes(row.distrito),
+    distrito: row.distrito,
     direccion: row.direccion,
     razon_social: row.razon_social,
     latitude: Number(row.latitud),
     longitude: Number(row.longitud),
-    vias: distintivas(row.direccion),
-    numeros: numeros(row.direccion),
-  })).filter((row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
-
-  const propuestas = [];
-  const resumen = [];
+  }));
   // Los `raw-*.json` son el volcado crudo de cada fuente, guardado para auditar;
   // no son directorios normalizados y no se emparejan.
-  for (const archivo of fs.readdirSync(directorios).filter((name) => name.endsWith('.json') && !name.startsWith('raw-'))) {
-    const directorio = JSON.parse(fs.readFileSync(path.join(directorios, archivo), 'utf8'));
-    let conflictos = 0; let sinCorroborar = 0;
-    for (const [indice, ficha] of directorio.entries.entries()) {
-      const fichaVias = distintivas(ficha.address);
-      const fichaNumeros = numeros(ficha.address);
-      const fichaDistrito = sinTildes(ficha.district);
-      const candidatos = sitios
-        .map((sitio) => ({ sitio, distancia: metros(ficha, sitio) }))
-        .filter(({ distancia }) => distancia <= RADIO_M)
-        .map(({ sitio, distancia }) => {
-          const via = [...fichaVias].filter((palabra) => sitio.vias.has(palabra));
-          const numero = [...fichaNumeros].filter((valor) => sitio.numeros.has(valor));
-          const distrito = fichaDistrito === sitio.distrito;
-          // La proximidad no puntúa: solo abre la ventana. Puntúan la vía, el
-          // número de puerta y el distrito, que es soporte y no confirmación.
-          const puntaje = (numero.length ? 45 : 0) + (via.length ? 35 : 0) + (distrito ? 10 : 0);
-          return { sitio, distancia, via, numero, distrito, puntaje };
-        })
-        .filter((candidato) => candidato.distrito && (candidato.numero.length || candidato.via.length))
-        .sort((left, right) => right.puntaje - left.puntaje || left.distancia - right.distancia);
-      if (!candidatos.length) { sinCorroborar += 1; continue; }
-      const [mejor, segundo] = candidatos;
-      const margen = segundo ? mejor.puntaje - segundo.puntaje : Infinity;
-      if (margen < MARGEN_MINIMO) { conflictos += 1; continue; }
-      propuestas.push({
-        establishment_id: mejor.sitio.establishment_id,
-        brand: directorio.brand,
-        method: 'official_directory',
-        reference: `${directorio.brand} · directorio oficial · ${ficha.name} · ${ficha.address} · ${directorio.source_url}`,
-        evidenced_at: directorio.evidenced_at,
-        consulted_at: directorio.consulted_at,
-        puntaje: mejor.puntaje,
-        margen: margen === Infinity ? null : margen,
-        distancia_m: Math.round(mejor.distancia),
-        señales: { numero_de_puerta: mejor.numero, via: mejor.via },
-        ficha: `${archivo}#${indice}`,
-      });
-    }
-    resumen.push({ directorio: archivo, fichas: directorio.entries.length, conflictos, sin_corroborar: sinCorroborar });
-  }
+  const lista = fs.readdirSync(directorios)
+    .filter((name) => name.endsWith('.json') && !name.startsWith('raw-'))
+    .sort()
+    .map((archivo) => ({ archivo, ...JSON.parse(fs.readFileSync(path.join(directorios, archivo), 'utf8')) }));
+  const { aceptadas, conflictos, pendientes, resumen } = emparejarDirectorios({ sitios, directorios: lista, marcasActivas: Object.values(FUENTES).map((fuente) => fuente.brand) });
 
-  // Asignación bipartita codiciosa: una ficha por establecimiento y un
-  // establecimiento por ficha. Lo que empate se descarta, no se reparte.
-  const porPuntaje = [...propuestas].sort((a, b) => b.puntaje - a.puntaje || a.distancia_m - b.distancia_m);
-  const sitiosTomados = new Set(); const fichasTomadas = new Set(); const aceptadas = [];
-  for (const propuesta of porPuntaje) {
-    if (sitiosTomados.has(propuesta.establishment_id) || fichasTomadas.has(propuesta.ficha)) continue;
-    sitiosTomados.add(propuesta.establishment_id); fichasTomadas.add(propuesta.ficha);
-    aceptadas.push(propuesta);
-  }
-
-  const entradas = Object.fromEntries(aceptadas.map((item) => [item.establishment_id, { brand: item.brand, method: item.method, reference: item.reference, evidenced_at: item.evidenced_at, consulted_at: item.consulted_at }]));
-  fs.writeFileSync(path.join(identidad, 'brand-evidence.json'), `${JSON.stringify({ generated_at: new Date().toISOString(), radio_m: RADIO_M, margen_minimo: MARGEN_MINIMO, resumen, entradas }, null, 2)}\n`, { mode: 0o600 });
-  fs.writeFileSync(path.join(identidad, 'brand-evidence-detalle.json'), `${JSON.stringify({ generated_at: new Date().toISOString(), aceptadas }, null, 2)}\n`, { mode: 0o600 });
-  process.stdout.write(`${JSON.stringify({ propuestas: propuestas.length, acreditadas: aceptadas.length, resumen }, null, 2)}\n`);
+  const generado = new Date().toISOString();
+  // `estrato` viaja con la entrada para muestrear cada regla por separado; el
+  // catálogo solo toma los campos de su contrato.
+  const entradas = Object.fromEntries(aceptadas.map((item) => [item.establishment_id, { brand: item.brand, method: item.method, reference: item.reference, evidenced_at: item.evidenced_at, consulted_at: item.consulted_at, estrato: item.estrato }]));
+  fs.writeFileSync(path.join(identidad, 'brand-evidence.json'), `${JSON.stringify({ generated_at: generado, margen_minimo: MARGEN_MINIMO, resumen, entradas, conflictos }, null, 2)}\n`, { mode: 0o600 });
+  fs.writeFileSync(path.join(identidad, 'brand-evidence-detalle.json'), `${JSON.stringify({ generated_at: generado, aceptadas, conflictos, pendientes }, null, 2)}\n`, { mode: 0o600 });
+  const porEstrato = {};
+  for (const item of aceptadas) porEstrato[item.estrato] = (porEstrato[item.estrato] ?? 0) + 1;
+  process.stdout.write(`${JSON.stringify({ acreditadas: aceptadas.length, por_estrato: porEstrato, conflictos: conflictos.length, resumen }, null, 2)}\n`);
 }
 
-const [comando, argumento] = process.argv.slice(2);
-if (comando === 'fetch') await descargar(argumento);
-else if (comando === 'match') emparejar();
-else throw new Error('Uso: brand-directory.mjs fetch <marca> | match');
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [comando, argumento] = process.argv.slice(2);
+  if (comando === 'fetch') await descargar(argumento);
+  else if (comando === 'match') emparejar();
+  else throw new Error('Uso: brand-directory.mjs fetch <marca> | match');
+}

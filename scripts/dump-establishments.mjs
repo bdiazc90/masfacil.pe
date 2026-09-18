@@ -87,7 +87,7 @@ async function main() {
     }));
 
   const body = `﻿${[columns.join(','), ...rows.map((row) => columns.map((key) => cell(row[key])).join(','))].join('\n')}\n`;
-  const out = path.join(root, '.local-cache', 'identity', 'establecimientos.csv');
+  const out = path.join(path.resolve(root, process.env.IDENTITY_ROOT || path.join('.local-cache', 'identity')), 'establecimientos.csv');
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, body, { mode: 0o600 });
 

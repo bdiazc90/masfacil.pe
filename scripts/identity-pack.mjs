@@ -8,7 +8,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const dir = path.join(root, '.local-cache', 'identity');
+// `IDENTITY_ROOT` empaqueta una copia de trabajo sin tocar el expediente vigente.
+const dir = path.resolve(root, process.env.IDENTITY_ROOT || path.join('.local-cache', 'identity'));
 const read = (file) => JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
 const payload = { catalog: read('commercial-identity-catalog.json'), audit: read('commercial-identity-audit.json') };
 // Sin comprimir son ~490 KB y el límite de un secret de GitHub es 48 KB.

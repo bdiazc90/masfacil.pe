@@ -9,6 +9,8 @@ import { GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, sha256, valid
 import { buildCommercialCatalogIndex, staleBrandEvidence } from '../app/commercial-catalog.mjs';
 import { brandAccreditationGroups } from '../app/commercial-audit.mjs';
 import { absentCommercialResolution, commercialIdentityReport, resolveCommercialIdentity } from '../app/commercial-resolution.mjs';
+import { brandAssetFor } from '../web/brand-logos.js';
+import { filterFreshOffers } from '../web/lib/freshness.js';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stable = (value) => `${JSON.stringify(value)}\n`;
@@ -193,7 +195,7 @@ export async function buildGasolinaProjectionForPointer({ root = rootFromModule,
   });
 }
 
-export function writeGasolinaProjection(candidate, { root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina') } = {}) {
+export function writeGasolinaProjection(candidate, { root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot } = {}) {
   for (const key of GASOLINA_KEYS) {
     const target = path.join(root, 'web', candidate.manifest.products[key].dataset_url);
     if (fs.existsSync(target) && fs.readFileSync(target, 'utf8') !== candidate.bodies[key]) throw new Error(`Snapshot inmutable ya existe con bytes distintos: ${target}`);
@@ -201,13 +203,71 @@ export function writeGasolinaProjection(candidate, { root = rootFromModule, outp
   }
   atomic(path.join(outputRoot, 'refresh-state.json'), stable(candidate.refreshState));
   atomic(path.join(outputRoot, 'manifest.json'), stable(candidate.manifest));
-  writeCommercialCoverage(candidate, root);
+  writeCommercialCoverage(candidate, root, identityRoot);
   return candidate;
+}
+
+/**
+ * La marca tal como llega a la tarjeta, contada por establecimiento único
+ * —Regular y Premium no son dos grifos— y por producto. El precio vigente y el
+ * vencido se separan con el reloj del propio snapshot (`cutoff_at`), así que dos
+ * proyecciones del mismo snapshot se comparan sin que el día de la corrida
+ * mueva nada. `svg` dice si el registro del cliente tiene con qué pintarla.
+ */
+export function brandCoverage(datasets) {
+  const universo = new Set();
+  const conMarca = new Set();
+  const porMarca = new Map();
+  for (const key of GASOLINA_KEYS) {
+    const { offers, cutoff_at: cutoffAt } = datasets[key];
+    const { offers: vigentes, expired: vencidas } = filterFreshOffers(offers, { now: () => cutoffAt, cutoffAt });
+    for (const [estado, lista] of [['vigentes', vigentes], ['vencidas', vencidas]]) {
+      for (const offer of lista) {
+        universo.add(offer.establishment_id);
+        const brand = offer.commercial_identity?.brand;
+        if (!brand) continue;
+        conMarca.add(offer.establishment_id);
+        const grupo = porMarca.get(brand) ?? { brand, svg: Boolean(brandAssetFor({ brand })), ids: new Set(), vigentes: new Set(), productos: Object.fromEntries(GASOLINA_KEYS.map((k) => [k, { vigentes: 0, vencidas: 0 }])) };
+        grupo.ids.add(offer.establishment_id);
+        if (estado === 'vigentes') grupo.vigentes.add(offer.establishment_id);
+        grupo.productos[key][estado] += 1;
+        porMarca.set(brand, grupo);
+      }
+    }
+  }
+  const marcas = [...porMarca.values()].sort((a, b) => b.ids.size - a.ids.size || a.brand.localeCompare(b.brand));
+  return {
+    clock: 'cutoff_at',
+    establishments: universo.size,
+    with_brand: conMarca.size,
+    without_brand: universo.size - conMarca.size,
+    brands_with_svg: marcas.filter((m) => m.svg).length,
+    brands_without_svg: marcas.filter((m) => !m.svg).map((m) => m.brand),
+    by_brand: marcas.map((m) => ({ brand: m.brand, svg: m.svg, establishments: m.ids.size, with_current_price: m.vigentes.size, only_expired_price: m.ids.size - m.vigentes.size, ...m.productos })),
+  };
+}
+
+// Lo que el expediente dejó sin acreditar: conteos por motivo. Solo existe
+// donde se construye el catálogo; en CI no hay expediente y queda en null.
+function brandPending(identidad) {
+  const leer = (nombre) => { const file = path.join(identidad, nombre); return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null; };
+  const evidencia = leer('brand-evidence.json');
+  const catalogo = leer('brand-conflicts.json');
+  if (!evidencia && !catalogo) return null;
+  const porMotivo = {};
+  for (const fila of evidencia?.resumen ?? []) {
+    for (const [motivo, n] of Object.entries(fila.pendientes ?? { conflicto: fila.conflictos ?? 0, sin_corroborar: fila.sin_corroborar ?? 0 })) porMotivo[motivo] = (porMotivo[motivo] ?? 0) + n;
+  }
+  return {
+    by_reason: porMotivo,
+    directory_conflicts: evidencia?.conflictos?.length ?? 0,
+    catalog_conflicts: catalogo?.conflictos?.length ?? 0,
+  };
 }
 
 // Las identidades acreditadas que hoy no tienen oferta vigente no se borran ni
 // se publican: quedan anotadas en la caché privada para poder revisarlas.
-export function writeCommercialCoverage(candidate, root = rootFromModule) {
+export function writeCommercialCoverage(candidate, root = rootFromModule, identityRoot) {
   const file = path.join(root, '.local-cache', 'publish', 'commercial-identity-coverage.json');
   const report = {
     revision_id: candidate.manifest.revision_id,
@@ -219,6 +279,8 @@ export function writeCommercialCoverage(candidate, root = rootFromModule) {
     unknown_anchors: candidate.catalogUnknownAnchors ?? [],
     brand_groups: candidate.brandGroups ?? [],
     brand_evidence_review_queue: candidate.brandEvidenceQueue ?? [],
+    brand_coverage: candidate.datasets ? brandCoverage(candidate.datasets) : null,
+    brand_pending: brandPending(commercialIdentityRoot(root, identityRoot)),
   };
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   fs.writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
@@ -227,7 +289,7 @@ export function writeCommercialCoverage(candidate, root = rootFromModule) {
 
 export async function projectGasolina({ root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot } = {}) {
   const candidate = await buildGasolinaProjectionForPointer({ root, pointer: active(root), identityRoot });
-  return writeGasolinaProjection(candidate, { root, outputRoot });
+  return writeGasolinaProjection(candidate, { root, outputRoot, identityRoot });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) projectGasolina()
