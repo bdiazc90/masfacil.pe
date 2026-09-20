@@ -1,11 +1,15 @@
 export const GASOLINA_KEYS = Object.freeze(['regular', 'premium']);
-export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0']);
+export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0', '2.7.0']);
 const CONFIDENCE_LEVELS = ['verified', 'nearby'];
 const PRODUCT_META = Object.freeze({ regular: Object.freeze({ canonical: 'GASOHOL REGULAR', label: 'Gasohol Regular' }), premium: Object.freeze({ canonical: 'GASOHOL PREMIUM', label: 'Gasohol Premium' }) });
 const legacyOfferFields = ['id', 'price', 'reported_at', 'district', 'longitude', 'latitude'];
 const identityOfferFields = ['id', 'establishment_id', 'commercial_identity', 'price', 'reported_at', 'district', 'longitude', 'latitude'];
 const addressOfferFields = ['id', 'establishment_id', 'commercial_identity', 'address', 'price', 'reported_at', 'district', 'longitude', 'latitude'];
+const facilitoOfferFields = [...addressOfferFields, 'facilito'];
 const address = (value) => value === null || (text(value) && value.length <= 48);
+// La consulta web nunca trae fecha de reporte: `reported_at: null` es parte del
+// contrato, no un hueco. Un bundle que afirmara lo contrario se rechaza.
+const facilito = (value) => value === null || (same(value, ['price', 'observed_at', 'reported_at']) && Number.isFinite(value.price) && text(value.observed_at) && value.reported_at === null);
 const same = (value, fields) => value && !Array.isArray(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...fields].sort());
 const text = (value) => typeof value === 'string' && value.length > 0;
 const identityFields = (conConfianza, conMarcaAcreditada) => conMarcaAcreditada ? ['brand', 'public_site_name', 'confidence', 'brand_accredited'] : conConfianza ? ['brand', 'public_site_name', 'confidence'] : ['brand', 'public_site_name'];
@@ -16,9 +20,14 @@ export function validateGasolinaManifest(manifest) {
   return GASOLINA_KEYS.every((key) => { const item = manifest.products[key]; const product = PRODUCT_META[key]; return same(item, ['canonical_product', 'label', 'dataset_url', 'bytes', 'sha256', 'cutoff_at']) && item.canonical_product === product.canonical && item.label === product.label && new RegExp(`^data/gasolina/snapshots/[^/]+/${key}\\.json$`).test(item.dataset_url) && Number.isInteger(item.bytes) && /^[a-f0-9]{64}$/.test(item.sha256); });
 }
 export function validateGasolinaDataset(dataset, key, revision) {
-  const fields = dataset?.schema_version === '2.0.0' ? legacyOfferFields : ['2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0'].includes(dataset?.schema_version) ? addressOfferFields : identityOfferFields;
+  const version = dataset?.schema_version;
+  const conDireccion = ['2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0', '2.7.0'].includes(version);
+  const conConfianza = ['2.3.0', '2.4.0', '2.5.0', '2.6.0', '2.7.0'].includes(version);
+  const conMarcaAcreditada = ['2.4.0', '2.5.0'].includes(version);
+  const conFacilito = version === '2.7.0';
+  const fields = version === '2.0.0' ? legacyOfferFields : conFacilito ? facilitoOfferFields : conDireccion ? addressOfferFields : identityOfferFields;
   const product = PRODUCT_META[key];
-  return same(dataset, ['schema_version', 'revision_id', 'product', 'scope', 'snapshot_date', 'cutoff_at', 'source_max_reported_at', 'provenance', 'offers']) && GASOLINA_VERSIONS.includes(dataset.schema_version) && dataset.revision_id === revision && dataset.product?.key === key && dataset.product?.canonical === product?.canonical && dataset.product?.label === product?.label && dataset.product?.display_unit === 'Galones' && dataset.scope?.department === 'LIMA' && dataset.scope?.province === 'LIMA' && Array.isArray(dataset.offers) && dataset.offers.every((offer) => same(offer, fields) && /^g2_[a-f0-9]{24}$/.test(offer.id) && (dataset.schema_version === '2.0.0' || (/^est_[a-f0-9]{24}$/.test(offer.establishment_id) && identity(offer.commercial_identity, ['2.3.0', '2.4.0', '2.5.0', '2.6.0'].includes(dataset.schema_version), ['2.4.0', '2.5.0'].includes(dataset.schema_version)) && (!['2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0'].includes(dataset.schema_version) || address(offer.address)))) && Number.isFinite(offer.price) && text(offer.reported_at) && text(offer.district) && Number.isFinite(offer.longitude) && Number.isFinite(offer.latitude));
+  return same(dataset, ['schema_version', 'revision_id', 'product', 'scope', 'snapshot_date', 'cutoff_at', 'source_max_reported_at', 'provenance', 'offers']) && GASOLINA_VERSIONS.includes(version) && dataset.revision_id === revision && dataset.product?.key === key && dataset.product?.canonical === product?.canonical && dataset.product?.label === product?.label && dataset.product?.display_unit === 'Galones' && dataset.scope?.department === 'LIMA' && dataset.scope?.province === 'LIMA' && Array.isArray(dataset.offers) && dataset.offers.every((offer) => same(offer, fields) && /^g2_[a-f0-9]{24}$/.test(offer.id) && (version === '2.0.0' || (/^est_[a-f0-9]{24}$/.test(offer.establishment_id) && identity(offer.commercial_identity, conConfianza, conMarcaAcreditada) && (!conDireccion || address(offer.address)) && (!conFacilito || facilito(offer.facilito)))) && Number.isFinite(offer.price) && text(offer.reported_at) && text(offer.district) && Number.isFinite(offer.longitude) && Number.isFinite(offer.latitude));
 }
 export async function validGasolinaBundle(manifest, key, body) {
   const descriptor = manifest.products?.[key]; if (!validateGasolinaManifest(manifest) || !descriptor || new TextEncoder().encode(body).length !== descriptor.bytes) return false;

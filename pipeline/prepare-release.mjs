@@ -17,16 +17,39 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { publicationDecisionForRoute } from '../app/publication-policy.mjs';
-import { projectGasolina, usablePrivateSnapshot } from './project-gasolina.mjs';
+import { composeGasolinaProjection, usablePrivateSnapshot, writeGasolinaProjection } from './project-gasolina.mjs';
+import { facilitoPublicationChange } from './facilito/publication.mjs';
+import { readFacilitoState } from './facilito/state.mjs';
+import { GASOLINA_KEYS } from './gasolina-contract.mjs';
 import { refreshSnapshot } from './refresh-snapshot.mjs';
 import { writeShellManifest } from './shell-manifest.mjs';
 import { verifyWeb } from '../scripts/verify-web.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-export const DEFAULT_PREPARE_DEPS = Object.freeze({ refreshSnapshot, projectGasolina, verifyWeb, writeShellManifest, usablePrivateSnapshot });
+export const DEFAULT_PREPARE_DEPS = Object.freeze({ refreshSnapshot, composeGasolinaProjection, writeGasolinaProjection, verifyWeb, writeShellManifest, usablePrivateSnapshot, readFacilitoState, publicadosDesdeDisco });
 
 const leerJson = (archivo) => { try { return JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { return null; } };
+
+/**
+ * Los datasets que hoy sirve producción, tal como quedaron en `web/data/`.
+ *
+ * En CI los acaba de bajar `fetch:live`, así que comparar contra ellos es
+ * comparar contra lo que la gente está viendo, no contra una copia local.
+ */
+function publicadosDesdeDisco(root) {
+  const base = path.join(root, 'web', 'data', 'gasolina');
+  const manifest = leerJson(path.join(base, 'manifest.json'));
+  if (!manifest?.products) return null;
+  const datasets = {};
+  for (const key of GASOLINA_KEYS) {
+    const url = manifest.products[key]?.dataset_url;
+    const dataset = url ? leerJson(path.join(root, 'web', url)) : null;
+    if (!dataset) return null;
+    datasets[key] = dataset;
+  }
+  return datasets;
+}
 const trimmed = (value) => String(value ?? '').trim();
 
 /**
@@ -62,6 +85,7 @@ export async function prepareRelease({
   routeReason = null,
   forceProject = false,
   identityRoot = null,
+  facilitoRoot = undefined,
   refreshOptions = {},
   deps = {},
 } = {}) {
@@ -86,16 +110,39 @@ export async function prepareRelease({
 
   const revisionAntes = revision();
   let decision;
-  try { decision = publicationDecisionForRoute(route, plan.refresh ? refresh : null, { forceProject, reusedSnapshot: plan.reused ?? null }); }
+  // Sin una sola unidad en el expediente no hay capa que componer, y `unchanged`
+  // vuelve a significar lo de siempre: cero bytes y cero deploy.
+  const facilitoAvailable = Object.keys(usar.readFacilitoState(root, { facilitoRoot })?.units ?? {}).length > 0;
+  // Con el refresco caído, el pointer activo sigue siendo el último snapshot
+  // oficial validado. Si además es utilizable, la consulta web puede publicarse
+  // sobre él en vez de perderse junto al CSV.
+  const officialSnapshotUsable = facilitoAvailable && ['unverifiable', 'needs_review', 'rejected'].includes(refresh.status)
+    ? usar.usablePrivateSnapshot(root, { publishedSnapshotId: null }).ok
+    : false;
+  try { decision = publicationDecisionForRoute(route, plan.refresh ? refresh : null, { forceProject, reusedSnapshot: plan.reused ?? null, facilitoAvailable, officialSnapshotUsable }); }
   catch (error) { decision = { action: 'fail_closed', project: false, verify: false, deploy: false, reason: `resultado de refresco no interpretable: ${error.message}` }; }
 
   const execution = { stage: plan.refresh ? 'refresh' : 'route', ok: decision.action !== 'fail_closed', error: null };
   let identity = refresh.identity ?? null;
 
+  let facilitoChange = null;
   if (execution.ok && decision.project) {
     execution.stage = 'project';
-    try { identity = (await usar.projectGasolina({ root, identityRoot })).identity ?? identity; }
-    catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'la proyección falló sin mensaje'; }
+    try {
+      const candidate = await usar.composeGasolinaProjection({ root, identityRoot, facilitoRoot });
+      // Con el CSV sin cambios, la entrega solo se justifica si la consulta web
+      // mueve algo que alguien pueda ver. Si no, la anterior sigue siendo
+      // correcta y se queda: publicar la misma lista con otra hora costaría una
+      // descarga completa a cada cliente para no decirle nada nuevo.
+      if (['facilito_project_verify_deploy', 'facilito_over_last_valid_snapshot'].includes(decision.action)) {
+        facilitoChange = facilitoPublicationChange({ candidate: candidate.datasets, published: usar.publicadosDesdeDisco(root), now: Date.now() });
+      }
+      if (facilitoChange && !facilitoChange.visible) {
+        decision = { ...decision, project: false, verify: false, deploy: false, action: 'no_op', reason: `consulta web sin efecto publicable: ${facilitoChange.reason}` };
+      } else {
+        identity = usar.writeGasolinaProjection(candidate, { root, identityRoot, facilitoRoot }).identity ?? identity;
+      }
+    } catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'la proyección falló sin mensaje'; }
   }
   // La precache se deriva antes de verificar, en TODA ruta que publica: el
   // shell que se sube y el módulo que lo describe salen de la misma corrida.
@@ -127,6 +174,7 @@ export async function prepareRelease({
     revision_id: revisionDespues,
     private_snapshot_reused: plan.reused ?? null,
     refresh_reason: refresh.refresh_reason ?? null,
+    facilito_change: facilitoChange?.reason ?? null,
     deploy: applied.deploy,
   };
   return { ok: execution.ok, route, route_reason: routeReason, refresh, decision: applied, execution, informe, identity };

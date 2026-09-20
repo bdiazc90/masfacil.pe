@@ -1,0 +1,48 @@
+name: Facilito · ensayo aislado desde GitHub
+on:
+  push:
+    branches: [codex/facilito-actions-probe-muab5gp0]
+permissions:
+  contents: read
+jobs:
+  captura:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.20.0
+      - name: Verificar código y publicación
+        run: |
+          npm test
+          node scripts/audit-publication.mjs --treeish HEAD --strict-history
+      - name: Instalar el navegador del workflow de producción
+        run: |
+          npm install --global --no-fund --no-audit agent-browser@0.34.0
+          agent-browser install --with-deps
+      - name: Consultar Lima completa con el extractor implementado
+        env:
+          FACILITO_ROOT: ${{ runner.temp }}/facilito-probe
+        run: node scripts/facilito-capture.mjs -v > "$RUNNER_TEMP/facilito-result.json"
+      - name: Informar adquisición y comprobar cobertura
+        if: always()
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const file = path.join(process.env.RUNNER_TEMP, 'facilito-result.json');
+          if (!fs.existsSync(file) || !fs.readFileSync(file, 'utf8').trim()) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'No se obtuvo un resumen de captura. Revisar el primer paso fallido.\n');
+            process.exit(1);
+          }
+          const r = JSON.parse(fs.readFileSync(file, 'utf8'));
+          console.log(JSON.stringify(r, null, 2));
+          const ok = r.distritos_en_el_select === 43 && r.unidades.comprobadas === 86 && r.unidades.fallidas === 0 && !r.bloqueo;
+          const rows = ['## Ensayo Facilito desde GitHub', '', '| Resultado | Valor |', '| --- | --- |', '| Distritos | ' + r.distritos_en_el_select + ' |', '| Unidades completas | ' + r.unidades.comprobadas + '/86 |', '| Unidades fallidas | ' + r.unidades.fallidas + ' |', '| Filas comprobadas | ' + r.filas_comprobadas + ' |', '| Duración de captura | ' + (r.duracion_ms / 1000).toFixed(1) + ' s |', '', ok ? 'Adquisición completa acreditada en esta ejecución.' : 'Adquisición incompleta: revisar los motivos del log.', '', 'Ensayo sin proyección ni despliegue; sin credenciales de producción, caché compartida ni subida del expediente.'];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, rows.join('\n') + '\n');
+          if (!ok) process.exitCode = 1;
+          JS

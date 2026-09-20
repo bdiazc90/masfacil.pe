@@ -8,9 +8,10 @@ La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de 
 
 ## Cómo decide la interfaz
 
+- Cada precio sale de una de dos fuentes, y la tarjeta dice cuál: **«Consultado hace X»** cuando viene de la consulta web de Facilito, que vale 24 horas, y **«Reportado hace X»** cuando viene del CSV oficial, que vale 30 días. Un reporte oficial posterior a la consulta siempre gana.
 - Con ubicación: fija un pool de estaciones cercanas y muestra las primeras, ordenables por cercanía o precio.
 - Sin ubicación: permite elegir distrito y no fabrica distancia.
-- La edad del precio se recalcula en el navegador.
+- La edad del precio y su fuente se recalculan en el navegador: cruzar las 24 horas activa el respaldo del CSV **aunque no haya conexión**, con el bundle ya guardado.
 - `Cómo llegar` abre Google Maps con el destino tras una acción explícita.
 - La ubicación de quien usa la app no se envía a servidores de masfacil.pe.
 - Cada tarjeta muestra la marca cuando el catálogo la respalda, con su logo si está en la lista controlada del cliente. Sin identidad con respaldo se muestra `Estación sin nombre verificado`.
@@ -45,8 +46,11 @@ Cuatro caminos, y el workflow elige el que corresponde según lo que cambió:
 | --- | --- |
 | Solo documentación | Se comprueba y no se publica nada. |
 | Interfaz o assets | Se recupera el último bundle público válido, se comprueba que el cliente nuevo lo acepte y se publica. **No se consulta la fuente de datos.** |
-| Refresco programado | Se adquiere, valida y promueve un snapshot nuevo; Regular y Premium van juntos. |
-| Código de proyección o catálogo | Se reproyecta desde el snapshot privado ya restaurado, **sin consultar la fuente**; solo si falta ese snapshot se refresca, y lo dice. |
+| Refresco programado | Se consulta Facilito, y se adquiere, valida y promueve un snapshot nuevo si el CSV cambió; Regular y Premium van juntos. |
+| Solo cambió la consulta web | Se compone con la capa nueva y se publica **solo si cambia algún precio efectivo**, entra o sale un vínculo, o la consulta publicada se acerca a las 24 h. Si no, la entrega anterior sigue siendo correcta y se queda. |
+| Código de proyección o catálogo | Se reproyecta desde el snapshot privado ya restaurado, **sin consultar ninguna de las dos fuentes**: se reutiliza también la última consulta guardada. Solo si falta ese snapshot se refresca, y lo dice. |
+| Falla el CSV pero hay consulta | Se compone sobre el último snapshot oficial válido y se publica la consulta de hoy. Sin snapshot utilizable no se publica ningún vínculo nuevo: se conserva la entrega anterior y se informa la causa. |
+| Falla la consulta pero hay CSV | Se publica el CSV. Un fallo del navegador o de Facilito nunca detiene la corrida. |
 
 ```bash
 npm run refresh                # refresca y promueve snapshot privado
@@ -57,9 +61,15 @@ npm run verify:web -- --origin https://masfacil.pe   # además, contra producci�
 npm run rollback -- <snapshot-id>
 npm run audit                  # bloquea material privado
 npm run dump:establishments    # vuelca los establecimientos con dirección y coordenada
+npm run facilito:capture       # consulta Facilito y guarda lo comprobado en el expediente privado
+node scripts/facilito-sample.mjs   # muestra privada de vínculos para revisar a ojo
 ```
 
-Recuperar: `npm run rollback -- <snapshot-id>` reconstruye y valida ambos productos **antes** de mover el pointer, y restaura el anterior si algo falla. Un fallo de identidad comercial no impide recuperar.
+La consulta web necesita `agent-browser` y su navegador; nada de eso viaja a
+`web/` ni hace falta para servir la PWA. Un fallo de Facilito no impide publicar
+el CSV, y el resumen de la corrida lo dice.
+
+Recuperar: `npm run rollback -- <snapshot-id>` reconstruye y valida ambos productos **antes** de mover el pointer, y restaura el anterior si algo falla. Un fallo de identidad comercial no impide recuperar. El rollback vuelve a CSV puro y nunca consulta la web; para restaurar también la consulta exacta de una entrega, `npm run rollback -- <snapshot-id> <revision-id>`.
 
 ## Histórico de precios
 

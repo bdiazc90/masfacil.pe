@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: false
+      facilito_only:
+        description: Solo consultar Facilito y reportar el resultado, sin proyectar ni desplegar (para acreditar la adquisición desde el runner)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -105,19 +110,47 @@ jobs:
 
       # El snapshot privado restaurado permite reproyectar sin consultar la
       # fuente (ruta `project`). Sin él, `publish` cae al refresco y lo dice.
+      # El expediente de consultas viaja con el snapshot: una captura vale 24 h y
+      # el cron corre cada 6, así que sin persistencia un fallo transitorio de un
+      # distrito borraría precios que seguían siendo válidos.
       - name: Restaurar el snapshot activo entre corridas
         if: steps.route.outputs.needs_refresh == 'true'
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.3
         with:
-          path: .local-cache/snapshots
+          path: |
+            .local-cache/snapshots
+            .local-cache/facilito
           key: snapshots-${{ hashFiles('bootstrap/seed.manifest.json') }}-${{ github.run_id }}
           restore-keys: |
             snapshots-${{ hashFiles('bootstrap/seed.manifest.json') }}-
+
+      # Solo en el camino que consulta Facilito. Versión fija, y nada de esto
+      # viaja a `web/` ni hace falta para servir la PWA. Tolerante a fallo: si el
+      # navegador no se instala, la corrida sigue y publica el CSV. Una fuente no
+      # puede tumbar a la otra.
+      - name: Instalar el navegador de la consulta web
+        if: steps.route.outputs.route == 'data' || inputs.facilito_only
+        continue-on-error: true
+        run: |
+          npm install --global --no-fund --no-audit agent-browser@0.34.0
+          agent-browser install --with-deps
+
+      # Un fallo aquí no impide publicar: el CSV sigue su camino y el resumen
+      # dice que la corrida publicó solo respaldo. Un bloqueo explícito detiene
+      # la adquisición por dentro, sin seguir golpeando el mismo muro.
+      # Solo en la ruta de DATOS. Una reproyección —cambio de contrato, de
+      # catálogo o de código— reutiliza el expediente guardado y no consulta
+      # nada: si consultara, reproyectar cambiaría los datos de la entrega.
+      - name: Consultar precios en Facilito
+        if: steps.route.outputs.route == 'data' || inputs.facilito_only
+        continue-on-error: true
+        run: node scripts/facilito-capture.mjs -v
 
       # Un solo programa. `publish` decide, escribe `prepare-result.json` y anexa
       # `deploy=` a GITHUB_OUTPUT; si muere sin escribirlo no hay output, el
       # job falla y el deployment vigente se conserva.
       - name: Preparar la entrega según la ruta
+        if: ${{ !inputs.facilito_only }}
         id: prepare
         env:
           REFRESH_STATE_PATH: ${{ github.workspace }}/web/data/gasolina/refresh-state.json
