@@ -9,6 +9,7 @@
     "serve": "node scripts/serve-web.mjs",
     "refresh": "node scripts/refresh.mjs",
     "project": "node pipeline/project-gasolina.mjs",
+    "facilito:capture": "node scripts/facilito-capture.mjs",
     "publish": "node scripts/publish.mjs",
     "rollback": "node scripts/rollback.mjs",
     "seed:install": "node scripts/seed-install.mjs",

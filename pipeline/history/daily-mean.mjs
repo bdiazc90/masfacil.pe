@@ -8,13 +8,19 @@
  * La regla de vigencia NO se reimplementa aquí: se importa la misma que usa la
  * interfaz (`web/lib/freshness.js`), con el reloj inyectado en `observed_at`.
  * Cualquier otra cosa mediría algo distinto de lo que la app podía mostrar en
- * ese instante, que es justo lo que este indicador afirma.
+ * ese instante, que es justo lo que este indicador afirma. Desde el contrato
+ * 2.7.0 eso incluye la elección de fuente: si la tarjeta mostró el precio de la
+ * consulta web, el promedio del día promedia ese mismo precio.
  */
 
 import { filterFreshOffers } from '../../web/lib/freshness.js';
 import { GASOLINA_KEYS, validateGasolinaBundle } from '../gasolina-contract.mjs';
 
-export const METHOD_VERSION = 'daily-mean-1';
+// Sube a `-2` porque el método cambió: antes promediaba siempre el reporte del
+// CSV y ahora promedia el precio efectivo, que puede venir de la consulta web.
+// El pasado no se recalcula —sería inventar observaciones que nadie hizo—, así
+// que la serie tiene un escalón declarado en vez de una continuidad falsa.
+export const METHOD_VERSION = 'daily-mean-2';
 /** Se persiste con cuatro decimales; la interfaz muestra dos. */
 const PRECISION = 10_000;
 

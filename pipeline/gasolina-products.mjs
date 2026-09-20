@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 import { GIS_FIELDS, MINIMIZED_FIELDS, RAW_FIELDS, REGISTRY_FIELDS, assertHeader, clean, csvRows, normalizeHeader, parseTimestamp, readTable } from './csv.mjs';
+import { facilitoLinkKey } from './facilito/link.mjs';
 
 export const GASOLINA_PRODUCTS = Object.freeze({
   regular: Object.freeze({ canonical: 'GASOHOL REGULAR', label: 'Gasohol Regular' }),
@@ -165,16 +166,27 @@ function finishProduct({ candidates, productKey, identities, duplicates, snapsho
     const identity = identities.get(item.selected.ID3);
     return identity?.RAZON_SOCIAL && identity?.DIRECCION;
   });
-  const offers = ready.map((item) => ({
-    id: `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`,
-    establishment_id: officialAnchorFromRegistration(item.selected.REGISTRO_DE_HIDROCARBUROS),
-    address: direccionParaPantalla(identities.get(item.selected.ID3).DIRECCION),
-    price: item.selected.numericPrice,
-    reported_at: item.selected.time.toISOString(),
-    district: item.selected.DISTRITO,
-    longitude: item.longitude,
-    latitude: item.latitude,
-  })).sort((a, b) => a.id.localeCompare(b.id));
+  // La huella del vínculo con la consulta web sale de la MISMA fila que da el
+  // precio publicado, no de la primera fila que el original traiga para ese
+  // Registro: la razón social y la dirección tienen que ser las del reporte que
+  // se está publicando, o estaríamos emparejando con una identidad de otra
+  // fecha. No viaja al bundle; se queda en la proyección.
+  const linkKeys = new Map();
+  const offers = ready.map((item) => {
+    const identity = identities.get(item.selected.ID3);
+    const id = `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`;
+    linkKeys.set(id, facilitoLinkKey(identity.RAZON_SOCIAL, identity.DIRECCION, item.selected.DISTRITO));
+    return {
+      id,
+      establishment_id: officialAnchorFromRegistration(item.selected.REGISTRO_DE_HIDROCARBUROS),
+      address: direccionParaPantalla(identity.DIRECCION),
+      price: item.selected.numericPrice,
+      reported_at: item.selected.time.toISOString(),
+      district: item.selected.DISTRITO,
+      longitude: item.longitude,
+      latitude: item.latitude,
+    };
+  }).sort((a, b) => a.id.localeCompare(b.id));
   const metric = (items) => ({ offers: items.length, districts: new Set(items.map((item) => item.selected?.DISTRITO ?? item.district)).size });
   // El universo del Registro es la referencia oficial contra la que se valida
   // la identidad comercial. No depende de que hoy haya precio vigente: una
@@ -203,6 +215,7 @@ function finishProduct({ candidates, productKey, identities, duplicates, snapsho
   return {
     product,
     offers,
+    linkKeys,
     registryAnchors,
     exclusions,
     metrics: {

@@ -304,14 +304,26 @@ J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique
 | CSV semanal de `Reporte-Diario` (actual) | martes; hasta 6 días | sí | única fuente oficial nominal por establecimiento |
 | `CL-Registro-precios-DMIN.csv` (misma carpeta) | mismo sello semanal | sí | distribuidores minoristas, no grifos |
 | Otras rutas de `SCOP-DOCS` | — | — | variantes probadas 404; el listado SharePoint exige autenticación |
-| Facilito web | horas (lee PRICE) | no | formulario Struts con reCAPTCHA v3 |
+| Facilito web | horas (lee PRICE) | sí, medido el 10 y el 20/09/2026 | formulario Struts con reCAPTCHA v3; un navegador normal lo atraviesa sin resolver ningún desafío |
 | Facilito app | horas | no | sin API pública; no se decompila |
 | PRICE/SCOP (`pvo.osinergmin.gob.pe`) | inmediato | no | credenciales de operador |
 | datosabiertos.gob.pe «Lista de precios diaria» | mensual | sí | anonimizado: sin establecimiento |
 | Precios de referencia PR1/PR2 | semanal | condicional | promedios nacionales, no por grifo |
 | ArcGIS de Osinergmin | — | — | `gis.osinergmin.gob.pe` no resuelve; `gisem` 404 |
 
-**Decisión.** Se mantiene el CSV semanal y la app declara la cadencia (fecha del registro en cada tarjeta y fecha del archivo sobre la lista). Dos caminos legítimos hacia ≤ 24 h, ninguno técnico: pedir a Osinergmin la publicación diaria del reporte o un acceso al módulo PRICE, y los aportes de quien usa la app como evidencia junto al precio oficial, nunca en su lugar (backlog en [roadmap.md](roadmap.md)). El cron sigue sondeando 4×/día: sus logs registran `Last-Modified` y confirmarán si la cadencia es martes fijo.
+**Decisión de agosto, ya superada en parte.** Se mantuvo el CSV semanal como única fuente y la app declaraba su cadencia. La fila de Facilito decía «no automatizable»; el piloto del 10/09/2026 y el barrido del 20/09/2026 lo desmintieron, y desde entonces la consulta web es una **capa sobre** el CSV, nunca un reemplazo. Siguen abiertos los dos caminos no técnicos: pedir a Osinergmin la publicación diaria del reporte o un acceso al módulo PRICE, y los aportes de quien usa la app junto al precio oficial, nunca en su lugar (backlog en [roadmap.md](roadmap.md)).
+
+## Consulta web de Facilito — medido el 20/09/2026
+
+**Qué es.** El buscador público de Facilito lee el mismo registro PRICE que alimenta el CSV, pero con horas de retraso en vez de días. Se conduce con un navegador normal sobre sus selectores públicos —departamento, provincia, distrito, producto— y se lee la tabla que DataTables ya cargó en el cliente, contrastando las filas contra el total que la propia tabla anuncia. No se llaman endpoints, no se reutiliza el token de reCAPTCHA, no se resuelve ningún desafío y no se usan proxies.
+
+**Barrido completo medido.** 43 distritos de Lima provincia × 2 productos = **86 unidades, 86 comprobadas, 1452 filas, en 109 segundos**. La unidad de aceptación es distrito × producto: una tabla parcial o de forma desconocida tumba esa unidad y no las demás. Un rechazo explícito —401/403/429 o un desafío— detiene la adquisición entera en vez de seguir probando distritos.
+
+**Qué NO entrega.** La tabla no publica el número de Registro ni la fecha en que el operador registró el precio. Por eso el vínculo con el establecimiento oficial es textual —razón social + dirección + distrito exactos y únicos en ambos sentidos, normalizando solo mayúsculas, tildes y espacios— y por eso la capa lleva `reported_at: null` y la tarjeta dice **«Consultado hace X»**, nunca «Reportado». Medido sobre el snapshot del 06/09: **684 de 726 ofertas Regular y 673 de 711 Premium** quedaron vinculadas, con **cero ambigüedades** y 95 filas sin par oficial.
+
+**Cuánto vale una consulta.** 24 horas desde que se leyó la tabla. Después manda el respaldo del CSV mientras su reporte tenga 30 días o menos, y si tampoco, la tarjeta se queda sin precio. Un reporte del CSV posterior a la consulta gana siempre: una consulta anterior no desplaza un cambio de precio más nuevo que sí conocemos. Un fallo de consulta no rejuvenece nada —la captura anterior conserva su hora— y no se presenta nunca como silencio del operador.
+
+**Privacidad.** La tabla trae razón social, dirección y teléfono. El teléfono se valida por posición y no se emite nunca; la razón social y la dirección se convierten en huella SHA-256 para comparar y no se persisten. El expediente privado (`.local-cache/facilito/`) guarda huella, precio y hora, nada más. Solo `npm run facilito:sample`, local y explícito, conserva el texto para revisar una muestra a ojo.
 
 ## Modelo útil
 
@@ -337,7 +349,7 @@ El catálogo canónico se ancla al **establecimiento físico mediante su código
 
 ## Procedencia, privacidad y reproducción
 
-Los originales grandes o con datos personales viven solo en `.local-cache/`: `raw/` guarda las adquisiciones, `snapshots/` los snapshots promovidos con su pointer, `identity/` el catálogo y la auditoría comercial, y `publish/` los artefactos de publicación. Los snapshots versionados eliminan RUC, razón social, dirección, representante, teléfono, correo y placa. Un manifiesto previo sella lista, tamaño y SHA-256; la verificación falla ante archivos nuevos, alterados o ausentes.
+Los originales grandes o con datos personales viven solo en `.local-cache/`: `raw/` guarda las adquisiciones, `snapshots/` los snapshots promovidos con su pointer, `identity/` el catálogo y la auditoría comercial, `facilito/` el expediente de consultas web, y `publish/` los artefactos de publicación. Los snapshots versionados eliminan RUC, razón social, dirección, representante, teléfono, correo y placa. Un manifiesto previo sella lista, tamaño y SHA-256; la verificación falla ante archivos nuevos, alterados o ausentes.
 
 La auditoría de publicación comprueba que nada de eso llegue a Git —rutas prohibidas, ignores requeridos y tamaño máximo por archivo rastreado:
 

@@ -11,9 +11,22 @@ import { brandAccreditationGroups } from '../app/commercial-audit.mjs';
 import { absentCommercialResolution, commercialIdentityReport, resolveCommercialIdentity } from '../app/commercial-resolution.mjs';
 import { brandAssetFor } from '../web/brand-logos.js';
 import { filterFreshOffers } from '../web/lib/freshness.js';
+import { selectOfferPrice } from '../web/lib/price-source.js';
+import { resolveFacilitoLayer } from './facilito/link.mjs';
+import { facilitoRunCounts, facilitoStateId, facilitoUnitInstants, readFacilitoState, writeFacilitoRevision } from './facilito/state.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stable = (value) => `${JSON.stringify(value)}\n`;
+
+// Cuántos precios saldrían de cada fuente ahora mismo. Es una foto del momento
+// de componer, no un guardrail: el cliente vuelve a decidir con su propio reloj
+// y puede llegar a otra respuesta perfectamente válida horas después.
+function preciosEfectivos(offers, cutoffAt, now) {
+  const reloj = () => new Date(Math.max(now, Date.parse(cutoffAt)));
+  const cuenta = { facilito: 0, csv: 0, none: 0 };
+  for (const offer of offers) cuenta[selectOfferPrice(offer, { now: reloj, cutoffAt }).source ?? 'none'] += 1;
+  return cuenta;
+}
 
 function atomic(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -71,7 +84,7 @@ function optionalSeed(root) {
   return decodeSeed(fs.readFileSync(encoded, 'utf8'), manifest);
 }
 
-export async function buildGasolinaProjectionCandidate({ pointer, temporalContext, sources = null, minimizedRoot, rawPath, bootstrapSeed = null, commercialResolution = absentCommercialResolution() }) {
+export async function buildGasolinaProjectionCandidate({ pointer, temporalContext, sources = null, minimizedRoot, rawPath, bootstrapSeed = null, commercialResolution = absentCommercialResolution(), facilitoState = null, now = Date.now() }) {
   // La identidad comercial ya no es una puerta: llega resuelta, con lo que tiene
   // respaldo y lo que no. Antes esta función empezaba comprobando la auditoría y
   // un nombre pendiente impedía construir un solo precio.
@@ -91,6 +104,11 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
     registryIds: GASOLINA_KEYS.flatMap((key) => [...results[key].registryAnchors]),
     offerIds: GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)),
   });
+  // La consulta web se resuelve aquí, con el vínculo exacto que salió de la
+  // misma fila del original que dio el precio publicado. Es una CAPA: el precio
+  // y la fecha del CSV viajan intactos al lado, porque el respaldo tiene que
+  // funcionar cuando la consulta venza y el cliente esté sin red.
+  const facilitoLayers = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, resolveFacilitoLayer({ state: facilitoState, linkKeys: results[key].linkKeys, product: key, now })]));
   // La revisión sale del contenido, no de un sufijo que había que subir a mano y
   // que se olvidaba: mismo contenido, misma revisión; contenido distinto,
   // revisión nueva, y los snapshots siguen siendo inmutables porque un contenido
@@ -108,7 +126,7 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
     cutoff_at: input.cutoffAt,
     source_max_reported_at: input.sourceMaxReportedAt,
     provenance: { source: 'Osinergmin', source_url: pointer.source_url, attribution: 'Datos de precios y coordenadas: Osinergmin.' },
-    offers: results[key].offers.map((offer) => ({ ...offer, commercial_identity: catalogIndex.byAnchor.get(offer.establishment_id) ?? null })),
+    offers: results[key].offers.map((offer) => ({ ...offer, commercial_identity: catalogIndex.byAnchor.get(offer.establishment_id) ?? null, facilito: facilitoLayers[key].byOfferId.get(offer.id) ?? null })),
   });
   // Una sola huella para los dos productos: el contrato exige que regular y
   // premium declaren la misma revisión.
@@ -138,6 +156,24 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
     validators: pointer.validators,
     source_max_reported_at: input.sourceMaxReportedAt,
     products: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, { ...results[key].metrics, cutoff_at: input.cutoffAt }])),
+    // Captura, vínculos y precios efectivos se miden por separado a propósito:
+    // un respaldo CSV que funciona no es un scraping que funcionó, y mezclarlos
+    // haría que una corrida sin una sola consulta pareciera exitosa. El embudo
+    // de arriba sigue midiendo lo mismo de siempre, con el reloj del snapshot,
+    // para que los guardrails de caída comparen manzanas con manzanas.
+    facilito: {
+      contract: facilitoState?.contract ?? 'sin-captura',
+      state_id: facilitoStateId(facilitoState),
+      // La hora de CADA unidad, no solo la más reciente: es lo que permite al
+      // preflight ver que un distrito retrocede aunque el máximo suba.
+      units_observed: facilitoUnitInstants(facilitoState),
+      units: facilitoRunCounts(facilitoState),
+      districts: new Set(Object.values(facilitoState?.units ?? {}).map((unidad) => unidad.district_code)).size,
+      linked: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, facilitoLayers[key].counts.linked])),
+      ambiguous: GASOLINA_KEYS.reduce((total, key) => total + facilitoLayers[key].counts.ambiguous, 0),
+      unlinked: GASOLINA_KEYS.reduce((total, key) => total + facilitoLayers[key].counts.unlinked, 0),
+      effective: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, preciosEfectivos(contenido(key).offers, input.cutoffAt, now)])),
+    },
   };
   const errors = [...validateGasolinaManifest(manifest), ...validateGasolinaRefreshState(refreshState, manifest)];
   for (const key of GASOLINA_KEYS) errors.push(...validateGasolinaBundle(manifest, key, bodies[key]));
@@ -145,7 +181,7 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
   // Cada identidad sin oferta viene con la etapa en la que se perdió por producto:
   // Regular y Premium pueden caerse por motivos distintos, así que se anotan los dos.
   const catalogWithoutOffer = catalogIndex.withoutOffer.map((id) => Object.fromEntries([['id', id], ...GASOLINA_KEYS.map((key) => [key, results[key].exclusions.get(id) ?? 'fuera_del_registro_del_producto'])]));
-  return { manifest, refreshState, datasets, bodies, results, identity: commercialIdentityReport(commercialResolution), isolatedEntries: commercialResolution.isolated ?? [], catalog: catalogIndex.metrics, catalogWithoutOffer, catalogUnknownAnchors: catalogIndex.unknownAnchors, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
+  return { manifest, refreshState, datasets, bodies, results, facilitoState, facilitoLayers, composedAt: now, identity: commercialIdentityReport(commercialResolution), isolatedEntries: commercialResolution.isolated ?? [], catalog: catalogIndex.metrics, catalogWithoutOffer, catalogUnknownAnchors: catalogIndex.unknownAnchors, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
 }
 
 /** Dónde vive el expediente. `IDENTITY_ROOT` permite trabajar sobre una copia. */
@@ -184,23 +220,35 @@ export function usablePrivateSnapshot(root = rootFromModule, { publishedSnapshot
   return { ok: !missing.length, snapshot_id: pointer.snapshot_id, missing };
 }
 
-export async function buildGasolinaProjectionForPointer({ root = rootFromModule, pointer, bootstrapSeed, identityRoot } = {}) {
+/**
+ * @param {object} [entrada]
+ * @param {object|null} [entrada.facilitoState]  estado a usar; `undefined` lee el
+ *   activo. El rollback pasa el de SU revisión: recuperar una entrega de ayer y
+ *   pintarle los precios de hoy sería inventar una revisión que nunca existió.
+ */
+export async function buildGasolinaProjectionForPointer({ root = rootFromModule, pointer, bootstrapSeed, identityRoot, facilitoState, facilitoRoot, now } = {}) {
   return buildGasolinaProjectionCandidate({
     pointer,
     temporalContext: temporalContextForPointer(root, pointer),
     minimizedRoot: path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized'),
     rawPath: resolveGasolinaRaw(root, pointer),
     bootstrapSeed: bootstrapSeed === undefined ? optionalSeed(root) : bootstrapSeed,
+    facilitoState: facilitoState === undefined ? readFacilitoState(root, { facilitoRoot }) : facilitoState,
+    ...(now === undefined ? {} : { now }),
     ...loadCommercialPublicationInputs(root, { identityRoot }),
   });
 }
 
-export function writeGasolinaProjection(candidate, { root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot } = {}) {
+export function writeGasolinaProjection(candidate, { root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot, facilitoRoot } = {}) {
   for (const key of GASOLINA_KEYS) {
     const target = path.join(root, 'web', candidate.manifest.products[key].dataset_url);
     if (fs.existsSync(target) && fs.readFileSync(target, 'utf8') !== candidate.bodies[key]) throw new Error(`Snapshot inmutable ya existe con bytes distintos: ${target}`);
     if (!fs.existsSync(target)) atomic(target, candidate.bodies[key]);
   }
+  // El estado que compuso esta revisión se sella antes del manifest, junto a
+  // los snapshots inmutables: es la referencia privada inequívoca y recuperable
+  // que el rollback necesita para no mezclar la captura de otra entrega.
+  if (candidate.facilitoState) writeFacilitoRevision(root, candidate.manifest.revision_id, candidate.facilitoState, { facilitoRoot, composedAt: candidate.composedAt });
   atomic(path.join(outputRoot, 'refresh-state.json'), stable(candidate.refreshState));
   atomic(path.join(outputRoot, 'manifest.json'), stable(candidate.manifest));
   writeCommercialCoverage(candidate, root, identityRoot);
@@ -287,9 +335,21 @@ export function writeCommercialCoverage(candidate, root = rootFromModule, identi
   return file;
 }
 
-export async function projectGasolina({ root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot } = {}) {
-  const candidate = await buildGasolinaProjectionForPointer({ root, pointer: active(root), identityRoot });
-  return writeGasolinaProjection(candidate, { root, outputRoot, identityRoot });
+/**
+ * Compone sin escribir.
+ *
+ * Existe porque desde el contrato 2.7.0 hay que mirar la composición ANTES de
+ * decidir si se publica: con el CSV sin cambios, lo único que puede justificar
+ * una entrega nueva es que la consulta web mueva algún precio efectivo, y eso
+ * no se sabe hasta haberla compuesto.
+ */
+export async function composeGasolinaProjection({ root = rootFromModule, identityRoot, facilitoRoot } = {}) {
+  return buildGasolinaProjectionForPointer({ root, pointer: active(root), identityRoot, facilitoRoot });
+}
+
+export async function projectGasolina({ root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot, facilitoRoot } = {}) {
+  const candidate = await composeGasolinaProjection({ root, identityRoot, facilitoRoot });
+  return writeGasolinaProjection(candidate, { root, outputRoot, identityRoot, facilitoRoot });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) projectGasolina()

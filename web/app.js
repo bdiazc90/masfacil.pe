@@ -2,6 +2,7 @@ import { loadGasolina } from './data-client.js';
 import { haversineKm, initialRadiusKm, nextVisibleCount, orderOffers, radiusIsInert, withinRadius, PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM, SHOW_ALL_THRESHOLD } from './lib/haversine.js';
 import { decisionTag, formatRadius } from './lib/decision-view.js';
 import { filterFreshOffers, MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
+import { msUntilSourceChange } from './lib/price-source.js';
 import { mergeOfferRows } from './lib/merge-products.js';
 import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
 import { visibleDistricts } from './district-list.js';
@@ -57,21 +58,24 @@ function currentRows() {
 // Lo que de verdad se puede comparar. Lo consultan el estado vacío, el radio
 // inicial y los controles que solo tienen sentido con más de un precio.
 const conPrecio = (filas) => filas.filter((row) => row.has_price);
-const DIA_MS = 86_400_000;
 // La vigencia se congela en el instante en que se calcula, así que hay que
 // volver a mirarla cada vez que se rearma la lista: un precio de 29 días y 23
 // horas cruza los 30 mientras la app sigue abierta. No hace falta recomputar en
-// cada frame —la vigencia solo cambia cuando un precio cruza la ventana, y ese
+// cada frame —la vigencia solo cambia cuando un precio cruza una ventana, y ese
 // instante se puede calcular— así que se guarda cuál es el próximo y hasta
 // entonces se reutiliza lo que ya hay.
 function refrescarVigencia({ forzar = false } = {}) {
   if (!forzar && Date.now() < state.freshUntil) return;
   state.fresh = currentRows();
-  const edades = state.fresh.flatMap((row) => GASOLINA_KEYS.map((key) => row.prices[key]?.age_days)).filter(Number.isFinite);
-  // El precio más viejo que hoy se ve es el primero en vencer. Sin ninguno
-  // visible ya no queda nada que pueda caducar.
-  const masViejo = edades.reduce((mayor, edad) => Math.max(mayor, edad), -Infinity);
-  state.freshUntil = edades.length ? Date.now() + (MAX_OFFER_AGE_DAYS - masViejo) * DIA_MS : Infinity;
+  // Ya no hay una sola ventana. Una consulta web que cruza las 24 horas activa
+  // el respaldo del CSV, y un reporte que cruza los 30 días apaga el precio:
+  // manda el vencimiento más cercano de los dos. Se le pregunta a la oferta y no
+  // a su edad porque el cambio de fuente tiene que ocurrir también sin red, con
+  // el bundle ya guardado.
+  const now = () => new Date();
+  const proximo = GASOLINA_KEYS.flatMap((key) => state.dataset.offers[key] ?? [])
+    .reduce((menor, offer) => Math.min(menor, msUntilSourceChange(offer, { now, cutoffAt: state.dataset.cutoff_at })), Infinity);
+  state.freshUntil = Number.isFinite(proximo) ? Date.now() + proximo : Infinity;
   if (state.origin) state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
 }
 function renderRadiusControl() {

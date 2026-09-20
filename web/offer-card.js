@@ -14,6 +14,11 @@ const calladoDesde = (days) => {
   if (days < 60) return `hace ${Math.max(1, Math.floor(days))} días`;
   return days < 365 ? `hace ${Math.round(days / 30)} meses` : 'hace más de un año';
 };
+// El verbo no es adorno: un precio del CSV rige desde su fecha porque el
+// operador lo registró, y uno de la consulta web solo consta desde que lo
+// leímos. Decir «reportado» de lo segundo afirmaría una fecha que nadie nos dio.
+const VERBOS = Object.freeze({ csv: 'Reportado', facilito: 'Consultado' });
+const desde = (days, source) => { const relativo = ago(days); return source ? `${VERBOS[source]} ${relativo}` : `${relativo[0].toLocaleUpperCase('es-PE')}${relativo.slice(1)}`; };
 const kilometers = (value) => value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`;
 const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y']);
 
@@ -86,14 +91,20 @@ export function renderOfferDetail(offer, { prices = {}, attribution = null } = {
   const filas = Object.keys(PRODUCTOS).map((key) => {
     const item = prices[key];
     if (!item) return `<div class="detail__row detail__row--empty">${chip(key)}<span class="detail__price">sin precio vigente</span><span class="detail__when"></span></div>`;
-    return `<div class="detail__row">${chip(key)}<span class="detail__price">${priceHtml(item.price)}</span><span class="detail__when">${escapeHtml(fechaHora(item.reported_at))}</span></div>`;
+    // Cada producto conserva su fuente y su fecha: aquí es donde se ve cuál de
+    // los dos importes se leyó de la web y cuál lo registró el operador.
+    const cuando = `${VERBOS[item.source ?? 'csv'].toLocaleLowerCase('es-PE')} ${fechaHora(item.at ?? item.reported_at)}`;
+    return `<div class="detail__row">${chip(key)}<span class="detail__price">${priceHtml(item.price)}</span><span class="detail__when">${escapeHtml(cuando)}</span></div>`;
   }).join('');
   const coordenada = `${offer.latitude.toFixed(5)}, ${offer.longitude.toFixed(5)}`;
   const fuente = attribution ? `<span>${escapeHtml(attribution)}</span>` : '';
   // En una fila muda las dos filas de arriba dicen «sin precio vigente»; lo que
   // el panel puede añadir es cuándo fue la última vez que reportó.
   const ultimo = offer.has_price === false && offer.last_reported_at ? `<span>Último precio reportado el <b>${escapeHtml(fechaHora(offer.last_reported_at))}</b></span>` : '';
-  return `<div class="offer__detail">${filas}<p class="detail__meta">${ultimo}<span>Coordenada oficial <b>${escapeHtml(coordenada)}</b></span>${fuente}</p><a class="button--text" href="${escapeHtml(streetViewUrl(offer))}" target="_blank" rel="noopener noreferrer">Ver en Street View</a></div>`;
+  // Última consulta y último reporte son fechas distintas y se conservan por
+  // separado: que nuestra consulta venciera no dice nada sobre el operador.
+  const consultado = offer.has_price === false && offer.last_observed_at ? `<span>Última consulta el <b>${escapeHtml(fechaHora(offer.last_observed_at))}</b></span>` : '';
+  return `<div class="offer__detail">${filas}<p class="detail__meta">${ultimo}${consultado}<span>Coordenada oficial <b>${escapeHtml(coordenada)}</b></span>${fuente}</p><a class="button--text" href="${escapeHtml(streetViewUrl(offer))}" target="_blank" rel="noopener noreferrer">Ver en Street View</a></div>`;
 }
 
 export function streetViewUrl(offer) {
@@ -160,6 +171,10 @@ export function renderOfferCard(offer, { withDistance = true, directionsUrl = nu
   // La capa de marca va primera en el marcado y detrás en pintura: nunca se
   // interpone entre el contenido y quien lo toca.
   const address = offer.address ? escapeHtml(offer.address) : '';
-  const frescura = ago(offer.age_days);
-  return `<li class="offer glass"${brandAttr(offer)} tabindex="-1">${brandMarkHtml(offer)}${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(`${frescura[0].toLocaleUpperCase('es-PE')}${frescura.slice(1)}`)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
+  // Una sola línea y un solo tiempo: el del precio más reciente que la tarjeta
+  // muestra, con el verbo de SU fuente. Si Regular viene de la consulta y
+  // Premium del CSV, el detalle desglosa las dos; la etiqueta no promete que
+  // ambos tengan la frescura del más nuevo.
+  const frescura = desde(offer.age_days, offer.age_source);
+  return `<li class="offer glass"${brandAttr(offer)} tabindex="-1">${brandMarkHtml(offer)}${tagHtml}<div class="offer__topline">${precios}${distance}</div><div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address || escapeHtml(displayDistrict(offer.district))}</p><p class="offer__freshness">${escapeHtml(frescura)}</p><p class="offer__district">${address ? escapeHtml(displayDistrict(offer.district)) : ''}</p></div>${actions}${detailSlot}</li>`;
 }

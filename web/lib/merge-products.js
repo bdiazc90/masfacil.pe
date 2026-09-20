@@ -38,19 +38,27 @@ export function mergeOfferRows(vigentes, vencidas = {}) {
       // `age_days` arranca en Infinity y solo lo baja un precio VIGENTE: si lo
       // sembrara la primera oferta que llega y esa fuera vencida, una tarjeta
       // con Premium de hoy anunciaría «Hace 190 días».
-      actual = { establishment_id: offer.establishment_id, address: offer.address, district: offer.district, latitude: offer.latitude, longitude: offer.longitude, commercial_identity: offer.commercial_identity, prices: Object.fromEntries(GASOLINA_KEYS.map((item) => [item, null])), age_days: Infinity, silent_days: Infinity, last_reported_at: null };
+      actual = { establishment_id: offer.establishment_id, address: offer.address, district: offer.district, latitude: offer.latitude, longitude: offer.longitude, commercial_identity: offer.commercial_identity, prices: Object.fromEntries(GASOLINA_KEYS.map((item) => [item, null])), age_days: Infinity, age_source: null, silent_days: Infinity, last_reported_at: null, last_observed_at: null };
       filas.set(offer.establishment_id, actual);
     }
-    // Desde cuándo calla: el reporte más reciente que tiene, vigente o no.
-    if (offer.age_days < actual.silent_days) { actual.silent_days = offer.age_days; actual.last_reported_at = offer.reported_at; }
+    // Desde cuándo calla: el reporte más reciente que tiene, vigente o no, y
+    // siempre el del CSV. Que nuestra consulta fallara o venciera no es silencio
+    // del operador y no puede contarse como tal.
+    if (offer.reported_age_days < actual.silent_days) { actual.silent_days = offer.reported_age_days; actual.last_reported_at = offer.reported_at; }
+    // La última vez que vimos su tabla se conserva aparte: última consulta y
+    // último reporte son fechas distintas y no se funden en una.
+    const observado = offer.facilito?.observed_at ?? null;
+    if (observado && (!actual.last_observed_at || Date.parse(observado) > Date.parse(actual.last_observed_at))) actual.last_observed_at = observado;
     return actual;
   };
   for (const key of GASOLINA_KEYS) {
     for (const offer of vigentes[key] ?? []) {
       const actual = fila(offer);
-      actual.prices[key] = { id: offer.id, price: offer.price, reported_at: offer.reported_at, age_days: offer.age_days };
-      // «Hace N días» habla del precio más reciente que la tarjeta muestra.
-      if (offer.age_days < actual.age_days) actual.age_days = offer.age_days;
+      actual.prices[key] = { id: offer.id, price: offer.price, reported_at: offer.reported_at, age_days: offer.age_days, source: offer.price_source, at: offer.price_at };
+      // «Hace N días» habla del precio más reciente que la tarjeta muestra, y
+      // `age_source` dice de dónde salió ese más reciente: sin eso la etiqueta
+      // no puede elegir entre «Consultado» y «Reportado» sin inventarse cuál.
+      if (offer.age_days < actual.age_days) { actual.age_days = offer.age_days; actual.age_source = offer.price_source; }
     }
   }
   for (const key of GASOLINA_KEYS) for (const offer of vencidas[key] ?? []) fila(offer);

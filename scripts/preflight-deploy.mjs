@@ -18,6 +18,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { codeRegression } from '../app/route-policy.mjs';
+import { dataStateIsBehind, dataStateRegressions } from '../app/publication-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const route = process.env.ROUTE || 'data';
@@ -31,14 +32,13 @@ if (!localSnapshot) throw new Error('El refresh-state local no declara snapshot_
 const base = new URL(origin);
 if (!base.pathname.endsWith('/')) base.pathname = `${base.pathname}/`;
 
-// `snapshot_id` es `AAAA-MM-DD-AAAAMMDDTHHMMSSsssZ-pid-hex`: el prefijo de fecha
-// y la marca UTC lo hacen monótono, así que el orden lexicográfico basta.
+// Se lee el refresh-state entero, no solo su `snapshot_id`: ordenar dos corridas
+// necesita también la consulta web, distrito por distrito.
 async function publicado() {
   const response = await fetch(new URL('data/gasolina/refresh-state.json', base), { redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' } });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`No se pudo leer el refresh-state publicado: HTTP ${response.status}`);
-  const state = JSON.parse(await response.text());
-  return state.snapshot_id ?? null;
+  return JSON.parse(await response.text());
 }
 
 const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
@@ -65,16 +65,25 @@ function retrocesoDeCodigo() {
   return codeRegression({ head, tip, isAncestor, changedPaths: delta });
 }
 
-const remoteSnapshot = await publicado();
-const atrasado = remoteSnapshot && remoteSnapshot > localSnapshot;
+const remoteState = await publicado();
+const remoteSnapshot = remoteState?.snapshot_id ?? null;
+const atrasado = Boolean(remoteState) && dataStateIsBehind(localState, remoteState);
+const retrocesos = remoteState ? dataStateRegressions(localState, remoteState) : [];
 const retroceso = atrasado ? null : retrocesoDeCodigo();
 
+// Las dos causas se informan por separado y pueden darse a la vez: un CSV
+// anterior y, además, distritos cuya consulta retrocede.
+const causas = [
+  remoteSnapshot && localSnapshot < remoteSnapshot ? `el CSV publicado (${remoteSnapshot}) es posterior al de esta corrida (${localSnapshot})` : null,
+  retrocesos.length ? `la consulta retrocede en ${retrocesos.length} unidad(es) — ${retrocesos.slice(0, 3).join('; ')}` : null,
+].filter(Boolean);
+
 const decision = atrasado
-  ? { deploy: false, reason: `corrida_desactualizada: lo publicado (${remoteSnapshot}) es más nuevo que lo de esta corrida (${localSnapshot})` }
+  ? { deploy: false, reason: `corrida_desactualizada: ${causas.join('; además, ') || 'el estado publicado es más nuevo'}` }
   : retroceso
     ? { deploy: false, reason: retroceso.reason }
     : { deploy: true, reason: remoteSnapshot ? 'estado revalidado; esta corrida no retrocede código ni datos' : 'no hay bundle publicado todavía; primera publicación' };
 
-const salida = { ...decision, route, local_snapshot: localSnapshot, published_snapshot: remoteSnapshot };
+const salida = { ...decision, route, local_snapshot: localSnapshot, published_snapshot: remoteSnapshot, local_facilito: localState?.facilito?.state_id ?? null, published_facilito: remoteState?.facilito?.state_id ?? null, unidades_que_retroceden: retrocesos.length };
 if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${decision.deploy}\npreflight_reason=${decision.reason}\n`);
 process.stdout.write(`${JSON.stringify(salida)}\n`);
