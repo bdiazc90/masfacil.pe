@@ -64,6 +64,9 @@
   --halo-repsol:#899ccd;
   --halo-ava:#e3c2eb;
   --halo-petroperu:#ffbbbb;
+  --halo-pecsa:#f5b8bf;
+  --halo-energigas:#c9e6b0;
+  --halo-terpel:#ffd1a8;
   --brand-halo-alpha:.38;
 
   /* Gráfico: tope del degradado de área */
@@ -113,6 +116,9 @@
   --halo-repsol:#5a2a0c;
   --halo-ava:#3a1244;
   --halo-petroperu:#0d3b29;
+  --halo-pecsa:#4a0b14;
+  --halo-energigas:#173d11;
+  --halo-terpel:#4f1a05;
   --chart-fill-alpha:.18; /* el relleno claro sobre carbón tapaba la referencia del promedio */
 }
 
@@ -542,6 +548,9 @@ h3{font-size:16px;margin-bottom:6px}
 .offer[data-brand="repsol"]{--brand-halo:var(--halo-repsol)}
 .offer[data-brand="ava"]{--brand-halo:var(--halo-ava)}
 .offer[data-brand="petroperu"]{--brand-halo:var(--halo-petroperu)}
+.offer[data-brand="pecsa"]{--brand-halo:var(--halo-pecsa)}
+.offer[data-brand="energigas"]{--brand-halo:var(--halo-energigas)}
+.offer[data-brand="terpel"]{--brand-halo:var(--halo-terpel)}
 /* Sin fila de precios la identidad sube a donde el isotipo es más denso. */
 .offer--silent{--brand-mark-size:96px;--brand-mark-opacity:.22}
 @media(max-width:340px){.offer{--brand-mark-size:118px}}

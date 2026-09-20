@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { color, declaracion, numero, pesosDeMezcla, tokensPorTema } from './css-tokens.mjs';
+import { BRAND_LOGOS } from '../web/brand-logos.js';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const HOJA = path.join(raiz, 'web', 'styles.css');
@@ -45,7 +46,9 @@ const ROLES = Object.freeze({
   premiumStrong: '--product-premium-strong',
 });
 const GLOWS = Object.freeze(['--glow-1', '--glow-2', '--glow-3']);
-const HALOS = Object.freeze(['--halo-primax', '--halo-repsol', '--halo-ava', '--halo-petroperu']);
+// Un halo por marca registrada: registrar una marca sin su halo claro y oscuro
+// rompe esta medición en vez de pasar sin medirse.
+const HALOS = Object.freeze(Object.keys(BRAND_LOGOS).map((clave) => `--halo-${clave}`));
 
 /**
  * Todo lo que la medición necesita, leído del CSS.

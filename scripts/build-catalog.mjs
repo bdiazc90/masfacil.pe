@@ -119,11 +119,16 @@ const conflictosDeDirectorio = new Map((expedienteDeMarca.conflictos ?? []).map(
 // El catálogo publicado: lo que ya estaba respaldado antes de este cambio.
 const rutaBase = process.env.CATALOGO_BASE ? path.resolve(root, process.env.CATALOGO_BASE) : path.join(identidad, 'base', 'commercial-identity-catalog.json');
 const base = fs.existsSync(rutaBase) ? new Map(JSON.parse(fs.readFileSync(rutaBase, 'utf8')).entries.map((entrada) => [entrada.establishment_id, entrada])) : null;
+const rutaAuditoriaBase = path.join(path.dirname(rutaBase), 'commercial-identity-audit.json');
+const auditoriaBase = base && fs.existsSync(rutaAuditoriaBase) ? JSON.parse(fs.readFileSync(rutaAuditoriaBase, 'utf8')) : null;
+const evidenciaBase = base && fs.existsSync(path.join(path.dirname(rutaBase), 'brand-evidence.json')) ? JSON.parse(fs.readFileSync(path.join(path.dirname(rutaBase), 'brand-evidence.json'), 'utf8')).entradas ?? {} : {};
 // Veredictos de BANDERA. Son otra afirmación que la del nombre y por eso viven
 // en su propio archivo: un visto bueno al nombre nunca acredita la marca.
 const veredictosMarca = fs.existsSync(path.join(identidad, 'veredictos-marca.json'))
-  ? JSON.parse(fs.readFileSync(path.join(identidad, 'veredictos-marca.json'), 'utf8')).entradas.map((x) => ({ establishment_id: x.id, result: x.r, selection_reason: x.motivo ?? 'random_sample', marca: x.marca ?? null }))
+  ? JSON.parse(fs.readFileSync(path.join(identidad, 'veredictos-marca.json'), 'utf8')).entradas.map((x) => ({ establishment_id: x.id, result: x.r, selection_reason: x.motivo ?? 'random_sample', marca: x.marca ?? null, revisor: x.revisor ?? null, revisado_en: x.revisado_en ?? null }))
   : [];
+
+const tierDe = (r) => (r.estado === 'verified' ? 'verified' : (r.estado === 'candidate' && r.distancia_m <= RADIO_NEARBY ? 'nearby' : null));
 
 // Choque: el nombre en Maps o la razón social dicen otra marca que la del
 // directorio. En la revisión del 17/09 la mitad de esos casos resultó falsa —un
@@ -131,7 +136,7 @@ const veredictosMarca = fs.existsSync(path.join(identidad, 'veredictos-marca.jso
 // azar salió entera correcta. Sin un veredicto del owner que confirme la marca
 // del directorio, un choque no se acredita: queda en conflicto y se conserva la
 // marca anterior hasta resolverlo.
-const PALABRAS_DE_MARCA = [['PRIMAX', 'Primax'], ['COESTI', 'Primax'], ['REPSOL', 'Repsol'], ['PECSA', 'Pecsa'], ['PETROPERU', 'Petroperú'], ['TERPEL', 'Terpel'], ['AVA', 'AVA']];
+const PALABRAS_DE_MARCA = [['PRIMAX', 'Primax'], ['COESTI', 'Primax'], ['REPSOL', 'Repsol'], ['PECSA', 'Pecsa'], ['PETROPERU', 'Petroperú'], ['TERPEL', 'Terpel'], ['AVA', 'AVA'], ['ENERGIGAS', 'Energigas']];
 const marcasEn = (texto) => [...new Set(PALABRAS_DE_MARCA.filter(([palabra]) => new RegExp(`\\b${palabra}\\b`).test(sinTildes(texto))).map(([, marca]) => marca))];
 const filaDeMatches = new Map(matches.resultados.map((r) => [r.establishment_id, r]));
 function choqueCon(establishmentId, marca) {
@@ -168,7 +173,62 @@ for (const [establishmentId, evidencia] of [...evidenciaDeMarca]) {
   conflictosDeDirectorio.set(establishmentId, { establishment_id: establishmentId, motivo: 'estrato_sin_muestra', marcas: [evidencia.brand], propuesta: { brand: evidencia.brand, reference: evidencia.reference, estrato: evidencia.estrato } });
 }
 
-const tierDe = (r) => (r.estado === 'verified' ? 'verified' : (r.estado === 'candidate' && r.distancia_m <= RADIO_NEARBY ? 'nearby' : null));
+// Letrero observado: la vía de las marcas sin directorio vigente. Vale como un
+// directorio —12 meses desde la fecha de la IMAGEN, no de la consulta— y solo
+// sobre la ficha de Maps ya emparejada con el grifo, cuya identidad corroboró la
+// auditoría de nombres. Cada incorporación exige además una revisión
+// independiente verificada. Lo que choque con otra evidencia queda en conflicto y
+// conserva la marca anterior; no se resuelve por orden de llegada.
+const MARCAS_OBSERVABLES = ['Pecsa', 'Energigas', 'Terpel', 'Petroamérica', 'Gazel', 'Picorp', 'GESA', 'Primax', 'Repsol', 'Petroperú', 'AVA'];
+const DOCE_MESES_MS = 365 * 24 * 60 * 60 * 1000;
+const observaciones = fs.existsSync(path.join(identidad, 'observaciones-letrero.json'))
+  ? JSON.parse(fs.readFileSync(path.join(identidad, 'observaciones-letrero.json'), 'utf8')).entradas ?? []
+  : [];
+const letrerosRetenidos = [];
+const letrerosIncorporados = [];
+for (const observacion of observaciones) {
+  const establishmentId = observacion.establishment_id;
+  const marca = MARCAS_OBSERVABLES.find((conocida) => misma(conocida, observacion.marca)) ?? null;
+  const fila = filaDeMatches.get(establishmentId);
+  const evidencedAt = /^\d{4}-(0[1-9]|1[0-2])$/.test(observacion.fecha_imagen ?? '') ? `${observacion.fecha_imagen}-01T00:00:00.000-05:00` : null;
+  const motivo = !marca ? 'marca_desconocida'
+    : !evidencedAt ? 'sin_fecha_de_imagen'
+      : Date.parse(REVISADO_MARCA) - Date.parse(evidencedAt) > DOCE_MESES_MS ? 'imagen_de_mas_de_12_meses'
+        : !(Date.parse(observacion.consultado_en) >= Date.parse(evidencedAt)) ? 'consulta_anterior_a_la_imagen'
+          : !fila || fila.place_id !== observacion.place_id ? 'ficha_de_otro_establecimiento'
+            : !tierDe(fila) ? 'identidad_sin_corroborar'
+              : veredictoDeMarca(establishmentId, marca, 'incorrect') ? 'rechazada_en_revision'
+                : !veredictoDeMarca(establishmentId, marca, 'verified') ? 'sin_revision_independiente'
+                  : null;
+  if (motivo) { letrerosRetenidos.push({ establishment_id: establishmentId, marca: observacion.marca, motivo }); continue; }
+  const actual = evidenciaDeMarca.get(establishmentId);
+  const previa = base?.get(establishmentId)?.brand ?? null;
+  const pendiente = conflictosDeDirectorio.get(establishmentId);
+  // Un directorio que el owner ya rechazó no contradice: el letrero lo confirma.
+  const pendienteContradice = pendiente && pendiente.motivo !== 'choque_rechazado_por_owner' && !misma(pendiente.propuesta?.brand ?? pendiente.marcas?.[0], marca);
+  const contradice = (actual && !misma(actual.brand, marca)) || (previa && !misma(previa, marca)) || pendienteContradice;
+  if (contradice) {
+    conflictosDeDirectorio.set(establishmentId, { establishment_id: establishmentId, motivo: 'letrero_contra_otra_evidencia', marcas: [marca, actual?.brand ?? previa ?? pendiente?.propuesta?.brand ?? pendiente?.marcas?.[0]], propuesta: { brand: marca, reference: observacion.referencia, estrato: 'letrero_observado' } });
+    letrerosRetenidos.push({ establishment_id: establishmentId, marca, motivo: 'contradice_otra_evidencia' });
+    continue;
+  }
+  if (pendiente) conflictosDeDirectorio.delete(establishmentId);
+  letrerosIncorporados.push({ establishment_id: establishmentId, marca });
+  // Si el directorio ya acredita esa misma marca, su evidencia se queda.
+  if (actual) continue;
+  evidenciaDeMarca.set(establishmentId, { brand: marca, method: 'storefront_observation', reference: observacion.referencia, evidenced_at: evidencedAt, consulted_at: observacion.consultado_en, estrato: 'letrero_observado', responsable: observacion.responsable ?? RESPONSABLE });
+}
+// Una marca que ya se publica en algún grifo entra a la limpieza de nombres: su
+// palabra no puede quedar en el nombre de una sede donde nadie la respalda.
+//
+// Energigas es la excepción, por decisión de Bruno del 18/09/2026: se publica en
+// dos grifos, pero otros siete llevan su palabra en el nombre, con el letrero
+// legible en fotos de 2020 a 2025 —fuera del plazo de doce meses— y figuran en su
+// lista oficial. Retirarles el nombre costaría más información de la que protege.
+// La limpieza entra cuando esas sedes tengan su letrero confirmado.
+const LIMPIEZA_DIFERIDA = ['Energigas'];
+for (const { marca } of letrerosIncorporados) if (!MARCAS.some((conocida) => misma(conocida, marca)) && !LIMPIEZA_DIFERIDA.some((diferida) => misma(diferida, marca))) MARCAS.push(marca);
+
 const publicables = matches.resultados.filter((r) => tierDe(r));
 
 function construirEntrada(r) {
@@ -267,13 +327,10 @@ const soloMarca = [...evidenciaDeMarca.entries()].filter(([id]) => !conNombre.ha
   brand: evidencia.brand,
   public_site_name: null,
   confidence: 'verified',
-  source: {
-    kind: 'first_party',
-    source_or_description: evidencia.reference,
-    acquisition_method: 'first_party_publication',
-    observed_at: evidencia.evidenced_at,
-    responsible: RESPONSABLE,
-  },
+  // Procedencia real: un padrón de la cadena, o una imagen pública revisada.
+  source: evidencia.method === 'storefront_observation'
+    ? { kind: 'public_web_observed', source_or_description: evidencia.reference, acquisition_method: 'public_web_review', observed_at: evidencia.consulted_at, responsible: evidencia.responsable ?? RESPONSABLE }
+    : { kind: 'first_party', source_or_description: evidencia.reference, acquisition_method: 'first_party_publication', observed_at: evidencia.evidenced_at, responsible: RESPONSABLE },
   entity_link: { method: 'official_establishment_id_exact', status: 'verified', verified_at: REVISADO_MARCA },
   identity_freshness: 'current',
   publication: { status: 'publishable', reviewed_at: REVISADO_MARCA, responsible: RESPONSABLE },
@@ -346,8 +403,9 @@ const veredictoA = (v, claim, revisadoEn) => {
     claim,
     confidence: entrada.confidence,
     selection_reason: v.selection_reason ?? 'random_sample',
-    reviewer: RESPONSABLE,
-    reviewed_at: revisadoEn,
+    // Quien revisó de verdad: el owner o una sonda independiente, con su fecha.
+    reviewer: v.revisor ?? RESPONSABLE,
+    reviewed_at: v.revisado_en ?? revisadoEn,
     result: v.result,
   };
 };
@@ -359,6 +417,12 @@ const revisadas = [
   // método por el que llegó.
   ...veredictosMarca.filter((v) => marcaRevisada.has(v.establishment_id) && hablaDeEsaMarca(v)).map((v) => veredictoA(v, 'brand', REVISADO_MARCA)),
 ];
+// Una corrección ya publicada no se borra del registro: si el catálogo base dejó
+// de publicar una marca por un veredicto `incorrect`, ese veredicto se conserva
+// tal cual y sigue contando en el grupo que la propuso.
+const heredadas = (auditoriaBase?.entries ?? []).filter((r) => r.claim === 'brand' && r.result === 'incorrect' && !marcaRevisada.has(r.establishment_id) && !revisadas.some((x) => x.establishment_id === r.establishment_id && x.claim === 'brand'));
+revisadas.push(...heredadas);
+for (const r of heredadas) metodoRevisado.set(r.establishment_id, evidenciaBase[r.establishment_id]?.method ?? 'operador_del_registro');
 
 // El tier de nombre mide precisión de NOMBRES: una entrada que solo publica
 // bandera no tiene nombre que auditar y no entra en su población.
@@ -394,8 +458,8 @@ const brandTiers = metodos.filter((m) => m !== 'operador_del_registro').map((met
     correct: correctas,
     lower_bound_95: Number(wilsonLowerBound(correctas, muestra.length).toFixed(3)),
     threshold: BRAND_THRESHOLD,
-    reviewer: RESPONSABLE,
-    reviewed_at: REVISADO_MARCA,
+    reviewer: [...new Set(muestra.map((r) => r.reviewer))].join('; ') || RESPONSABLE,
+    reviewed_at: muestra.map((r) => r.reviewed_at).sort().at(-1) ?? REVISADO_MARCA,
   };
 // Un grupo sin revisar no se declara: aparecer con muestra cero solo rompería
 // el contrato de la auditoría. Sin tier, el grupo queda pendiente y sin logo.
@@ -409,6 +473,9 @@ const auditoria = { schema_version: AUDIT_SCHEMA_VERSION, audit_id: AUDIT_ID, ca
 const erroresDeContrato = [...validateCommercialCatalog(catalogo), ...validateCommercialAudit(auditoria)];
 const evidenciaMasReciente = entradas.map((e) => e.brand_evidence?.evidenced_at).filter(Boolean).sort().at(-1);
 if (evidenciaMasReciente && Date.parse(REVISADO_MARCA) < Date.parse(evidenciaMasReciente)) erroresDeContrato.push(`REVISADO_MARCA (${REVISADO_MARCA}) es anterior a la evidencia más reciente (${evidenciaMasReciente})`);
+// Una observación no puede publicarse con una revisión anterior a la consulta.
+const consultaMasReciente = entradas.filter((e) => e.brand_evidence?.method === 'storefront_observation').map((e) => e.brand_evidence.consulted_at).sort().at(-1);
+if (consultaMasReciente && Date.parse(REVISADO_MARCA) < Date.parse(consultaMasReciente)) erroresDeContrato.push(`REVISADO_MARCA (${REVISADO_MARCA}) es anterior a la última consulta de letrero (${consultaMasReciente})`);
 if (!erroresDeContrato.length) erroresDeContrato.push(...commercialNameBacking(catalogo, auditoria).problems.map((problema) => `nombres sin respaldo: ${problema.reason} (${problema.affected})`));
 if (erroresDeContrato.length) throw new Error(`No se escribe el catálogo:\n- ${[...new Set(erroresDeContrato)].join('\n- ')}`);
 
@@ -460,6 +527,7 @@ REVISIÓN DE MARCA    (mide la bandera publicada; NO es una puerta)
   solo bandera   ${soloMarca.filter((e) => entradas.includes(e)).length}   (del padrón oficial, sin nombre de sede publicable)
   conflictos     ${conflictosDeMarca.length}   ${Object.entries(conflictosDeMarca.reduce((cuenta, c) => ({ ...cuenta, [c.motivo]: (cuenta[c.motivo] ?? 0) + 1 }), {})).map(([motivo, n]) => `${motivo} ${n}`).join(' · ')}
   conservadas    ${conservadas.length}   (marca del catálogo base mantenida por conflicto)
+  letreros       ${letrerosIncorporados.length} incorporados ${Object.entries(letrerosIncorporados.reduce((c, l) => ({ ...c, [l.marca]: (c[l.marca] ?? 0) + 1 }), {})).map(([m, n]) => `${m} ${n}`).join(' · ')} · ${letrerosRetenidos.length} retenidos ${Object.entries(letrerosRetenidos.reduce((c, l) => ({ ...c, [l.motivo]: (c[l.motivo] ?? 0) + 1 }), {})).map(([m, n]) => `${m} ${n}`).join(' · ')}
   corregidas     ${corregidas.length}   ${corregidas.map((c) => `−${c.marca_retirada}${c.conservaba_nombre ? '' : ' (entrada retirada)'}`).join(', ')}
   nombres base   ${nombresConservados.length} conservados · ${nombresCambiados.size} cambiados (sin veredicto) · ${base ? [...base.keys()].filter((id) => !entradas.some((e) => e.establishment_id === id)).length : 0} entradas del base ya no se publican${base ? '' : '   ⚠ sin catálogo base: no se protegen nombres ni marcas previas'}
 

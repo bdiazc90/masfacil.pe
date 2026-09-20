@@ -85,6 +85,51 @@ export const BRAND_LOGOS = Object.freeze({
       }),
     }),
   }),
+  pecsa: Object.freeze({
+    slug: 'pecsa',
+    brand: 'Pecsa',
+    assets: Object.freeze({
+      mark: Object.freeze({
+        file: 'pecsa-mark.svg',
+        width: 100,
+        height: 100,
+        source_kind: 'faithful_recreation',
+        source_url: 'recreación fiel del símbolo desde el logotipo de pecsa.com.pe archivado por Wayback Machine (2021-09-27)',
+        retrieved_at: '2026-09-18',
+        note: 'campo rojo con tres barras blancas; la cinta con pliegues del original se simplifica a barras rectas',
+      }),
+    }),
+  }),
+  energigas: Object.freeze({
+    slug: 'energigas',
+    brand: 'Energigas',
+    assets: Object.freeze({
+      mark: Object.freeze({
+        file: 'energigas-mark.svg',
+        width: 86,
+        height: 80,
+        source_kind: 'faithful_recreation',
+        source_url: 'recreación fiel del isotipo desde https://www.energigas.com/wp-content/uploads/2025/07/logo-azul.svg',
+        retrieved_at: '2026-09-18',
+        note: 'las dos flechas del símbolo, sin la palabra; el bisel se resuelve con una sola copia oscura desplazada',
+      }),
+    }),
+  }),
+  terpel: Object.freeze({
+    slug: 'terpel',
+    brand: 'Terpel',
+    assets: Object.freeze({
+      mark: Object.freeze({
+        file: 'terpel-mark.svg',
+        width: 120,
+        height: 120,
+        source_kind: 'faithful_recreation',
+        source_url: 'recreación fiel del isotipo desde https://commons.wikimedia.org/wiki/File:Logo_terpel.jpg',
+        retrieved_at: '2026-09-18',
+        note: 'solo el aro circular, sin la palabra; colores muestreados de la referencia',
+      }),
+    }),
+  }),
 });
 
 /** Ruta pública de una variante. Sale del registro, nunca de una convención. */
