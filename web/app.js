@@ -1,23 +1,35 @@
 import { loadGasolina } from './data-client.js';
-import { haversineKm, initialRadiusKm, nextVisibleCount, orderOffers, radiusIsInert, withinRadius, PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM, SHOW_ALL_THRESHOLD } from './lib/haversine.js';
-import { decisionTag, formatRadius } from './lib/decision-view.js';
-import { filterFreshOffers, MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
-import { msUntilSourceChange } from './lib/price-source.js';
-import { mergeOfferRows } from './lib/merge-products.js';
+import { PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM } from './lib/haversine.js';
+import { formatRadius } from './lib/decision-view.js';
+import { MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
+import { createSearch, districtsFrom, evaluateRows, resultsView, startResults, withDistances, withPrice } from './lib/search.js';
 import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
 import { visibleDistricts } from './district-list.js';
 import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
-import { GASOLINA_KEYS, PRODUCTS } from './lib/catalog.js';
+import { PRODUCTS } from './lib/catalog.js';
+import { createLocator } from './geolocation.js';
 import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
 import { mountHistoryChart } from './history-chart.js';
 
-const state = { dataset: null, dataMode: 'network', origin: null, district: null, districts: [], showAllDistricts: false, fresh: [], located: [], pool: [], radiusKm: RADIUS_MIN_KM, visibleCount: PAGE_SIZE, sort: 'distance', priceProduct: 'regular', locationAttempt: 0, updatingLocation: false, preferencesTouched: false, freshUntil: 0 };
+// El estado se declara, no se deduce de la pantalla. `search` es lo que la
+// persona eligió y lo único que necesitan las reglas de `lib/search.js`; `data`,
+// lo que se cargó; `ui`, lo que solo le importa a esta presentación. Las filas se
+// guardan evaluadas hasta `refreshAt` y, con ubicación, ya medidas.
+let search = createSearch();
+const data = { dataset: null, mode: 'network' };
+let rows = [];
+let located = [];
+let refreshAt = 0;
+const ui = { screen: 'start', updatingLocation: false, districts: [], showAllDistricts: false, view: null };
+const elegir = (cambios) => { search = { ...search, ...cambios }; };
+const locator = createLocator();
 const $ = (id) => document.getElementById(id);
 // La única ruta además de `/`: la misma portada con el gráfico enfocado.
 // `_redirects` la reescribe a `index.html`; aquí solo se enfoca y se historia.
 const HISTORY_ROUTE = /^\/gasolina\/historial\/?$/;
+const SCREENS = Object.freeze({ start: 'start-step', loading: 'loading-step', district: 'district-step', compare: 'compare-step', fatal: 'fatal-state' });
 const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 
@@ -28,165 +40,113 @@ const controls = initControlsCard({
   collapseSentinel: document.querySelector('.controls-sentinel--collapse'), expandSentinel: document.querySelector('.controls-sentinel--expand'),
   // La tarjeta se fija sobre las dos pantallas con lista larga: resultados y
   // distritos. En las demás no hay nada que perseguir al hacer scroll.
-  isActive: () => !nodes['compare-step'].hidden || !nodes['district-step'].hidden,
+  isActive: () => ui.screen === 'compare' || ui.screen === 'district',
 });
 
-function show(name) {
-  for (const key of ['start-step', 'loading-step', 'district-step', 'compare-step', 'fatal-state']) nodes[key].hidden = key !== name;
+function show(screen) {
+  ui.screen = screen;
+  for (const [key, id] of Object.entries(SCREENS)) nodes[id].hidden = key !== screen;
   // La ruta del historial describe la portada con el gráfico; al salir de ella
   // la URL vuelve a `/` sin añadir entradas al historial del navegador.
-  if (name !== 'start-step' && HISTORY_ROUTE.test(location.pathname)) history.replaceState(null, '', '/');
-  $('main').setAttribute('aria-busy', String(name === 'loading-step'));
+  if (screen !== 'start' && HISTORY_ROUTE.test(location.pathname)) history.replaceState(null, '', '/');
+  $('main').setAttribute('aria-busy', String(screen === 'loading'));
   // Tres valores, no dos: en distritos la tarjeta conserva la píldora y se fija.
-  const pantalla = name === 'compare-step' ? 'compare' : name === 'district-step' ? 'district' : 'other';
+  // El atributo es para el CSS; la lógica lee `ui.screen`.
+  const pantalla = screen === 'compare' || screen === 'district' ? screen : 'other';
   nodes.controls.dataset.screen = pantalla;
   if (pantalla === 'other') controls.setState('full');
 }
-// La vigencia se evalúa por producto y recién después se fusiona: un grifo con
-// Regular vigente y Premium vencido conserva su tarjeta y apaga solo ese precio.
-// Lo vencido ya no se descarta: viaja aparte para que la fila quede muda en vez
-// de desaparecer.
-function currentRows() {
-  const now = () => new Date();
-  const porProducto = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, filterFreshOffers(state.dataset.offers[key], { now, cutoffAt: state.dataset.cutoff_at })]));
-  return mergeOfferRows(
-    Object.fromEntries(GASOLINA_KEYS.map((key) => [key, porProducto[key].offers])),
-    Object.fromEntries(GASOLINA_KEYS.map((key) => [key, porProducto[key].expired])),
-  );
-}
-// Lo que de verdad se puede comparar. Lo consultan el estado vacío, el radio
-// inicial y los controles que solo tienen sentido con más de un precio.
-const conPrecio = (filas) => filas.filter((row) => row.has_price);
 // La vigencia se congela en el instante en que se calcula, así que hay que
 // volver a mirarla cada vez que se rearma la lista: un precio de 29 días y 23
 // horas cruza los 30 mientras la app sigue abierta. No hace falta recomputar en
-// cada frame —la vigencia solo cambia cuando un precio cruza una ventana, y ese
-// instante se puede calcular— así que se guarda cuál es el próximo y hasta
-// entonces se reutiliza lo que ya hay.
-function refrescarVigencia({ forzar = false } = {}) {
-  if (!forzar && Date.now() < state.freshUntil) return;
-  state.fresh = currentRows();
-  // Ya no hay una sola ventana. Una consulta web que cruza las 24 horas activa
-  // el respaldo del CSV, y un reporte que cruza los 30 días apaga el precio:
-  // manda el vencimiento más cercano de los dos. Se le pregunta a la oferta y no
-  // a su edad porque el cambio de fuente tiene que ocurrir también sin red, con
-  // el bundle ya guardado.
-  const now = () => new Date();
-  const proximo = GASOLINA_KEYS.flatMap((key) => state.dataset.offers[key] ?? [])
-    .reduce((menor, offer) => Math.min(menor, msUntilSourceChange(offer, { now, cutoffAt: state.dataset.cutoff_at })), Infinity);
-  state.freshUntil = Number.isFinite(proximo) ? Date.now() + proximo : Infinity;
-  if (state.origin) state.located = state.fresh.map((offer) => ({ ...offer, distance_km: haversineKm(state.origin, offer) }));
+// cada frame: las reglas dicen cuándo cambia la próxima respuesta y hasta
+// entonces se reutiliza lo que ya hay. Con ubicación, las distancias se rehacen
+// siempre junto con las filas, nunca unas sin las otras.
+function refrescar({ force = false } = {}) {
+  if (!force && Date.now() < refreshAt) return;
+  ({ rows, refreshAt } = evaluateRows(data.dataset, new Date()));
+  if (search.origin) located = withDistances(rows, search.origin);
 }
-function renderRadiusControl() {
-  const inerte = radiusIsInert(state.located);
+function renderRadiusControl({ inert, total }) {
   nodes['radius-control'].hidden = false;
-  nodes['radius-input'].value = String(state.radiusKm);
-  nodes['radius-input'].disabled = inerte;
-  const total = state.pool.length;
+  nodes['radius-input'].value = String(search.radiusKm);
+  nodes['radius-input'].disabled = inert;
   // Inerte significa que mover el radio no cambia el conteo, no que haya una
   // sola estación: en Pucusana son tres en todo el rango.
-  nodes['radius-readout'].textContent = inerte
+  nodes['radius-readout'].textContent = inert
     ? (total === 1 ? `Única estación en ${formatRadius(RADIUS_MAX_KM)}` : `Las mismas ${total} estaciones en todo el radio`)
-    : `${formatRadius(state.radiusKm)} · ${total} ${total === 1 ? 'estación' : 'estaciones'}`;
+    : `${formatRadius(search.radiusKm)} · ${total} ${total === 1 ? 'estación' : 'estaciones'}`;
 }
 // Resumen del card compacto: el lugar puede truncar; el criterio nunca.
-function renderSummary(hayPrecios = true) {
-  const porPrecio = state.sort.startsWith('price:') || !state.origin;
+function renderSummary(criterion) {
   // Sin un solo precio vigente, anunciar un criterio de precio promete un orden
   // que no existe: el resumen dice lo que pasa, no lo que ordenaría.
-  const criterio = !hayPrecios ? 'Sin precios recientes' : porPrecio ? `${PRODUCTS[state.priceProduct].short} más barata` : 'Más cerca';
-  const partes = state.origin ? [formatRadius(state.radiusKm), criterio] : [criterio];
+  const criterio = criterion === 'none' ? 'Sin precios recientes' : criterion === 'price' ? `${PRODUCTS[search.priceProduct].short} más barata` : 'Más cerca';
+  const partes = search.origin ? [formatRadius(search.radiusKm), criterio] : [criterio];
   // Con GPS el icono de la barra ya dice «mi ubicación»: repetirlo en texto solo
   // le robaba ancho al criterio, que nunca debe truncar.
-  nodes['sum-criteria'].textContent = state.origin ? partes.join(' · ') : `· ${partes.join(' · ')}`;
+  nodes['sum-criteria'].textContent = search.origin ? partes.join(' · ') : `· ${partes.join(' · ')}`;
 }
 
+// Pinta lo que deciden las reglas. Siempre repinta; solo el recálculo de filas
+// espera a que algo venza.
 function renderOffers() {
-  refrescarVigencia();
-  const noOrigin = !state.origin;
-  // Sin nada que comparar, ordenar por precio no significa nada: se cae a
-  // cercanía sin tocar la preferencia guardada de la persona.
-  const hayPrecios = conPrecio(state.fresh).length > 0;
-  const porPrecio = hayPrecios && state.sort.startsWith('price:');
-  const producto = state.priceProduct;
-  // Con ubicación: el radio filtra, el toggle solo ordena y la lista pagina.
-  // Cada control hace una cosa.
-  state.pool = noOrigin ? [] : withinRadius(state.located, state.radiusKm);
-  const ordenadas = noOrigin
-    ? orderOffers(state.fresh.filter((row) => row.district === state.district), `price:${producto}`)
-    : orderOffers(state.pool, porPrecio ? state.sort : 'distance');
-  // Si lo que falta cabe en el umbral se muestra entero: un botón para cuatro
-  // tarjetas cuesta más de lo que ahorra.
-  const pedidas = Math.min(state.visibleCount, ordenadas.length);
-  const corte = ordenadas.length - pedidas <= SHOW_ALL_THRESHOLD ? ordenadas.length : pedidas;
-  const items = ordenadas.slice(0, corte);
-  const comparables = conPrecio(items).length;
-  const showTag = !noOrigin && comparables > 1;
-  const activeProduct = porPrecio || noOrigin ? producto : null;
-  nodes.offers.innerHTML = items.map((offer) => renderOfferCard(offer, { withDistance: !noOrigin, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: showTag ? decisionTag(offer, state.pool, state.radiusKm, producto) : null, activeProduct })).join('');
-  nodes.offers.hidden = items.length === 0;
+  refrescar();
+  const view = resultsView({ rows, located, search });
+  ui.view = view;
+  const conOrigen = Boolean(search.origin);
+  nodes.offers.innerHTML = view.items.map((offer, index) => renderOfferCard(offer, { withDistance: conOrigen, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: view.tags[index], activeProduct: view.activeProduct })).join('');
+  nodes.offers.hidden = view.items.length === 0;
   // El aviso de «sin precios recientes» acompaña a las tarjetas mudas, no las
   // sustituye: el grifo sigue existiendo aunque hoy no diga a cuánto vende.
-  nodes['empty-state'].hidden = hayPrecios;
-  nodes['sort-toggle'].hidden = noOrigin || comparables < 2;
-  // El sub-toggle solo aparece cuando el orden depende del producto: en «Más
-  // cerca» no ordena nada y sería un control que no hace lo que promete.
-  nodes['price-product-toggle'].hidden = !(porPrecio || noOrigin) || comparables < 2;
-  if (!noOrigin) renderRadiusControl();
-  nodes['radius-empty'].hidden = noOrigin || items.length > 0;
-  const restantes = ordenadas.length - items.length;
-  const siguiente = nextVisibleCount(items.length, ordenadas.length);
-  nodes['load-more'].hidden = restantes <= 0;
+  nodes['empty-state'].hidden = view.hasPrices;
+  nodes['sort-toggle'].hidden = !view.sortToggle;
+  nodes['price-product-toggle'].hidden = !view.productToggle;
+  if (view.radius) renderRadiusControl(view.radius);
+  nodes['radius-empty'].hidden = !view.radiusEmpty;
+  nodes['load-more'].hidden = view.remaining <= 0;
   // El botón carga su propio salto: la etiqueta y lo que hace salen del mismo
   // número, así que no pueden discrepar.
-  nodes['load-more'].dataset.siguiente = String(siguiente);
-  nodes['load-more'].textContent = siguiente >= ordenadas.length ? `Ver las ${restantes} restantes` : `Ver ${siguiente - items.length} más (${restantes} restantes)`;
-  // Solo habla cuando hubo algo que paginar: en una lista que cabe entera el
-  // radio ya dice cuántas son y repetirlo sería ruido. Cuando sí paginó, el
-  // último toque cierra con «N de N», que es lo que el botón ya no puede decir.
-  nodes['offers-status'].textContent = ordenadas.length > items.length || ordenadas.length > PAGE_SIZE + SHOW_ALL_THRESHOLD ? `Se muestran ${items.length} de ${ordenadas.length} estaciones.` : '';
-  document.querySelectorAll('[data-sort]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.sort === (porPrecio ? 'price' : 'distance'))));
-  document.querySelectorAll('[data-price-product]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.priceProduct === producto)));
-  renderSummary(hayPrecios);
+  nodes['load-more'].textContent = view.nextCount >= view.ordered.length ? `Ver las ${view.remaining} restantes` : `Ver ${view.nextCount - view.items.length} más (${view.remaining} restantes)`;
+  // Cuando sí paginó, el último toque cierra con «N de N», que es lo que el botón
+  // ya no puede decir.
+  nodes['offers-status'].textContent = view.paged ? `Se muestran ${view.items.length} de ${view.ordered.length} estaciones.` : '';
+  document.querySelectorAll('[data-sort]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.sort === (view.byPrice ? 'price' : 'distance'))));
+  document.querySelectorAll('[data-price-product]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.priceProduct === search.priceProduct)));
+  renderSummary(view.criterion);
 }
 
 // Los dos precios ya viajan en la fila, así que el panel se abre sin pedir nada
 // y funciona igual sin conexión.
 function toggleDetail(button) {
   const slot = nodes.offers.querySelector(`[data-detail-slot="${CSS.escape(button.dataset.detail)}"]`);
-  const offer = state.pool.concat(state.fresh).find((item) => item.establishment_id === button.dataset.detail);
+  const offer = (ui.view?.pool ?? []).concat(rows).find((item) => item.establishment_id === button.dataset.detail);
   if (!slot || !offer) return;
   const abierto = button.getAttribute('aria-expanded') === 'true';
   button.setAttribute('aria-expanded', String(!abierto));
   button.textContent = abierto ? 'Ver detalle' : 'Ocultar';
   slot.hidden = abierto;
-  slot.innerHTML = abierto ? '' : renderOfferDetail(offer, { prices: offer.prices, attribution: state.dataset.provenance.attribution });
+  slot.innerHTML = abierto ? '' : renderOfferDetail(offer, { prices: offer.prices, attribution: data.dataset.provenance.attribution });
 }
 
 function renderResults() {
-  refrescarVigencia({ forzar: true });
-  nodes['official-source'].href = state.dataset.provenance.source_url;
+  refrescar({ force: true });
+  nodes['official-source'].href = data.dataset.provenance.source_url;
   // El nombre del lugar es el encabezado de los resultados: dice desde dónde se
   // compara, y por eso nunca es un botón.
-  const lugar = state.origin ? 'Mi ubicación' : displayDistrict(state.district);
+  const lugar = search.origin ? 'Mi ubicación' : displayDistrict(search.district);
   nodes['place-name'].textContent = lugar;
-  nodes['sum-place'].textContent = state.origin ? '' : lugar;
+  nodes['sum-place'].textContent = search.origin ? '' : lugar;
   // `hidden` como propiedad solo existe en HTMLElement: sobre un <svg> hay que
   // escribir el atributo o el icono se queda visible en los dos modos.
-  nodes['place-icon'].toggleAttribute('hidden', !state.origin);
+  nodes['place-icon'].toggleAttribute('hidden', !search.origin);
   renderPlaceAction('idle');
   // Sin precios vigentes ya no se corta aquí: las tarjetas mudas se siguen
   // pintando y los controles se recalculan en renderOffers. Cortar dejaba el
   // radio y el resumen con los números de la búsqueda anterior.
-  state.visibleCount = PAGE_SIZE;
-  if (state.origin) {
-    // El radio se abre donde caben seis PRECIOS. Medirlo sobre todas las filas
-    // lo dejaría estrecho y lleno de tarjetas mudas. Si la persona ya eligió
-    // radio o criterio, esa elección sobrevive a volver al inicio y a cambiar
-    // de origen: es una preferencia, no una consecuencia de dónde está.
-    if (!state.preferencesTouched) { state.radiusKm = initialRadiusKm(conPrecio(state.located)); state.sort = 'distance'; }
-  } else {
-    state.located = [];
+  search = startResults(search, located);
+  if (!search.origin) {
+    located = [];
     nodes['radius-control'].hidden = true;
     nodes['radius-empty'].hidden = true;
   }
@@ -196,32 +156,34 @@ function showCompare() {
   // La pantalla se declara ANTES de pintar: la píldora decide su promesa según
   // dónde está, y renderizarla con la pantalla anterior le ponía la etiqueta
   // equivocada.
-  show('compare-step');
-  state.updatingLocation = false;
+  show('compare');
+  ui.updatingLocation = false;
   renderLocationUpdate('idle', '');
   renderResults();
-  nodes['offline-note'].hidden = state.dataMode !== 'saved';
-  nodes['offline-note'].textContent = state.dataMode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(state.dataset.cutoff_at)}.` : '';
+  nodes['offline-note'].hidden = data.mode !== 'saved';
+  nodes['offline-note'].textContent = data.mode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(data.dataset.cutoff_at)}.` : '';
   nodes['compare-title'].focus();
 }
 function renderDistricts(query = '') {
   const normalizedQuery = query.trim();
-  const matches = visibleDistricts(state.districts, normalizedQuery, state.showAllDistricts);
+  const matches = visibleDistricts(ui.districts, normalizedQuery, ui.showAllDistricts);
   nodes.districts.innerHTML = matches.map((district) => `<button type="button" data-district="${escapeHtml(district)}">${escapeHtml(displayDistrict(district))}</button>`).join('');
   nodes['district-empty'].hidden = !normalizedQuery || matches.length > 0;
 }
 function chooseDistrict({ fromError = false } = {}) {
-  state.locationAttempt += 1;
-  state.updatingLocation = false;
-  state.districts = [...new Set(currentRows().map((offer) => offer.district))].sort();
+  // Elegir distrito descarta cualquier ubicación en vuelo.
+  locator.cancel();
+  ui.updatingLocation = false;
+  // Se evalúa en el momento, sin tocar las filas guardadas de los resultados.
+  ui.districts = districtsFrom(evaluateRows(data.dataset, new Date()).rows);
   // Todos los chips de entrada: el buscador acota una lista visible, no la revela.
-  state.showAllDistricts = true;
+  ui.showAllDistricts = true;
   nodes['district-search'].value = '';
   renderDistricts();
   nodes['district-hint'].hidden = !fromError;
   // Solo se ofrece volver si hay resultados detrás a los que volver.
-  nodes['menu-back-results'].hidden = !(state.origin || state.district);
-  show('district-step');
+  nodes['menu-back-results'].hidden = !(search.origin || search.district);
+  show('district');
   renderPlaceAction('idle');
   // Una pantalla nueva empieza arriba: si se llegaba desde una lista scrolleada,
   // quedarse a media altura escondía el buscador y la propia píldora.
@@ -247,7 +209,7 @@ const ACCION_LUGAR = Object.freeze({
 // de pantalla: el proceso y el fallo tienen que contarse en el propio botón.
 // Con GPS guardado pero fuera de resultados —en la lista de distritos— la píldora
 // no puede prometer «actualizar»: ahí solo tiene sentido salir hacia el GPS.
-const enGps = () => Boolean(state.origin) && nodes.controls.dataset.screen === 'compare';
+const enGps = () => Boolean(search.origin) && ui.screen === 'compare';
 function renderPlaceAction(status = 'idle') {
   const accion = enGps() ? ACCION_LUGAR.gps : ACCION_LUGAR.distrito;
   const pendiente = status === 'pending';
@@ -255,7 +217,7 @@ function renderPlaceAction(status = 'idle') {
   nodes['place-action-label'].textContent = pendiente ? 'Actualizando…' : error ? 'Reintentar' : accion.label;
   // En distritos la barra compacta lleva solo este botón: no hay resumen con el
   // que competir, así que cabe el nombre completo y no hay por qué abreviarlo.
-  const soloEnLaBarra = nodes.controls.dataset.screen === 'district';
+  const soloEnLaBarra = ui.screen === 'district';
   nodes['refresh-location-compact-label'].textContent = pendiente ? 'Actualizando…' : error ? 'Reintentar' : (soloEnLaBarra ? accion.label : accion.corta);
   const nombre = error ? `${AVISO_UBICACION.error} Reintentar.` : nodes['place-action-label'].textContent;
   for (const key of ['refresh-location', 'refresh-location-compact']) {
@@ -282,63 +244,56 @@ function renderLocationUpdate(status, message = null) {
 // persona decide si lo amplía.
 function applyUpdatedOrigin() {
   // Forzado: cambió el origen, así que las distancias hay que rehacerlas aunque
-  // ningún precio haya vencido todavía. De paso reevalúa la vigencia, que es lo
-  // que faltaba: se recalculaban distancias sobre precios congelados al entrar.
-  refrescarVigencia({ forzar: true });
-  state.visibleCount = PAGE_SIZE;
+  // ningún precio haya vencido todavía, y de paso se reevalúa la vigencia.
+  refrescar({ force: true });
+  elegir({ visibleCount: PAGE_SIZE });
   renderOffers();
 }
-function refreshLocation() {
-  if (!state.origin || state.updatingLocation) return;
-  if (!navigator.geolocation) { renderLocationUpdate('error'); return; }
-  const attempt = ++state.locationAttempt;
-  state.updatingLocation = true;
+async function refreshLocation() {
+  if (!search.origin || ui.updatingLocation) return;
+  if (!locator.available) { renderLocationUpdate('error'); return; }
+  ui.updatingLocation = true;
   renderLocationUpdate('pending');
-  // El token de intento es el mismo del flujo inicial: si mientras tanto se
-  // elige distrito o se reintenta, la respuesta que llegue tarde se descarta.
-  const stale = () => attempt !== state.locationAttempt;
-  navigator.geolocation.getCurrentPosition((position) => {
-    if (stale()) return;
-    state.updatingLocation = false;
-    state.origin = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-    applyUpdatedOrigin();
-    // Sin salto al inicio: si te moviste 300 m la lista casi no cambia de orden,
-    // y arrancarte de la tarjeta que leías castiga justo el uso en movimiento.
-    // El foco se queda en la píldora, que es la que cuenta el resultado.
-    renderLocationUpdate('done', `Ubicación actualizada · ${state.pool.length} ${state.pool.length === 1 ? 'estación' : 'estaciones'} en ${formatRadius(state.radiusKm)}.`);
-  }, () => {
-    if (stale()) return;
-    state.updatingLocation = false;
-    renderLocationUpdate('error');
-  }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 });
+  // Si mientras tanto se elige distrito, se vuelve al inicio o se reintenta, la
+  // respuesta que llegue tarde se descarta.
+  const respuesta = await locator.request();
+  if (respuesta.status === 'stale') return;
+  ui.updatingLocation = false;
+  if (respuesta.status === 'error') { renderLocationUpdate('error'); return; }
+  elegir({ origin: respuesta.origin });
+  applyUpdatedOrigin();
+  // Sin salto al inicio: si te moviste 300 m la lista casi no cambia de orden,
+  // y arrancarte de la tarjeta que leías castiga justo el uso en movimiento.
+  // El foco se queda en la píldora, que es la que cuenta el resultado.
+  const total = ui.view.pool.length;
+  renderLocationUpdate('done', `Ubicación actualizada · ${total} ${total === 1 ? 'estación' : 'estaciones'} en ${formatRadius(search.radiusKm)}.`);
 }
 // Un solo gesto con una sola promesa. Con distrito elegido es el flujo inicial
 // completo, porque el radio y el orden solo tienen sentido sobre una posición.
 function placeAction() { if (enGps()) refreshLocation(); else locate(); }
-function locate() {
-  if (!navigator.geolocation) { chooseDistrict({ fromError: true }); return; }
-  const attempt = ++state.locationAttempt;
-  show('loading-step');
-  navigator.geolocation.getCurrentPosition((position) => {
-    if (attempt !== state.locationAttempt) return;
-    state.origin = { latitude: position.coords.latitude, longitude: position.coords.longitude }; state.district = null; showCompare();
-  }, () => { if (attempt !== state.locationAttempt) return; state.origin = null; chooseDistrict({ fromError: true }); }, { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 });
+async function locate() {
+  if (!locator.available) { chooseDistrict({ fromError: true }); return; }
+  show('loading');
+  const respuesta = await locator.request();
+  if (respuesta.status === 'stale') return;
+  if (respuesta.status === 'error') { elegir({ origin: null }); chooseDistrict({ fromError: true }); return; }
+  elegir({ origin: respuesta.origin, district: null });
+  showCompare();
 }
-function cancelLocation() { state.locationAttempt += 1; chooseDistrict(); }
-function fatal(error) { console.error(error); nodes['fatal-message'].textContent = navigator.onLine ? 'No pudimos cargar los precios. Revisa tu conexión y reintenta.' : 'No hay datos guardados todavía. Conéctate una vez para descargar precios.'; show('fatal-state'); }
+function fatal(error) { console.error(error); nodes['fatal-message'].textContent = navigator.onLine ? 'No pudimos cargar los precios. Revisa tu conexión y reintenta.' : 'No hay datos guardados todavía. Conéctate una vez para descargar precios.'; show('fatal'); }
 function applyLoaded(dataset) {
-  state.dataset = dataset; state.dataMode = dataset.dataMode;
-  const filas = currentRows();
+  data.dataset = dataset; data.mode = dataset.dataMode;
+  const filas = evaluateRows(dataset, new Date()).rows;
   $('use-location').disabled = false;
   $('choose-district').disabled = false;
-  nodes['data-status'].textContent = `${conPrecio(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(state.dataset.cutoff_at)}.`;
+  nodes['data-status'].textContent = `${withPrice(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
   // Lo que el producto tiene que declarar, sin justificarse: atribución, no
   // afiliación, qué significa una ausencia, la ventana de vigencia, cómo se mide
   // la distancia, la precisión medida y de quién son las marcas. Nada de
   // explicar por qué se decidió cada cosa, y nada de pedir un contacto que la
   // app no ofrece.
-  nodes['source-content'].innerHTML = `<p>${escapeHtml(state.dataset.provenance.attribution)} Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>No guardamos tu ubicación ni sale de tu dispositivo.</p><p>«—» significa que ese grifo no publica precio vigente de ese producto, no que no lo venda. Pasados ${MAX_OFFER_AGE_DAYS} días sin reportar, su tarjeta queda sin precios y dice desde cuándo calla.</p><p>La distancia es en línea recta. Tu zona es el radio que eliges, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km.</p><p>Los nombres salen del Registro oficial: precisión medida de 89 % en los confirmados y 85 % en los <b>por confirmar</b>. Marcas y logos son de sus titulares, solo para identificar la estación.</p><p><a href="${escapeHtml(state.dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
+  nodes['source-content'].innerHTML = `<p>${escapeHtml(dataset.provenance.attribution)} Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>No guardamos tu ubicación ni sale de tu dispositivo.</p><p>«—» significa que ese grifo no publica precio vigente de ese producto, no que no lo venda. Pasados ${MAX_OFFER_AGE_DAYS} días sin reportar, su tarjeta queda sin precios y dice desde cuándo calla.</p><p>La distancia es en línea recta. Tu zona es el radio que eliges, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km.</p><p>Los nombres salen del Registro oficial: precisión medida de 89 % en los confirmados y 85 % en los <b>por confirmar</b>. Marcas y logos son de sus titulares, solo para identificar la estación.</p><p><a href="${escapeHtml(dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
 // La app NUNCA se localiza sola. Antes, si el permiso ya estaba concedido, la
 // portada llamaba a `locate()` al cargar; como el navegador guarda ese permiso
@@ -353,26 +308,27 @@ async function initialize() {
   } catch (error) { fatal(error); }
 }
 
-$('use-location').addEventListener('click', locate); $('choose-district').addEventListener('click', chooseDistrict);
-$('cancel-location').addEventListener('click', cancelLocation); nodes['district-search'].addEventListener('input', () => renderDistricts(nodes['district-search'].value));
+$('use-location').addEventListener('click', locate); $('choose-district').addEventListener('click', () => chooseDistrict());
+// Elegir distrito ya descarta la ubicación en vuelo.
+$('cancel-location').addEventListener('click', () => chooseDistrict()); nodes['district-search'].addEventListener('input', () => renderDistricts(nodes['district-search'].value));
 // Volver a los resultados los devuelve tal como estaban: no se recalcula nada,
 // solo se vuelve a mostrar la pantalla que seguía pintada debajo.
-$('menu-back-results').addEventListener('click', () => { closePlaceMenu(); show('compare-step'); renderPlaceAction('idle'); nodes['compare-title'].focus(); });
-nodes.districts.addEventListener('click', (event) => { const district = event.target.closest('[data-district]')?.dataset.district; if (district) { state.origin = null; state.district = district; showCompare(); } });
+$('menu-back-results').addEventListener('click', () => { closePlaceMenu(); show('compare'); renderPlaceAction('idle'); nodes['compare-title'].focus(); });
+nodes.districts.addEventListener('click', (event) => { const district = event.target.closest('[data-district]')?.dataset.district; if (district) { elegir({ origin: null, district }); showCompare(); } });
 // Cambiar un filtro estando abajo: el primer resultado es la respuesta, así
 // que la lista vuelve arriba y el card de controles regresa al flujo.
-document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', () => { state.sort = button.dataset.sort === 'price' ? `price:${state.priceProduct}` : 'distance'; state.preferencesTouched = true; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
+document.querySelectorAll('[data-sort]').forEach((button) => button.addEventListener('click', () => { elegir({ sort: button.dataset.sort === 'price' ? 'price' : 'distance', preferencesTouched: true, visibleCount: PAGE_SIZE }); renderOffers(); controls.scrollToTop(); }));
 // El sub-toggle recuerda la elección aunque se vuelva a «Más cerca», así que
 // quien compara Premium no tiene que volver a decirlo en cada vuelta.
-document.querySelectorAll('[data-price-product]').forEach((button) => button.addEventListener('click', () => { state.priceProduct = button.dataset.priceProduct; if (state.sort.startsWith('price:')) state.sort = `price:${state.priceProduct}`; state.visibleCount = PAGE_SIZE; renderOffers(); controls.scrollToTop(); }));
+document.querySelectorAll('[data-price-product]').forEach((button) => button.addEventListener('click', () => { elegir({ priceProduct: button.dataset.priceProduct, visibleCount: PAGE_SIZE }); renderOffers(); controls.scrollToTop(); }));
 nodes.offers.addEventListener('click', (event) => { const button = event.target.closest('[data-detail]'); if (button) toggleDetail(button); });
 // Filtrado local sobre datos ya cargados: no hay red, así que `input` responde
 // mientras se arrastra sin costo perceptible; al soltar, la lista vuelve arriba.
-nodes['radius-input'].addEventListener('input', () => { state.radiusKm = Number(nodes['radius-input'].value); state.preferencesTouched = true; state.visibleCount = PAGE_SIZE; renderOffers(); });
+nodes['radius-input'].addEventListener('input', () => { elegir({ radiusKm: Number(nodes['radius-input'].value), preferencesTouched: true, visibleCount: PAGE_SIZE }); renderOffers(); });
 nodes['radius-input'].addEventListener('change', () => controls.scrollToTop());
 nodes['load-more'].addEventListener('click', () => {
   const pintadas = nodes.offers.children.length;
-  state.visibleCount = Number(nodes['load-more'].dataset.siguiente);
+  elegir({ visibleCount: ui.view.nextCount });
   renderOffers();
   // El botón puede acabar de desaparecer y el foco caería en <body>. Pasa a la
   // primera tarjeta nueva, que es justo lo que se acaba de pedir.
@@ -416,11 +372,11 @@ addEventListener('scroll', () => closePlaceMenu(), { passive: true });
 $('menu-districts').addEventListener('click', () => { closePlaceMenu(); chooseDistrict(); });
 // Volver al inicio conserva radio y criterio: son preferencias, no consecuencias
 // del origen. Solo se suelta la posición en vuelo, si había una.
-$('menu-home').addEventListener('click', () => { closePlaceMenu(); state.locationAttempt += 1; state.updatingLocation = false; show('start-step'); $('use-location').focus(); });
+$('menu-home').addEventListener('click', () => { closePlaceMenu(); locator.cancel(); ui.updatingLocation = false; show('start'); $('use-location').focus(); });
 $('retry-load').addEventListener('click', () => location.reload());
 // Volver a la app tras un rato no dispara ningún gesto: sin esto, un precio que
 // venció mientras estaba en segundo plano seguiría en pantalla hasta tocar algo.
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.dataset && !nodes['compare-step'].hidden) renderOffers(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && data.dataset && ui.screen === 'compare') renderOffers(); });
 initTheme();
 initialize();
 // Sentencia aparte y fuera del `try` de `initialize()`: el histórico se pide en
@@ -430,7 +386,7 @@ const historyChart = mountHistoryChart({ mount: $('history-chart'), body: $('his
 // «Ver historial» no es otra pantalla: es la portada con el gráfico enfocado, y
 // tiene URL propia para poder enlazarla y volver a ella con «atrás».
 function showHistory({ push = true } = {}) {
-  closePlaceMenu(); state.locationAttempt += 1; state.updatingLocation = false; show('start-step');
+  closePlaceMenu(); locator.cancel(); ui.updatingLocation = false; show('start');
   if (push && !HISTORY_ROUTE.test(location.pathname)) history.pushState(null, '', '/gasolina/historial');
   historyChart.focus();
 }
