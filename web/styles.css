@@ -229,6 +229,11 @@ h1,h2,h3,p{margin-top:0}
    Fuera de resultados solo se ve la appbar y el card no se fija. */
 .controls{
   padding:0 var(--s3);
+  /* `.plate` ya da `backdrop-filter`, que crea contexto de apilamiento propio
+     con z-index:auto. En estado full cada `.offer.glass` crea el suyo igual:
+     sin este número ganaba el que pinta después en el DOM —una tarjeta— y
+     tapaba `.place__menu` aunque su z-index fuera mayor. */
+  z-index:1;
   /* Alto de la fila resumen. La usan el propio resumen y el `scroll-margin` de
      la tarjeta: si cambia aquí, el foco al paginar sigue cayendo donde debe. */
   --controls-compact-h:64px;
