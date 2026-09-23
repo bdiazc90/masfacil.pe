@@ -1,4 +1,4 @@
-import { GASOLINA_KEYS } from '../gasolina-contract.js';
+import { GASOLINA_KEYS } from './catalog.js';
 
 // Los dos bundles describen el mismo universo de grifos —la mayoría aparece en
 // ambos— y solo difieren en precio y fecha. Fusionarlos deja una tarjeta por

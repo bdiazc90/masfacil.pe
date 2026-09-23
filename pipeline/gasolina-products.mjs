@@ -2,12 +2,13 @@ import crypto from 'node:crypto';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 import { GIS_FIELDS, MINIMIZED_FIELDS, RAW_FIELDS, REGISTRY_FIELDS, assertHeader, clean, csvRows, normalizeHeader, parseTimestamp, readTable } from './csv.mjs';
 import { facilitoLinkKey } from './facilito/link.mjs';
+import { GASOLINA, GASOLINA_KEYS, PRODUCTS } from '../web/lib/catalog.js';
+import { withinPeru } from '../web/lib/bundle-contract.js';
 
-export const GASOLINA_PRODUCTS = Object.freeze({
-  regular: Object.freeze({ canonical: 'GASOHOL REGULAR', label: 'Gasohol Regular' }),
-  premium: Object.freeze({ canonical: 'GASOHOL PREMIUM', label: 'Gasohol Premium' }),
-});
-export const GASOLINA_PRODUCT_KEYS = Object.freeze(Object.keys(GASOLINA_PRODUCTS));
+// Nombre canónico, etiqueta y unidad salen del catálogo público. Las actividades
+// autorizadas de abajo son de operación y se quedan aquí.
+export const GASOLINA_PRODUCTS = Object.freeze(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, PRODUCTS[key]])));
+export const GASOLINA_PRODUCT_KEYS = GASOLINA_KEYS;
 const activities = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GNV': '05', 'EE.SS con GLP y GNV': '06' });
 const sep = '\u001f';
 
@@ -45,7 +46,7 @@ export function direccionParaPantalla(bruta) {
   return salida || null;
 }
 
-const lima = (row) => row.DEPARTAMENTO === 'LIMA' && row.PROVINCIA === 'LIMA';
+const lima = (row) => row.DEPARTAMENTO === GASOLINA.scope.department && row.PROVINCIA === GASOLINA.scope.province;
 
 function seedRows(seed, name, fields, mapRow) {
   if (!seed || !Array.isArray(seed[name])) return null;
@@ -91,7 +92,7 @@ function selectProductCandidates({ sources, productKey, cutoffAt }) {
   const byGis = new Map(); for (const row of sources.gis.filter((item) => item.LAYER === '35')) byGis.set(row.N, [...(byGis.get(row.N) ?? []), row]);
   const grouped = new Map(); let sourceRows = 0;
   for (const row of sources.prices) {
-    if (!Object.hasOwn(activities, row.ACTIVIDAD) || row.PRODUCTO !== product.canonical || row.UNIDAD !== 'Galones') continue;
+    if (!Object.hasOwn(activities, row.ACTIVIDAD) || row.PRODUCTO !== product.canonical || row.UNIDAD !== product.unit) continue;
     sourceRows += 1; const time = parseTimestamp(row.FECHA_DE_REGISTRO); const key = [row.REGISTRO_DE_HIDROCARBUROS, row.ACTIVIDAD, row.PRODUCTO, row.UNIDAD].join(sep); const current = grouped.get(key) ?? { rows: [], max: null };
     const numericPrice = Number(row.PRECIO_DE_VENTA_SOLES.replace(',', '.')); const candidate = { ...row, time, numericPrice };
     if (time && (!current.max || time > current.max)) { current.max = time; current.rows = [candidate]; } else if (time && current.max && time.getTime() === current.max.getTime()) current.rows.push(candidate);
@@ -131,7 +132,7 @@ function selectProductCandidates({ sources, productKey, cutoffAt }) {
     return { ...item, gisMatches: matches, coordinate, longitude: Number(coordinate?.LONGITUDE), latitude: Number(coordinate?.LATITUDE) };
   });
   const gisAmbiguous = conCruceGis.filter((item) => item.gisMatches.length > 1).length;
-  const geo = conCruceGis.filter((item) => item.coordinate && lima(item.coordinate) && item.coordinate.DISTRITO === item.selected.DISTRITO && Number.isFinite(item.longitude) && item.longitude >= -82 && item.longitude <= -68 && Number.isFinite(item.latitude) && item.latitude >= -19 && item.latitude <= 1);
+  const geo = conCruceGis.filter((item) => item.coordinate && lima(item.coordinate) && item.coordinate.DISTRITO === item.selected.DISTRITO && withinPeru(item.longitude, item.latitude));
   return { product, sourceRows, latest, latestLima, publicables, fresh, registered, geo, fresco, vencido, motivoNoFresco, registryAmbiguous, gisAmbiguous, registry: sources.registry };
 }
 

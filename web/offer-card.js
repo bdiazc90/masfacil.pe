@@ -1,4 +1,5 @@
 import { brandAssetFor } from './brand-logos.js';
+import { GASOLINA_KEYS, PRODUCTS } from './lib/catalog.js';
 
 export const UNVERIFIED_STATION_LABEL = 'Estación sin nombre verificado';
 
@@ -24,9 +25,10 @@ const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y'])
 
 export const UNCONFIRMED_LABEL = 'por confirmar';
 
-// Las claves de producto son las mismas en datos, JS y CSS ([data-key]).
-const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
-export const PRODUCT_CHIPS = Object.freeze({ regular: 'REG', premium: 'PRE' });
+// Las claves de producto son las mismas en datos, JS y CSS ([data-key]). Nombre
+// corto y sigla salen del catálogo, en el orden de la tarjeta.
+const PRODUCTOS = Object.freeze(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, PRODUCTS[key].short])));
+export const PRODUCT_CHIPS = Object.freeze(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, PRODUCTS[key].chip])));
 const fechaHora = (iso) => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date(iso));
 // «S/» reducido dentro de la cifra: el número es el dato que decide, la moneda solo lo acompaña.
 const priceHtml = (value) => `<small>S/</small>${escapeHtml(value.toFixed(2))}`;

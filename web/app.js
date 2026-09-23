@@ -7,7 +7,7 @@ import { mergeOfferRows } from './lib/merge-products.js';
 import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
 import { visibleDistricts } from './district-list.js';
 import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
-import { GASOLINA_KEYS } from './gasolina-contract.js';
+import { GASOLINA_KEYS, PRODUCTS } from './lib/catalog.js';
 import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
@@ -20,7 +20,6 @@ const $ = (id) => document.getElementById(id);
 const HISTORY_ROUTE = /^\/gasolina\/historial\/?$/;
 const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
-const PRODUCTOS = Object.freeze({ regular: 'Regular', premium: 'Premium' });
 
 // El card de controles solo se fija en resultados; en las demás pantallas es la
 // appbar de siempre, en flujo.
@@ -95,7 +94,7 @@ function renderSummary(hayPrecios = true) {
   const porPrecio = state.sort.startsWith('price:') || !state.origin;
   // Sin un solo precio vigente, anunciar un criterio de precio promete un orden
   // que no existe: el resumen dice lo que pasa, no lo que ordenaría.
-  const criterio = !hayPrecios ? 'Sin precios recientes' : porPrecio ? `${PRODUCTOS[state.priceProduct]} más barata` : 'Más cerca';
+  const criterio = !hayPrecios ? 'Sin precios recientes' : porPrecio ? `${PRODUCTS[state.priceProduct].short} más barata` : 'Más cerca';
   const partes = state.origin ? [formatRadius(state.radiusKm), criterio] : [criterio];
   // Con GPS el icono de la barra ya dice «mi ubicación»: repetirlo en texto solo
   // le robaba ancho al criterio, que nunca debe truncar.

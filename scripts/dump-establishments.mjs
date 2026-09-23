@@ -15,6 +15,7 @@ import { buildGasolinaProjectionForPointer, resolveGasolinaRaw } from '../pipeli
 import { RAW_FIELDS, assertHeader, clean, csvRows, normalizeHeader } from '../pipeline/csv.mjs';
 import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 import { readActivePointer } from '../app/snapshot-manifest.mjs';
+import { GASOLINA_KEYS } from '../web/lib/catalog.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -39,7 +40,7 @@ async function main() {
 
   // Unión por establecimiento: un lugar físico puede vender los dos productos.
   const byAnchor = new Map();
-  for (const key of ['regular', 'premium']) {
+  for (const key of GASOLINA_KEYS) {
     for (const offer of candidate.datasets[key].offers) {
       const current = byAnchor.get(offer.establishment_id) ?? {
         establishment_id: offer.establishment_id,

@@ -30,6 +30,16 @@ const OPERATOR_ONLY = Object.freeze([
 
 const DOCS_FILES = Object.freeze(['LICENSE', 'NOTICE', 'mockup.html']);
 
+// Módulos de `web/` que la proyección también ejecuta y que deciden los bytes
+// publicados o su validación: el catálogo de productos, las reglas del contrato
+// y la política de fuente del precio, que cuenta los precios efectivos del
+// `refresh-state`. Tocar solo uno de ellos es cambiar la proyección aunque viva
+// junto al shell, así que reproyecta.
+// Norma: si un módulo de `web/` pasa a decidir qué se publica o si es válido,
+// va en esta lista; si solo pinta o solo lo lee el operador —los logos, por
+// ejemplo—, no.
+const SHARED_WITH_PROJECTION = Object.freeze(['lib/catalog.js', 'lib/bundle-contract.js', 'lib/price-source.js']);
+
 export const ROUTES = Object.freeze(['docs', 'shell', 'data', 'project']);
 
 // Qué necesita cada ruta. `deploy` es la intención; en las rutas de datos la
@@ -50,6 +60,7 @@ export function classifyPath(rawPath) {
   const [head, ...rest] = parts;
   // La proyección pública se genera; nunca llega por un push (está en .gitignore).
   if (head === 'web' && rest[0] === 'data') return 'docs';
+  if (head === 'web' && SHARED_WITH_PROJECTION.includes(rest.join('/'))) return 'projection';
   if (head === 'web') return 'shell';
   if (head === 'docs') return 'docs';
   if (head === 'scripts' && rest.length === 1 && OPERATOR_ONLY.includes(rest[0])) return 'operator';

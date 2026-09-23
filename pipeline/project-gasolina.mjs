@@ -10,6 +10,7 @@ import { buildCommercialCatalogIndex, staleBrandEvidence } from '../app/commerci
 import { brandAccreditationGroups } from '../app/commercial-audit.mjs';
 import { absentCommercialResolution, commercialIdentityReport, resolveCommercialIdentity } from '../app/commercial-resolution.mjs';
 import { brandAssetFor } from '../web/brand-logos.js';
+import { GASOLINA } from '../web/lib/catalog.js';
 import { filterFreshOffers } from '../web/lib/freshness.js';
 import { selectOfferPrice } from '../web/lib/price-source.js';
 import { resolveFacilitoLayer } from './facilito/link.mjs';
@@ -120,7 +121,7 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
   // año como inmutable.
   const contenido = (key) => ({
     schema_version: GASOLINA_MANIFEST_VERSION,
-    product: { key, canonical: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, display_unit: 'Galones' },
+    product: { key, canonical: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, display_unit: GASOLINA_PRODUCTS[key].unit },
     scope: GASOLINA_SCOPE,
     snapshot_date: pointer.snapshot_date,
     cutoff_at: input.cutoffAt,
@@ -141,7 +142,7 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
       ...contenido(key),
     };
     const body = stable(data);
-    const relative = `data/gasolina/snapshots/${revisionId}/${key}.json`;
+    const relative = `${GASOLINA.dataRoot}/snapshots/${revisionId}/${key}.json`;
     datasets[key] = data;
     bodies[key] = body;
     descriptors[key] = { canonical_product: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, dataset_url: relative, bytes: Buffer.byteLength(body), sha256: sha256(body), cutoff_at: input.cutoffAt };

@@ -1,4 +1,5 @@
-const GASOLINA_KEYS = Object.freeze(['regular', 'premium']);
+import { GASOLINA_KEYS } from '../web/lib/catalog.js';
+
 const MAX_OFFER_DROP = 0.2;
 const MAX_COVERAGE_DROP_POINTS = 5;
 

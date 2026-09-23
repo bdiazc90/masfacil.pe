@@ -3,12 +3,13 @@
  * viaja del observador al navegador.
  *
  * Este módulo es ISOMÓRFICO: lo importan Node —el observador y las sondas— y el
- * navegador, sin duplicarse. El contrato de precios sí está duplicado
- * (`pipeline/gasolina-contract.mjs` usa `node:crypto`, `web/gasolina-contract.js`
- * usa `crypto.subtle`) porque valida por hash. Aquí no hay hash que calcular: el
- * resumen se valida por su ESTRUCTURA —fechas reales, orden, alcance, unidades,
- * finitud, coherencia entre `mean` y `n`, tamaño—, así que un solo archivo sirve
- * a los dos entornos. Cero criptografía, cero `fs`, cero red.
+ * navegador, sin duplicarse. El contrato de precios también comparte sus reglas
+ * (`lib/bundle-contract.js`), pero además valida por hash y cada entorno pone el
+ * suyo: `node:crypto` en la proyección, `crypto.subtle` en el navegador. Aquí no
+ * hay hash que calcular: el resumen se valida por su ESTRUCTURA —fechas reales,
+ * orden, alcance, unidades, finitud, coherencia entre `mean` y `n`, tamaño—, así
+ * que un solo archivo sirve a los dos entornos. Cero criptografía, cero `fs`,
+ * cero red.
  *
  * El resumen NO repite las ofertas ni el expediente comercial: solo dos medias y
  * dos conteos por día, más la traza de qué observación los produjo.
@@ -41,10 +42,9 @@ export const HISTORY_MAX_BYTES = 64 * 1024;
 export const HISTORY_ORIGIN = 'https://br-winter-flower-axp7ynzb.storage.c-4.us-east-2.aws.neon.tech';
 export const HISTORY_SUMMARY_PATH = '/masfacil-datos/gasolina/series/daily-v1.json';
 
-// El alcance y los productos se declaran aquí en vez de importarse del contrato
-// de precios: este formato es independiente y no debe romperse porque aquel
-// cambie. La sonda cruza ambas listas, que es como el proyecto ya protege la
-// duplicación deliberada entre `web/` y `pipeline/`.
+// El alcance y los productos se declaran aquí en vez de importarse del catálogo
+// ni del contrato de precios: este formato es independiente y no debe romperse
+// porque aquellos cambien.
 export const HISTORY_SCOPE = Object.freeze({ department: 'LIMA', province: 'LIMA' });
 export const HISTORY_PRODUCTS = Object.freeze(['regular', 'premium']);
 

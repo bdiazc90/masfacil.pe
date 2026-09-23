@@ -27,9 +27,10 @@
  * un lector de pantalla anuncie lo que la persona eligió y no toda la gráfica.
  */
 
-import { HISTORY_MAX_DAYS, HISTORY_ORIGIN, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from './lib/history-contract.js';
+import { HISTORY_MAX_DAYS, HISTORY_ORIGIN, HISTORY_PRODUCTS, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from './lib/history-contract.js';
 import { DEFAULT_WINDOW, STALE_HOURS, areaPath, demoSummary, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, staleHours } from './lib/history-series.js';
 import { escapeHtml } from './offer-card.js';
+import { PRODUCTS } from './lib/catalog.js';
 
 const GUARDADO = 'masfacil-history-daily-v1';
 const DIA_CORTO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -37,10 +38,9 @@ const DIA_SEMANA = new Intl.DateTimeFormat('es-PE', { weekday: 'short', timeZone
 const DIA_NUMERO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', timeZone: 'UTC' });
 const DIA_LARGO = new Intl.DateTimeFormat('es-PE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 
-const PRODUCTOS = Object.freeze([
-  { key: 'regular', label: 'Regular' },
-  { key: 'premium', label: 'Premium' },
-]);
+// Los productos son los del contrato del resumen, que es independiente del de
+// precios; solo el nombre que se pinta sale del catálogo.
+const PRODUCTOS = Object.freeze(HISTORY_PRODUCTS.map((key) => ({ key, label: PRODUCTS[key]?.short ?? key })));
 
 // Lienzo único, con `viewBox`: escala a cualquier ancho sin recalcular nada y sin
 // desbordar a 320 px. El margen izquierdo deja sitio a las cifras del eje y el

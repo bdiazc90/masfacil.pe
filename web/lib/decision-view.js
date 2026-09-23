@@ -1,4 +1,5 @@
 import { orderOffers } from './haversine.js';
+import { GASOLINA_KEYS, PRODUCTS } from './catalog.js';
 
 // El más barato del radio, en el producto activo. Una fila que no publica ese
 // producto no compite: no tiene precio que comparar, y darle `Infinity` la
@@ -16,7 +17,7 @@ export function decisionTag(offer, pool, radiusKm = null, product = 'regular') {
   if (!cheapest || offer.establishment_id !== cheapest.establishment_id) return null;
   const nearest = orderOffers(pool, 'distance')[0];
   const alcance = radiusKm ? `en ${formatRadius(radiusKm)}` : 'de tu zona';
-  const etiqueta = product === 'premium' ? 'Premium' : 'Regular';
+  const etiqueta = (GASOLINA_KEYS.includes(product) ? PRODUCTS[product] : PRODUCTS.regular).short;
   return nearest && nearest.establishment_id === cheapest.establishment_id ? `${etiqueta} más barata y más cercana ${alcance}` : `${etiqueta} más barata ${alcance}`;
 }
 

@@ -8,10 +8,15 @@
 //   npm run verify:web -- --origin <url>     además, contra el origen público
 //
 // `verifyWeb` es una función: `prepareRelease` la llama en proceso y este guion
-// solo imprime o lanza. La comprobación con el contrato del cliente es la que
-// faltaba: `web/` y `pipeline/` mantienen a mano dos copias del mismo contrato
-// y nada las comparaba, así que un cliente nuevo podía publicarse sobre un
-// bundle que él mismo iba a rechazar.
+// solo imprime o lanza. Las reglas del contrato son un solo módulo
+// (`web/lib/bundle-contract.js`), pero cada entorno calcula su huella —Node con
+// `node:crypto`, el navegador con `crypto.subtle`— y el cliente se publica junto
+// con los datos: por eso se sigue comprobando que el cliente nuevo acepte el
+// bundle que viaja con él, y no solo que el productor lo dé por bueno.
+//
+// Con `--origin` se mira además lo que de verdad sirve el origen: el bundle
+// servido, validado en memoria sin tocar `web/data/`, y el shell publicado,
+// archivo por archivo, contra este árbol. Es la comprobación posterior al deploy.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,11 +24,52 @@ import { fileURLToPath } from 'node:url';
 import { GASOLINA_KEYS, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from '../pipeline/gasolina-contract.mjs';
 import { validateGasolinaManifest as clienteAceptaManifest, validGasolinaBundle as clienteAceptaBundle } from '../web/gasolina-contract.js';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
-import { shellManifestProblems } from '../pipeline/shell-manifest.mjs';
+import { renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
+import { fetchLiveBundle } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
-import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems } from '../app/shell-assets.mjs';
+import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+/**
+ * Problemas de un bundle con los dos contratos: el del productor y el del
+ * cliente. Sirve igual para el árbol local y para los bytes que sirve el origen.
+ *
+ * @param {{manifest: object, state: object|undefined, bodies: Record<string, string|undefined>}} bundle
+ */
+async function bundleProblems({ manifest, state, bodies }) {
+  const errors = [...validateGasolinaManifest(manifest)];
+  if (state === undefined) errors.push('falta refresh-state gasolina');
+  else errors.push(...validateGasolinaRefreshState(state, manifest));
+  for (const key of GASOLINA_KEYS) {
+    if (bodies[key] === undefined) { errors.push(`falta snapshot ${key}`); continue; }
+    errors.push(...validateGasolinaBundle(manifest, key, bodies[key]));
+  }
+  // Si el cliente que se publica no acepta el bundle que se publica con él, no
+  // se publica ninguno de los dos.
+  if (!clienteAceptaManifest(manifest)) errors.push('el cliente nuevo rechaza el manifest del bundle');
+  for (const key of GASOLINA_KEYS) {
+    if (bodies[key] === undefined) continue;
+    if (!(await clienteAceptaBundle(manifest, key, bodies[key]))) errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
+  }
+  return errors;
+}
+
+/** Módulos relativos que alcanza `entrada` por imports estáticos, dentro de `web/`. */
+function grafoDeModulos(root, entrada) {
+  const vistos = new Set();
+  const pendientes = [entrada];
+  while (pendientes.length) {
+    const relativo = pendientes.pop();
+    const archivo = path.join(root, 'web', relativo);
+    if (vistos.has(relativo) || !fs.existsSync(archivo)) continue;
+    vistos.add(relativo);
+    for (const match of fs.readFileSync(archivo, 'utf8').matchAll(/\b(?:from|import)\s*['"](\.{1,2}\/[^'"]+)['"]/g)) {
+      pendientes.push(path.posix.normalize(path.posix.join(path.posix.dirname(relativo), match[1])));
+    }
+  }
+  return vistos;
+}
 
 /**
  * @param {{root?: string, origin?: string|null}} [entrada]
@@ -34,31 +80,23 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   const errors = [];
   const notas = [];
 
-  // 1. Bundle de datos, con el contrato de servidor.
+  // 1 y 2. Bundle de datos del árbol, con el contrato del productor y el del
+  // cliente.
   const manifestPath = path.join(dataRoot, 'manifest.json');
   if (!fs.existsSync(manifestPath)) throw new Error('Falta web/data/gasolina/manifest.json; ejecuta npm run project o npm run fetch:live -- <url de Pages>');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  errors.push(...validateGasolinaManifest(manifest));
   const refreshPath = path.join(dataRoot, 'refresh-state.json');
-  if (!fs.existsSync(refreshPath)) errors.push('falta refresh-state gasolina');
-  else errors.push(...validateGasolinaRefreshState(JSON.parse(fs.readFileSync(refreshPath, 'utf8')), manifest));
-
   const cuerpos = {};
   for (const key of GASOLINA_KEYS) {
     const descriptor = manifest.products?.[key];
     const snapshot = descriptor && path.join(root, 'web', descriptor.dataset_url);
-    if (!snapshot || !fs.existsSync(snapshot)) { errors.push(`falta snapshot ${key}`); continue; }
-    cuerpos[key] = fs.readFileSync(snapshot, 'utf8');
-    errors.push(...validateGasolinaBundle(manifest, key, cuerpos[key]));
+    if (snapshot && fs.existsSync(snapshot)) cuerpos[key] = fs.readFileSync(snapshot, 'utf8');
   }
-
-  // 2. Compatibilidad cliente ↔ datos: si el cliente que se publica no acepta el
-  // bundle que se publica con él, no se publica ninguno de los dos.
-  if (!clienteAceptaManifest(manifest)) errors.push('el cliente nuevo rechaza el manifest del bundle');
-  for (const key of GASOLINA_KEYS) {
-    if (cuerpos[key] === undefined) continue;
-    if (!(await clienteAceptaBundle(manifest, key, cuerpos[key]))) errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
-  }
+  errors.push(...await bundleProblems({
+    manifest,
+    state: fs.existsSync(refreshPath) ? JSON.parse(fs.readFileSync(refreshPath, 'utf8')) : undefined,
+    bodies: cuerpos,
+  }));
 
   // 3. Precache: se DERIVA aquí y se compara con el módulo generado en disco.
   // Verificar no genera: publicar con un manifest viejo sería publicar un
@@ -68,6 +106,21 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // El bump solo llega si sw.js importa el módulo generado: el navegador
   // reinstala el service worker por sus bytes y los de sus imports.
   errors.push(...serviceWorkerUpdateProblems(fs.readFileSync(path.join(root, 'web', 'sw.js'), 'utf8')));
+  // El catálogo y las reglas del contrato se comparten con la proyección, así que
+  // es fácil que algo de Node se cuele. Ningún módulo que cargue el navegador
+  // puede importar `node:`: la página fallaría y el service worker ni siquiera se
+  // instalaría. `sw.js` no está en la precache —se sirve aparte—, por eso su grafo
+  // se recorre desde él; y en ese grafo tampoco cabe un import dinámico, que un
+  // service worker no admite.
+  const grafoDelSw = grafoDeModulos(root, 'sw.js');
+  const delNavegador = new Set([...shell.derived.entries.filter((entry) => entry.endsWith('.js')).map((entry) => entry.slice(1)), ...grafoDelSw]);
+  for (const relativo of delNavegador) {
+    const archivo = path.join(root, 'web', relativo);
+    if (fs.existsSync(archivo) && /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]node:/.test(fs.readFileSync(archivo, 'utf8'))) errors.push(`web/${relativo} importa un módulo node:, que el navegador no puede cargar`);
+  }
+  for (const relativo of grafoDelSw) {
+    if (/\bimport\s*\(/.test(fs.readFileSync(path.join(root, 'web', relativo), 'utf8'))) errors.push(`web/${relativo} usa un import dinámico, que el service worker no admite`);
+  }
 
   // 4. Activos de marca registrados: registro → archivo → SVG válido → precache.
   errors.push(...brandAssetProblems({
@@ -102,6 +155,7 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
 
   // 7. Contra el origen público. Se mira el tipo y el contenido de cada
   // respuesta, no solo que llegue: un 200 con HTML donde iba un SVG es un fallo.
+  let servido = null;
   if (origin) {
     // Una ruta que no existe tiene que responder 404 con la página propia; si
     // responde 200 con la portada, el 404.html no llegó al deploy.
@@ -125,10 +179,41 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
       } catch (error) { respuestas.set(ruta, { ok: false, error: error.message }); }
     }
     errors.push(...brandAssetProblems({ brandLogos: BRAND_LOGOS, shellList: shell.derived.entries, read: (ruta) => respuestas.get(ruta) }).map((motivo) => `origen público · ${motivo}`));
+
+    // 8. El bundle que de verdad se sirve, no la copia local: se lee con la misma
+    // lectura coherente que usa CI —manifest releído al final— y se valida en
+    // memoria con los dos contratos. `web/data/` no se toca.
+    try {
+      const vivo = await fetchLiveBundle({ origin });
+      servido = vivo.revision_id;
+      const problemas = await bundleProblems({ manifest: vivo.manifest, state: JSON.parse(vivo.stateText), bodies: vivo.bodies });
+      errors.push(...problemas.map((motivo) => `origen público · bundle servido · ${motivo}`));
+    } catch (error) { errors.push(`origen público · no se pudo leer un bundle servido coherente: ${error.message}`); }
+
+    // 9. El shell publicado. La precache que sirve el origen tiene que ser la
+    // derivada de este árbol y cada archivo, byte a byte, el de este árbol: así se
+    // sabe que el deploy subió este commit entero y no una mezcla. `sw.js` va
+    // aparte porque no está en la precache. La única alteración que se descuenta
+    // es el bloque que Pages Analytics inyecta en el HTML servido, delimitado por
+    // su propio comentario; cualquier otra diferencia cuenta.
+    const sinAnalytics = (bytes) => Buffer.from(bytes.toString('utf8').replace(/<!-- Cloudflare Pages Analytics -->[\s\S]*?<!-- Cloudflare Pages Analytics -->/g, ''));
+    const publicados = [...shell.derived.entries, '/sw.js', '/shell-manifest.js'];
+    const comparados = await Promise.all(publicados.map(async (entry) => {
+      try {
+        const response = await fetch(new URL(entry, origin), { redirect: 'error', cache: 'no-store' });
+        if (!response.ok) return `origen público · shell · ${entry} respondió ${response.status}`;
+        const recibido = Buffer.from(await response.arrayBuffer());
+        const bytes = (response.headers.get('content-type') ?? '').startsWith('text/html') ? sinAnalytics(recibido) : recibido;
+        const local = entry === '/shell-manifest.js' ? Buffer.from(renderShellManifest(shell.derived)) : fs.readFileSync(path.join(root, shellEntryFile(entry)));
+        return bytes.equals(local) ? null : `origen público · shell · ${entry} no coincide con este árbol`;
+      } catch (error) { return `origen público · shell · ${entry}: ${error.message}`; }
+    }));
+    errors.push(...comparados.filter(Boolean));
   }
 
   const variantes = [...brandAssets(BRAND_LOGOS)].length;
-  const summary = `Bundles gasolina válidos: ${manifest.revision_id} · Regular ${manifest.products?.regular?.bytes} bytes · Premium ${manifest.products?.premium?.bytes} bytes · cliente compatible · ${Object.keys(BRAND_LOGOS).length} marcas y ${variantes} activos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)`;
+  const publico = origin ? ` · origen: bundle ${servido ?? 'sin leer'} y shell ${shell.derived.cache}` : '';
+  const summary = `Bundles gasolina válidos: ${manifest.revision_id} · Regular ${manifest.products?.regular?.bytes} bytes · Premium ${manifest.products?.premium?.bytes} bytes · cliente compatible · ${Object.keys(BRAND_LOGOS).length} marcas y ${variantes} activos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)${publico}`;
   return { errors: [...new Set(errors)], notas, summary };
 }
 
