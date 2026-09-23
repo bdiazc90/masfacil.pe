@@ -8,6 +8,8 @@ import { visibleDistricts } from './district-list.js';
 import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
 import { PRODUCTS } from './lib/catalog.js';
 import { createLocator } from './geolocation.js';
+import { historyPath, resolvePath, viewPath } from './lib/routes.js';
+import { readPreference, writePreference } from './preference.js';
 import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
 import { initControlsCard } from './controls-card.js';
@@ -26,9 +28,20 @@ const ui = { screen: 'start', updatingLocation: false, districts: [], showAllDis
 const elegir = (cambios) => { search = { ...search, ...cambios }; };
 const locator = createLocator();
 const $ = (id) => document.getElementById(id);
-// La única ruta además de `/`: la misma portada con el gráfico enfocado.
-// `_redirects` la reescribe a `index.html`; aquí solo se enfoca y se historia.
-const HISTORY_ROUTE = /^\/gasolina\/historial\/?$/;
+// La ruta decide la vista. `/` no tiene vista propia: vale la recordada y la URL
+// pasa a la canónica sin añadir una entrada al historial. Una ruta concreta manda
+// sobre la preferencia y queda recordada. El servidor y el service worker ya
+// redirigieron los enlaces antiguos; si uno llega hasta aquí, se redirige igual.
+const entrada = resolvePath(location.pathname, { preference: readPreference() });
+const inicial = entrada.kind === 'view' ? entrada : resolvePath('/', { preference: readPreference() });
+elegir({ view: inicial.view });
+if (entrada.kind === 'redirect') location.replace(`${entrada.to}${location.search}${location.hash}`);
+else {
+  if (location.pathname !== inicial.canonical) history.replaceState(null, '', `${inicial.canonical}${location.search}${location.hash}`);
+  writePreference(inicial.view);
+}
+// La ruta del historial es la misma portada con el gráfico enfocado.
+const enHistorial = () => resolvePath(location.pathname).history === true;
 const SCREENS = Object.freeze({ start: 'start-step', loading: 'loading-step', district: 'district-step', compare: 'compare-step', fatal: 'fatal-state' });
 const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
@@ -47,8 +60,8 @@ function show(screen) {
   ui.screen = screen;
   for (const [key, id] of Object.entries(SCREENS)) nodes[id].hidden = key !== screen;
   // La ruta del historial describe la portada con el gráfico; al salir de ella
-  // la URL vuelve a `/` sin añadir entradas al historial del navegador.
-  if (screen !== 'start' && HISTORY_ROUTE.test(location.pathname)) history.replaceState(null, '', '/');
+  // la URL vuelve a la vista sin añadir entradas al historial del navegador.
+  if (screen !== 'start' && enHistorial()) history.replaceState(null, '', viewPath(search.view));
   $('main').setAttribute('aria-busy', String(screen === 'loading'));
   // Tres valores, no dos: en distritos la tarjeta conserva la píldora y se fija.
   // El atributo es para el CSS; la lógica lee `ui.screen`.
@@ -387,9 +400,9 @@ const historyChart = mountHistoryChart({ mount: $('history-chart'), body: $('his
 // tiene URL propia para poder enlazarla y volver a ella con «atrás».
 function showHistory({ push = true } = {}) {
   closePlaceMenu(); locator.cancel(); ui.updatingLocation = false; show('start');
-  if (push && !HISTORY_ROUTE.test(location.pathname)) history.pushState(null, '', '/gasolina/historial');
+  if (push && !enHistorial()) history.pushState(null, '', historyPath(search.view));
   historyChart.focus();
 }
 $('menu-history').addEventListener('click', () => showHistory());
-addEventListener('popstate', () => { if (HISTORY_ROUTE.test(location.pathname)) showHistory({ push: false }); });
-if (HISTORY_ROUTE.test(location.pathname)) historyChart.focus();
+addEventListener('popstate', () => { if (enHistorial()) showHistory({ push: false }); });
+if (inicial.history) historyChart.focus();

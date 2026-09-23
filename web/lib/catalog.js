@@ -25,3 +25,12 @@ export const GASOLINA = Object.freeze({
   scope: Object.freeze({ department: 'LIMA', province: 'LIMA' }),
   dataRoot: 'data/gasolina',
 });
+
+// Vistas: lo que la persona elige ver. Cada una muestra juntos sus productos y
+// vive en `/combustibles/<clave>`. Solo existen las de `ACTIVE_VIEWS`: activar una
+// vista es una decisión de cada entrega, no el efecto de que aparezcan sus datos.
+export const VIEWS = Object.freeze({
+  gasolina: Object.freeze({ key: GASOLINA.key, products: GASOLINA.products, dataRoot: GASOLINA.dataRoot, history: true }),
+});
+export const ACTIVE_VIEWS = Object.freeze(['gasolina']);
+export const DEFAULT_VIEW = 'gasolina';

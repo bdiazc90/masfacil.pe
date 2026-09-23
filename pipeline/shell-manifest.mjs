@@ -73,7 +73,9 @@ export function deriveShell({ root = rootFromModule } = {}) {
     for (const motivo of svgProblems(fs.readFileSync(archivo, 'utf8'))) problems.push(`${key}.${role}: ${ruta} ${motivo}`);
     marcas.push(ruta);
   }
-  const entries = ['/', '/styles.css', '/manifest.webmanifest', ...modulosDelCliente(webRoot), ...iconosReferenciados(webRoot), ...ordenar(marcas)];
+  // La 404 propia viaja en la precache: sin red, el service worker la devuelve
+  // con su estado para cualquier dirección que no sea una vista.
+  const entries = ['/', '/404.html', '/styles.css', '/manifest.webmanifest', ...modulosDelCliente(webRoot), ...iconosReferenciados(webRoot), ...ordenar(marcas)];
 
   const hash = crypto.createHash('sha256').update(`${JSON.stringify(entries)}\n`);
   for (const entry of entries) {

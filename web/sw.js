@@ -5,6 +5,7 @@
 import { SHELL, SHELL_CACHE } from './shell-manifest.js';
 import { DATA_CACHE, cacheFirst } from './sw-cache-policy.js';
 import { GASOLINA_KEYS, validGasolinaBundle, validateGasolinaManifest } from './gasolina-contract.js';
+import { resolvePath } from './lib/routes.js';
 
 const active = new Map();
 const pairRequest = (key) => new Request(`/__masfacil-gasolina-pair/${key}`);
@@ -39,7 +40,16 @@ async function networkSnapshot(request, key) {
   const cache = await caches.open(DATA_CACHE); await cache.put(request, response.clone()); await cache.put(pairRequest(key), entry.response.clone());
   return response;
 }
-self.addEventListener('install', (event) => event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting())));
+// La 404 propia se guarda aparte. En Pages `/404.html` responde con un 308 a
+// `/404`, y una respuesta redirigida no se puede servir a una navegación: se
+// guarda una copia limpia, que es la que se devuelve sin red, con estado 404.
+const NOT_FOUND = '/404.html';
+async function guardarNotFound(cache) {
+  const response = await fetch(NOT_FOUND);
+  if (!response.ok) throw new Error(`404 propia HTTP ${response.status}`);
+  await cache.put(NOT_FOUND, new Response(await response.blob(), { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
+}
+self.addEventListener('install', (event) => event.waitUntil(caches.open(SHELL_CACHE).then((cache) => Promise.all([cache.addAll(SHELL.filter((entry) => entry !== NOT_FOUND)), guardarNotFound(cache)])).then(() => self.skipWaiting())));
 self.addEventListener('activate', (event) => event.waitUntil(caches.keys().then((names) => Promise.all(names.filter((name) => /^(?:masfacil|facilito)-/.test(name) && ![SHELL_CACHE, DATA_CACHE].includes(name)).map((name) => caches.delete(name)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url); if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
@@ -56,8 +66,27 @@ self.addEventListener('fetch', (event) => {
       catch (error) { const pair = await cachedPair(resolved); if (!pair || pair.manifest.products[resolved].dataset_url !== url.pathname.slice(1)) throw error; return tagged(pair.snapshot, 'saved'); }
     })()); return;
   }
-  // `/gasolina/historial` es la misma portada: se sirve la `/` precacheada, así
-  // que el enlace profundo funciona también sin red y sin una entrada extra.
-  const request = event.request.mode === 'navigate' && /^\/gasolina\/historial\/?$/.test(url.pathname) ? new Request('/') : event.request;
-  event.respondWith(cacheFirst({ request, cache: { match: async (request) => (await caches.open(SHELL_CACHE)).match(request), put: async (request, response) => (await caches.open(SHELL_CACHE)).put(request, response) }, fetchImpl: (request) => fetch(request) }).then(({ response }) => response));
+  if (event.request.mode === 'navigate') { event.respondWith(navegar(event.request, url)); return; }
+  event.respondWith(cacheFirst({ request: event.request, cache: { match: async (request) => (await caches.open(SHELL_CACHE)).match(request), put: async (request, response) => (await caches.open(SHELL_CACHE)).put(request, response) }, fetchImpl: (request) => fetch(request) }).then(({ response }) => response));
 });
+// Navegaciones con la misma tabla de rutas que el hosting y el servidor local.
+async function navegar(request, url) {
+  const ruta = resolvePath(url.pathname);
+  // Un enlace antiguo o con barra final redirige también sin red.
+  if (ruta.kind === 'redirect') return Response.redirect(new URL(`${ruta.to}${url.search}`, url.origin).href, 301);
+  const shell = await caches.open(SHELL_CACHE);
+  // Cada vista es la misma portada: se sirve la `/` precacheada, también sin red
+  // y sin guardar una copia por URL.
+  if (ruta.kind === 'view') return (await cacheFirst({ request: new Request('/'), cache: shell, fetchImpl: (pedido) => fetch(pedido) })).response;
+  // Lo que no es una vista no se disfraza de portada: un archivo del shell abierto
+  // directamente sale del caché, lo demás de la red y, sin red, la 404 guardada
+  // con su estado.
+  const guardado = await shell.match(request);
+  if (guardado) return guardado;
+  try { return await fetch(request); }
+  catch (error) {
+    const pagina = await shell.match(NOT_FOUND);
+    if (!pagina) throw error;
+    return new Response(await pagina.blob(), { status: 404, statusText: 'Not Found', headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+}

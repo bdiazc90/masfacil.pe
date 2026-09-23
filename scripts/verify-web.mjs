@@ -27,6 +27,7 @@ import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
 import { renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
 import { fetchLiveBundle } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
+import { appPaths, redirectRules, redirects } from '../web/lib/routes.js';
 import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -69,6 +70,43 @@ function grafoDeModulos(root, entrada) {
     }
   }
   return vistos;
+}
+
+// Direcciones que tienen que responder 404 con la página propia: la raíz de las
+// vistas, las vistas no activadas y rutas inventadas. Ninguna puede ser la portada.
+const NO_EXISTEN = Object.freeze(['/combustibles', '/combustibles/', '/combustibles/diesel', '/combustibles/glp', '/combustibles/gnv', '/combustibles/gasolina/otra', '/tipo-de-cambio']);
+
+/**
+ * La tabla de rutas contra un origen: la app en cada vista, cada 301 con su
+ * destino exacto y 404 propio en lo demás. Sirve para producción y para el
+ * servidor local, que tienen que responder lo mismo.
+ */
+export async function routeProblems(origin) {
+  const problemas = [];
+  const pedir = (ruta) => fetch(new URL(ruta, origin), { redirect: 'manual', cache: 'no-store' });
+  for (const ruta of ['/', ...appPaths()]) {
+    try {
+      const response = await pedir(ruta);
+      const cuerpo = await response.text();
+      if (response.status !== 200 || !cuerpo.includes('src="/app.js"')) problemas.push(`ruta ${ruta} respondió ${response.status} sin la app`);
+    } catch (error) { problemas.push(`ruta ${ruta}: ${error.message}`); }
+  }
+  for (const [desde, hacia] of redirects()) {
+    try {
+      const response = await pedir(desde);
+      await response.arrayBuffer();
+      const destino = response.headers.get('location');
+      if (response.status !== 301 || !destino || new URL(destino, origin).pathname !== hacia) problemas.push(`ruta ${desde} respondió ${response.status} → ${destino ?? 'sin destino'} en vez de 301 → ${hacia}`);
+    } catch (error) { problemas.push(`ruta ${desde}: ${error.message}`); }
+  }
+  for (const ruta of NO_EXISTEN) {
+    try {
+      const response = await pedir(ruta);
+      const cuerpo = await response.text();
+      if (response.status !== 404 || !cuerpo.includes(NOT_FOUND_MARKER)) problemas.push(`ruta ${ruta} respondió ${response.status} en vez de la 404 propia`);
+    } catch (error) { problemas.push(`ruta ${ruta}: ${error.message}`); }
+  }
+  return problemas;
 }
 
 /**
@@ -152,6 +190,13 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   if (!fs.existsSync(notFoundPath)) errors.push('falta web/404.html: Pages serviría la portada con 200 para cualquier ruta desconocida');
   else errors.push(...notFoundPageProblems(fs.readFileSync(notFoundPath, 'utf8')));
   if (!shell.derived.entries.includes('/404.js')) errors.push('/404.js no está en la precache derivada');
+  if (!shell.derived.entries.includes('/404.html')) errors.push('/404.html no está en la precache derivada: sin red no habría 404 propia');
+
+  // 6b. Las reglas del hosting son las de la tabla de rutas, una a una y en el
+  // mismo orden: el cliente, el service worker y el servidor local usan la tabla.
+  const reglas = fs.readFileSync(path.join(root, 'web', '_redirects'), 'utf8').split('\n')
+    .map((linea) => linea.trim().replace(/\s+/g, ' ')).filter((linea) => linea && !linea.startsWith('#'));
+  if (JSON.stringify(reglas) !== JSON.stringify(redirectRules())) errors.push('web/_redirects no coincide con la tabla de web/lib/routes.js');
 
   // 7. Contra el origen público. Se mira el tipo y el contenido de cada
   // respuesta, no solo que llegue: un 200 con HTML donde iba un SVG es un fallo.
@@ -200,7 +245,8 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     const publicados = [...shell.derived.entries, '/sw.js', '/shell-manifest.js'];
     const comparados = await Promise.all(publicados.map(async (entry) => {
       try {
-        const response = await fetch(new URL(entry, origin), { redirect: 'error', cache: 'no-store' });
+        // `/404.html` es la única entrada que Pages redirige (308 a `/404`).
+        const response = await fetch(new URL(entry, origin), { redirect: entry === '/404.html' ? 'follow' : 'error', cache: 'no-store' });
         if (!response.ok) return `origen público · shell · ${entry} respondió ${response.status}`;
         const recibido = Buffer.from(await response.arrayBuffer());
         const bytes = (response.headers.get('content-type') ?? '').startsWith('text/html') ? sinAnalytics(recibido) : recibido;
@@ -209,6 +255,9 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
       } catch (error) { return `origen público · shell · ${entry}: ${error.message}`; }
     }));
     errors.push(...comparados.filter(Boolean));
+
+    // 10. Las rutas, tal como responde el origen.
+    errors.push(...(await routeProblems(origin)).map((motivo) => `origen público · ${motivo}`));
   }
 
   const variantes = [...brandAssets(BRAND_LOGOS)].length;

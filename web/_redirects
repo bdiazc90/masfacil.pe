@@ -1,11 +1,20 @@
-# Reescrituras primero: el historial es la misma portada con el gráfico enfocado.
-# El destino es `/`, no `/index.html`: Pages normaliza `/index.html` a `/` con un
-# 308 y ese redirect se colaría en la reescritura.
-/gasolina/historial / 200
-/gasolina/historial/ / 200
-/gasolina / 301
-/gasolina/ / 301
-/gasolina/regular / 301
-/gasolina/regular/ / 301
-/gasolina/premium / 301
-/gasolina/premium/ / 301
+# Las mismas reglas que `web/lib/routes.js`; `npm run verify:web` exige que
+# coincidan una a una, en este orden.
+#
+# Reescrituras: cada vista activa es la misma portada, sin cambiar la URL. El
+# destino es `/`, no `/index.html`: Pages normaliza `/index.html` a `/` con un 308
+# y ese redirect se colaría en la reescritura.
+/combustibles/gasolina / 200
+/combustibles/gasolina/historial / 200
+# La forma canónica no lleva barra final.
+/combustibles/gasolina/ /combustibles/gasolina 301
+/combustibles/gasolina/historial/ /combustibles/gasolina/historial 301
+# Enlaces publicados antes de las vistas.
+/gasolina /combustibles/gasolina 301
+/gasolina/ /combustibles/gasolina 301
+/gasolina/regular /combustibles/gasolina 301
+/gasolina/regular/ /combustibles/gasolina 301
+/gasolina/premium /combustibles/gasolina 301
+/gasolina/premium/ /combustibles/gasolina 301
+/gasolina/historial /combustibles/gasolina/historial 301
+/gasolina/historial/ /combustibles/gasolina/historial 301

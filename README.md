@@ -2,7 +2,7 @@
 
 PWA independiente para comparar Gasohol Regular y Premium en Lima provincia por precio reportado, cercanía y frescura. No está afiliada, aprobada ni producida por Osinergmin, Facilito ni el Estado peruano.
 
-Una sola pantalla, `/`, con los dos productos en la misma tarjeta. `/gasolina/historial` abre esa misma portada con el gráfico del histórico enfocado; las rutas antiguas de producto (`/gasolina/regular`, `/gasolina/premium`) redirigen a `/`. Cualquier otra ruta responde 404 con una página mínima que devuelve a la portada.
+Una sola pantalla por vista, con los dos productos en la misma tarjeta: hoy la única vista activa es `/combustibles/gasolina`, y `/` abre la última vista recordada en el dispositivo (sin preferencia, Gasolina). `/combustibles/gasolina/historial` abre esa misma portada con el gráfico del histórico enfocado. Los enlaces antiguos (`/gasolina`, `/gasolina/regular`, `/gasolina/premium`, `/gasolina/historial`) y la barra final redirigen con 301 a su ruta canónica. Una vista no activada o cualquier otra ruta responde 404 con una página mínima que devuelve a la portada, también sin conexión.
 
 La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de más de 30 días no se muestran ni compiten al ordenar; el grifo permanece en una tarjeta compacta que dice desde cuándo calla.
 

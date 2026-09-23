@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeShellManifest } from '../pipeline/shell-manifest.mjs';
+import { resolvePath } from '../web/lib/routes.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = path.join(root, 'web');
@@ -15,11 +16,12 @@ const types = new Map([['.html','text/html; charset=utf-8'],['.js','text/javascr
 const server = http.createServer((request,response) => {
   if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405); response.end(); return; }
   const url = new URL(request.url, `http://127.0.0.1:${port}`);
-  // Reproduce en local `_redirects`: el historial reescribe a la portada sin
-  // cambiar la URL; las rutas viejas de producto llevan a la raíz con 301.
-  if (/^\/gasolina\/historial\/?$/.test(url.pathname)) url.pathname = '/';
-  if (/^\/gasolina(?:\/(?:regular|premium)?\/?)?$/.test(url.pathname)) { response.writeHead(301, { Location: '/' }); response.end(); return; }
-  const route = url.pathname === '/' ? '/index.html' : url.pathname;
+  // La misma tabla que `_redirects` y el service worker: las vistas son la
+  // portada sin cambiar la URL, la barra final y los enlaces antiguos responden
+  // 301, y lo demás es un archivo o 404.
+  const ruta = resolvePath(url.pathname);
+  if (ruta.kind === 'redirect') { response.writeHead(301, { Location: `${ruta.to}${url.search}` }); response.end(); return; }
+  const route = ruta.kind === 'view' ? '/index.html' : url.pathname;
   const relative = path.posix.normalize(route).replace(/^\/+/, ''); const file = path.join(webRoot, relative);
   if (!file.startsWith(`${webRoot}${path.sep}`) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     // Como Pages: la página 404 propia, con su código de estado; sin ella, texto.

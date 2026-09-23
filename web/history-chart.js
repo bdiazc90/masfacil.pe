@@ -483,7 +483,7 @@ export function mountHistoryChart({
   cargar().catch(() => { estado = 'error'; nota = 'No pudimos cargar el histórico.'; render(); });
 
   return {
-    /** Lleva la vista y el foco al bloque: es lo que hace «Ver historial» y la ruta `/gasolina/historial`. */
+    /** Lleva la vista y el foco al bloque: es lo que hace «Ver historial» y la ruta `/combustibles/gasolina/historial`. */
     focus() {
       mount.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
       (body.querySelector('.history__svg') ?? mount.querySelector('#history-title') ?? mount).focus?.({ preventScroll: true });
