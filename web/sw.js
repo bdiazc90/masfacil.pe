@@ -134,11 +134,14 @@ async function migrarParesAntiguos() {
 // guarda una copia limpia, que es la que se devuelve sin red, con estado 404.
 const NOT_FOUND = '/404.html';
 async function guardarNotFound(cache) {
-  const response = await fetch(NOT_FOUND);
+  const response = await fetch(NOT_FOUND, { cache: 'reload' });
   if (!response.ok) throw new Error(`404 propia HTTP ${response.status}`);
   await cache.put(NOT_FOUND, new Response(await response.blob(), { headers: { 'Content-Type': 'text/html; charset=utf-8' } }));
 }
-self.addEventListener('install', (event) => event.waitUntil(caches.open(SHELL_CACHE).then((cache) => Promise.all([cache.addAll(SHELL.filter((entry) => entry !== NOT_FOUND)), guardarNotFound(cache)])).then(() => self.skipWaiting())));
+// La precache va a la red sin pasar por la caché HTTP: en producción JS, CSS e
+// imágenes llegan con `max-age=14400`, y una copia todavía fresca del deploy
+// anterior quedaría guardada en el shell nuevo junto al HTML nuevo.
+self.addEventListener('install', (event) => event.waitUntil(caches.open(SHELL_CACHE).then((cache) => Promise.all([cache.addAll(SHELL.filter((entry) => entry !== NOT_FOUND).map((entry) => new Request(entry, { cache: 'reload' }))), guardarNotFound(cache)])).then(() => self.skipWaiting())));
 // Migrar va antes de limpiar, y un fallo al migrar no impide activar.
 self.addEventListener('activate', (event) => event.waitUntil(migrarParesAntiguos().catch(() => {}).then(() => caches.keys()).then((names) => Promise.all(names.filter((name) => /^(?:masfacil|facilito)-/.test(name) && ![SHELL_CACHE, DATA_CACHE].includes(name)).map((name) => caches.delete(name)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', (event) => {

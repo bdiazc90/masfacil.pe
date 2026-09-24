@@ -28,7 +28,7 @@ import { renderShellManifest, shellManifestProblems } from '../pipeline/shell-ma
 import { fetchLiveGroups } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { appPaths, redirectRules, redirects } from '../web/lib/routes.js';
-import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
+import { ANALYTICS_BEACON, ANALYTICS_ENDPOINT, NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -186,6 +186,12 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   const cabeceras = fs.readFileSync(path.join(root, 'web', '_headers'), 'utf8');
   const connectSrc = /connect-src ([^;]+);/.exec(cabeceras)?.[1] ?? '';
   if (!connectSrc.split(/\s+/).includes(HISTORY_ORIGIN)) errors.push(`web/_headers no autoriza ${HISTORY_ORIGIN} en connect-src; el navegador bloquearía el histórico`);
+  // Además del histórico, solo el endpoint exacto al que envía el beacon.
+  else if (connectSrc.trim() !== `'self' ${HISTORY_ORIGIN} ${ANALYTICS_ENDPOINT}`) errors.push(`web/_headers: connect-src tiene que ser exactamente 'self' ${HISTORY_ORIGIN} ${ANALYTICS_ENDPOINT}; es «${connectSrc.trim()}»`);
+  // Los scripts: lo propio y el beacon de Web Analytics que inyecta Pages, nada
+  // más. Sin comodines ni `unsafe-inline`: por aquí no puede colarse otro script.
+  const scriptSrc = /script-src ([^;]+);/.exec(cabeceras)?.[1]?.trim() ?? '';
+  if (scriptSrc !== `'self' ${ANALYTICS_BEACON}`) errors.push(`web/_headers: script-src tiene que ser exactamente 'self' ${ANALYTICS_BEACON}; es «${scriptSrc}»`);
   // Y tiene que ser CROSS-ORIGIN: es lo que hace que el service worker lo ignore
   // (web/sw.js descarta lo que no es del propio origen) y que un JSON que cambia
   // cada pocas horas no acabe cacheado como si fuera parte del shell.

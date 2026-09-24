@@ -97,6 +97,22 @@ export function serviceWorkerUpdateProblems(swSource) {
   return /from\s+['"]\.\/shell-manifest\.js['"]/.test(swSource) ? [] : ['sw.js no importa ./shell-manifest.js: un shell nuevo no reinstalaría el service worker'];
 }
 
+/**
+ * El beacon de Cloudflare Web Analytics, la única fuente de scripts ajena a
+ * `'self'` que admite la CSP. Lo inyecta Pages en cada HTML; la app no lo carga
+ * por su cuenta. Cuenta visitas sin cookies (decisión de Bruno, 23/09/2026).
+ */
+export const ANALYTICS_BEACON = 'https://static.cloudflareinsights.com/beacon.min.js';
+
+/**
+ * Adonde envía el beacon. La etiqueta de Pages solo declara el token, y sin
+ * `send.to` ni `version` el beacon manda las visitas a este endpoint, no al
+ * `/cdn-cgi/rum` del propio dominio: con `connect-src` sin él, el script carga
+ * y el envío queda bloqueado (comprobado el 23/09/2026 con el beacon publicado).
+ * Se autoriza la ruta exacta, no el host.
+ */
+export const ANALYTICS_ENDPOINT = 'https://cloudflareinsights.com/cdn-cgi/rum';
+
 /** Texto que identifica la página 404 propia, también cuando se lee desde el origen público. */
 export const NOT_FOUND_MARKER = 'No encontramos esta página';
 

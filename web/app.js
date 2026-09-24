@@ -302,11 +302,12 @@ function applyLoaded(dataset) {
   nodes['data-status'].textContent = `${withPrice(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
   // Lo que el producto tiene que declarar, sin justificarse: atribución, no
-  // afiliación, qué significa una ausencia, la ventana de vigencia, cómo se mide
-  // la distancia, la precisión medida y de quién son las marcas. Nada de
+  // afiliación, qué se mide de la visita, qué significa una ausencia, la ventana
+  // de vigencia, cómo se mide la distancia, la precisión medida y de quién son las
+  // marcas. Nada de
   // explicar por qué se decidió cada cosa, y nada de pedir un contacto que la
   // app no ofrece.
-  nodes['source-content'].innerHTML = `<p>${escapeHtml(dataset.provenance.attribution)} Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>No guardamos tu ubicación ni sale de tu dispositivo.</p><p>«—» significa que ese grifo no publica precio vigente de ese producto, no que no lo venda. Pasados ${MAX_OFFER_AGE_DAYS} días sin reportar, su tarjeta queda sin precios y dice desde cuándo calla.</p><p>La distancia es en línea recta. Tu zona es el radio que eliges, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km.</p><p>Los nombres salen del Registro oficial: precisión medida de 89 % en los confirmados y 85 % en los <b>por confirmar</b>. Marcas y logos son de sus titulares, solo para identificar la estación.</p><p><a href="${escapeHtml(dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
+  nodes['source-content'].innerHTML = `<p>${escapeHtml(dataset.provenance.attribution)} Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>No guardamos tu ubicación ni sale de tu dispositivo. Contamos visitas de forma anónima y sin cookies, para mejorar la app.</p><p>«—» significa que ese grifo no publica precio vigente de ese producto, no que no lo venda. Pasados ${MAX_OFFER_AGE_DAYS} días sin reportar, su tarjeta queda sin precios y dice desde cuándo calla.</p><p>La distancia es en línea recta. Tu zona es el radio que eliges, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km.</p><p>Los nombres salen del Registro oficial: precisión medida de 89 % en los confirmados y 85 % en los <b>por confirmar</b>. Marcas y logos son de sus titulares, solo para identificar la estación.</p><p><a href="${escapeHtml(dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
 // La app NUNCA se localiza sola. Antes, si el permiso ya estaba concedido, la
 // portada llamaba a `locate()` al cargar; como el navegador guarda ese permiso

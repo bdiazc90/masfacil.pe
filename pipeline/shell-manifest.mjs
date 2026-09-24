@@ -59,9 +59,9 @@ function iconosReferenciados(webRoot) {
 /**
  * Lista de la precache y huella de su contenido.
  *
- * La huella cubre la lista ordenada MÁS los bytes de cada archivo listado. Los
- * precios (`web/data/`) no entran porque no están en la lista: la versión del
- * shell no se mueve cuando cambian los datos.
+ * La huella cubre la lista ordenada, los bytes de cada archivo listado y los de
+ * `web/_headers`. Los precios (`web/data/`) no entran porque no están en la
+ * lista: la versión del shell no se mueve cuando cambian los datos.
  */
 export function deriveShell({ root = rootFromModule } = {}) {
   const webRoot = path.join(root, 'web');
@@ -83,6 +83,12 @@ export function deriveShell({ root = rootFromModule } = {}) {
     if (!fs.existsSync(archivo)) { problems.push(`${entry} está en la precache derivada y no existe en el árbol`); continue; }
     hash.update(fs.readFileSync(archivo));
   }
+  // Las cabeceras también son versión del shell: el service worker guarda cada
+  // respuesta con las suyas —la portada con su CSP— y la sirve así, sin volver a
+  // pedirla. Si cambiar `_headers` no reinstalara el service worker, quien ya
+  // tiene la app seguiría con la cabecera vieja. `_headers` no se precachea.
+  const cabeceras = path.join(webRoot, '_headers');
+  if (fs.existsSync(cabeceras)) hash.update(fs.readFileSync(cabeceras));
   const digest = hash.digest('hex').slice(0, 12);
   return { entries, digest, cache: `${SHELL_CACHE_PREFIX}${digest}`, problems };
 }

@@ -62,7 +62,7 @@ La rapidez nunca justifica una decisión peor informada.
 | 7 | Lo tocable, abajo | la acción primaria vive en la mitad superior de la pantalla |
 | 8 | Nada invita a mirar el teléfono: sin auto-refresh, sin alertas, sin animación que llame | el layout cambia sin que la persona haya hecho nada |
 | 9 | Accesibilidad de origen, no de fase | un target bajo 44 px, un contraste bajo el mínimo, un cambio de estado sin anuncio |
-| 10 | Cero red de terceros, con una excepción declarada: el origen público del histórico en `connect-src` | aparece en el CSP un host que no sea `'self'` ni ese origen |
+| 10 | Cero red de terceros, con dos excepciones declaradas: el origen público del histórico en `connect-src` y Cloudflare Web Analytics, que Pages inyecta y cuenta visitas sin cookies —su beacon (`https://static.cloudflareinsights.com/beacon.min.js`) en `script-src` y su envío (`https://cloudflareinsights.com/cdn-cgi/rum`) en `connect-src`— | aparece en el CSP un host que no sea `'self'` ni esas dos excepciones |
 | 11 | El origen del dato y la no afiliación se leen sin buscarlos | se llega a resultados sin haber podido saber de dónde salen y quién hizo esto |
 
 Sobre el principio 8: el card de controles se contrae al hacer scroll y se expande al
@@ -72,9 +72,12 @@ reserva su alto desde el primer pintado.
 
 Sobre el principio 10: el resumen del histórico se sirve desde su propio bucket, y eso es
 deliberado —así el service worker, que ignora lo cross-origin, no puede cachear como shell
-un JSON que cambia cada pocas horas—. Es la única excepción, está escrita en `_headers` y
+un JSON que cambia cada pocas horas—. Está escrita en `_headers` y
 `scripts/verify-web.mjs` cruza esa cabecera con la constante del cliente en cada
-verificación. No hay analítica, ni fuentes, ni imágenes, ni scripts de terceros.
+verificación. La otra excepción es Web Analytics: Pages inyecta su beacon, que
+cuenta visitas sin cookies, y la CSP admite ese script y su envío por ruta exacta;
+`scripts/verify-web.mjs` exige que `script-src` y `connect-src` no admitan nada más.
+No hay otra analítica, ni fuentes, ni imágenes, ni scripts de terceros.
 
 ## 4 · Honestidad del dato
 
