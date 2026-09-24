@@ -33,9 +33,10 @@ npm run fetch:live -- https://masfacil.pe   # trae el bundle público ya validad
 npm run project                              # o proyecta desde .local-cache/ autorizado
 ```
 
-`web/data/` y `web/shell-manifest.js` se generan y nunca viven en Git. El
-segundo es la precache del service worker: `npm run serve` y `npm run publish`
-la derivan del contenido, así que cambiar un CSS o registrar un logo no exige
+`web/data/`, `web/shell-manifest.js` y `web/sw.js` se generan y nunca viven en
+Git. Los dos últimos son la precache del service worker y el script que lleva su
+versión (la lógica vive en `web/sw-main.js`): `npm run serve` y `npm run publish`
+los derivan del contenido, así que cambiar un CSS o registrar un logo no exige
 recordar ningún número de versión.
 
 ## Operación

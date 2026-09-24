@@ -11,8 +11,10 @@
 # Proyección pública generada desde el pointer local; nunca se versiona.
 /web/data/
 
-# Precache derivada del contenido; se genera al servir y al publicar.
+# Precache derivada del contenido y el script del service worker que lleva su
+# versión; se generan al servir y al publicar.
 /web/shell-manifest.js
+/web/sw.js
 
 # Dependencias instaladas; el lockfile sí se versiona, el árbol nunca.
 /node_modules/

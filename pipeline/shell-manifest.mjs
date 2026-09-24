@@ -17,6 +17,11 @@
  * variante registrada en `BRAND_LOGOS` —el mismo recorrido `brandAssets()` que
  * usan el verificador y la tarjeta—, y un icono solo si lo referencia
  * `index.html` o el manifiesto de la PWA.
+ *
+ * El mismo paso genera `web/sw.js`, el script que registra el navegador: un
+ * import de la lógica (`sw-main.js`) y la versión. Chrome no reinstala un
+ * service worker de módulos cuando cambia solo un import, así que la versión
+ * tiene que vivir en los bytes del script registrado.
  */
 
 import crypto from 'node:crypto';
@@ -24,14 +29,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
-import { shellEntryFile, svgProblems } from '../app/shell-assets.mjs';
+import { moduleGraph, shellEntryFile, svgProblems } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const SHELL_MANIFEST_RELATIVE = 'web/shell-manifest.js';
+export const SERVICE_WORKER_RELATIVE = 'web/sw.js';
 export const SHELL_CACHE_PREFIX = 'masfacil-shell-';
-/** `sw.js` se sirve aparte y el manifest se importa desde él: ninguno se precachea. */
-const FUERA_DE_LA_PRECACHE = new Set(['sw.js', 'shell-manifest.js']);
+/** La lógica del service worker; `sw.js` solo la importa. */
+export const SERVICE_WORKER_MAIN = 'sw-main.js';
+/** Generados por este módulo (rutas relativas a `web/`): nunca entran en la huella. */
+const GENERADOS = Object.freeze(['shell-manifest.js', 'sw.js']);
+/** El worker se sirve aparte y el manifest se importa desde él: ninguno se precachea. */
+const FUERA_DE_LA_PRECACHE = new Set([...GENERADOS, SERVICE_WORKER_MAIN]);
 
 const ordenar = (valores) => [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'en'));
 
@@ -89,8 +99,21 @@ export function deriveShell({ root = rootFromModule } = {}) {
   // tiene la app seguiría con la cabecera vieja. `_headers` no se precachea.
   const cabeceras = path.join(webRoot, '_headers');
   if (fs.existsSync(cabeceras)) hash.update(fs.readFileSync(cabeceras));
+  // Y el grafo entero del worker, recorrido desde su lógica: un cambio en un
+  // módulo que solo importa el service worker, también en una subcarpeta, cambia
+  // la versión y con ella los bytes de `/sw.js`. Los generados están en el grafo
+  // pero no en la huella: salen de ella.
+  const leer = (relativo) => {
+    const archivo = path.join(webRoot, relativo);
+    return fs.existsSync(archivo) && fs.statSync(archivo).isFile() ? fs.readFileSync(archivo, 'utf8') : null;
+  };
+  const worker = moduleGraph({ entry: SERVICE_WORKER_MAIN, read: leer, generated: GENERADOS });
+  problems.push(...worker.problems);
+  const propios = worker.modules.filter((relativo) => !GENERADOS.includes(relativo));
+  hash.update(`\n${JSON.stringify(propios)}\n`);
+  for (const relativo of propios) hash.update(fs.readFileSync(path.join(webRoot, relativo)));
   const digest = hash.digest('hex').slice(0, 12);
-  return { entries, digest, cache: `${SHELL_CACHE_PREFIX}${digest}`, problems };
+  return { entries, worker: worker.modules, digest, cache: `${SHELL_CACHE_PREFIX}${digest}`, problems };
 }
 
 /** El módulo generado: dos constantes y de dónde salieron. */
@@ -106,29 +129,50 @@ export function renderShellManifest({ entries, cache }) {
   ].join('\n');
 }
 
-/** Genera `web/shell-manifest.js`. Lanza si la derivación tiene problemas. */
+/** El script que registra el navegador: la versión y el import de la lógica. */
+export function renderServiceWorker({ cache }) {
+  return [
+    '// GENERADO por pipeline/shell-manifest.mjs. No editar a mano ni versionar.',
+    '// Chrome no reinstala un service worker de módulos cuando cambia solo un',
+    '// import: la versión va aquí para que cada cambio del shell, de `_headers` o',
+    '// del grafo del worker cambie los bytes de este script.',
+    `// ${cache}`,
+    `import './${SERVICE_WORKER_MAIN}';`,
+    '',
+  ].join('\n');
+}
+
+function escribir(destino, contenido) {
+  const temporal = `${destino}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporal, contenido, { mode: 0o644, flag: 'wx' });
+  fs.renameSync(temporal, destino);
+}
+
+/** Genera `web/shell-manifest.js` y `web/sw.js`. Lanza si la derivación tiene problemas. */
 export function writeShellManifest({ root = rootFromModule } = {}) {
   const derived = deriveShell({ root });
   if (derived.problems.length) throw new Error(`No se puede derivar la precache: ${derived.problems.join('; ')}`);
   const destino = path.join(root, SHELL_MANIFEST_RELATIVE);
   const contenido = renderShellManifest(derived);
-  const temporal = `${destino}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(temporal, contenido, { mode: 0o644, flag: 'wx' });
-  fs.renameSync(temporal, destino);
+  escribir(destino, contenido);
+  escribir(path.join(root, SERVICE_WORKER_RELATIVE), renderServiceWorker(derived));
   return { ...derived, path: destino, content: contenido };
 }
 
 /**
- * Problemas del manifest en disco frente al derivado. Vacío si está al día.
- * Verificar no genera: publicar con un manifest viejo es publicar un `addAll`
- * que no corresponde al árbol.
+ * Problemas de los generados en disco frente a lo derivado. Vacío si están al
+ * día. Verificar no genera: publicar con un manifest viejo es publicar un
+ * `addAll` que no corresponde al árbol, y con un `sw.js` viejo el navegador no
+ * vería la versión nueva.
  */
 export function shellManifestProblems({ root = rootFromModule } = {}) {
   const derived = deriveShell({ root });
   if (derived.problems.length) return { derived, problems: derived.problems };
-  const destino = path.join(root, SHELL_MANIFEST_RELATIVE);
-  if (!fs.existsSync(destino)) return { derived, problems: [`falta ${SHELL_MANIFEST_RELATIVE}; ejecuta npm run serve o npm run publish para generarlo`] };
-  const actual = fs.readFileSync(destino, 'utf8');
-  if (actual !== renderShellManifest(derived)) return { derived, problems: [`${SHELL_MANIFEST_RELATIVE} no coincide con el árbol; la precache derivada es ${derived.cache}`] };
-  return { derived, problems: [] };
+  const problems = [];
+  for (const [relativo, esperado] of [[SHELL_MANIFEST_RELATIVE, renderShellManifest(derived)], [SERVICE_WORKER_RELATIVE, renderServiceWorker(derived)]]) {
+    const destino = path.join(root, relativo);
+    if (!fs.existsSync(destino)) problems.push(`falta ${relativo}; ejecuta npm run serve o npm run publish para generarlo`);
+    else if (fs.readFileSync(destino, 'utf8') !== esperado) problems.push(`${relativo} no coincide con el árbol; la precache derivada es ${derived.cache}`);
+  }
+  return { derived, problems };
 }

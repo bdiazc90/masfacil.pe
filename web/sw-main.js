@@ -1,7 +1,9 @@
-// La lista de la precache y su versión son generadas: salen de las referencias
-// del árbol y de la huella de esos bytes. El navegador reinstala el service
-// worker cuando cambian los bytes de sus imports, así que importar el módulo
-// generado ES el mecanismo de actualización.
+// La lógica del service worker. El navegador registra `/sw.js`, un archivo
+// generado que solo importa este módulo y lleva la versión del shell: Chrome no
+// reinstala un worker de módulos cuando cambia solo un import (comprobado el
+// 23/09/2026), así que la versión tiene que cambiar los bytes del script
+// registrado. La lista de la precache y su versión salen de `shell-manifest.js`,
+// también generado; la huella cubre además todo el grafo de este módulo.
 import { SHELL, SHELL_CACHE } from './shell-manifest.js';
 import { DATA_CACHE, cacheFirst } from './sw-cache-policy.js';
 import { ACTIVE_VIEWS, VIEWS } from './lib/catalog.js';

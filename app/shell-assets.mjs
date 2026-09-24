@@ -7,6 +7,7 @@
  * sigue siendo publicable.
  */
 
+import path from 'node:path';
 import { ASSET_FILE_PATTERN, brandAssets } from '../web/brand-logos.js';
 
 // Lo que se publica no debe depender de un tercero ni poder pedirle nada. El
@@ -87,14 +88,61 @@ export function shellEntryFile(entry) {
 }
 
 /**
- * El mecanismo de actualización: el navegador solo reinstala el service worker
- * cuando cambian sus bytes o los de sus imports. La lista y la versión de la
- * precache viven en el módulo generado `shell-manifest.js`, así que sw.js tiene
- * que importarlo para que un shell nuevo llegue a quien ya tiene caché. Un
- * refactor que copie la lista dentro de sw.js rompería eso en silencio.
+ * La lógica del service worker lee la lista y la versión de la precache del
+ * módulo generado `shell-manifest.js`. Un refactor que copie la lista dentro de
+ * `sw-main.js` dejaría la precache fija aunque el shell cambiara.
  */
-export function serviceWorkerUpdateProblems(swSource) {
-  return /from\s+['"]\.\/shell-manifest\.js['"]/.test(swSource) ? [] : ['sw.js no importa ./shell-manifest.js: un shell nuevo no reinstalaría el service worker'];
+export function serviceWorkerUpdateProblems(swMainSource) {
+  return /from\s+['"]\.\/shell-manifest\.js['"]/.test(swMainSource) ? [] : ['sw-main.js no importa ./shell-manifest.js: la precache no seguiría al shell'];
+}
+
+// Declaraciones de import al inicio de línea: `import … from '…'`,
+// `export … from '…'` e `import '…'`; el cuerpo puede ocupar varias líneas.
+const DECLARACION = /^[ \t]*(?:import|export)\b(?:[^;'"]*?\bfrom)?[ \t]*(['"])([^'"\n]+)\1/gm;
+// Lo que queda de un import después de quitar esas declaraciones y los
+// comentarios: un import con otra forma o uno dinámico. `import.meta` no es
+// una dependencia.
+const RASTRO_DE_IMPORT = /\bimport\b(?!\s*\.\s*meta\b)|\bfrom\s*['"]/;
+const sinComentarios = (fuente) => fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/.*$/gm, '$1');
+
+/**
+ * El grafo de módulos de un punto de entrada de `web/`, completo o con sus
+ * problemas: cada dependencia se resuelve o se rechaza, ninguna se omite.
+ *
+ * Solo se admiten imports estáticos con ruta relativa que quede dentro de
+ * `web/`. Un módulo que falta, otro tipo de especificador, un import dinámico
+ * —que un service worker no admite— o un import escrito de otra forma son
+ * problemas. Los módulos `generated` (rutas relativas a `web/`) se admiten sin
+ * existir todavía y no se recorren: los escribe el mismo paso que deriva la
+ * huella, y leerlos la haría circular.
+ *
+ * `read(relativo)` devuelve el texto del módulo, o `null` si no existe.
+ * Devuelve los módulos ordenados, generados incluidos, y los problemas.
+ */
+export function moduleGraph({ entry, read, generated = [] }) {
+  const generados = new Set(generated);
+  const modulos = new Set([entry]);
+  const problemas = [];
+  const pendientes = [entry];
+  if (read(entry) === null) problemas.push(`falta web/${entry}`);
+  while (pendientes.length) {
+    const relativo = pendientes.pop();
+    const fuente = generados.has(relativo) ? null : read(relativo);
+    if (fuente === null) continue;
+    for (const [, , especificador] of fuente.matchAll(DECLARACION)) {
+      if (!/^\.{1,2}\//.test(especificador)) { problemas.push(`web/${relativo}: import no admitido «${especificador}»; solo rutas relativas dentro de web/`); continue; }
+      const destino = path.posix.normalize(path.posix.join(path.posix.dirname(relativo), especificador));
+      if (destino === '..' || destino.startsWith('../')) { problemas.push(`web/${relativo}: «${especificador}» sale de web/`); continue; }
+      if (modulos.has(destino)) continue;
+      if (!generados.has(destino) && read(destino) === null) { problemas.push(`web/${relativo} importa «${especificador}», que no existe`); continue; }
+      modulos.add(destino);
+      pendientes.push(destino);
+    }
+    const resto = sinComentarios(fuente.replace(DECLARACION, ''));
+    if (/\bimport\s*\(/.test(resto)) problemas.push(`web/${relativo} usa un import dinámico, que el service worker no admite`);
+    else if (RASTRO_DE_IMPORT.test(resto)) problemas.push(`web/${relativo} tiene un import que no se reconoce; va al inicio de su línea`);
+  }
+  return { modules: [...modulos].sort((a, b) => a.localeCompare(b, 'en')), problems: problemas };
 }
 
 /**

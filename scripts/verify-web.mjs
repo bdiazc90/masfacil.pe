@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { PUBLISHED_GROUPS } from '../pipeline/groups.mjs';
 import { GROUP_CONTRACTS } from '../web/group-contracts.js';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
-import { renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
+import { SERVICE_WORKER_MAIN, renderServiceWorker, renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
 import { fetchLiveGroups } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { appPaths, redirectRules, redirects } from '../web/lib/routes.js';
@@ -57,22 +57,6 @@ async function bundleProblems(grupo, { manifest, state, bodies }) {
     if (!(await cliente.validBundle(manifest, key, bodies[key]))) errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
   }
   return errors;
-}
-
-/** Módulos relativos que alcanza `entrada` por imports estáticos, dentro de `web/`. */
-function grafoDeModulos(root, entrada) {
-  const vistos = new Set();
-  const pendientes = [entrada];
-  while (pendientes.length) {
-    const relativo = pendientes.pop();
-    const archivo = path.join(root, 'web', relativo);
-    if (vistos.has(relativo) || !fs.existsSync(archivo)) continue;
-    vistos.add(relativo);
-    for (const match of fs.readFileSync(archivo, 'utf8').matchAll(/\b(?:from|import)\s*['"](\.{1,2}\/[^'"]+)['"]/g)) {
-      pendientes.push(path.posix.normalize(path.posix.join(path.posix.dirname(relativo), match[1])));
-    }
-  }
-  return vistos;
 }
 
 // Direcciones que tienen que responder 404 con la página propia: la raíz de las
@@ -149,23 +133,20 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // `addAll` que no corresponde al árbol, y cache-first no lo corregiría nunca.
   const shell = shellManifestProblems({ root });
   errors.push(...shell.problems);
-  // El bump solo llega si sw.js importa el módulo generado: el navegador
-  // reinstala el service worker por sus bytes y los de sus imports.
-  errors.push(...serviceWorkerUpdateProblems(fs.readFileSync(path.join(root, 'web', 'sw.js'), 'utf8')));
+  // La lógica del worker tiene que leer la precache del módulo generado. El grafo
+  // del worker ya viene resuelto en la derivación: una dependencia que falta, que
+  // no es relativa o que es dinámica ya es un problema de `shell.problems`.
+  const logica = path.join(root, 'web', SERVICE_WORKER_MAIN);
+  if (fs.existsSync(logica)) errors.push(...serviceWorkerUpdateProblems(fs.readFileSync(logica, 'utf8')));
   // El catálogo y las reglas del contrato se comparten con la proyección, así que
   // es fácil que algo de Node se cuele. Ningún módulo que cargue el navegador
   // puede importar `node:`: la página fallaría y el service worker ni siquiera se
-  // instalaría. `sw.js` no está en la precache —se sirve aparte—, por eso su grafo
-  // se recorre desde él; y en ese grafo tampoco cabe un import dinámico, que un
-  // service worker no admite.
-  const grafoDelSw = grafoDeModulos(root, 'sw.js');
-  const delNavegador = new Set([...shell.derived.entries.filter((entry) => entry.endsWith('.js')).map((entry) => entry.slice(1)), ...grafoDelSw]);
+  // instalaría. La lógica del worker no está en la precache, así que se revisa
+  // su grafo además de la lista.
+  const delNavegador = new Set([...shell.derived.entries.filter((entry) => entry.endsWith('.js')).map((entry) => entry.slice(1)), ...(shell.derived.worker ?? [])]);
   for (const relativo of delNavegador) {
     const archivo = path.join(root, 'web', relativo);
     if (fs.existsSync(archivo) && /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]node:/.test(fs.readFileSync(archivo, 'utf8'))) errors.push(`web/${relativo} importa un módulo node:, que el navegador no puede cargar`);
-  }
-  for (const relativo of grafoDelSw) {
-    if (/\bimport\s*\(/.test(fs.readFileSync(path.join(root, 'web', relativo), 'utf8'))) errors.push(`web/${relativo} usa un import dinámico, que el service worker no admite`);
   }
 
   // 4. Activos de marca registrados: registro → archivo → SVG válido → precache.
@@ -193,7 +174,7 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   const scriptSrc = /script-src ([^;]+);/.exec(cabeceras)?.[1]?.trim() ?? '';
   if (scriptSrc !== `'self' ${ANALYTICS_BEACON}`) errors.push(`web/_headers: script-src tiene que ser exactamente 'self' ${ANALYTICS_BEACON}; es «${scriptSrc}»`);
   // Y tiene que ser CROSS-ORIGIN: es lo que hace que el service worker lo ignore
-  // (web/sw.js descarta lo que no es del propio origen) y que un JSON que cambia
+  // (web/sw-main.js descarta lo que no es del propio origen) y que un JSON que cambia
   // cada pocas horas no acabe cacheado como si fuera parte del shell.
   if (origin && new URL(HISTORY_ORIGIN).origin === new URL(origin).origin) errors.push('el histórico no puede servirse desde el mismo origen que la app: el service worker lo cachearía como shell');
 
@@ -254,12 +235,14 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
 
     // 9. El shell publicado. La precache que sirve el origen tiene que ser la
     // derivada de este árbol y cada archivo, byte a byte, el de este árbol: así se
-    // sabe que el deploy subió este commit entero y no una mezcla. `sw.js` va
-    // aparte porque no está en la precache. La única alteración que se descuenta
-    // es el bloque que Pages Analytics inyecta en el HTML servido, delimitado por
-    // su propio comentario; cualquier otra diferencia cuenta.
+    // sabe que el deploy subió este commit entero y no una mezcla. El worker va
+    // aparte porque no está en la precache: `/sw.js` y todo su grafo, también los
+    // módulos que solo él importa, estén donde estén. La única alteración que se
+    // descuenta es el bloque que Pages Analytics inyecta en el HTML servido,
+    // delimitado por su propio comentario; cualquier otra diferencia cuenta.
     const sinAnalytics = (bytes) => Buffer.from(bytes.toString('utf8').replace(/<!-- Cloudflare Pages Analytics -->[\s\S]*?<!-- Cloudflare Pages Analytics -->/g, ''));
-    const publicados = [...shell.derived.entries, '/sw.js', '/shell-manifest.js'];
+    const publicados = [...new Set([...shell.derived.entries, '/sw.js', ...(shell.derived.worker ?? []).map((relativo) => `/${relativo}`)])];
+    const generados = { '/shell-manifest.js': renderShellManifest, '/sw.js': renderServiceWorker };
     const comparados = await Promise.all(publicados.map(async (entry) => {
       try {
         // `/404.html` es la única entrada que Pages redirige (308 a `/404`).
@@ -267,7 +250,7 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
         if (!response.ok) return `origen público · shell · ${entry} respondió ${response.status}`;
         const recibido = Buffer.from(await response.arrayBuffer());
         const bytes = (response.headers.get('content-type') ?? '').startsWith('text/html') ? sinAnalytics(recibido) : recibido;
-        const local = entry === '/shell-manifest.js' ? Buffer.from(renderShellManifest(shell.derived)) : fs.readFileSync(path.join(root, shellEntryFile(entry)));
+        const local = generados[entry] ? Buffer.from(generados[entry](shell.derived)) : fs.readFileSync(path.join(root, shellEntryFile(entry)));
         return bytes.equals(local) ? null : `origen público · shell · ${entry} no coincide con este árbol`;
       } catch (error) { return `origen público · shell · ${entry}: ${error.message}`; }
     }));

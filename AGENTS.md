@@ -81,6 +81,7 @@ declara cada variante renderizable con su archivo y su función visual, y ese
 .local-cache/{raw,snapshots,identity,publish,history}/
 web/data/
 web/shell-manifest.js
+web/sw.js
 node_modules/
 ```
 
@@ -88,7 +89,7 @@ node_modules/
 
 - Los contratos se validan al proyectar y en el navegador. Es runtime, no testing.
 - Regular y Premium se promueven juntos; el manifest se escribe al final; los snapshots son inmutables y la revisión sale del contenido.
-- La precache del service worker también sale del contenido: su lista se deriva de las referencias del árbol y del registro de marcas, y su versión de la huella de esos bytes. No hay número que subir a mano.
+- La precache del service worker también sale del contenido: su lista se deriva de las referencias del árbol y del registro de marcas, y su versión de la huella de esos bytes y del grafo del worker. La versión viaja en `web/sw.js`, generado, porque Chrome no reinstala un worker de módulos si solo cambia un import; la lógica vive en `web/sw-main.js`. No hay número que subir a mano.
 - Publicar la interfaz no depende de la fuente de datos: la ruta `shell` reutiliza el último bundle público válido y comprueba que el cliente nuevo lo acepte.
 - `npm run audit`, `npm run verify:web` y el rollback se conservan.
 - `web/` es exactamente lo que se publica: una herramienta de desarrollo no vive ahí, y una ruta que no existe responde 404 con `web/404.html`, no la portada con 200.
