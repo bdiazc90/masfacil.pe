@@ -69,6 +69,8 @@ const lectura = capturarLima({
   ejecutar: agentBrowserSession({ cwd: ROOT, session: `facilito-muestra-${process.pid}-${Date.now()}` }),
   log: (linea) => process.stderr.write(`${linea}\n`),
   soloDistritos: opciones.districts,
+  // La muestra compara contra la proyección de Gasolina; Diésel tendrá la suya.
+  soloProductos: GASOLINA_KEYS,
   conTexto: true,
 });
 

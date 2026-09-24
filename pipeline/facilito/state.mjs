@@ -146,13 +146,53 @@ export function applyFacilitoRun(previous, units, { attemptedAt, contract = null
   // presencia la captura: sin esto no podría distinguir una unidad recién leída
   // de otra que lleva cinco horas guardada, y un fallo parecería un éxito.
   const frescas = units.filter((unidad) => unidad.status === 'ok').length;
+  // También por producto: el expediente es uno, pero cada grupo publica sus
+  // propios conteos y no debe sumar las consultas de otro combustible.
+  const porProducto = {};
+  for (const unidad of units) {
+    const cuenta = porProducto[unidad.product] ??= { fresh: 0, failed: 0 };
+    if (unidad.status === 'ok') cuenta.fresh += 1; else cuenta.failed += 1;
+  }
   state.last_run = {
     at: attemptedAt,
     fresh: frescas,
     failed: units.length - frescas,
     reused: Math.max(0, Object.keys(state.units).length - frescas),
+    by_product: porProducto,
   };
   return state;
+}
+
+/**
+ * El expediente visto desde un grupo: solo las unidades de sus productos.
+ *
+ * La captura llena un único expediente, pero cada grupo publica su propio
+ * estado, y el preflight compara unidad por unidad contra lo que sirve
+ * producción. Sin este filtro, las consultas de Diésel entrarían en el
+ * refresh-state de Gasolina, y el día que dejaran de estar ahí el preflight las
+ * vería como distritos que retroceden. Un expediente anterior al desglose por
+ * producto conserva sus conteos globales: entonces solo había Gasolina.
+ */
+export function facilitoStateForProducts(state, products) {
+  if (!state) return state;
+  const propios = new Set(products);
+  // La clave ya dice el producto (`distrito:producto`); el campo es la misma cosa.
+  const units = Object.fromEntries(Object.entries(state.units ?? {}).filter(([clave, unidad]) => propios.has(unidad?.product ?? clave.slice(clave.lastIndexOf(':') + 1))));
+  const corrida = state.last_run;
+  if (!corrida?.by_product) return { ...state, units };
+  const cuentas = Object.entries(corrida.by_product).filter(([producto]) => propios.has(producto));
+  const frescas = cuentas.reduce((total, [, cuenta]) => total + cuenta.fresh, 0);
+  return {
+    ...state,
+    units,
+    last_run: {
+      at: corrida.at,
+      fresh: frescas,
+      failed: cuentas.reduce((total, [, cuenta]) => total + cuenta.failed, 0),
+      reused: Math.max(0, Object.keys(units).length - frescas),
+      by_product: Object.fromEntries(cuentas),
+    },
+  };
 }
 
 /** Conteos de captura para el resumen y el refresh-state. Nunca son vínculos ni precios. */

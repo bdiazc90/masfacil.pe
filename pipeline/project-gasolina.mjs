@@ -14,7 +14,7 @@ import { GASOLINA } from '../web/lib/catalog.js';
 import { filterFreshOffers } from '../web/lib/freshness.js';
 import { selectOfferPrice } from '../web/lib/price-source.js';
 import { resolveFacilitoLayer } from './facilito/link.mjs';
-import { facilitoRunCounts, facilitoStateId, facilitoUnitInstants, readFacilitoState, writeFacilitoRevision } from './facilito/state.mjs';
+import { facilitoRunCounts, facilitoStateForProducts, facilitoStateId, facilitoUnitInstants, readFacilitoState, writeFacilitoRevision } from './facilito/state.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const stable = (value) => `${JSON.stringify(value)}\n`;
@@ -148,6 +148,9 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
     descriptors[key] = { canonical_product: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, dataset_url: relative, bytes: Buffer.byteLength(body), sha256: sha256(body), cutoff_at: input.cutoffAt };
   }
   const manifest = { schema_version: GASOLINA_MANIFEST_VERSION, revision_id: revisionId, scope: GASOLINA_SCOPE, products: descriptors, generated_at: pointer.promoted_at };
+  // El expediente guarda también otros combustibles; el estado de Gasolina
+  // cuenta solo sus unidades, para que el preflight no compare las ajenas.
+  const facilitoPropio = facilitoStateForProducts(facilitoState, GASOLINA_KEYS);
   const refreshState = {
     schema_version: GASOLINA_MANIFEST_VERSION,
     revision_id: revisionId,
@@ -164,12 +167,12 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
     // para que los guardrails de caída comparen manzanas con manzanas.
     facilito: {
       contract: facilitoState?.contract ?? 'sin-captura',
-      state_id: facilitoStateId(facilitoState),
+      state_id: facilitoStateId(facilitoPropio),
       // La hora de CADA unidad, no solo la más reciente: es lo que permite al
       // preflight ver que un distrito retrocede aunque el máximo suba.
-      units_observed: facilitoUnitInstants(facilitoState),
-      units: facilitoRunCounts(facilitoState),
-      districts: new Set(Object.values(facilitoState?.units ?? {}).map((unidad) => unidad.district_code)).size,
+      units_observed: facilitoUnitInstants(facilitoPropio),
+      units: facilitoRunCounts(facilitoPropio),
+      districts: new Set(Object.values(facilitoPropio?.units ?? {}).map((unidad) => unidad.district_code)).size,
       linked: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, facilitoLayers[key].counts.linked])),
       ambiguous: GASOLINA_KEYS.reduce((total, key) => total + facilitoLayers[key].counts.ambiguous, 0),
       unlinked: GASOLINA_KEYS.reduce((total, key) => total + facilitoLayers[key].counts.unlinked, 0),

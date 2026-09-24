@@ -31,10 +31,18 @@ export function dataStateIsBehind(candidato, publicado) {
  * Las unidades del candidato que irían hacia atrás, para explicar el rechazo.
  *
  * No depende del snapshot: un CSV nuevo no exime de comparar las consultas.
+ *
+ * Solo cuentan las unidades de los productos del grupo, que su propio estado
+ * declara. Si un estado publicado arrastrara consultas de otro combustible —un
+ * código anterior al filtro por grupo—, su ausencia en el candidato no es un
+ * retroceso: sin esta guarda, esas claves bloquearían para siempre el deploy.
  */
 export function dataStateRegressions(candidato, publicado) {
   const aUnidades = candidato?.facilito?.units_observed ?? {};
+  const propios = new Set([...Object.keys(publicado?.products ?? {}), ...Object.keys(candidato?.products ?? {})]);
+  const delGrupo = (clave) => !propios.size || propios.has(clave.slice(clave.lastIndexOf(':') + 1));
   return Object.entries(publicado?.facilito?.units_observed ?? {})
+    .filter(([clave]) => delGrupo(clave))
     .filter(([clave, publicada]) => !aUnidades[clave] || Date.parse(aUnidades[clave]) < Date.parse(publicada))
     .map(([clave, publicada]) => `${clave}: ${aUnidades[clave] ?? 'ausente'} < ${publicada}`);
 }

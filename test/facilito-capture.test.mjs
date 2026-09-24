@@ -73,7 +73,7 @@ function navegadorFalso({ distritos, tablaDe }) {
     if (args[0] === '--json' && args[1] === 'eval') {
       const script = Buffer.from(args[3], 'base64').toString('utf8');
       const respuesta = script.includes('page.info')
-        ? tablaDe(distritoActual, productoActual)
+        ? { seleccion: { valor: productoActual, texto: ETIQUETAS_DEL_SITIO[productoActual] ?? '' }, ...tablaDe(distritoActual, productoActual) }
         : { t: (reloj += 1), distritos };
       return JSON.stringify({ result: respuesta });
     }
@@ -82,9 +82,12 @@ function navegadorFalso({ distritos, tablaDe }) {
 }
 
 const DISTRITOS = [{ nombre: 'ATE', codigo: '150103' }, { nombre: 'SAN LUIS', codigo: '150134' }];
+// Lo que muestra el select del sitio para cada código (HAR del 10/09/2026).
+const ETIQUETAS_DEL_SITIO = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV' };
 
 test('un producto roto no se lleva por delante al distrito ni a los demás', () => {
   const resultado = capturarLima({
+    soloProductos: ['regular', 'premium'],
     ejecutar: navegadorFalso({
       distritos: DISTRITOS,
       // Solo Premium de Ate llega truncado; los otros tres pares están enteros.
@@ -105,6 +108,7 @@ test('un producto roto no se lleva por delante al distrito ni a los demás', () 
 
 test('un bloqueo explícito detiene la adquisición entera', () => {
   const resultado = capturarLima({
+    soloProductos: ['regular', 'premium'],
     ejecutar: navegadorFalso({
       distritos: DISTRITOS,
       tablaDe: (distrito) => (distrito?.codigo === '150103' ? { rechazo: 'desafio_o_rechazo' } : tabla([fila('GRIFO B', 'S/ 19,49', 'SAN LUIS')])),

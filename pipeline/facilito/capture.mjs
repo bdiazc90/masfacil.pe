@@ -27,9 +27,17 @@ export const FACILITO_URL = 'https://www.facilito.gob.pe/facilito/pages/facilito
 
 const DEPARTAMENTO = { nombre: 'LIMA', codigo: '150000' };
 const PROVINCIA = { nombre: 'LIMA', codigo: '150100' };
-const PRODUCTOS = Object.freeze([
-  { key: 'regular', nombre: 'GASOHOL REGULAR', codigo: '126' },
-  { key: 'premium', nombre: 'GASOHOL PREMIUM', codigo: '127' },
+// Los productos que se consultan: nuestra clave, el código del select del sitio
+// y la etiqueta que el sitio muestra para ese código. El código se fija —así
+// Gasolina conserva el método acreditado— y la etiqueta se comprueba en cada
+// lectura: si el sitio reasignara un código, esa unidad falla con su motivo en
+// vez de guardar como Diésel los precios de otro producto. La etiqueta del sitio
+// no es el nombre del CSV («DB5 S-50 UV» frente a `Diesel B5 S-50 UV`): que sean
+// el mismo producto lo acredita la muestra de vínculos, no el parecido.
+export const FACILITO_PRODUCTS = Object.freeze([
+  { key: 'regular', etiqueta: 'GASOHOL REGULAR', codigo: '126' },
+  { key: 'premium', etiqueta: 'GASOHOL PREMIUM', codigo: '127' },
+  { key: 'diesel', etiqueta: 'DB5 S-50 UV', codigo: '40' },
 ]);
 // Orden exacto de la tabla. El teléfono se valida por posición y nunca se emite.
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
@@ -38,6 +46,14 @@ const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Pr
 // los dos productos, así que 43 distritos caben de sobra en el total; el techo
 // existe para que una corrida rota no se quede colgada hasta el siguiente cron.
 export const RUN_BUDGET_MS = 20 * 60_000;
+// Cada pasada recorre Lima con sus productos y su presupuesto. Gasolina va
+// primero y exactamente como antes; Diésel después y aparte, para que un
+// problema de su tabla nunca le cueste a Gasolina un distrito. Un bloqueo
+// explícito, en cambio, detiene todas las pasadas.
+export const FACILITO_PASSES = Object.freeze([
+  { name: 'gasolina', products: ['regular', 'premium'], budgetMs: RUN_BUDGET_MS },
+  { name: 'diesel', products: ['diesel'], budgetMs: 10 * 60_000 },
+]);
 const TIMEOUT_MS = 30_000;
 const OPEN_TIMEOUT_MS = 45_000;
 const MAX_FILAS = 400;
@@ -78,7 +94,9 @@ const TABLA = `(() => {${RECHAZO}
       if (todas.length === total) { nodos = todas; completo = true; }
     }
   }
-  return { t, estado: 'ok', total, completo, firma, cabeceras: cab ? Array.from(cab.children).map(txt) : [], filas: nodos.map((f) => Array.from(f.cells).map(txt)) };
+  const prod = document.querySelector('select[name=producto]');
+  const seleccion = prod ? { valor: prod.value, texto: txt(prod.selectedOptions?.[0]) } : null;
+  return { t, estado: 'ok', total, completo, firma, seleccion, cabeceras: cab ? Array.from(cab.children).map(txt) : [], filas: nodos.map((f) => Array.from(f.cells).map(txt)) };
 })()`;
 
 /**
@@ -87,10 +105,15 @@ const TABLA = `(() => {${RECHAZO}
  * Cero filas solo vale si la tabla cargada confirma explícitamente ese total:
  * una tabla vacía porque todavía no terminó de dibujarse diría que un distrito
  * entero dejó de vender.
+ *
+ * Con `producto`, además, la opción elegida en el select tiene que ser ese
+ * código con esa etiqueta: la tabla no tiene columna de producto y su cabecera
+ * es la misma para todos, así que es la única prueba de qué se está leyendo.
  */
-export function parseTabla(payload, distritoNombre, { conTexto = false } = {}) {
+export function parseTabla(payload, distritoNombre, { conTexto = false, producto = null } = {}) {
   if (payload?.rechazo) return { ok: false, razon: payload.rechazo };
   if (payload?.estado !== 'ok') return { ok: false, razon: payload?.estado ?? 'sin_respuesta' };
+  if (producto && (payload.seleccion?.valor !== producto.codigo || norm(payload.seleccion?.texto) !== norm(producto.etiqueta))) return { ok: false, razon: 'producto_no_coincide' };
   const cab = (payload.cabeceras ?? []).map((c) => String(c ?? '').replace(/\s+/g, ' ').trim());
   if (cab.length !== CABECERAS.length || cab.some((c, i) => c !== CABECERAS[i])) return { ok: false, razon: 'cabeceras_desconocidas' };
   const filas = [];
@@ -165,20 +188,49 @@ function controlador(ejecutar, restante) {
 }
 
 /**
- * Barre Lima provincia: cada distrito, los dos productos.
+ * Barre Lima provincia, una pasada tras otra: cada distrito, los productos de la
+ * pasada.
  *
  * @param {object} entrada
  * @param {(args: string[], opciones: object) => string} [entrada.ejecutar]  comando del navegador
  * @param {(linea: string) => void} [entrada.log]
  * @param {() => Date} [entrada.now]
- * @param {number} [entrada.budgetMs]  presupuesto total declarado de la corrida
+ * @param {number|null} [entrada.budgetMs]  techo del presupuesto de cada pasada
  * @param {string[]|null} [entrada.soloDistritos]  para una corrida de comprobación
+ * @param {string[]|null} [entrada.soloProductos]  claves a consultar; las pasadas
+ *   que se quedan sin productos no se recorren
  * @param {boolean} [entrada.conTexto]  conserva razón social y dirección en las
  *   filas devueltas, SOLO para armar la muestra que se revisa a ojo. Nunca se
  *   persiste en el expediente ni se imprime.
- * @returns {{units: object[], districts: object[], blocked: object|null, elapsed_ms: number}}
+ * @returns {{units: object[], districts: object[], blocked: object|null, elapsed_ms: number, passes: object[]}}
  */
-export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(), budgetMs = RUN_BUDGET_MS, soloDistritos = null, conTexto = false } = {}) {
+export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(), budgetMs = null, soloDistritos = null, soloProductos = null, conTexto = false } = {}) {
+  const inicioMs = Date.now();
+  const units = [];
+  const passes = [];
+  let bloqueo = null;
+  let catalogo = [];
+  try {
+    for (const pasada of FACILITO_PASSES) {
+      const productos = FACILITO_PRODUCTS.filter((p) => pasada.products.includes(p.key) && (!soloProductos || soloProductos.includes(p.key)));
+      if (!productos.length) continue;
+      const presupuesto = budgetMs === null ? pasada.budgetMs : Math.min(budgetMs, pasada.budgetMs);
+      log(`Pasada ${pasada.name}: ${productos.map((p) => p.key).join(', ')} · presupuesto ${Math.round(presupuesto / 1000)} s`);
+      const resultado = recorrerLima({ ejecutar, log, now, productos, budgetMs: presupuesto, soloDistritos, conTexto });
+      units.push(...resultado.units);
+      if (resultado.districts.length) catalogo = resultado.districts;
+      passes.push({ name: pasada.name, products: productos.map((p) => p.key), elapsed_ms: resultado.elapsed_ms, blocked: resultado.blocked });
+      // Un rechazo explícito no se esquiva cambiando de producto.
+      if (resultado.blocked) { bloqueo = resultado.blocked; break; }
+    }
+  } finally {
+    try { ejecutar(['close'], { ms: 5_000 }); } catch { /* la sesión se cierra sola al terminar */ }
+  }
+  return { units, districts: catalogo, blocked: bloqueo, elapsed_ms: Date.now() - inicioMs, passes };
+}
+
+// Una pasada: la cascada hasta los distritos y cada distrito con sus productos.
+function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, conTexto }) {
   const inicioMs = Date.now();
   const restante = () => budgetMs - (Date.now() - inicioMs);
   const units = [];
@@ -196,14 +248,15 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
     return { t: provincia.t, catalogo: provincia.distritos ?? [] };
   };
 
-  // Un distrito completo: seleccionar y leer sus dos tablas. Cada producto se
+  // Un distrito completo: seleccionar y leer la tabla de cada producto de la
+  // pasada. Cada producto se
   // acepta o se rechaza por su cuenta; la cascada, en cambio, es de todo o nada,
   // porque si el sitio devolvió al buscador ya no sabemos qué estamos leyendo.
   const recorrerDistrito = (distrito, previo) => {
     const leidas = [];
     let t = control.aplicar({ selector: 'select[name=distrito]', valor: distrito.codigo, siguiente: 'select[name=producto]', previo, etapa: `distrito_${distrito.codigo}` }).t;
     let firma = '';
-    for (const producto of PRODUCTOS) {
+    for (const producto of productos) {
       const etapa = `${distrito.codigo}_${producto.codigo}`;
       try {
         control.cmd(['select', 'select[name=producto]', producto.codigo], etapa);
@@ -214,7 +267,7 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
           const f = JSON.stringify(Array.from(tb.querySelectorAll('tbody tr')).slice(0, 3).map((e) => (e.innerText || '').replace(/\\s+/g, ' ').trim()));
           return performance.timeOrigin !== ${Number(t)} || f !== ${JSON.stringify(firma)}; })()`], etapa);
         const observadoEn = now().toISOString();
-        const leido = parseTabla(control.evaluar(TABLA, etapa), distrito.nombre, { conTexto });
+        const leido = parseTabla(control.evaluar(TABLA, etapa), distrito.nombre, { conTexto, producto });
         if (!leido.ok) throw new Fallo(leido.razon, etapa);
         firma = leido.firma;
         t = control.sondear(etapa).t;
@@ -269,13 +322,13 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
           units.push(...resultado.units);
           t = resultado.t;
           hecho = true;
-          log(`${distrito.nombre}: ${resultado.units.filter((u) => u.status === 'ok').length}/2 unidades`);
+          log(`${distrito.nombre}: ${resultado.units.filter((u) => u.status === 'ok').length}/${productos.length} unidades`);
         } catch (error) {
           const fallo = error instanceof Fallo ? error : new Fallo('fallo_inesperado', 'distrito');
           if (fallo.bloqueo) { bloqueo = { codigo: fallo.codigo, etapa: fallo.etapa, distrito: distrito.nombre }; break; }
           log(`${distrito.nombre}: intento ${intento}/${INTENTOS_POR_DISTRITO} falló (${fallo.codigo}${fallo.detalle ? `: ${fallo.detalle}` : ''})`);
           if (intento === INTENTOS_POR_DISTRITO || !fallo.reintentable) {
-            for (const producto of PRODUCTOS) units.push({ district_code: distrito.codigo, district_name: distrito.nombre, product: producto.key, status: fallo.codigo });
+            for (const producto of productos) units.push({ district_code: distrito.codigo, district_name: distrito.nombre, product: producto.key, status: fallo.codigo });
             break;
           }
           // Reabrir la cascada: tras un fallo no sabemos en qué página estamos.
@@ -293,8 +346,6 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
     const fallo = error instanceof Fallo ? error : new Fallo('fallo_inesperado', 'cascada', String(error?.message ?? '').slice(0, 200));
     bloqueo = fallo.bloqueo ? { codigo: fallo.codigo, etapa: fallo.etapa, distrito: null } : bloqueo;
     log(`Cascada inicial fallida: ${fallo.codigo} en ${fallo.etapa}${fallo.detalle ? ` (${fallo.detalle})` : ''}`);
-  } finally {
-    try { ejecutar(['close'], { ms: 5_000 }); } catch { /* la sesión se cierra sola al terminar */ }
   }
 
   return { units, districts: catalogo, blocked: bloqueo, elapsed_ms: Date.now() - inicioMs };

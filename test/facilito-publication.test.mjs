@@ -173,6 +173,11 @@ const candidato = (precioWeb) => ({
   identity: null,
 });
 
+// `prepareRelease` decide con el reloj real (`Date.now()`) y estas consultas
+// están fechadas respecto a AHORA: sin fijar el reloj, en cuanto pasan 24 h desde
+// AHORA la consulta publicada vence y la decisión cambia sola.
+const relojEnAhora = (t) => t.mock.timers.enable({ apis: ['Date'], now: AHORA });
+
 /** `unchanged` + expediente con unidades: se compone para mirar, no para publicar. */
 function conDeps({ precioWeb, publicadoWeb, escrituras }) {
   return {
@@ -187,9 +192,10 @@ function conDeps({ precioWeb, publicadoWeb, escrituras }) {
   };
 }
 
-test('con el CSV sin cambios y la consulta sin novedad, se compone, se mira y no se escribe', async () => {
+test('con el CSV sin cambios y la consulta sin novedad, se compone, se mira y no se escribe', async (t) => {
   // El caso normal de tres de cada cuatro corridas del día: la tabla dice lo
   // mismo que hace seis horas y la entrega anterior sigue siendo correcta.
+  relojEnAhora(t);
   const escrituras = [];
   const resultado = await prepareRelease({ route: 'data', deps: conDeps({ precioWeb: 22.39, publicadoWeb: 22.39, escrituras }) });
   assert.equal(resultado.decision.action, 'no_op');
@@ -198,7 +204,8 @@ test('con el CSV sin cambios y la consulta sin novedad, se compone, se mira y no
   assert.match(resultado.informe.facilito_change, /ningún precio efectivo cambia/);
 });
 
-test('con el CSV sin cambios y un precio distinto, sí se escribe y se despliega', async () => {
+test('con el CSV sin cambios y un precio distinto, sí se escribe y se despliega', async (t) => {
+  relojEnAhora(t);
   const escrituras = [];
   const resultado = await prepareRelease({ route: 'data', deps: conDeps({ precioWeb: 21.99, publicadoWeb: 22.39, escrituras }) });
   assert.equal(resultado.decision.action, 'facilito_project_verify_deploy');
@@ -206,7 +213,8 @@ test('con el CSV sin cambios y un precio distinto, sí se escribe y se despliega
   assert.deepEqual(escrituras, ['gasolina-X-nueva']);
 });
 
-test('sin expediente de consulta, el CSV sin cambios sigue siendo cero bytes y cero deploy', async () => {
+test('sin expediente de consulta, el CSV sin cambios sigue siendo cero bytes y cero deploy', async (t) => {
+  relojEnAhora(t);
   const escrituras = [];
   const resultado = await prepareRelease({
     route: 'data',

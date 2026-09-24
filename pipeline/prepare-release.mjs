@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { publicationDecisionForRoute } from '../app/publication-policy.mjs';
 import { composeGasolinaProjection, usablePrivateSnapshot, writeGasolinaProjection } from './project-gasolina.mjs';
 import { facilitoPublicationChange } from './facilito/publication.mjs';
-import { readFacilitoState } from './facilito/state.mjs';
+import { facilitoStateForProducts, readFacilitoState } from './facilito/state.mjs';
 import { GASOLINA_KEYS } from './gasolina-contract.mjs';
 import { refreshSnapshot } from './refresh-snapshot.mjs';
 import { writeShellManifest } from './shell-manifest.mjs';
@@ -112,7 +112,9 @@ export async function prepareRelease({
   let decision;
   // Sin una sola unidad en el expediente no hay capa que componer, y `unchanged`
   // vuelve a significar lo de siempre: cero bytes y cero deploy.
-  const facilitoAvailable = Object.keys(usar.readFacilitoState(root, { facilitoRoot })?.units ?? {}).length > 0;
+  // Cuentan solo las unidades de Gasolina: una captura de Diésel no es una capa
+  // que Gasolina pueda componer.
+  const facilitoAvailable = Object.keys(facilitoStateForProducts(usar.readFacilitoState(root, { facilitoRoot }), GASOLINA_KEYS)?.units ?? {}).length > 0;
   // Con el refresco caído, el pointer activo sigue siendo el último snapshot
   // oficial validado. Si además es utilizable, la consulta web puede publicarse
   // sobre él en vez de perderse junto al CSV.
