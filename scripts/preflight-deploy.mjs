@@ -18,26 +18,31 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { codeRegression } from '../app/route-policy.mjs';
-import { dataStateIsBehind, dataStateRegressions } from '../app/publication-policy.mjs';
+import { groupsBehind } from '../app/publication-policy.mjs';
+import { PUBLISHED_GROUPS } from '../pipeline/groups.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const route = process.env.ROUTE || 'data';
 const origin = process.env.PUBLIC_ORIGIN;
 if (!origin) throw new Error('Se requiere PUBLIC_ORIGIN para revalidar antes de subir');
 
-const localState = JSON.parse(fs.readFileSync(path.join(root, 'web', 'data', 'gasolina', 'refresh-state.json'), 'utf8'));
-const localSnapshot = localState.snapshot_id ?? null;
-if (!localSnapshot) throw new Error('El refresh-state local no declara snapshot_id; no se puede ordenar la corrida');
+// Cada grupo publicado se compara con su propio estado: la novedad de uno no
+// autoriza a retroceder otro, y un grupo que ya está publicado no puede faltar.
+const locales = Object.fromEntries(PUBLISHED_GROUPS.map((grupo) => {
+  const estado = JSON.parse(fs.readFileSync(path.join(root, 'web', ...grupo.dataRoot.split('/'), 'refresh-state.json'), 'utf8'));
+  if (!estado.snapshot_id) throw new Error(`El refresh-state local de ${grupo.key} no declara snapshot_id; no se puede ordenar la corrida`);
+  return [grupo.key, estado];
+}));
 
 const base = new URL(origin);
 if (!base.pathname.endsWith('/')) base.pathname = `${base.pathname}/`;
 
 // Se lee el refresh-state entero, no solo su `snapshot_id`: ordenar dos corridas
 // necesita también la consulta web, distrito por distrito.
-async function publicado() {
-  const response = await fetch(new URL('data/gasolina/refresh-state.json', base), { redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' } });
+async function publicado(grupo) {
+  const response = await fetch(new URL(`${grupo.dataRoot}/refresh-state.json`, base), { redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' } });
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`No se pudo leer el refresh-state publicado: HTTP ${response.status}`);
+  if (!response.ok) throw new Error(`No se pudo leer el refresh-state publicado de ${grupo.key}: HTTP ${response.status}`);
   return JSON.parse(await response.text());
 }
 
@@ -65,25 +70,35 @@ function retrocesoDeCodigo() {
   return codeRegression({ head, tip, isAncestor, changedPaths: delta });
 }
 
-const remoteState = await publicado();
-const remoteSnapshot = remoteState?.snapshot_id ?? null;
-const atrasado = Boolean(remoteState) && dataStateIsBehind(localState, remoteState);
-const retrocesos = remoteState ? dataStateRegressions(localState, remoteState) : [];
-const retroceso = atrasado ? null : retrocesoDeCodigo();
+const publicados = Object.fromEntries(await Promise.all(PUBLISHED_GROUPS.map(async (grupo) => [grupo.key, await publicado(grupo)])));
+const atrasados = groupsBehind({ local: locales, published: publicados });
+const retroceso = atrasados.length ? null : retrocesoDeCodigo();
 
-// Las dos causas se informan por separado y pueden darse a la vez: un CSV
-// anterior y, además, distritos cuya consulta retrocede.
-const causas = [
-  remoteSnapshot && localSnapshot < remoteSnapshot ? `el CSV publicado (${remoteSnapshot}) es posterior al de esta corrida (${localSnapshot})` : null,
-  retrocesos.length ? `la consulta retrocede en ${retrocesos.length} unidad(es) — ${retrocesos.slice(0, 3).join('; ')}` : null,
-].filter(Boolean);
+// Las causas se informan por grupo y pueden darse a la vez: un CSV anterior y,
+// además, distritos cuya consulta retrocede.
+const causa = (atrasado) => (atrasado.missing
+  ? `${atrasado.group}: publicado y ausente en esta corrida`
+  : [
+    atrasado.published_snapshot && atrasado.local_snapshot < atrasado.published_snapshot ? `${atrasado.group}: el CSV publicado (${atrasado.published_snapshot}) es posterior al de esta corrida (${atrasado.local_snapshot})` : null,
+    atrasado.regressions.length ? `${atrasado.group}: la consulta retrocede en ${atrasado.regressions.length} unidad(es) — ${atrasado.regressions.slice(0, 3).join('; ')}` : null,
+  ].filter(Boolean).join('; además, ') || `${atrasado.group}: el estado publicado es más nuevo`);
 
-const decision = atrasado
-  ? { deploy: false, reason: `corrida_desactualizada: ${causas.join('; además, ') || 'el estado publicado es más nuevo'}` }
+const decision = atrasados.length
+  ? { deploy: false, reason: `corrida_desactualizada: ${atrasados.map(causa).join('; además, ')}` }
   : retroceso
     ? { deploy: false, reason: retroceso.reason }
-    : { deploy: true, reason: remoteSnapshot ? 'estado revalidado; esta corrida no retrocede código ni datos' : 'no hay bundle publicado todavía; primera publicación' };
+    : { deploy: true, reason: Object.values(publicados).some(Boolean) ? 'estado revalidado; esta corrida no retrocede código ni datos' : 'no hay bundle publicado todavía; primera publicación' };
 
-const salida = { ...decision, route, local_snapshot: localSnapshot, published_snapshot: remoteSnapshot, local_facilito: localState?.facilito?.state_id ?? null, published_facilito: remoteState?.facilito?.state_id ?? null, unidades_que_retroceden: retrocesos.length };
+const [local, remoto] = [locales.gasolina ?? null, publicados.gasolina ?? null];
+const salida = {
+  ...decision,
+  route,
+  local_snapshot: local?.snapshot_id ?? null,
+  published_snapshot: remoto?.snapshot_id ?? null,
+  local_facilito: local?.facilito?.state_id ?? null,
+  published_facilito: remoto?.facilito?.state_id ?? null,
+  unidades_que_retroceden: atrasados.reduce((total, atrasado) => total + atrasado.regressions.length, 0),
+  grupos: Object.fromEntries(PUBLISHED_GROUPS.map((grupo) => [grupo.key, { local: locales[grupo.key]?.snapshot_id ?? null, publicado: publicados[grupo.key]?.snapshot_id ?? null }])),
+};
 if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${decision.deploy}\npreflight_reason=${decision.reason}\n`);
 process.stdout.write(`${JSON.stringify(salida)}\n`);

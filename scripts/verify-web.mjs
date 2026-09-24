@@ -21,11 +21,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GASOLINA_KEYS, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from '../pipeline/gasolina-contract.mjs';
-import { validateGasolinaManifest as clienteAceptaManifest, validGasolinaBundle as clienteAceptaBundle } from '../web/gasolina-contract.js';
+import { PUBLISHED_GROUPS } from '../pipeline/groups.mjs';
+import { GROUP_CONTRACTS } from '../web/group-contracts.js';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
 import { renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
-import { fetchLiveBundle } from '../pipeline/live-bundle.mjs';
+import { fetchLiveGroups } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { appPaths, redirectRules, redirects } from '../web/lib/routes.js';
 import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
@@ -33,25 +33,28 @@ import { NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWork
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * Problemas de un bundle con los dos contratos: el del productor y el del
- * cliente. Sirve igual para el árbol local y para los bytes que sirve el origen.
+ * Problemas del bundle de un grupo con los dos contratos: el del productor y el
+ * del cliente. Sirve igual para el árbol local y para los bytes que sirve el origen.
  *
+ * @param {object} grupo  un grupo de `pipeline/groups.mjs`
  * @param {{manifest: object, state: object|undefined, bodies: Record<string, string|undefined>}} bundle
  */
-async function bundleProblems({ manifest, state, bodies }) {
-  const errors = [...validateGasolinaManifest(manifest)];
-  if (state === undefined) errors.push('falta refresh-state gasolina');
-  else errors.push(...validateGasolinaRefreshState(state, manifest));
-  for (const key of GASOLINA_KEYS) {
+async function bundleProblems(grupo, { manifest, state, bodies }) {
+  const cliente = GROUP_CONTRACTS[grupo.key];
+  const errors = [...grupo.validate.manifest(manifest)];
+  if (state === undefined) errors.push(`falta refresh-state ${grupo.key}`);
+  else errors.push(...grupo.validate.refreshState(state, manifest));
+  for (const key of grupo.products) {
     if (bodies[key] === undefined) { errors.push(`falta snapshot ${key}`); continue; }
-    errors.push(...validateGasolinaBundle(manifest, key, bodies[key]));
+    errors.push(...grupo.validate.bundle(manifest, key, bodies[key]));
   }
   // Si el cliente que se publica no acepta el bundle que se publica con él, no
   // se publica ninguno de los dos.
-  if (!clienteAceptaManifest(manifest)) errors.push('el cliente nuevo rechaza el manifest del bundle');
-  for (const key of GASOLINA_KEYS) {
+  if (!cliente) return [...errors, `el cliente nuevo no tiene contrato para ${grupo.key}`];
+  if (!cliente.validManifest(manifest)) errors.push('el cliente nuevo rechaza el manifest del bundle');
+  for (const key of grupo.products) {
     if (bodies[key] === undefined) continue;
-    if (!(await clienteAceptaBundle(manifest, key, bodies[key]))) errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
+    if (!(await cliente.validBundle(manifest, key, bodies[key]))) errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
   }
   return errors;
 }
@@ -114,27 +117,32 @@ export async function routeProblems(origin) {
  * @returns {Promise<{errors: string[], notas: string[], summary: string}>}
  */
 export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
-  const dataRoot = path.join(root, 'web', 'data', 'gasolina');
   const errors = [];
   const notas = [];
 
-  // 1 y 2. Bundle de datos del árbol, con el contrato del productor y el del
-  // cliente.
-  const manifestPath = path.join(dataRoot, 'manifest.json');
-  if (!fs.existsSync(manifestPath)) throw new Error('Falta web/data/gasolina/manifest.json; ejecuta npm run project o npm run fetch:live -- <url de Pages>');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  const refreshPath = path.join(dataRoot, 'refresh-state.json');
-  const cuerpos = {};
-  for (const key of GASOLINA_KEYS) {
-    const descriptor = manifest.products?.[key];
-    const snapshot = descriptor && path.join(root, 'web', descriptor.dataset_url);
-    if (snapshot && fs.existsSync(snapshot)) cuerpos[key] = fs.readFileSync(snapshot, 'utf8');
+  // 1 y 2. El bundle de cada grupo publicado, con el contrato del productor y el
+  // del cliente. Todos: subir el árbol sin uno de ellos sería perderlo.
+  const manifiestos = {};
+  for (const grupo of PUBLISHED_GROUPS) {
+    const dataRoot = path.join(root, 'web', ...grupo.dataRoot.split('/'));
+    const manifestPath = path.join(dataRoot, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) throw new Error(`Falta web/${grupo.dataRoot}/manifest.json; ejecuta npm run project o npm run fetch:live -- <url de Pages>`);
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    manifiestos[grupo.key] = manifest;
+    const refreshPath = path.join(dataRoot, 'refresh-state.json');
+    const cuerpos = {};
+    for (const key of grupo.products) {
+      const descriptor = manifest.products?.[key];
+      const snapshot = descriptor && path.join(root, 'web', descriptor.dataset_url);
+      if (snapshot && fs.existsSync(snapshot)) cuerpos[key] = fs.readFileSync(snapshot, 'utf8');
+    }
+    errors.push(...await bundleProblems(grupo, {
+      manifest,
+      state: fs.existsSync(refreshPath) ? JSON.parse(fs.readFileSync(refreshPath, 'utf8')) : undefined,
+      bodies: cuerpos,
+    }));
   }
-  errors.push(...await bundleProblems({
-    manifest,
-    state: fs.existsSync(refreshPath) ? JSON.parse(fs.readFileSync(refreshPath, 'utf8')) : undefined,
-    bodies: cuerpos,
-  }));
+  const manifest = manifiestos.gasolina;
 
   // 3. Precache: se DERIVA aquí y se compara con el módulo generado en disco.
   // Verificar no genera: publicar con un manifest viejo sería publicar un
@@ -229,10 +237,13 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     // lectura coherente que usa CI —manifest releído al final— y se valida en
     // memoria con los dos contratos. `web/data/` no se toca.
     try {
-      const vivo = await fetchLiveBundle({ origin });
-      servido = vivo.revision_id;
-      const problemas = await bundleProblems({ manifest: vivo.manifest, state: JSON.parse(vivo.stateText), bodies: vivo.bodies });
-      errors.push(...problemas.map((motivo) => `origen público · bundle servido · ${motivo}`));
+      const vivos = await fetchLiveGroups({ origin });
+      servido = vivos.map((vivo) => vivo.revision_id).join(', ');
+      for (const vivo of vivos) {
+        const grupo = PUBLISHED_GROUPS.find((item) => item.key === vivo.group);
+        const problemas = await bundleProblems(grupo, { manifest: vivo.manifest, state: JSON.parse(vivo.stateText), bodies: vivo.bodies });
+        errors.push(...problemas.map((motivo) => `origen público · bundle servido · ${vivo.group} · ${motivo}`));
+      }
     } catch (error) { errors.push(`origen público · no se pudo leer un bundle servido coherente: ${error.message}`); }
 
     // 9. El shell publicado. La precache que sirve el origen tiene que ser la

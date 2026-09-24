@@ -1,24 +1,62 @@
-import { GASOLINA_KEYS, validGasolinaBundle, validateGasolinaManifest } from './gasolina-contract.js';
+// Carga de una vista: un conjunto completo de su grupo, de una sola revisión.
+//
+// Se pide UN manifest y todos los productos se validan contra él, así que Regular
+// y Premium no pueden salir de revisiones distintas. Si la revisión cambia a
+// mitad de la lectura —un deploy mientras se descarga— se vuelve a empezar. Si
+// tras los intentos no hay un conjunto nuevo completo, se pide el conjunto
+// guardado entero (`guardado=1`), que el service worker solo entrega completo y
+// validado: nunca se combina una parte nueva con otra antigua.
+//
+// El manifest se pide con `?product=`: el service worker anterior lo exige, y
+// durante una actualización puede ser él quien atienda la primera carga.
+
+import { VIEWS } from './lib/catalog.js';
+import { GROUP_CONTRACTS } from './group-contracts.js';
 import { mergeProducts } from './lib/merge-products.js';
 
-export async function loadGasolinaProduct(key, fetchImpl = fetch) {
-  if (!GASOLINA_KEYS.includes(key)) throw new Error('Producto gasolina no permitido');
-  const manifestResponse = await fetchImpl(`/data/gasolina/manifest.json?product=${key}`, { cache: 'no-store' });
-  if (!manifestResponse.ok) throw new Error(`No se pudo obtener el manifest gasolina (HTTP ${manifestResponse.status})`);
+const ESPERAS_MS = Object.freeze([300, 900]);
+const desdeCopia = (response) => response.headers.get('X-Masfacil-Data-Mode') === 'saved';
+
+async function leerConjunto(view, contrato, fetchImpl, { deCopia }) {
+  const url = `/${view.dataRoot}/manifest.json?product=${view.products[0]}${deCopia ? '&guardado=1' : ''}`;
+  const manifestResponse = await fetchImpl(url, { cache: 'no-store' });
+  if (!manifestResponse.ok) throw new Error(`No se pudo obtener el manifest ${view.key} (HTTP ${manifestResponse.status})`);
   const manifest = await manifestResponse.clone().json();
-  if (!validateGasolinaManifest(manifest)) throw new Error('El manifest gasolina recibido no cumple el contrato');
-  const descriptor = manifest.products[key];
-  const snapshotResponse = await fetchImpl(`/${descriptor.dataset_url}`, { cache: 'no-store' });
-  if (!snapshotResponse.ok) throw new Error(`No se pudo obtener ${descriptor.label} (HTTP ${snapshotResponse.status})`);
-  const body = await snapshotResponse.clone().text();
-  if (!(await validGasolinaBundle(manifest, key, body))) throw new Error(`El bundle ${descriptor.label} no coincide con su revisión`);
-  return { dataset: JSON.parse(body), manifest, key, dataMode: snapshotResponse.headers.get('X-Masfacil-Data-Mode') ?? manifestResponse.headers.get('X-Masfacil-Data-Mode') ?? 'network' };
+  if (!contrato.validManifest(manifest)) throw new Error(`El manifest ${view.key} recibido no cumple el contrato`);
+  const respuestas = [manifestResponse];
+  const cargados = await Promise.all(view.products.map(async (key) => {
+    const descriptor = manifest.products[key];
+    const response = await fetchImpl(`/${descriptor.dataset_url}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`No se pudo obtener ${descriptor.label} (HTTP ${response.status})`);
+    const body = await response.clone().text();
+    if (!(await contrato.validBundle(manifest, key, body))) throw new Error(`El bundle ${descriptor.label} no coincide con su revisión`);
+    respuestas.push(response);
+    return { key, manifest, dataset: JSON.parse(body) };
+  }));
+  // Basta que una parte venga de la copia guardada para no prometer datos vivos.
+  const dataMode = respuestas.some(desdeCopia) ? 'saved' : 'network';
+  return mergeProducts(...cargados.map((cargado) => ({ ...cargado, dataMode })));
 }
 
-// Los dos bundles ya viajaban bajo demanda al abrir un detalle; ahora se piden
-// en paralelo y llegan juntos. Tras la primera visita el service worker los
-// sirve de cache, así que el costo se paga una vez.
-export async function loadGasolina(fetchImpl = fetch) {
-  const cargados = await Promise.all(GASOLINA_KEYS.map((key) => loadGasolinaProduct(key, fetchImpl)));
-  return mergeProducts(...cargados);
+/**
+ * @param {string} viewKey
+ * @param {{fetchImpl?: Function, attempts?: number, sleep?: Function, views?: object, contracts?: object}} [opciones]
+ */
+export async function loadView(viewKey, { fetchImpl = fetch, attempts = 3, sleep = (ms) => new Promise((listo) => setTimeout(listo, ms)), views = VIEWS, contracts = GROUP_CONTRACTS } = {}) {
+  const view = views[viewKey];
+  const contrato = contracts[viewKey];
+  if (!view || !contrato) throw new Error(`Vista sin datos publicados: ${viewKey}`);
+  let ultimo;
+  for (let intento = 0; intento < attempts; intento += 1) {
+    try { return await leerConjunto(view, contrato, fetchImpl, { deCopia: false }); }
+    catch (error) {
+      ultimo = error;
+      if (intento < attempts - 1) await sleep(ESPERAS_MS[Math.min(intento, ESPERAS_MS.length - 1)]);
+    }
+  }
+  try { return await leerConjunto(view, contrato, fetchImpl, { deCopia: true }); }
+  catch { throw ultimo; }
 }
+
+// El nombre de siempre, para quien lo importe mientras Gasolina sea la única vista.
+export const loadGasolina = (fetchImpl = fetch) => loadView('gasolina', { fetchImpl });

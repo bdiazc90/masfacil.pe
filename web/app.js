@@ -1,4 +1,4 @@
-import { loadGasolina } from './data-client.js';
+import { loadView } from './data-client.js';
 import { PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM } from './lib/haversine.js';
 import { formatRadius } from './lib/decision-view.js';
 import { MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
@@ -317,7 +317,7 @@ function applyLoaded(dataset) {
 async function initialize() {
   try {
     await prepareServiceWorker();
-    applyLoaded(await loadGasolina());
+    applyLoaded(await loadView(search.view));
   } catch (error) { fatal(error); }
 }
 

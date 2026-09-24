@@ -40,6 +40,28 @@ export function dataStateRegressions(candidato, publicado) {
 }
 
 /**
+ * Grupos de esta corrida que irían hacia atrás frente a lo que sirve producción.
+ *
+ * Cada grupo se compara con su propio estado publicado: la novedad de uno no
+ * autoriza a retroceder otro. Un grupo publicado que falta en la corrida se
+ * perdería al subir el árbol, así que también cuenta; uno que todavía no está
+ * publicado no tiene con qué compararse.
+ *
+ * @param {{local: Record<string, object|null>, published: Record<string, object|null>}} estados
+ * @returns {{group: string, local_snapshot: string|null, published_snapshot: string|null, regressions: string[], missing: boolean}[]}
+ */
+export function groupsBehind({ local, published }) {
+  const atrasados = [];
+  for (const [group, publicado] of Object.entries(published)) {
+    if (!publicado) continue;
+    const propio = local[group] ?? null;
+    if (!propio) { atrasados.push({ group, local_snapshot: null, published_snapshot: publicado.snapshot_id ?? null, regressions: [], missing: true }); continue; }
+    if (dataStateIsBehind(propio, publicado)) atrasados.push({ group, local_snapshot: propio.snapshot_id ?? null, published_snapshot: publicado.snapshot_id ?? null, regressions: dataStateRegressions(propio, publicado), missing: false });
+  }
+  return atrasados;
+}
+
+/**
  * Rutas que no dependen de la fuente. `docs` no publica nada; `shell` publica el
  * cliente nuevo sobre el bundle público ya validado, y por eso no recibe —ni
  * necesita— un resultado de refresco: antes una caída de Osinergmin dejaba un
