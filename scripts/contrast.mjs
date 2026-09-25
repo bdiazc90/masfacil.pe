@@ -44,6 +44,8 @@ const ROLES = Object.freeze({
   regularStrong: '--product-regular-strong',
   premium: '--product-premium',
   premiumStrong: '--product-premium-strong',
+  diesel: '--product-diesel',
+  dieselStrong: '--product-diesel-strong',
 });
 const GLOWS = Object.freeze(['--glow-1', '--glow-2', '--glow-3']);
 // Un halo por marca registrada: registrar una marca sin su halo claro y oscuro
@@ -132,11 +134,15 @@ export function verifyContrast(tema, paleta) {
     chipPremium: enChip(t.premiumStrong, t.premium),
     chipMutedRegular: enChip(t.muted, t.regular),
     chipMutedPremium: enChip(t.muted, t.premium),
+    chipDiesel: enChip(t.dieselStrong, t.diesel),
+    chipMutedDiesel: enChip(t.muted, t.diesel),
     // La cifra grande de la tarjeta y la curva de su serie llevan el mismo color
     // «strong». El relleno no entra aquí: queda DEBAJO del trazo, que siempre
     // linda por arriba con el vidrio limpio.
     regularStrong: minimo(t.regularStrong),
     premiumStrong: minimo(t.premiumStrong),
+    // Diésel no tiene serie en el histórico: solo su cifra y su chip.
+    dieselStrong: minimo(t.dieselStrong),
     // La referencia del promedio sí cruza el relleno, y es gráfico necesario
     // para entender el dato: se miden su línea y su etiqueta, que llevan el
     // color de su serie tirado hacia la tinta.
@@ -157,8 +163,8 @@ export function verifyContrast(tema, paleta) {
 // degradado de área, que es decoración.
 export const MINIMUM = Object.freeze({
   foreground: 4.5, muted: 4.5, accent: 4.5, button: 4.5,
-  chipRegular: 4.5, chipPremium: 4.5, chipMutedRegular: 4.5, chipMutedPremium: 4.5,
-  primary: 3, ring: 3, regularStrong: 3, premiumStrong: 3, promedioRegular: 3, promedioPremium: 3,
+  chipRegular: 4.5, chipPremium: 4.5, chipMutedRegular: 4.5, chipMutedPremium: 4.5, chipDiesel: 4.5, chipMutedDiesel: 4.5,
+  primary: 3, ring: 3, regularStrong: 3, premiumStrong: 3, dieselStrong: 3, promedioRegular: 3, promedioPremium: 3,
 });
 
 const pct = (fraccion) => `${Number((fraccion * 100).toFixed(2))}%`;

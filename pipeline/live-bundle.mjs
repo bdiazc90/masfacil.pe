@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PUBLISHED_GROUPS, groupByKey } from './groups.mjs';
+import { viewPath } from '../web/lib/routes.js';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const espera = (ms) => new Promise((listo) => setTimeout(listo, ms));
@@ -34,9 +35,23 @@ function liveBundleBase(baseUrl, { testMode = process.env.TEST_MODE === '1' } = 
 
 async function descargar(base, relative, fetchImpl) {
   const response = await fetchImpl(new URL(relative, base), { redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' } });
-  if (response.status === 404) throw new Error(`Bundle público ausente en Pages (${relative}): el workflow requiere manifest, refresh-state y snapshots ya publicados`);
+  if (response.status === 404) throw Object.assign(new Error(`Bundle público ausente en Pages (${relative}): el workflow requiere manifest, refresh-state y snapshots ya publicados`), { status: 404, relative });
   if (!response.ok) throw new Error(`No se pudo descargar ${relative}: HTTP ${response.status}`);
   return response.text();
+}
+
+/**
+ * ¿El grupo todavía no se publicó nunca?
+ *
+ * Solo si faltan a la vez sus datos y su página: un manifest ausente con la
+ * vista respondiendo 200 es un despliegue roto, no una primera vez, y eso tiene
+ * que detener la corrida. Se pregunta una sola vez, sin reintentos, y solo
+ * puede decir «no publicado» un grupo que declara cómo juzgar su primera versión.
+ */
+async function sinPublicar(base, grupo, fetchImpl) {
+  if (!grupo.config?.guardrails?.firstActivation) return false;
+  const response = await fetchImpl(new URL(viewPath(grupo.key).slice(1), base), { redirect: 'manual', cache: 'no-store' });
+  return response.status === 404;
 }
 
 async function intentar(base, grupo, fetchImpl) {
@@ -79,10 +94,28 @@ export async function fetchLiveGroup({ origin, group = groupByKey('gasolina'), f
     try { return await intentar(base, group, fetchImpl); }
     catch (error) {
       ultimo = error;
+      if (error.status === 404 && error.relative === `${group.dataRoot}/manifest.json` && await sinPublicar(base, group, fetchImpl)) return { group: group.key, unpublished: true };
       if (intento < attempts - 1) await sleep(REINTENTOS_MS[Math.min(intento, REINTENTOS_MS.length - 1)]);
     }
   }
   throw new Error(`No se pudo leer un bundle público coherente tras ${attempts} intentos: ${ultimo.message}`);
+}
+
+/**
+ * El `refresh-state.json` que sirve producción para un grupo, o `null` si el
+ * grupo no se publicó nunca: faltan a la vez su estado y su página. Cualquier
+ * otra respuesta lanza, también un estado ausente con la página en 200.
+ */
+export async function fetchPublishedState({ origin, group, fetchImpl = fetch, testMode } = {}) {
+  const base = liveBundleBase(origin, testMode === undefined ? {} : { testMode });
+  const response = await fetchImpl(new URL(`${group.dataRoot}/refresh-state.json`, base), { redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' } });
+  if (response.status === 404) {
+    const pagina = await fetchImpl(new URL(viewPath(group.key).slice(1), base), { redirect: 'manual', cache: 'no-store' });
+    if (pagina.status === 404) return null;
+    throw new Error(`El refresh-state de ${group.key} no está publicado pero su página responde HTTP ${pagina.status}`);
+  }
+  if (!response.ok) throw new Error(`No se pudo leer el refresh-state publicado de ${group.key}: HTTP ${response.status}`);
+  return JSON.parse(await response.text());
 }
 
 /** El bundle de Gasolina, como siempre: el histórico y quien lo necesite solo. */
@@ -91,6 +124,7 @@ export const fetchLiveBundle = (entrada = {}) => fetchLiveGroup({ ...entrada, gr
 /**
  * Todos los grupos publicados, o ninguno. Publicar el shell sin uno de ellos
  * sería perderlo, así que un grupo que no se puede leer o validar detiene todo.
+ * Un grupo que nunca se publicó vuelve como `{ group, unpublished: true }`.
  */
 export async function fetchLiveGroups({ groups = PUBLISHED_GROUPS, ...entrada } = {}) {
   const bundles = [];
@@ -119,6 +153,7 @@ function snapshotTarget(root, grupo, datasetUrl) {
 /** Deja en `web/<raíz del grupo>/` un bundle ya obtenido y validado. */
 export function writeLiveGroup({ manifest, manifestText, stateText, bodies }, { root = rootFromModule, group = groupByKey('gasolina') } = {}) {
   const dataRoot = path.join(root, 'web', ...group.dataRoot.split('/'));
+  for (const key of group.products) if (!manifest.products?.[key]) throw new Error(`El bundle no declara ${key} para el grupo ${group.key}`);
   const snapshots = Object.fromEntries(group.products.map((key) => [key, { target: snapshotTarget(root, group, manifest.products[key].dataset_url), body: bodies[key], bytes: manifest.products[key].bytes }]));
   // Mismo orden que la proyección: primero snapshots inmutables, el manifest al
   // final, para que nunca quede un manifest apuntando a snapshots ausentes.
@@ -144,6 +179,9 @@ export function writeLiveGroups(bundles, { root = rootFromModule, groups = PUBLI
   return Object.fromEntries(bundles.map((bundle) => {
     const group = groups.find((grupo) => grupo.key === bundle.group);
     if (!group) throw new Error(`Bundle de un grupo no publicado: ${bundle.group}`);
+    // Un grupo que todavía no tiene primera versión no deja nada en disco: su
+    // ausencia es lo que la preparación reconoce como primera activación.
+    if (bundle.unpublished) return [bundle.group, { unpublished: true }];
     return [bundle.group, writeLiveGroup(bundle, { root, group })];
   }));
 }

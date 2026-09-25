@@ -6,9 +6,11 @@
 # y ese redirect se colaría en la reescritura.
 /combustibles/gasolina / 200
 /combustibles/gasolina/historial / 200
+/combustibles/diesel / 200
 # La forma canónica no lleva barra final.
 /combustibles/gasolina/ /combustibles/gasolina 301
 /combustibles/gasolina/historial/ /combustibles/gasolina/historial 301
+/combustibles/diesel/ /combustibles/diesel 301
 # Enlaces publicados antes de las vistas.
 /gasolina /combustibles/gasolina 301
 /gasolina/ /combustibles/gasolina 301

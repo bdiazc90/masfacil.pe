@@ -1,12 +1,12 @@
 import { loadView } from './data-client.js';
 import { PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM } from './lib/haversine.js';
-import { formatRadius } from './lib/decision-view.js';
+import { concordancia, formatRadius } from './lib/decision-view.js';
 import { MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
 import { createSearch, districtsFrom, evaluateRows, resultsView, startResults, withDistances, withPrice } from './lib/search.js';
 import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
 import { visibleDistricts } from './district-list.js';
 import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
-import { PRODUCTS } from './lib/catalog.js';
+import { ACTIVE_VIEWS, PRODUCTS, VIEWS } from './lib/catalog.js';
 import { createLocator } from './geolocation.js';
 import { historyPath, resolvePath, viewPath } from './lib/routes.js';
 import { readPreference, writePreference } from './preference.js';
@@ -17,10 +17,20 @@ import { mountHistoryChart } from './history-chart.js';
 
 // El estado se declara, no se deduce de la pantalla. `search` es lo que la
 // persona eligió y lo único que necesitan las reglas de `lib/search.js`; `data`,
-// lo que se cargó; `ui`, lo que solo le importa a esta presentación. Las filas se
-// guardan evaluadas hasta `refreshAt` y, con ubicación, ya medidas.
-let search = createSearch();
-const data = { dataset: null, mode: 'network' };
+// lo que se cargó de la vista activa; `ui`, lo que solo le importa a esta
+// presentación. Las filas se guardan evaluadas hasta `refreshAt` y, con
+// ubicación, ya medidas.
+//
+// Cada vista guarda su propia copia cargada, y cada carga lleva su turno: la
+// respuesta tardía de la vista que se dejó queda guardada, pero no se pinta bajo
+// la etiqueta de la nueva. Mismo patrón que el localizador.
+let search;
+let data = { dataset: null, mode: 'network' };
+const cargadas = new Map();
+let turnoDeCarga = 0;
+// El producto que ordena se recuerda por vista: volver a Gasolina devuelve
+// Premium a quien lo había elegido.
+const ordenPorVista = {};
 let rows = [];
 let located = [];
 let refreshAt = 0;
@@ -34,7 +44,7 @@ const $ = (id) => document.getElementById(id);
 // redirigieron los enlaces antiguos; si uno llega hasta aquí, se redirige igual.
 const entrada = resolvePath(location.pathname, { preference: readPreference() });
 const inicial = entrada.kind === 'view' ? entrada : resolvePath('/', { preference: readPreference() });
-elegir({ view: inicial.view });
+search = createSearch(inicial.view);
 if (entrada.kind === 'redirect') location.replace(`${entrada.to}${location.search}${location.hash}`);
 else {
   if (location.pathname !== inicial.canonical) history.replaceState(null, '', `${inicial.canonical}${location.search}${location.hash}`);
@@ -43,7 +53,7 @@ else {
 // La ruta del historial es la misma portada con el gráfico enfocado.
 const enHistorial = () => resolvePath(location.pathname).history === true;
 const SCREENS = Object.freeze({ start: 'start-step', loading: 'loading-step', district: 'district-step', compare: 'compare-step', fatal: 'fatal-state' });
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text', 'sum-fuel', 'view-state', 'view-state-text', 'view-state-action', 'start-retry', 'history-chart', 'menu-history'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 
 // El card de controles solo se fija en resultados; en las demás pantallas es la
@@ -94,7 +104,18 @@ function renderRadiusControl({ inert, total }) {
 function renderSummary(criterion) {
   // Sin un solo precio vigente, anunciar un criterio de precio promete un orden
   // que no existe: el resumen dice lo que pasa, no lo que ordenaría.
-  const criterio = criterion === 'none' ? 'Sin precios recientes' : criterion === 'price' ? `${PRODUCTS[search.priceProduct].short} más barata` : 'Más cerca';
+  const criterio = criterion === 'none' ? 'Sin precios recientes' : criterion === 'price' ? `${PRODUCTS[search.priceProduct].short} más barat${concordancia(search.priceProduct)}` : 'Más cerca';
+  // Con más de una vista el resumen dice de qué combustible habla, en dos
+  // renglones: arriba el combustible y dónde —el radio o el distrito, que es lo
+  // que puede truncarse—, abajo el criterio entero.
+  const varias = ACTIVE_VIEWS.length > 1;
+  nodes['sum-fuel'].hidden = !varias;
+  if (varias) {
+    nodes['sum-fuel'].textContent = VIEWS[search.view].label;
+    nodes['sum-place'].textContent = `· ${search.origin ? formatRadius(search.radiusKm) : displayDistrict(search.district)}`;
+    nodes['sum-criteria'].textContent = criterio;
+    return;
+  }
   const partes = search.origin ? [formatRadius(search.radiusKm), criterio] : [criterio];
   // Con GPS el icono de la barra ya dice «mi ubicación»: repetirlo en texto solo
   // le robaba ancho al criterio, que nunca debe truncar.
@@ -108,8 +129,10 @@ function renderOffers() {
   const view = resultsView({ rows, located, search });
   ui.view = view;
   const conOrigen = Boolean(search.origin);
-  nodes.offers.innerHTML = view.items.map((offer, index) => renderOfferCard(offer, { withDistance: conOrigen, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: view.tags[index], activeProduct: view.activeProduct })).join('');
+  const { products, priceUnit } = VIEWS[search.view];
+  nodes.offers.innerHTML = view.items.map((offer, index) => renderOfferCard(offer, { withDistance: conOrigen, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: view.tags[index], activeProduct: view.activeProduct, products, priceUnit })).join('');
   nodes.offers.hidden = view.items.length === 0;
+  renderViewState(view.districtEmpty ? 'district-empty' : 'ready');
   // El aviso de «sin precios recientes» acompaña a las tarjetas mudas, no las
   // sustituye: el grifo sigue existiendo aunque hoy no diga a cuánto vende.
   nodes['empty-state'].hidden = view.hasPrices;
@@ -139,7 +162,8 @@ function toggleDetail(button) {
   button.setAttribute('aria-expanded', String(!abierto));
   button.textContent = abierto ? 'Ver detalle' : 'Ocultar';
   slot.hidden = abierto;
-  slot.innerHTML = abierto ? '' : renderOfferDetail(offer, { prices: offer.prices, attribution: data.dataset.provenance.attribution });
+  const { products, priceUnit } = VIEWS[search.view];
+  slot.innerHTML = abierto ? '' : renderOfferDetail(offer, { prices: offer.prices, attribution: data.dataset.provenance.attribution, products, priceUnit });
 }
 
 function renderResults() {
@@ -184,6 +208,7 @@ function renderDistricts(query = '') {
   nodes['district-empty'].hidden = !normalizedQuery || matches.length > 0;
 }
 function chooseDistrict({ fromError = false } = {}) {
+  if (!data.dataset) return;
   // Elegir distrito descarta cualquier ubicación en vuelo.
   locator.cancel();
   ui.updatingLocation = false;
@@ -285,30 +310,161 @@ async function refreshLocation() {
 // completo, porque el radio y el orden solo tienen sentido sobre una posición.
 function placeAction() { if (enGps()) refreshLocation(); else locate(); }
 async function locate() {
+  if (!data.dataset) return;
   if (!locator.available) { chooseDistrict({ fromError: true }); return; }
   show('loading');
   const respuesta = await locator.request();
   if (respuesta.status === 'stale') return;
   if (respuesta.status === 'error') { elegir({ origin: null }); chooseDistrict({ fromError: true }); return; }
   elegir({ origin: respuesta.origin, district: null });
+  // Si mientras se buscaba la posición se cambió de combustible y la vista
+  // nueva todavía carga, los resultados se abren cuando llegue.
+  if (!data.dataset) { show('start'); return; }
   showCompare();
 }
-function fatal(error) { console.error(error); nodes['fatal-message'].textContent = navigator.onLine ? 'No pudimos cargar los precios. Revisa tu conexión y reintenta.' : 'No hay datos guardados todavía. Conéctate una vez para descargar precios.'; show('fatal'); }
+// Lo que el producto tiene que declarar, sin justificarse: atribución, no
+// afiliación, qué se mide de la visita, qué significa una ausencia, la ventana
+// de vigencia, cómo se mide la distancia, la precisión medida y de quién son las
+// marcas. Nada de explicar por qué se decidió cada cosa, y nada de pedir un
+// contacto que la app no ofrece.
 function applyLoaded(dataset) {
-  data.dataset = dataset; data.mode = dataset.dataMode;
   const filas = evaluateRows(dataset, new Date()).rows;
   $('use-location').disabled = false;
   $('choose-district').disabled = false;
+  nodes['start-retry'].hidden = true;
   nodes['data-status'].textContent = `${withPrice(filas).length} de ${filas.length} grifos con precio vigente · corte ${formatDate(dataset.cutoff_at)}.`;
   nodes['data-status'].classList.add('sr-only');
-  // Lo que el producto tiene que declarar, sin justificarse: atribución, no
-  // afiliación, qué se mide de la visita, qué significa una ausencia, la ventana
-  // de vigencia, cómo se mide la distancia, la precisión medida y de quién son las
-  // marcas. Nada de
-  // explicar por qué se decidió cada cosa, y nada de pedir un contacto que la
-  // app no ofrece.
   nodes['source-content'].innerHTML = `<p>${escapeHtml(dataset.provenance.attribution)} Proyecto independiente, sin afiliación con Osinergmin, Facilito ni el Estado.</p><p>No guardamos tu ubicación ni sale de tu dispositivo. Contamos visitas de forma anónima y sin cookies, para mejorar la app.</p><p>«—» significa que ese grifo no publica precio vigente de ese producto, no que no lo venda. Pasados ${MAX_OFFER_AGE_DAYS} días sin reportar, su tarjeta queda sin precios y dice desde cuándo calla.</p><p>La distancia es en línea recta. Tu zona es el radio que eliges, entre ${RADIUS_MIN_KM} y ${RADIUS_MAX_KM} km.</p><p>Los nombres salen del Registro oficial: precisión medida de 89 % en los confirmados y 85 % en los <b>por confirmar</b>. Marcas y logos son de sus titulares, solo para identificar la estación.</p><p><a href="${escapeHtml(dataset.provenance.source_url)}" target="_blank" rel="noopener noreferrer">Ver fuente de Osinergmin</a></p>`;
 }
+
+// El estado de la lista cuando no hay tarjetas que mostrar por una razón de la
+// vista: se está cargando, falló o el distrito conservado no tiene grifos de
+// este combustible. Nunca se dejan a la vista precios de la anterior.
+const ESTADO_VISTA = Object.freeze({
+  loading: (vista) => ({ texto: `Cargando precios de ${vista}…`, accion: null }),
+  error: (vista) => ({ texto: navigator.onLine ? `No pudimos cargar los precios de ${vista}. Revisa tu conexión y reintenta.` : `No hay precios de ${vista} guardados todavía. Conéctate una vez para descargarlos.`, accion: 'Reintentar' }),
+  'district-empty': (vista) => ({ texto: `Ningún grifo de este distrito publica ${vista}.`, accion: 'Cambiar distrito' }),
+});
+function renderViewState(estado) {
+  const vista = VIEWS[search.view].label;
+  const contenido = ESTADO_VISTA[estado]?.(vista) ?? null;
+  nodes['view-state'].hidden = !contenido;
+  nodes['view-state'].dataset.state = estado;
+  nodes['view-state-text'].textContent = contenido?.texto ?? '';
+  nodes['view-state-action'].hidden = !contenido?.accion;
+  nodes['view-state-action'].textContent = contenido?.accion ?? '';
+}
+
+// En Inicio la falla se cuenta en el mismo renglón que decía «Cargando precios…»,
+// ahora visible, con su reintento; el selector sigue ahí para cambiar de vista.
+function renderStartError() {
+  $('use-location').disabled = true;
+  $('choose-district').disabled = true;
+  nodes['data-status'].textContent = ESTADO_VISTA.error(VIEWS[search.view].label).texto;
+  nodes['data-status'].classList.remove('sr-only');
+  nodes['start-retry'].hidden = false;
+}
+function renderStartLoading() {
+  $('use-location').disabled = true;
+  $('choose-district').disabled = true;
+  nodes['start-retry'].hidden = true;
+  nodes['data-status'].textContent = 'Cargando precios…';
+  nodes['data-status'].classList.add('sr-only');
+}
+
+// El selector y todo lo que depende de la vista, sin tocar la lista: el botón
+// usado conserva el foco porque solo cambia su `aria-pressed`.
+function renderViewChrome() {
+  const varias = ACTIVE_VIEWS.length > 1;
+  for (const grupo of document.querySelectorAll('[data-view-picker]')) grupo.hidden = !varias;
+  for (const boton of document.querySelectorAll('[data-view]')) boton.setAttribute('aria-pressed', String(boton.dataset.view === search.view));
+  // El histórico existe solo donde hay una serie válida: hoy, Gasolina.
+  const conHistorial = VIEWS[search.view].history;
+  nodes['history-chart'].hidden = !conHistorial;
+  nodes['menu-history'].hidden = !conHistorial;
+  if (conHistorial) montarHistorial();
+}
+
+function mountViewPickers() {
+  const botones = ACTIVE_VIEWS.map((key) => `<button type="button" data-view="${escapeHtml(key)}" aria-pressed="false">${escapeHtml(VIEWS[key].label)}</button>`).join('');
+  for (const opciones of document.querySelectorAll('[data-view-options]')) opciones.innerHTML = botones;
+}
+
+// Aplica la copia cargada de la vista activa donde esté la persona: en
+// resultados conserva origen o distrito, radio y orden —no pasa por
+// `startResults`, que los recalcula— y vuelve a la primera página.
+function applyView(entrada) {
+  data = entrada;
+  applyLoaded(entrada.dataset);
+  if (ui.screen === 'compare') {
+    refrescar({ force: true });
+    elegir({ visibleCount: PAGE_SIZE });
+    nodes['official-source'].href = data.dataset.provenance.source_url;
+    nodes['offline-note'].hidden = data.mode !== 'saved';
+    nodes['offline-note'].textContent = data.mode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(data.dataset.cutoff_at)}.` : '';
+    renderOffers();
+    controls.scrollToTop();
+  } else if (ui.screen === 'district') {
+    ui.districts = districtsFrom(evaluateRows(data.dataset, new Date()).rows);
+    renderDistricts(nodes['district-search'].value);
+  }
+}
+
+// Mientras la vista nueva carga no se pinta ningún precio: ni los de la
+// anterior bajo la etiqueta nueva, ni una lista vacía que parezca un resultado.
+function showViewLoading() {
+  data = { dataset: null, mode: 'network' };
+  renderStartLoading();
+  if (ui.screen === 'compare') {
+    nodes.offers.innerHTML = '';
+    nodes.offers.hidden = true;
+    for (const id of ['empty-state', 'radius-empty', 'load-more', 'sort-toggle', 'price-product-toggle']) nodes[id].hidden = true;
+    renderViewState('loading');
+  }
+}
+function showViewError() {
+  renderStartError();
+  if (ui.screen === 'compare') renderViewState('error');
+  // Sin datos no hay distritos que elegir: se vuelve a Inicio, que tiene el
+  // selector y el reintento.
+  if (ui.screen === 'district') show('start');
+}
+
+async function loadActiveView() {
+  const view = search.view;
+  const turno = ++turnoDeCarga;
+  const guardada = cargadas.get(view);
+  if (guardada) { applyView(guardada); return; }
+  showViewLoading();
+  let dataset;
+  try { dataset = await loadView(view); }
+  catch (error) {
+    console.error(error);
+    if (turno === turnoDeCarga) showViewError();
+    return;
+  }
+  const entrada = { dataset, mode: dataset.dataMode };
+  cargadas.set(view, entrada);
+  if (turno !== turnoDeCarga || view !== search.view) return;
+  applyView(entrada);
+}
+
+// Cambiar de combustible: la URL y la preferencia pasan a la vista nueva sin
+// añadir una entrada al historial, y todo lo demás se conserva.
+function switchView(view, { fromHistory = false } = {}) {
+  if (!VIEWS[view] || !ACTIVE_VIEWS.includes(view) || view === search.view) return;
+  ordenPorVista[search.view] = search.priceProduct;
+  const recordado = ordenPorVista[view];
+  elegir({ view, priceProduct: VIEWS[view].products.includes(recordado) ? recordado : VIEWS[view].products[0], visibleCount: PAGE_SIZE });
+  // Desde el historial se sigue en el historial solo si la vista nueva lo
+  // tiene; si no, se vuelve a su portada: una ruta de historial sin histórico no existe.
+  if (!fromHistory) history.replaceState(null, '', `${enHistorial() && VIEWS[view].history ? historyPath(view) : viewPath(view)}${location.search}${location.hash}`);
+  writePreference(view);
+  renderViewChrome();
+  // Con GPS, la posición espera a que cargue la vista: no se pide de nuevo.
+  loadActiveView();
+}
+
 // La app NUNCA se localiza sola. Antes, si el permiso ya estaba concedido, la
 // portada llamaba a `locate()` al cargar; como el navegador guarda ese permiso
 // de forma persistente, desde la primera concesión la portada dejaba de ser
@@ -316,10 +472,10 @@ function applyLoaded(dataset) {
 // localización secuestrara la pantalla. Un permiso concedido una vez no es una
 // orden permanente. Localizar es siempre un gesto.
 async function initialize() {
-  try {
-    await prepareServiceWorker();
-    applyLoaded(await loadView(search.view));
-  } catch (error) { fatal(error); }
+  // Sin un worker listo los datos se piden igual a la red: esperar un
+  // controlador compatible es una mejora, no una condición.
+  try { await prepareServiceWorker(); } catch (error) { console.error(error); }
+  await loadActiveView();
 }
 
 $('use-location').addEventListener('click', locate); $('choose-district').addEventListener('click', () => chooseDistrict());
@@ -388,22 +544,44 @@ $('menu-districts').addEventListener('click', () => { closePlaceMenu(); chooseDi
 // del origen. Solo se suelta la posición en vuelo, si había una.
 $('menu-home').addEventListener('click', () => { closePlaceMenu(); locator.cancel(); ui.updatingLocation = false; show('start'); $('use-location').focus(); });
 $('retry-load').addEventListener('click', () => location.reload());
+nodes['start-retry'].addEventListener('click', () => loadActiveView());
+nodes['view-state-action'].addEventListener('click', () => {
+  if (nodes['view-state'].dataset.state === 'district-empty') chooseDistrict();
+  else loadActiveView();
+});
+// Un solo listener por contenedor: los botones se pintan desde el catálogo.
+for (const opciones of document.querySelectorAll('[data-view-options]')) opciones.addEventListener('click', (event) => { const boton = event.target.closest('[data-view]'); if (boton) switchView(boton.dataset.view); });
 // Volver a la app tras un rato no dispara ningún gesto: sin esto, un precio que
 // venció mientras estaba en segundo plano seguiría en pantalla hasta tocar algo.
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && data.dataset && ui.screen === 'compare') renderOffers(); });
 initTheme();
-initialize();
-// Sentencia aparte y fuera del `try` de `initialize()`: el histórico se pide en
-// paralelo con los precios, no retrasa el GPS, y si falla se cuenta dentro de su
-// propio bloque en vez de mandar la app a `fatal-state`.
-const historyChart = mountHistoryChart({ mount: $('history-chart'), body: $('history-body') });
 // «Ver historial» no es otra pantalla: es la portada con el gráfico enfocado, y
-// tiene URL propia para poder enlazarla y volver a ella con «atrás».
+// tiene URL propia para poder enlazarla y volver a ella con «atrás». El gráfico
+// se monta la primera vez que se entra a una vista con histórico: en paralelo
+// con los precios, sin retrasar el GPS, y si falla se cuenta dentro de su
+// propio bloque.
+let historyChart = null;
+function montarHistorial() {
+  if (!historyChart) historyChart = mountHistoryChart({ mount: $('history-chart'), body: $('history-body') });
+}
 function showHistory({ push = true } = {}) {
+  if (!VIEWS[search.view].history) return;
   closePlaceMenu(); locator.cancel(); ui.updatingLocation = false; show('start');
   if (push && !enHistorial()) history.pushState(null, '', historyPath(search.view));
+  montarHistorial();
   historyChart.focus();
 }
 $('menu-history').addEventListener('click', () => showHistory());
-addEventListener('popstate', () => { if (enHistorial()) showHistory({ push: false }); });
-if (inicial.history) historyChart.focus();
+// Atrás y adelante se resuelven con la misma tabla que la carga directa: si la
+// entrada es de otra vista, se cambia de vista por el mismo camino que el
+// selector, sin volver a escribir el historial.
+addEventListener('popstate', () => {
+  const ruta = resolvePath(location.pathname, { preference: readPreference() });
+  if (ruta.kind !== 'view') return;
+  if (ruta.view !== search.view) switchView(ruta.view, { fromHistory: true });
+  if (ruta.history) showHistory({ push: false });
+});
+mountViewPickers();
+renderViewChrome();
+initialize();
+if (inicial.history) historyChart?.focus();

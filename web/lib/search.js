@@ -5,7 +5,7 @@
 // como argumento, igual que en `freshness.js` y `price-source.js`. La página lo
 // traduce a marcado; una prueba en Node, o una interfaz futura, lo llama igual.
 
-import { GASOLINA, GASOLINA_KEYS } from './catalog.js';
+import { DEFAULT_VIEW, GASOLINA_KEYS, VIEWS } from './catalog.js';
 import { filterFreshOffers } from './freshness.js';
 import { msUntilSourceChange } from './price-source.js';
 import { mergeOfferRows } from './merge-products.js';
@@ -13,12 +13,13 @@ import { haversineKm, initialRadiusKm, nextVisibleCount, orderOffers, radiusIsIn
 import { decisionTag } from './decision-view.js';
 
 /**
- * Lo que la persona eligió, declarado y no deducido de la pantalla. Con
- * `origin` se mide desde un punto; con `district`, dentro de él. `sort` dice si
- * se ordena por cercanía o por precio, y `priceProduct` de qué producto.
+ * Lo que la persona eligió, declarado y no deducido de la pantalla. `view` es el
+ * combustible. Con `origin` se mide desde un punto; con `district`, dentro de
+ * él. `sort` dice si se ordena por cercanía o por precio, y `priceProduct` de
+ * qué producto de la vista.
  */
-export function createSearch() {
-  return { view: GASOLINA.key, origin: null, district: null, radiusKm: RADIUS_MIN_KM, sort: 'distance', priceProduct: GASOLINA_KEYS[0], visibleCount: PAGE_SIZE, preferencesTouched: false };
+export function createSearch(view = DEFAULT_VIEW) {
+  return { view, origin: null, district: null, radiusKm: RADIUS_MIN_KM, sort: 'distance', priceProduct: VIEWS[view].products[0], visibleCount: PAGE_SIZE, preferencesTouched: false };
 }
 
 /**
@@ -38,12 +39,16 @@ export function createSearch() {
 export function evaluateRows(dataset, instante) {
   const now = () => instante;
   const cutoffAt = dataset.cutoff_at;
-  const porProducto = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, filterFreshOffers(dataset.offers[key], { now, cutoffAt })]));
+  // Los productos los declara el conjunto cargado; uno anterior a esa
+  // declaración solo pudo ser de Gasolina.
+  const keys = dataset.products ?? GASOLINA_KEYS;
+  const porProducto = Object.fromEntries(keys.map((key) => [key, filterFreshOffers(dataset.offers[key], { now, cutoffAt })]));
   const rows = mergeOfferRows(
-    Object.fromEntries(GASOLINA_KEYS.map((key) => [key, porProducto[key].offers])),
-    Object.fromEntries(GASOLINA_KEYS.map((key) => [key, porProducto[key].expired])),
+    Object.fromEntries(keys.map((key) => [key, porProducto[key].offers])),
+    Object.fromEntries(keys.map((key) => [key, porProducto[key].expired])),
+    keys,
   );
-  const proximo = GASOLINA_KEYS.flatMap((key) => dataset.offers[key] ?? [])
+  const proximo = keys.flatMap((key) => dataset.offers[key] ?? [])
     .reduce((menor, offer) => Math.min(menor, msUntilSourceChange(offer, { now, cutoffAt })), Infinity);
   return { rows, refreshAt: Number.isFinite(proximo) ? instante.getTime() + proximo : Infinity };
 }
@@ -75,10 +80,11 @@ export function startResults(search, located) {
  * elegido y no hay radio. Sin un solo precio vigente, ordenar por precio no
  * significa nada y se cae a cercanía sin tocar la preferencia guardada.
  *
- * @returns {{hasPrices: boolean, byPrice: boolean, pool: object[], ordered: object[], items: object[], comparables: number, tags: (string|null)[], activeProduct: string|null, sortToggle: boolean, productToggle: boolean, radius: {inert: boolean, total: number}|null, radiusEmpty: boolean, remaining: number, nextCount: number, paged: boolean, criterion: 'none'|'price'|'distance'}}
+ * @returns {{hasPrices: boolean, byPrice: boolean, pool: object[], ordered: object[], items: object[], comparables: number, tags: (string|null)[], activeProduct: string|null, sortToggle: boolean, productToggle: boolean, radius: {inert: boolean, total: number}|null, radiusEmpty: boolean, districtEmpty: boolean, remaining: number, nextCount: number, paged: boolean, criterion: 'none'|'price'|'distance'}}
  */
 export function resultsView({ rows, located, search }) {
   const conOrigen = Boolean(search.origin);
+  const productos = VIEWS[search.view]?.products ?? GASOLINA_KEYS;
   const hasPrices = withPrice(rows).length > 0;
   const byPrice = hasPrices && search.sort === 'price';
   const product = search.priceProduct;
@@ -106,10 +112,14 @@ export function resultsView({ rows, located, search }) {
     activeProduct: byPrice || !conOrigen ? product : null,
     sortToggle: conOrigen && comparables >= 2,
     // El sub-toggle solo aparece cuando el orden depende del producto: en «Más
-    // cerca» no ordena nada y sería un control que no hace lo que promete.
-    productToggle: (byPrice || !conOrigen) && comparables >= 2,
+    // cerca» no ordena nada y sería un control que no hace lo que promete. Con
+    // un solo producto en la vista no hay nada que elegir.
+    productToggle: productos.length > 1 && (byPrice || !conOrigen) && comparables >= 2,
     radius: conOrigen ? { inert: radiusIsInert(located), total: pool.length } : null,
     radiusEmpty: conOrigen && items.length === 0,
+    // Un distrito que se conserva al cambiar de combustible puede no tener
+    // ningún grifo de este: se dice, no se cambia de distrito por la persona.
+    districtEmpty: !conOrigen && ordered.length === 0,
     remaining,
     nextCount: nextVisibleCount(items.length, ordered.length),
     // Solo se cuenta cuando hubo algo que paginar: en una lista que cabe entera

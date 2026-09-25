@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ecf0e9">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Compara precio y cercanía de Gasohol Regular y Premium en Lima provincia.">
+  <meta name="description" content="Compara precio y cercanía de gasolina y diésel en Lima provincia.">
   <title>masfacil.pe</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/logo.svg" type="image/svg+xml">
@@ -25,7 +25,7 @@
           <button class="controls__quick" id="refresh-location-compact" type="button" aria-label="Actualizar ubicación" title="Actualizar ubicación"><svg class="controls__quick-icon" data-place-icon="refresh" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"/><path d="M20.5 4v4.8h-4.8"/></svg><svg class="controls__quick-icon" data-place-icon="gps" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span class="controls__quick-label" id="refresh-location-compact-label">Actualizar</span></button>
           <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
             <img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">
-            <span class="controls__text"><span class="controls__place" id="sum-place"></span><span class="controls__criteria" id="sum-criteria"></span></span>
+            <span class="controls__text"><span class="controls__lead"><span class="controls__fuel" id="sum-fuel" hidden></span><span class="controls__place" id="sum-place"></span></span><span class="controls__criteria" id="sum-criteria"></span></span>
             <span class="controls__expand">Ajustar <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
           </button>
         </div>
@@ -58,6 +58,9 @@
                 </div>
               </div>
             </div>
+            <!-- El combustible, entre el lugar y el radio como en el mockup. Viene
+                 oculto: solo el app.js que lo pinta sabe cuándo hay más de una vista. -->
+            <div id="view-picker-controls" class="toggle view-picker" role="group" aria-label="Combustible" data-view-picker data-view-options hidden></div>
             <div id="radius-control" class="radius" hidden>
               <div class="radius__head"><label class="radius__label" for="radius-input">Radio</label><p id="radius-readout" class="radius__readout" role="status"></p></div>
               <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
@@ -71,10 +74,13 @@
     </div>
     <div class="controls-scrim" id="controls-scrim" hidden></div>
     <section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">
-      <h1 id="start-title">Encuentra gasolina cerca de ti</h1>
+      <h1 id="start-title">Encuentra combustible cerca de ti</h1>
+      <!-- Elegir combustible no pide ubicación ni abre otra pantalla. -->
+      <fieldset id="view-picker-start" class="view-picker view-picker--start" data-view-picker hidden><legend>Combustible</legend><div class="toggle" data-view-options></div></fieldset>
       <button id="use-location" class="button button--primary" type="button" disabled>Ver en mi ubicación</button>
       <button id="choose-district" class="button button--ghost" type="button" disabled>Ver distritos</button>
       <p id="data-status" class="hint" role="status" aria-live="polite">Cargando precios…</p>
+      <button id="start-retry" class="button button--ghost" type="button" hidden>Reintentar</button>
       <!-- Contexto, no acción: va después de los botones. Reserva su alto desde
            el primer pintado para que la portada no salte cuando llegue el dato.
            El subtítulo describe la ventana sin prometer cobertura: dice sobre qué
@@ -92,6 +98,8 @@
       <div id="location-update" class="location-update" hidden>
         <p id="location-update-text" class="location-update__text" role="status" aria-live="polite"></p>
       </div>
+      <!-- Cargando, error o distrito sin grifos del combustible elegido. -->
+      <section id="view-state" class="plate empty view-state" hidden><p id="view-state-text" class="lede" role="status" aria-live="polite"></p><button id="view-state-action" class="button button--ghost" type="button" hidden></button></section>
       <section id="empty-state" class="plate empty" hidden><p class="eyebrow">Sin precios recientes</p><h2>Ningún grifo reportó precio en los últimos 30 días</h2><p class="lede">Los grifos siguen ahí, pero hoy ninguno tiene un precio que sirva para decidir.</p><a id="official-source" class="button button--primary" target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a></section>
       <ol id="offers" class="offers"></ol>
       <section id="radius-empty" class="plate empty" hidden><h2>Ningún grifo en este radio</h2><p class="lede">Amplía el radio de búsqueda para encontrar estaciones más lejanas.</p></section>

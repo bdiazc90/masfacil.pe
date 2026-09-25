@@ -4,12 +4,13 @@ import { GIS_FIELDS, MINIMIZED_FIELDS, RAW_FIELDS, REGISTRY_FIELDS, assertHeader
 import { facilitoLinkKey } from './facilito/link.mjs';
 import { GASOLINA, GASOLINA_KEYS, PRODUCTS } from '../web/lib/catalog.js';
 import { withinPeru } from '../web/lib/bundle-contract.js';
+import { GROUP_CONFIG } from './groups.mjs';
 
 // Nombre canónico, etiqueta y unidad salen del catálogo público. Las actividades
-// autorizadas de abajo son de operación y se quedan aquí.
+// autorizadas y el esquema de IDs de cada grupo son de operación y viven en
+// `groups.mjs`.
 export const GASOLINA_PRODUCTS = Object.freeze(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, PRODUCTS[key]])));
 export const GASOLINA_PRODUCT_KEYS = GASOLINA_KEYS;
-const activities = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GNV': '05', 'EE.SS con GLP y GNV': '06' });
 const sep = '\u001f';
 
 // La dirección del Registro viene en mayúsculas y mezcla la vía con la
@@ -46,7 +47,7 @@ export function direccionParaPantalla(bruta) {
   return salida || null;
 }
 
-const lima = (row) => row.DEPARTAMENTO === GASOLINA.scope.department && row.PROVINCIA === GASOLINA.scope.province;
+const enAmbito = (row, scope) => row.DEPARTAMENTO === scope.department && row.PROVINCIA === scope.province;
 
 function seedRows(seed, name, fields, mapRow) {
   if (!seed || !Array.isArray(seed[name])) return null;
@@ -62,8 +63,8 @@ function seedRows(seed, name, fields, mapRow) {
 }
 
 /**
- * Precios minimizados, Registro y GIS: las tres tablas que comparten los dos
- * productos, cargadas UNA vez.
+ * Precios minimizados, Registro y GIS: las tres tablas que comparten todos los
+ * productos líquidos, cargadas UNA vez.
  *
  * De la misma pasada sale `sourceMaxReportedAt`: el máximo de
  * `FECHA_DE_REGISTRO` sobre TODAS las filas, antes de cualquier filtro. Lo
@@ -81,13 +82,23 @@ export async function loadGasolinaSources({ minimizedRoot, bootstrapSeed = null 
     ?? await readTable(`${minimizedRoot}/gis/features.csv.gz`, GIS_FIELDS);
   return { prices, registry, gis, sourceMaxReportedAt: maximo ? maximo.toISOString() : null };
 }
+export const loadLiquidSources = loadGasolinaSources;
 
 /**
  * Embudo de un producto hasta el cruce geográfico. No toca el original de 1,2 GB:
  * solo declara qué ID3 necesita de él.
+ *
+ * El producto y la unidad se comparan con el nombre exacto del catálogo: otra
+ * variedad con un nombre parecido es otro registro y no entra.
+ *
+ * @param {object} entrada
+ * @param {object} entrada.product     producto del catálogo público
+ * @param {Record<string, string>} entrada.activities  actividad del CSV → código del Registro
+ * @param {{department: string, province: string}} entrada.scope
  */
-function selectProductCandidates({ sources, productKey, cutoffAt }) {
-  const product = GASOLINA_PRODUCTS[productKey]; if (!product) throw new Error(`Producto gasolina no permitido: ${productKey}`);
+export function selectProductCandidates({ sources, product, activities, scope, cutoffAt }) {
+  if (!product?.canonical || product.unit !== 'Galones') throw new Error(`Producto líquido inválido: ${product?.key ?? 'sin clave'}`);
+  const lima = (row) => enAmbito(row, scope);
   const byRegistry = new Map(); for (const row of sources.registry) { const key = `${row.SOURCE_ACTIVITY}${sep}${row.REGISTRO}`; byRegistry.set(key, [...(byRegistry.get(key) ?? []), row]); }
   const byGis = new Map(); for (const row of sources.gis.filter((item) => item.LAYER === '35')) byGis.set(row.N, [...(byGis.get(row.N) ?? []), row]);
   const grouped = new Map(); let sourceRows = 0;
@@ -159,7 +170,7 @@ export async function readRawIdentities({ rawPath, targetIds }) {
   return { identities, duplicates };
 }
 
-function finishProduct({ candidates, productKey, identities, duplicates, snapshotId, cutoffAt, sourceMaxReportedAt, sourceUrl }) {
+function finishProduct({ candidates, productKey, identities, duplicates, snapshotId, cutoffAt, sourceMaxReportedAt, sourceUrl, idScheme }) {
   const { product, geo, registered, publicables, latestLima, fresh, latest, fresco, vencido, motivoNoFresco, sourceRows } = candidates;
   const repetidos = geo.filter((item) => duplicates.has(item.selected.ID3));
   const ready = geo.filter((item) => {
@@ -175,7 +186,7 @@ function finishProduct({ candidates, productKey, identities, duplicates, snapsho
   const linkKeys = new Map();
   const offers = ready.map((item) => {
     const identity = identities.get(item.selected.ID3);
-    const id = `g2_${crypto.createHash('sha256').update(`masfacil-pe|gasolina-v2|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`;
+    const id = `${idScheme.prefix}${crypto.createHash('sha256').update(`${idScheme.namespace}|${snapshotId}|${productKey}|${item.selected.REGISTRO_DE_HIDROCARBUROS}|${item.selected.ACTIVIDAD}`).digest('hex').slice(0, 24)}`;
     linkKeys.set(id, facilitoLinkKey(identity.RAZON_SOCIAL, identity.DIRECCION, item.selected.DISTRITO));
     return {
       id,
@@ -219,6 +230,7 @@ function finishProduct({ candidates, productKey, identities, duplicates, snapsho
     linkKeys,
     registryAnchors,
     exclusions,
+    funnel: funnelFor({ candidates, ready, repetidos }),
     metrics: {
       exact_scope_source_rows: sourceRows,
       latest_offers: metric(latest),
@@ -249,18 +261,78 @@ function finishProduct({ candidates, productKey, identities, duplicates, snapsho
 }
 
 /**
+ * Dónde se pierde cada reporte, contado por distrito.
+ *
+ * Cada último reporte en el ámbito termina en exactamente un motivo —o en
+ * `publicada`—, así que los motivos suman el total y ninguna pérdida queda sin
+ * explicar. Lo usa la primera activación de un grupo, que tiene que comparar
+ * distritos contra su base auditada, y el embudo que se revisa antes de activar.
+ * Va aparte de `metrics` porque `metrics` es parte del estado público.
+ */
+function funnelFor({ candidates, ready, repetidos }) {
+  const { latestLima, publicables, registered, geo, fresco, motivoNoFresco } = candidates;
+  const ids = (items) => new Set(items.map((item) => item.selected.ID3));
+  const [enPublicables, enRegistro, enGis, enListas, repetido] = [ids(publicables), ids(registered), ids(geo), ids(ready), ids(repetidos)];
+  const motivo = (item) => {
+    const id = item.selected.ID3;
+    if (!enPublicables.has(id)) return motivoNoFresco(item);
+    if (!enRegistro.has(id)) return 'no_cruza_registro';
+    if (!enGis.has(id)) return 'sin_gis_unico';
+    if (repetido.has(id)) return 'id_repetido_en_el_raw';
+    if (!enListas.has(id)) return 'sin_razon_social_o_direccion';
+    return fresco(item) ? 'publicada' : 'publicada_sin_precio_vigente';
+  };
+  const byDistrict = {};
+  const reasons = {};
+  for (const item of latestLima) {
+    const distrito = item.selected.DISTRITO;
+    const razon = motivo(item);
+    const fila = byDistrict[distrito] ?? { latest: 0, fresh: 0, contract_ready: 0, published: 0, reasons: {} };
+    fila.latest += 1;
+    if (fresco(item) && enPublicables.has(item.selected.ID3)) fila.fresh += 1;
+    if (razon === 'publicada') fila.contract_ready += 1;
+    if (razon.startsWith('publicada')) fila.published += 1;
+    fila.reasons[razon] = (fila.reasons[razon] ?? 0) + 1;
+    reasons[razon] = (reasons[razon] ?? 0) + 1;
+    byDistrict[distrito] = fila;
+  }
+  const ordenado = Object.fromEntries(Object.keys(byDistrict).sort().map((distrito) => [distrito, byDistrict[distrito]]));
+  return { latest: latestLima.length, reasons, by_district: ordenado };
+}
+
+/**
+ * Los productos líquidos de varios grupos desde las mismas tablas y UNA sola
+ * pasada por el original de 1,2 GB: la identidad de un ID3 no depende del
+ * producto ni del grupo que lo pidió, y los repetidos se detectan por ID, así
+ * que sumar productos de otro grupo no cambia el resultado de ninguno.
+ *
+ * @param {object} entrada
+ * @param {object} [entrada.sources]  tablas ya cargadas; si faltan se cargan aquí
+ * @param {{key: string, products: string[], activities: object, scope: object, idScheme: object}[]} entrada.groups
+ * @returns {Promise<{sources: object, resultsByGroup: Record<string, Record<string, object>>}>}
+ */
+export async function buildLiquidProducts({ sources = null, minimizedRoot, rawPath, cutoffAt, snapshotId, sourceMaxReportedAt, sourceUrl, bootstrapSeed = null, groups }) {
+  const tablas = sources ?? await loadLiquidSources({ minimizedRoot, bootstrapSeed });
+  const candidates = Object.fromEntries(groups.map((grupo) => [grupo.key, Object.fromEntries(grupo.products.map((key) => [key, selectProductCandidates({ sources: tablas, product: PRODUCTS[key], activities: grupo.activities, scope: grupo.scope, cutoffAt })]))]));
+  const targetIds = new Set(groups.flatMap((grupo) => grupo.products.flatMap((key) => candidates[grupo.key][key].geo.map((item) => item.selected.ID3))));
+  const { identities, duplicates } = await readRawIdentities({ rawPath, targetIds });
+  const resultsByGroup = Object.fromEntries(groups.map((grupo) => [grupo.key, Object.fromEntries(grupo.products.map((key) => [key, finishProduct({
+    candidates: candidates[grupo.key][key], productKey: key, identities, duplicates, snapshotId, cutoffAt, sourceMaxReportedAt, sourceUrl, idScheme: grupo.idScheme,
+  })]))]));
+  return { sources: tablas, resultsByGroup };
+}
+
+/** Lo que `buildLiquidProducts` necesita saber de Gasolina. */
+export const GASOLINA_LIQUID_GROUP = Object.freeze({ key: GASOLINA.key, products: GASOLINA_KEYS, activities: GROUP_CONFIG.gasolina.activities, scope: GASOLINA.scope, idScheme: GROUP_CONFIG.gasolina.idScheme });
+
+/**
  * Regular y Premium desde las mismas tablas y la misma pasada de original.
  *
  * @param {object} entrada
  * @param {object} [entrada.sources]  tablas ya cargadas; si faltan se cargan aquí
  */
 export async function buildGasolinaProducts({ sources = null, minimizedRoot, rawPath, cutoffAt, snapshotId, sourceMaxReportedAt, sourceUrl, bootstrapSeed = null, productKeys = GASOLINA_PRODUCT_KEYS }) {
-  const tablas = sources ?? await loadGasolinaSources({ minimizedRoot, bootstrapSeed });
-  const candidates = Object.fromEntries(productKeys.map((key) => [key, selectProductCandidates({ sources: tablas, productKey: key, cutoffAt })]));
-  const targetIds = new Set(productKeys.flatMap((key) => candidates[key].geo.map((item) => item.selected.ID3)));
-  const { identities, duplicates } = await readRawIdentities({ rawPath, targetIds });
-  const results = Object.fromEntries(productKeys.map((key) => [key, finishProduct({
-    candidates: candidates[key], productKey: key, identities, duplicates, snapshotId, cutoffAt, sourceMaxReportedAt, sourceUrl,
-  })]));
-  return { sources: tablas, results };
+  for (const key of productKeys) if (!GASOLINA_KEYS.includes(key)) throw new Error(`Producto gasolina no permitido: ${key}`);
+  const { sources: tablas, resultsByGroup } = await buildLiquidProducts({ sources, minimizedRoot, rawPath, cutoffAt, snapshotId, sourceMaxReportedAt, sourceUrl, bootstrapSeed, groups: [{ ...GASOLINA_LIQUID_GROUP, products: productKeys }] });
+  return { sources: tablas, results: resultsByGroup.gasolina };
 }

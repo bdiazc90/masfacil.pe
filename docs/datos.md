@@ -48,6 +48,13 @@ El candidato produjo **740** ofertas frescas, **714** listas para contrato y **9
 
 Más tarde la promoción se amplió al contrato público v2: el staging construye y valida **Regular y Premium** contra una misma revisión antes de mover el pointer privado. Los guardrails comprueban por producto ofertas frescas/publicables, distritos, cobertura y conflictos; también exigen que avance `source_max_reported_at`. El manifest público común se escribe después de sus dos snapshots inmutables. `npm run rollback -- <snapshot-id>` reconstruye y valida el mismo par antes de cambiar el pointer. La simulación de runner limpio verificó `changed` con 714 Regular y 700 Premium, y luego `unchanged` con un HEAD y 0 bytes de raw.
 
+**Un pointer por grupo (Fase 2B).** Desde que hay dos grupos, la carpeta del snapshot sigue siendo una sola —el raw y el minimizado traen todos los productos—, pero la decisión de usarla es de cada grupo:
+
+- **Gasolina** conserva `active.json` y su significado de siempre: el último snapshot que Gasolina aprobó.
+- **Diésel** tiene `active-diesel.json`.
+
+El refresco construye los dos grupos con **una sola** pasada por el raw y juzga cada uno con su línea base y sus tolerancias. La carpeta se promueve si la aprueba al menos un grupo, y solo se mueven los pointers de los que la aprobaron: un CSV que Gasolina rechaza puede publicarse en Diésel, y al revés. Un grupo que se queda atrás espera al próximo CSV, sin ponerse al día solo, para no deshacer un rollback. `npm run rollback -- <snapshot-id> [<revisión>] --group diesel` mueve solo el pointer de Diésel y escribe solo `web/data/diesel`; sin `--group` es el rollback de Gasolina de siempre.
+
 Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026**; no fueron refrescados ni se afirma lo contrario. Los originales y derivados grandes viven solo en `.local-cache/`; la evidencia agregada de ese refresco ya no se conserva en el repositorio y queda en el historial de Git.
 
 ## Evidencia externa verificada por el owner: EVPC
@@ -319,13 +326,76 @@ J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique
 
 **Barrido completo medido.** 43 distritos de Lima provincia × 2 productos = **86 unidades, 86 comprobadas, 1452 filas, en 109 segundos**. La unidad de aceptación es distrito × producto: una tabla parcial o de forma desconocida tumba esa unidad y no las demás. Un rechazo explícito —401/403/429 o un desafío— detiene la adquisición entera en vez de seguir probando distritos.
 
-**Diésel, capturado sin publicarse (24/09/2026).** El select de producto ofrece `126` Gasohol Regular, `127` Gasohol Premium y `40` «DB5 S-50 UV»; nada de GLP ni GNV en este formulario. Los códigos se fijan y en cada lectura se comprueba que la opción elegida muestre su etiqueta: la tabla no tiene columna de producto y su cabecera es la misma para todos, así que es la única prueba de qué se leyó. Diésel se recorre en una **pasada propia**, después de la de Gasolina —que no cambia— y con su propio presupuesto (10 min): un problema de su tabla no le cuesta a Gasolina ningún distrito, y un bloqueo detiene las dos. Primera lectura local: San Luis y Ate, 2 de 2 unidades, 66 filas, unos 5 s por distrito. «DB5 S-50 UV» no es el nombre del CSV (`Diesel B5 S-50 UV`): que sean el mismo producto lo acredita la muestra de vínculos antes de publicar Diésel, no el parecido. El expediente es uno, pero cada grupo cuenta solo sus unidades: el `refresh-state` de Gasolina no lleva consultas de Diésel y el preflight no las compara como suyas. El resumen de cada corrida sale por producto y por pasada; `--products` limita una corrida de comprobación.
+**Diésel: capturado desde el 24/09/2026, publicado desde la Fase 2B.** El select de producto ofrece `126` Gasohol Regular, `127` Gasohol Premium y `40` «DB5 S-50 UV»; nada de GLP ni GNV en este formulario. Los códigos se fijan y en cada lectura se comprueba que la opción elegida muestre su etiqueta: la tabla no tiene columna de producto y su cabecera es la misma para todos, así que es la única prueba de qué se leyó. Diésel se recorre en una **pasada propia**, después de la de Gasolina —que no cambia— y con su propio presupuesto (10 min): un problema de su tabla no le cuesta a Gasolina ningún distrito, y un bloqueo detiene las dos. Primera lectura local: San Luis y Ate, 2 de 2 unidades, 66 filas, unos 5 s por distrito. «DB5 S-50 UV» no es el nombre del CSV (`Diesel B5 S-50 UV`): que sean el mismo producto lo acreditó la muestra de vínculos antes de publicar Diésel, no el parecido.
+
+La muestra del 24/09/2026 se tomó en seis distritos con el CSV que publicaba Gasolina:
+- **184 filas vinculadas** de 192, **cero ambigüedades** y 8 sin par oficial.
+- En **172 de las 184** el precio de la consulta y el del CSV coinciden al céntimo; la mediana y el percentil 90 de la diferencia son 0. Con reporte del CSV de 72 horas o menos coinciden 158 de 167.
+- Una sonda independiente revisó 20 establecimientos: 18 correctos, 2 dudosos y ninguno incorrecto. Los dudosos tienen el vínculo exacto; lo raro es una subida de precio grande en unas 24 horas.
+- Dos de las filas sin par usan comillas tipográficas en la dirección, que la normalización no iguala. Eso resta cobertura, pero no produce vínculos falsos. El expediente es uno, pero cada grupo cuenta solo sus unidades: el `refresh-state` de Gasolina no lleva consultas de Diésel y el preflight no las compara como suyas. El resumen de cada corrida sale por producto y por pasada; `--products` limita una corrida de comprobación.
 
 **Qué NO entrega.** La tabla no publica el número de Registro ni la fecha en que el operador registró el precio. Por eso el vínculo con el establecimiento oficial es textual —razón social + dirección + distrito exactos y únicos en ambos sentidos, normalizando solo mayúsculas, tildes y espacios— y por eso la capa lleva `reported_at: null` y la tarjeta dice **«Consultado hace X»**, nunca «Reportado». Medido sobre el snapshot del 06/09: **684 de 726 ofertas Regular y 673 de 711 Premium** quedaron vinculadas, con **cero ambigüedades** y 95 filas sin par oficial.
 
 **Cuánto vale una consulta.** 24 horas desde que se leyó la tabla. Después manda el respaldo del CSV mientras su reporte tenga 30 días o menos, y si tampoco, la tarjeta se queda sin precio. Un reporte del CSV posterior a la consulta gana siempre: una consulta anterior no desplaza un cambio de precio más nuevo que sí conocemos. Un fallo de consulta no rejuvenece nada —la captura anterior conserva su hora— y no se presenta nunca como silencio del operador.
 
 **Privacidad.** La tabla trae razón social, dirección y teléfono. El teléfono se valida por posición y no se emite nunca; la razón social y la dirección se convierten en huella SHA-256 para comparar y no se persisten. El expediente privado (`.local-cache/facilito/`) guarda huella, precio y hora, nada más. Solo `node scripts/facilito-sample.mjs`, local y explícito, conserva el texto para revisar una muestra a ojo.
+
+## Grupo Diésel — embudo auditado el 24/09/2026
+
+Diésel es un grupo propio de un producto:
+- producto `Diesel B5 S-50 UV` en `Galones`, con el nombre exacto del CSV;
+- datos en `/data/diesel/`, contrato 1.0.0, revisiones `diesel-` e IDs `d1_`;
+- su estado, sus guardrails y su rollback no dependen de Gasolina.
+
+Las otras variedades con nombre parecido se cuentan y no se unen. En filas de Lima, con la unidad de cada una:
+
+| Variedad | Filas |
+| --- | ---: |
+| `Diesel B5 S-50` | 294 |
+| `Diesel 2 S-50 UV` | 241 |
+| `DIESEL B5` | 17 |
+| `DIESEL B5 UV` | 15 |
+| `Diesel 2 S-50` | 1 |
+
+**Actividades, con evidencia del CSV.** Establecimientos de Lima que reportan el producto:
+
+| Actividad | Establecimientos | Se usa |
+| --- | ---: | --- |
+| Estación de servicios / grifos | 341 | sí |
+| Con gasocentro de GLP | 264 | sí |
+| Con GLP y GNV | 218 | sí |
+| Con GNV | 30 | sí |
+| Distribuidor mayorista de combustibles líquidos | 8 | no: vende al por mayor |
+
+Las cuatro actividades usadas coinciden con las de la semilla de Registro y GIS, así que no hace falta tocarla. Cambiar la semilla vaciaría la caché de Actions.
+
+**Embudo sobre el CSV del 24/09/2026.** Validadores `…,275` y `Thu, 24 Sep 2026 12:31:26 GMT`, el mismo CSV que publicaba Gasolina:
+
+| Paso | Ofertas | Distritos |
+| --- | ---: | ---: |
+| Último reporte por clave en Lima | 853 | 43 |
+| Reportadas en ≤30 días | 752 | 43 |
+| Con Registro único | 723 | 43 |
+| Con GIS seguro | 714 | 43 |
+| Listas para contrato | 714 | 43 |
+| Publicadas (con precio + 18 sin precio vigente) | 732 | 43 |
+
+- **Cobertura:** 94.947 %.
+- **Conflictos:** ninguno, ni de precio ni de territorio.
+- **Ambigüedades y repetidos:** ninguno, ni en Registro, ni en GIS, ni en el raw.
+- **Motivos de pérdida** sobre los 853 últimos reportes: 714 publicadas, 18 publicadas sin precio vigente, 112 no cruzan el Registro (29 frescas y 83 vencidas) y 9 sin GIS único.
+- **Por distrito:** cinco distritos tienen un solo grifo con precio; el que más tiene, 60. El detalle por distrito queda en `.local-cache/publish/diesel/funnel.json` en cada composición.
+
+**Guardrails.**
+- **Tolerancias:** las mismas que Gasolina. Las ofertas frescas no pueden caer más de 20 % y la cobertura no puede caer más de 5 puntos frente a la versión publicada.
+- **Primera activación:** sin versión publicada, Diésel se juzga contra la base auditada de arriba (`pipeline/groups.mjs`) con esas mismas tolerancias. Además no puede perder más de 2 de sus 43 distritos publicados, porque cinco tienen un solo grifo, y su fuente no puede ser anterior a la auditada; igual no hace falta que avance.
+
+**Primera activación y recuperación.**
+- **Cuándo cuenta como no publicado:** solo cuando producción responde 404 a la vez en su manifest y en `/combustibles/diesel`. Cualquier otra ausencia es un despliegue roto y detiene la corrida; lo mismo aplican `fetch:live` y el preflight.
+- **Cómo se activa:** sin pointer propio, Diésel se compone sobre el snapshot de Gasolina y solo lo adopta si pasa.
+- **Si la primera versión no pasa:** la entrega entera termina en `fail_closed`. El código ya activó la vista y publicarla sin datos sería peor.
+- **Después:** un fallo de Diésel conserva su versión publicada y deja publicar Gasolina, y al revés.
+- **Recuperar la entrega de código:** `git revert` y redeploy por el workflow.
 
 ## Modelo útil
 

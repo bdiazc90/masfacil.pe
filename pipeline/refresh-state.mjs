@@ -1,7 +1,5 @@
-import { GASOLINA_KEYS } from '../web/lib/catalog.js';
-
-const MAX_OFFER_DROP = 0.2;
-const MAX_COVERAGE_DROP_POINTS = 5;
+import { GROUPS } from '../web/lib/catalog.js';
+import { GROUP_CONFIG } from './groups.mjs';
 
 function number(value) { return typeof value === 'number' && Number.isFinite(value); }
 
@@ -13,7 +11,7 @@ export function snapshotIdFromGasolinaRevision(revisionId) {
   return revisionId.slice('gasolina-'.length);
 }
 
-function productQuality(previous, candidate, key) {
+function productQuality(previous, candidate, key, { maxOfferDrop, maxCoverageDropPoints }) {
   const reasons = [];
   const fresh = candidate?.fresh_0_30_days?.offers;
   const ready = candidate?.contract_ready?.offers;
@@ -27,15 +25,37 @@ function productQuality(previous, candidate, key) {
   if (candidate?.conflicts?.latest_territory_conflicts !== 0) reasons.push(`${key}: conflictos territoriales más recientes`);
   const previousFresh = previous?.fresh_0_30_days?.offers;
   const previousCoverage = previous?.coverage_percent;
-  if (Number.isInteger(previousFresh) && previousFresh > 0 && Number.isInteger(fresh) && fresh < previousFresh * (1 - MAX_OFFER_DROP)) reasons.push(`${key}: caída de ofertas frescas superior a 20%`);
-  if (number(previousCoverage) && number(coverage) && coverage < previousCoverage - MAX_COVERAGE_DROP_POINTS) reasons.push(`${key}: caída de cobertura superior a 5 puntos`);
+  if (Number.isInteger(previousFresh) && previousFresh > 0 && Number.isInteger(fresh) && fresh < previousFresh * (1 - maxOfferDrop)) reasons.push(`${key}: caída de ofertas frescas superior a ${Math.round(maxOfferDrop * 100)}%`);
+  if (number(previousCoverage) && number(coverage) && coverage < previousCoverage - maxCoverageDropPoints) reasons.push(`${key}: caída de cobertura superior a ${maxCoverageDropPoints} puntos`);
   return { status: reasons.length ? 'needs_review' : 'ready', reasons, previous: previous ?? null, candidate };
 }
 
-export function compareGasolinaQuality({ previousProducts = null, candidateProducts, previousSourceMaxReportedAt = null, candidateSourceMaxReportedAt, forcedReprojection = false }) {
-  const products = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, productQuality(previousProducts?.[key], candidateProducts?.[key], key)]));
-  const reasons = GASOLINA_KEYS.flatMap((key) => products[key].reasons);
+/**
+ * ¿La versión candidata de un grupo se puede publicar frente a la anterior?
+ *
+ * Cada grupo se compara solo consigo mismo y con sus tolerancias. Sin versión
+ * publicada, un grupo con `firstActivation` se compara con la base auditada
+ * antes de activarlo: las mismas caídas máximas, ningún distrito perdido más
+ * allá de lo declarado y una fuente que no sea anterior a la auditada —igual no
+ * hace falta que avance: la auditoría y la activación pueden usar el mismo CSV—.
+ */
+export function compareGroupQuality({ group, previousProducts = null, candidateProducts, previousSourceMaxReportedAt = null, candidateSourceMaxReportedAt, forcedReprojection = false }) {
+  const keys = GROUPS[group].products;
+  const guardrails = GROUP_CONFIG[group].guardrails;
+  const primera = !previousProducts && guardrails.firstActivation ? guardrails.firstActivation : null;
+  const previos = previousProducts ?? primera?.audited.products ?? null;
+  const products = Object.fromEntries(keys.map((key) => [key, productQuality(previos?.[key], candidateProducts?.[key], key, guardrails)]));
+  const reasons = keys.flatMap((key) => products[key].reasons);
   if (!Number.isFinite(Date.parse(candidateSourceMaxReportedAt ?? ''))) reasons.push('máximo temporal del candidato inválido');
+  if (primera) {
+    if (Date.parse(candidateSourceMaxReportedAt) < Date.parse(primera.audited.source_max_reported_at)) reasons.push('la fuente es anterior a la base auditada');
+    for (const key of keys) {
+      const minimo = primera.audited.products[key].published.districts - primera.maxDistrictLoss;
+      const distritos = candidateProducts?.[key]?.published?.districts;
+      if (!Number.isInteger(distritos) || distritos < minimo) reasons.push(`${key}: pierde más de ${primera.maxDistrictLoss} distritos frente a la base auditada`);
+    }
+    return { status: reasons.length ? 'needs_review' : 'ready', reasons, products, forced_reprojection: forcedReprojection, first_activation: true, source_max_reported_at: { previous: primera.audited.source_max_reported_at, candidate: candidateSourceMaxReportedAt } };
+  }
   // Este guardrail existe para no publicar una fuente que retrocedió. En una
   // reproyección forzada la fuente es idéntica por definición —lo que cambió es
   // el código o el catálogo—, así que exigir que avance impediría justo lo que
@@ -46,3 +66,5 @@ export function compareGasolinaQuality({ previousProducts = null, candidateProdu
   if (noAvanza && !forcedReprojection) reasons.push('el máximo temporal de la fuente no avanzó');
   return { status: reasons.length ? 'needs_review' : 'ready', reasons, products, forced_reprojection: forcedReprojection, source_max_reported_at: { previous: previousSourceMaxReportedAt, candidate: candidateSourceMaxReportedAt } };
 }
+
+export const compareGasolinaQuality = (entrada) => compareGroupQuality({ ...entrada, group: 'gasolina' });

@@ -46,13 +46,18 @@ export function makeSnapshotPointer({ root, snapshotId, snapshotDate, datasetPat
   };
 }
 
-export function promoteSnapshot({ root, stagePath, finalPath, pointer, beforePointerUpdate = () => {}, fsModule = fs }) {
+/**
+ * Mueve el snapshot validado a su carpeta final y apunta a él los pointers de
+ * los grupos que lo aprobaron. La carpeta es una sola; la decisión de usarla es
+ * de cada grupo.
+ */
+export function promoteSnapshot({ root, stagePath, finalPath, pointer, groups = ['gasolina'], beforePointerUpdate = () => {}, fsModule = fs }) {
   if (fsModule.existsSync(finalPath)) throw new Error(`El snapshot destino ya existe: ${finalPath}`);
   fsModule.mkdirSync(path.dirname(finalPath), { recursive: true, mode: 0o700 });
   fsModule.renameSync(stagePath, finalPath);
   try {
     beforePointerUpdate();
-    writeActivePointer(root, pointer, fsModule);
+    for (const group of groups) writeActivePointer(root, pointer, fsModule, { group });
   } catch (error) {
     throw new Error(`Snapshot validado movido pero pointer no actualizado: ${error.message}; snapshot_id=${pointer.snapshot_id}; recuperación: npm run rollback -- ${pointer.snapshot_id}`);
   }
@@ -66,17 +71,31 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, beforePoi
  * rama que reconstruía un pointer a mano describía un dataset bajo `data/` y
  * `evidence/`, rutas que este árbol ya no tiene.
  */
-export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerUpdate = () => {}) {
+export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerUpdate = () => {}, { group = 'gasolina' } = {}) {
   const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
   if (!fsModule.existsSync(snapshotPath)) throw new Error(`No existe snapshot para rollback: ${snapshotId}`);
   const target = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
   if (target.eligible_for_rollback === false) throw new Error(`Snapshot no elegible para rollback: ${snapshotId}`);
-  const active = readActivePointer(root);
+  const active = readActivePointer(root, { group });
   if (!active) throw new Error('No hay pointer activo desde el que revertir');
   const { dataset_absolute_path, ...persistedTarget } = target;
   const pointer = { ...persistedTarget, rollback_from: active.snapshot_id, rolled_back_at: new Date().toISOString() };
   beforePointerUpdate(pointer);
-  writeActivePointer(root, pointer, fsModule);
+  writeActivePointer(root, pointer, fsModule, { group });
+  return pointer;
+}
+
+/**
+ * Un grupo adopta como propio un snapshot ya promovido por otro: su primera
+ * activación, cuando todavía no tiene pointer. Se escribe el pointer que el
+ * snapshot declara de sí mismo, no una copia del pointer del otro grupo, que
+ * podría arrastrar la marca de un rollback ajeno.
+ */
+export function adoptSnapshot(root, snapshotId, { group, fsModule = fs } = {}) {
+  const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
+  if (!fsModule.existsSync(snapshotPath)) throw new Error(`No existe snapshot para adoptar: ${snapshotId}`);
+  const { dataset_absolute_path, ...pointer } = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
+  writeActivePointer(root, pointer, fsModule, { group });
   return pointer;
 }
 

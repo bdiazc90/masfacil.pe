@@ -1,38 +1,48 @@
 #!/usr/bin/env node
 
-// La muestra que se revisa antes de habilitar la publicación.
+// La muestra que se revisa antes de habilitar la publicación de un grupo.
 //
 // El vínculo es una igualdad exacta de razón social + dirección + distrito, así
 // que el emparejamiento en sí no admite opinión: o coincide o no. Lo que una
-// revisión humana sí puede pillar es lo otro —que el establecimiento oficial no
-// sea el mismo negocio, que un precio se haya leído mal, o que un rechazo por
-// ambigüedad estuviera injustificado— y para eso hace falta ver el texto.
+// revisión sí puede pillar es lo otro —que el establecimiento oficial no sea el
+// mismo negocio, que un precio se haya leído mal, que la tabla consultada no sea
+// el producto que creemos, o que un rechazo por ambigüedad estuviera
+// injustificado— y para eso hace falta ver el texto.
 //
 // Por eso esta corrida es aparte, local y explícita: vuelve a leer unos pocos
 // distritos conservando razón social y dirección, las cruza con lo que la
 // composición publicaría y deja una hoja privada. Nada de esto entra en el
 // expediente que viaja a la caché de Actions, y a consola solo salen conteos.
 //
-//   node scripts/facilito-sample.mjs [--districts "ATE,SAN LUIS"] [--size 20]
+//   node scripts/facilito-sample.mjs [--group gasolina|diesel] [--districts "ATE,SAN LUIS"] [--size 20]
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
+import { readActivePointer } from '../app/snapshot-manifest.mjs';
 import { agentBrowserSession, capturarLima } from '../pipeline/facilito/capture.mjs';
 import { facilitoRoot } from '../pipeline/facilito/state.mjs';
-import { composeGasolinaProjection } from '../pipeline/project-gasolina.mjs';
-import { GASOLINA_KEYS } from '../pipeline/gasolina-contract.mjs';
+import { loadLiquidSources } from '../pipeline/gasolina-products.mjs';
+import { describeGroup } from '../pipeline/groups.mjs';
+import { composeGasolinaProjection, composeGroups } from '../pipeline/project-gasolina.mjs';
+import { PRODUCTS } from '../web/lib/catalog.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Un reparto deliberado: dos distritos grandes, uno chico, uno periférico y dos
 // de operadores con varias sedes. No es aleatorio y no se presenta como tal.
 const DISTRITOS = ['ATE', 'SAN LUIS', 'MIRAFLORES', 'SAN JUAN DE LURIGANCHO', 'PUENTE PIEDRA', 'SANTIAGO DE SURCO'];
+// Otras variedades de diésel que el CSV registra aparte. No se unen a ninguna
+// vista; en la hoja sirven para ver que la tabla consultada calza con el
+// producto publicado y no con otro que el mismo grifo también reporta.
+const PARECIDAS = /diesel|d2|db5|b5/i;
 
 function parseArgs(argv) {
-  const opciones = { districts: DISTRITOS, size: 20, excluir: [] };
+  const opciones = { group: 'gasolina', districts: DISTRITOS, size: 20, excluir: [] };
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--districts') opciones.districts = String(argv[++i] ?? '').split(',').map((d) => d.trim()).filter(Boolean);
+    if (argv[i] === '--group') opciones.group = String(argv[++i] ?? '');
+    else if (argv[i] === '--districts') opciones.districts = String(argv[++i] ?? '').split(',').map((d) => d.trim()).filter(Boolean);
     else if (argv[i] === '--size') opciones.size = Number(argv[++i]);
     // Para completar una muestra ya revisada sin repetir lo que ya se miró.
     else if (argv[i] === '--excluir-revisados') opciones.excluir.push(String(argv[++i] ?? ''));
@@ -43,6 +53,7 @@ function parseArgs(argv) {
 }
 
 const opciones = parseArgs(process.argv.slice(2));
+const grupo = describeGroup(opciones.group);
 // Los establecimientos que otra hoja ya revisó. La muestra se completa, no se
 // rehace: lo revisado sigue contando.
 const yaRevisados = new Set(opciones.excluir.flatMap((archivo) => {
@@ -51,15 +62,40 @@ const yaRevisados = new Set(opciones.excluir.flatMap((archivo) => {
 }));
 
 // 1. La composición que se publicaría: de ahí salen el vínculo, la identidad
-//    publicada y el precio del CSV con su fecha.
-const candidate = await composeGasolinaProjection({ root: ROOT });
+//    publicada y el precio del CSV con su fecha. Antes de su primera activación
+//    un grupo nuevo no tiene pointer propio y se compone sobre el de Gasolina,
+//    que es el snapshot que usaría.
+const pointer = readActivePointer(ROOT, { group: grupo.key }) ?? readActivePointer(ROOT);
+const candidate = grupo.key === 'gasolina'
+  ? await composeGasolinaProjection({ root: ROOT })
+  : (await composeGroups({ root: ROOT, plan: [{ pointer, groups: [grupo.key] }] }))[grupo.key];
+// Todas las ofertas de cada huella, no la última: dos ofertas con la misma
+// huella son una ambigüedad del lado oficial y el vínculo las rechaza.
 const porHuella = new Map();
-for (const key of GASOLINA_KEYS) {
+for (const key of grupo.products) {
   const offers = new Map(candidate.datasets[key].offers.map((offer) => [offer.id, offer]));
   for (const [offerId, huella] of candidate.results[key].linkKeys) {
-    if (!huella) continue;
-    const offer = offers.get(offerId);
-    if (offer) porHuella.set(`${huella}:${key}`, { producto: key, offer });
+    const offer = huella ? offers.get(offerId) : null;
+    if (offer) porHuella.set(`${huella}:${key}`, [...(porHuella.get(`${huella}:${key}`) ?? []), offer]);
+  }
+}
+
+// Lo que cada establecimiento reporta de otras variedades de diésel, con el
+// último precio de cada una. Solo tiene sentido para Diésel.
+const otrasVariantes = new Map();
+if (grupo.key === 'diesel') {
+  const minimizedRoot = path.join(ROOT, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized');
+  const { prices } = await loadLiquidSources({ minimizedRoot });
+  const ultimo = new Map();
+  for (const row of prices) {
+    if (!PARECIDAS.test(row.PRODUCTO) || grupo.products.some((key) => PRODUCTS[key].canonical === row.PRODUCTO)) continue;
+    const clave = `${row.REGISTRO_DE_HIDROCARBUROS}|${row.PRODUCTO}|${row.UNIDAD}`;
+    const previo = ultimo.get(clave);
+    if (!previo || String(row.FECHA_DE_REGISTRO) > String(previo.FECHA_DE_REGISTRO)) ultimo.set(clave, row);
+  }
+  for (const row of ultimo.values()) {
+    const anchor = officialAnchorFromRegistration(row.REGISTRO_DE_HIDROCARBUROS);
+    otrasVariantes.set(anchor, [...(otrasVariantes.get(anchor) ?? []), { producto: row.PRODUCTO, unidad: row.UNIDAD, precio: Number(String(row.PRECIO_DE_VENTA_SOLES).replace(',', '.')), reportado: row.FECHA_DE_REGISTRO }]);
   }
 }
 
@@ -69,33 +105,42 @@ const lectura = capturarLima({
   ejecutar: agentBrowserSession({ cwd: ROOT, session: `facilito-muestra-${process.pid}-${Date.now()}` }),
   log: (linea) => process.stderr.write(`${linea}\n`),
   soloDistritos: opciones.districts,
-  // La muestra compara contra la proyección de Gasolina; Diésel tendrá la suya.
-  soloProductos: GASOLINA_KEYS,
+  soloProductos: grupo.products,
   conTexto: true,
 });
 
 const vinculadas = [];
 const sinPar = [];
+const ambiguas = [];
 for (const unidad of lectura.units) {
   if (unidad.status !== 'ok') continue;
+  // Una huella que se repite en la misma tabla es ambigua del lado de la consulta.
+  const repetidas = new Map();
+  for (const fila of unidad.rows) repetidas.set(fila.key_hash, (repetidas.get(fila.key_hash) ?? 0) + 1);
   for (const fila of unidad.rows) {
-    const par = porHuella.get(`${fila.key_hash}:${unidad.product}`);
+    const pares = porHuella.get(`${fila.key_hash}:${unidad.product}`) ?? [];
     const comun = {
       distrito: unidad.district_name,
       producto: unidad.product,
       facilito: { razon_social: fila.establecimiento, direccion: fila.direccion, precio: fila.price, observado_en: unidad.observed_at },
     };
-    if (!par) { sinPar.push(comun); continue; }
+    if (repetidas.get(fila.key_hash) > 1 || pares.length > 1) {
+      ambiguas.push({ ...comun, filas_con_la_huella: repetidas.get(fila.key_hash), ofertas_con_la_huella: pares.map((offer) => ({ establishment_id: offer.establishment_id, direccion: offer.address, precio_csv: offer.price })) });
+      continue;
+    }
+    if (!pares.length) { sinPar.push(comun); continue; }
+    const [offer] = pares;
     vinculadas.push({
       ...comun,
-      establishment_id: par.offer.establishment_id,
-      publicado: { nombre: par.offer.commercial_identity?.public_site_name ?? null, marca: par.offer.commercial_identity?.brand ?? null, direccion: par.offer.address },
-      csv: { precio: par.offer.price, reportado_en: par.offer.reported_at },
+      establishment_id: offer.establishment_id,
+      publicado: { nombre: offer.commercial_identity?.public_site_name ?? null, marca: offer.commercial_identity?.brand ?? null, direccion: offer.address },
+      csv: { precio: offer.price, reportado_en: offer.reported_at },
       // Lo que la capa publicaría hoy para esa oferta, que puede venir de una
       // captura anterior a esta lectura: verlo separado evita confundir «el
       // precio cambió entre las dos lecturas» con «el vínculo está mal».
-      capa_publicada: par.offer.facilito,
-      diferencia: Number((fila.price - par.offer.price).toFixed(4)),
+      capa_publicada: offer.facilito,
+      diferencia: Number((fila.price - offer.price).toFixed(4)),
+      ...(grupo.key === 'diesel' ? { otras_variantes_en_csv: otrasVariantes.get(offer.establishment_id) ?? [] } : {}),
     });
   }
 }
@@ -109,7 +154,7 @@ for (const item of [...vinculadas].sort((a, b) => Math.abs(b.diferencia) - Math.
   const clave = `${item.distrito}:${item.producto}`;
   grupos.set(clave, [...(grupos.get(clave) ?? []), item]);
 }
-// Un establecimiento aparece en los dos productos, así que sin deduplicar una
+// Un establecimiento aparece en varios productos, así que sin deduplicar una
 // muestra de 20 filas puede cubrir 15 grifos distintos. Lo que se revisa es el
 // grifo, no la fila: se cuenta una vez cada uno.
 const claves = [...grupos.keys()].sort();
@@ -126,19 +171,36 @@ while (seleccion.length < opciones.size && vuelta < 200) {
   vuelta += 1;
 }
 
+// La comparación de precios de TODO lo vinculado, no solo de la muestra. Si la
+// tabla consultada fuera otra variedad que el mismo grifo vende, las diferencias
+// serían sistemáticas; con el mismo producto, un reporte reciente del CSV y la
+// consulta de hoy suelen coincidir al céntimo.
+const diferencias = vinculadas.map((item) => ({ d: Math.abs(item.diferencia), horas: (Date.parse(item.facilito.observado_en) - Date.parse(item.csv.reportado_en)) / 3_600_000 }));
+function resumir(lista) {
+  const ds = lista.map((item) => item.d).sort((a, b) => a - b);
+  const cuantil = (p) => (ds.length ? ds[Math.min(ds.length - 1, Math.floor(p * ds.length))] : null);
+  return { n: ds.length, iguales: ds.filter((d) => d === 0).length, hasta_10_centimos: ds.filter((d) => d <= 0.1).length, mediana: cuantil(0.5), p90: cuantil(0.9), maxima: ds.at(-1) ?? null };
+}
+const comparacion = { todas: resumir(diferencias), reporte_csv_hasta_72h: resumir(diferencias.filter((item) => item.horas <= 72)) };
+
 const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
-const destino = path.join(facilitoRoot(ROOT), `muestra-${stamp}.json`);
+const destino = path.join(facilitoRoot(ROOT), `muestra-${grupo.key === 'gasolina' ? '' : `${grupo.key}-`}${stamp}.json`);
 const hoja = {
   generado_en: new Date().toISOString(),
+  grupo: grupo.key,
   revision_compuesta: candidate.manifest.revision_id,
   criterio: 'razón social + dirección + distrito exactos y únicos en ambos sentidos; normalización de mayúsculas, tildes y espacios',
   distritos: opciones.districts,
-  poblacion: { vinculadas: vinculadas.length, establecimientos_vinculados: new Set(vinculadas.map((item) => item.establishment_id)).size, sin_par_oficial: sinPar.length },
+  poblacion: { vinculadas: vinculadas.length, establecimientos_vinculados: new Set(vinculadas.map((item) => item.establishment_id)).size, sin_par_oficial: sinPar.length, ambiguas: ambiguas.length },
+  comparacion_precios: comparacion,
   ya_revisados_en_otra_hoja: [...yaRevisados],
   // Quién revisa y qué resolvió se escribe DESPUÉS, al revisar. Se deja el hueco
   // para que la hoja no se confunda con una revisión ya hecha.
   revision: { revisor: null, revisado_en: null, veredictos: {} },
   seleccion,
+  // Los rechazos por ambigüedad se revisan todos: uno injustificado es un
+  // precio que se deja de publicar sin motivo.
+  ambiguas,
   sin_par_oficial: sinPar.slice(0, 20),
 };
 fs.mkdirSync(path.dirname(destino), { recursive: true, mode: 0o700 });
@@ -146,15 +208,19 @@ fs.writeFileSync(destino, `${JSON.stringify(hoja, null, 2)}\n`, { mode: 0o600 })
 
 process.stdout.write(`${JSON.stringify({
   hoja: path.relative(ROOT, destino),
+  grupo: grupo.key,
   distritos: opciones.districts.length,
   unidades_leidas: lectura.units.filter((u) => u.status === 'ok').length,
   vinculadas: vinculadas.length,
+  ambiguas: ambiguas.length,
   sin_par_oficial: sinPar.length,
   muestra: seleccion.length,
   establecimientos_distintos: new Set(seleccion.map((item) => item.establishment_id)).size,
   excluidos_por_ya_revisados: yaRevisados.size,
   con_diferencia_de_precio: seleccion.filter((item) => item.diferencia !== 0).length,
-  por_producto: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, seleccion.filter((item) => item.producto === key).length])),
+  con_otras_variantes: seleccion.filter((item) => item.otras_variantes_en_csv?.length).length,
+  comparacion_precios: comparacion,
+  por_producto: Object.fromEntries(grupo.products.map((key) => [key, seleccion.filter((item) => item.producto === key).length])),
   distritos_en_la_muestra: new Set(seleccion.map((item) => item.distrito)).size,
   bloqueo: lectura.blocked,
 }, null, 2)}\n`);

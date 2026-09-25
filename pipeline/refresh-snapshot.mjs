@@ -27,9 +27,10 @@ import { canUseCurlFallback } from '../app/refresh-policy.mjs';
 import { findMatchingRaw } from '../app/raw-reuse.mjs';
 import { acquireExclusiveLock } from '../app/exclusive-lock.mjs';
 import { validateGasolinaRefreshState } from './gasolina-contract.mjs';
-import { buildGasolinaProjectionCandidate, loadCommercialPublicationInputs, temporalContextForPointer } from './project-gasolina.mjs';
-import { loadGasolinaSources } from './gasolina-products.mjs';
-import { compareGasolinaQuality, snapshotIdFromGasolinaRevision } from './refresh-state.mjs';
+import { buildGroupCandidate, loadCommercialPublicationInputs, temporalContextForPointer } from './project-gasolina.mjs';
+import { buildLiquidProducts, loadGasolinaSources } from './gasolina-products.mjs';
+import { PUBLISHED_GROUPS } from './groups.mjs';
+import { compareGroupQuality, snapshotIdFromGasolinaRevision } from './refresh-state.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -216,6 +217,27 @@ function refreshBaseline({ root, publicRefreshStatePath }) {
   return { active, localValidators: active.validators, previousProducts, previousSourceMaxReportedAt };
 }
 
+/**
+ * La línea base de cada grupo que no es Gasolina: su propio estado publicado.
+ *
+ * En CI lo acaba de escribir `fetch:live`; en local es la copia de `web/`, y
+ * solo cuenta si describe el snapshot de su pointer. Sin estado —un grupo que
+ * todavía no se activó— no hay línea base y la primera versión se juzga contra
+ * la base auditada de su configuración.
+ */
+function groupBaseline({ root, group, ci }) {
+  const file = path.join(root, 'web', ...group.dataRoot.split('/'), 'refresh-state.json');
+  if (!fs.existsSync(file)) return { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
+  const state = readJson(file);
+  const errors = group.validate.refreshState(state, { revision_id: state.revision_id });
+  if (errors.length) throw new Error(`Refresh-state ${group.key} inválido: ${errors.join('; ')}`);
+  if (!ci) {
+    const pointer = readActivePointer(root, { group: group.key });
+    if (!pointer || pointer.snapshot_id !== state.snapshot_id) return { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
+  }
+  return { previousProducts: state.products, previousSourceMaxReportedAt: state.source_max_reported_at, validators: state.validators, snapshot_id: state.snapshot_id };
+}
+
 async function runRefresh(options) {
   const {
     root, sourceId, forceRefresh, publicRefreshStatePath, referenceMinimizedRoot,
@@ -225,12 +247,17 @@ async function runRefresh(options) {
   if (sourceId !== 'liquid-current') throw new Error(`Solo se permite refrescar ${sourceId} actual: liquid-current`);
   const baseline = refreshBaseline({ root, publicRefreshStatePath });
   const active = baseline.active;
+  const otros = Object.fromEntries(PUBLISHED_GROUPS.filter((grupo) => grupo.key !== 'gasolina').map((grupo) => [grupo.key, groupBaseline({ root, group: grupo, ci: Boolean(publicRefreshStatePath) })]));
+  // Se compara contra el CSV más nuevo que algún grupo ya aprobó. Si Gasolina
+  // rechazó un archivo que Diésel sí publicó, volver a bajarlo en cada corrida
+  // solo repetiría el mismo rechazo: Gasolina espera al próximo CSV.
+  const masNuevo = Object.values(otros).filter((base) => base.validators && base.snapshot_id > (active.snapshot_id ?? '')).sort((a, b) => (a.snapshot_id < b.snapshot_id ? 1 : -1))[0];
   const url = refreshSourceUrl;
-  let detection = await probeSnapshotValidators({ url, local: baseline.localValidators, timeoutMs: probeTimeoutMs });
+  let detection = await probeSnapshotValidators({ url, local: masNuevo?.validators ?? baseline.localValidators, timeoutMs: probeTimeoutMs });
   if (detection.status === 'unverifiable' && detection.reason && canUseCurlFallback(detection.attempts)) {
     detection = await probeSnapshotValidators({
       url,
-      local: baseline.localValidators,
+      local: masNuevo?.validators ?? baseline.localValidators,
       timeoutMs: probeTimeoutMs,
       fetchImpl: (target, init) => curlHeadFetch(target, init, { probeTimeoutMs, userAgent, maxRedirects }),
     });
@@ -302,40 +329,69 @@ async function runRefresh(options) {
       referenceInputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' },
       lineage: { ...lineage, paths: { raw_path: path.relative(root, path.join(final, path.relative(stage, rawPath))), minimized_path: path.relative(root, path.join(final, 'minimized', 'prices', 'liquid-current.csv.gz')) } },
     });
-    const projection = await buildGasolinaProjectionCandidate({
-      pointer,
-      temporalContext,
-      sources,
-      minimizedRoot,
-      rawPath,
-      ...loadCommercialPublicationInputs(root, { identityRoot }),
+    // UNA pasada por el original para todos los grupos; cada uno se juzga con su
+    // línea base y sus tolerancias. Un error de contrato de Gasolina sigue
+    // rechazando el refresco entero, como siempre; el de otro grupo solo lo deja
+    // a él pendiente de revisión.
+    const { resultsByGroup } = await buildLiquidProducts({
+      sources, minimizedRoot, rawPath, cutoffAt: temporalContext.cutoff_at, snapshotId: pointer.snapshot_id, sourceMaxReportedAt: temporalContext.source_max_reported_at, sourceUrl: pointer.source_url,
+      groups: PUBLISHED_GROUPS.map((grupo) => ({ key: grupo.key, products: grupo.products, activities: grupo.config.activities, scope: grupo.scope, idScheme: grupo.config.idScheme })),
     });
-    // Un solo guardrail. El legado solo se evaluaba con evidencia previa, que en
-    // CI era siempre null: no protegía nada donde importaba.
-    const quality = compareGasolinaQuality({
-      previousProducts: baseline.previousProducts,
-      candidateProducts: projection.refreshState.products,
-      previousSourceMaxReportedAt: baseline.previousSourceMaxReportedAt,
-      candidateSourceMaxReportedAt: projection.refreshState.source_max_reported_at,
-      forcedReprojection: forceRefresh,
-    });
-    const validation = {
-      schema_version: 1,
-      revision_id: projection.manifest.revision_id,
-      source_max_reported_at: projection.refreshState.source_max_reported_at,
-      products: Object.fromEntries(Object.entries(projection.results).map(([key, value]) => [key, { metrics: value.metrics, public_snapshot: projection.manifest.products[key] }])),
-      identity: projection.identity,
-      commercial_identity: { ...projection.catalog, without_current_offer_detail: projection.catalogWithoutOffer, unknown_anchors: projection.catalogUnknownAnchors, brand_groups: projection.brandGroups, brand_evidence_review_queue: projection.brandEvidenceQueue },
-      quality,
-    };
-    fs.writeFileSync(path.join(stage, 'gasolina-validation.json'), `${JSON.stringify(validation, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    const report = { schema_version: 2, status: quality.status, detection, active_before: active, download: downloaded, lineage, temporal_context: temporalContext, identity: projection.identity, commercial_identity: projection.catalog, reference_inputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' }, quality, staging_path: path.relative(root, stage), gasolina: { revision_id: projection.manifest.revision_id, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: projection.results[key].metrics.contract_ready.districts }])) } };
+    const comerciales = loadCommercialPublicationInputs(root, { identityRoot });
+    const grupos = {};
+    for (const grupo of PUBLISHED_GROUPS) {
+      const base = grupo.key === 'gasolina' ? baseline : otros[grupo.key];
+      let projection;
+      try { projection = buildGroupCandidate({ group: grupo, pointer, temporalContext, results: resultsByGroup[grupo.key], ...comerciales }); }
+      catch (error) {
+        if (grupo.key === 'gasolina') throw error;
+        grupos[grupo.key] = { projection: null, quality: { status: 'needs_review', reasons: [`${grupo.key}: ${error.message}`] } };
+        continue;
+      }
+      // Un solo guardrail por grupo. El legado solo se evaluaba con evidencia
+      // previa, que en CI era siempre null: no protegía nada donde importaba.
+      const quality = compareGroupQuality({
+        group: grupo.key,
+        previousProducts: base.previousProducts,
+        candidateProducts: projection.refreshState.products,
+        previousSourceMaxReportedAt: base.previousSourceMaxReportedAt,
+        candidateSourceMaxReportedAt: projection.refreshState.source_max_reported_at,
+        forcedReprojection: forceRefresh,
+      });
+      grupos[grupo.key] = { projection, quality };
+    }
+    const projection = grupos.gasolina.projection;
+    const quality = grupos.gasolina.quality;
+    for (const [key, { projection: candidata, quality: calidad }] of Object.entries(grupos)) {
+      if (!candidata) continue;
+      const validation = {
+        schema_version: 1,
+        revision_id: candidata.manifest.revision_id,
+        source_max_reported_at: candidata.refreshState.source_max_reported_at,
+        products: Object.fromEntries(Object.entries(candidata.results).map(([producto, value]) => [producto, { metrics: value.metrics, public_snapshot: candidata.manifest.products[producto] }])),
+        identity: candidata.identity,
+        commercial_identity: { ...candidata.catalog, without_current_offer_detail: candidata.catalogWithoutOffer, unknown_anchors: candidata.catalogUnknownAnchors, brand_groups: candidata.brandGroups, brand_evidence_review_queue: candidata.brandEvidenceQueue },
+        quality: calidad,
+      };
+      fs.writeFileSync(path.join(stage, `${key}-validation.json`), `${JSON.stringify(validation, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+    }
+    const resumenGrupos = Object.fromEntries(Object.entries(grupos).map(([key, { projection: candidata, quality: calidad }]) => [key, { status: calidad.status, reasons: calidad.reasons, first_activation: calidad.first_activation === true, revision_id: candidata?.manifest.revision_id ?? null, products: candidata ? Object.fromEntries(Object.entries(candidata.datasets).map(([producto, value]) => [producto, { offers: value.offers.length, districts: candidata.results[producto].metrics.contract_ready.districts }])) : null }]));
+    const report = { schema_version: 2, status: quality.status, detection, active_before: active, download: downloaded, lineage, temporal_context: temporalContext, identity: projection.identity, commercial_identity: projection.catalog, reference_inputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' }, quality, staging_path: path.relative(root, stage), gasolina: { revision_id: projection.manifest.revision_id, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: projection.results[key].metrics.contract_ready.districts }])) }, groups: resumenGrupos };
     fs.writeFileSync(path.join(stage, 'refresh-report.json'), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    if (quality.status === 'needs_review') return { ...report, promoted: false, staging_path: path.relative(root, stage) };
+    // La carpeta se promueve si la aprueba al menos un grupo, y solo se mueven
+    // los pointers de los que la aprobaron: Gasolina conserva el suyo si
+    // rechaza un CSV que Diésel sí acepta, y al revés.
+    const aprobados = PUBLISHED_GROUPS.map((grupo) => grupo.key).filter((key) => grupos[key].quality.status === 'ready');
+    const conGrupos = (estado) => ({ ...estado, groups: Object.fromEntries(Object.entries(resumenGrupos).map(([key, value]) => [key, { ...value, status: aprobados.includes(key) ? 'promoted' : 'needs_review' }])), promoted_groups: aprobados });
+    if (!aprobados.length) return conGrupos({ ...report, promoted: false, staging_path: path.relative(root, stage) });
 
     fs.writeFileSync(path.join(stage, 'snapshot-manifest.json'), `${JSON.stringify(pointer, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    const promoted = promoteSnapshot({ root, stagePath: stage, finalPath: final, pointer, beforePointerUpdate: () => rewriteFinalAcquisition(root, final, snapshotDate, path.relative(stage, rawPath), sourceId) });
-    return { ...report, status: 'promoted', promoted: true, active_after: promoted, downloaded: true, public_projection_validated: true };
+    const promoted = promoteSnapshot({ root, stagePath: stage, finalPath: final, pointer, groups: aprobados, beforePointerUpdate: () => rewriteFinalAcquisition(root, final, snapshotDate, path.relative(stage, rawPath), sourceId) });
+    if (quality.status === 'needs_review') {
+      const { staging_path: _staging, ...sinStaging } = report;
+      return conGrupos({ ...sinStaging, promoted: false, downloaded: true, snapshot_path: path.relative(root, final) });
+    }
+    return conGrupos({ ...report, status: 'promoted', promoted: true, active_after: promoted, downloaded: true, public_projection_validated: true });
   } catch (error) {
     if (fs.existsSync(stage)) fs.rmSync(stage, { recursive: true, force: true });
     throw new Error(`${error.message}${error.snapshot_id ? `; snapshot_id=${error.snapshot_id}` : ''}`);

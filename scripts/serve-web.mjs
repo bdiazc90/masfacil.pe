@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeShellManifest } from '../pipeline/shell-manifest.mjs';
 import { resolvePath } from '../web/lib/routes.js';
+import { dataCacheControl } from '../pipeline/groups.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = path.join(root, 'web');
@@ -29,7 +30,8 @@ const server = http.createServer((request,response) => {
     if (fs.existsSync(notFound)) { response.writeHead(404, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'}); if (request.method === 'GET') fs.createReadStream(notFound).pipe(response); else response.end(); return; }
     response.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}); response.end('No encontrado'); return;
   }
-  const headers = {'Content-Type':types.get(path.extname(file)) ?? 'application/octet-stream','Cache-Control':relative === 'data/gasolina/manifest.json' ? 'no-store' : relative.startsWith('data/gasolina/snapshots/') ? 'public, max-age=31536000, immutable' : 'no-cache','Service-Worker-Allowed':'/','X-Content-Type-Options':'nosniff'};
+  // Los datos de cada grupo, con las mismas reglas que `web/_headers`.
+  const headers = {'Content-Type':types.get(path.extname(file)) ?? 'application/octet-stream','Cache-Control':dataCacheControl(relative) ?? 'no-cache','Service-Worker-Allowed':'/','X-Content-Type-Options':'nosniff'};
   response.writeHead(200,headers); if(request.method==='GET')fs.createReadStream(file).pipe(response); else response.end();
 });
 server.listen(port,'127.0.0.1',()=>process.stdout.write(`masfacil.pe local en http://127.0.0.1:${port}\nPrecache derivada: ${shell.cache} · ${shell.entries.length} entradas\n`));

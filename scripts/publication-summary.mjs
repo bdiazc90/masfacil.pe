@@ -58,6 +58,18 @@ if (stage === 'deploy') {
   if (resultado?.execution && resultado.execution.ok === false) lineas.push(`| falló en | \`${resultado.execution.stage}\` · ${resultado.execution.error ?? 'sin mensaje'} |`);
   for (const motivo of refresh.quality?.reasons ?? []) lineas.push(`| guardrail | ${motivo} |`);
 
+  // Cada grupo decide por su cuenta: uno puede publicar mientras otro conserva
+  // su versión. La tabla lo dice sin tener que leer el JSON.
+  const grupos = Object.entries(informe.groups ?? {});
+  if (grupos.length > 1 || grupos.some(([, grupo]) => grupo.first_activation)) {
+    const RESULTADO = { written: 'versión nueva', reused: 'reutilizada', unchanged: 'sin cambios', failed: 'conserva la publicada', first_activation_failed: 'primera activación rechazada' };
+    lineas.push('', '| grupo | decisión | resultado | revisión | nota |', '| --- | --- | --- | --- | --- |');
+    for (const [clave, grupo] of grupos) {
+      const nota = [grupo.first_activation ? 'primera activación' : null, grupo.facilito_change, grupo.error, ...(refresh.groups?.[clave]?.reasons ?? []).map((motivo) => `guardrail: ${motivo}`)].filter(Boolean).join(' · ');
+      lineas.push(`| ${clave} | \`${grupo.action}\` | ${RESULTADO[grupo.outcome] ?? grupo.outcome} | ${grupo.revision_generated ? `\`${grupo.revision_generated}\`` : grupo.revision_id ? `\`${grupo.revision_id}\` (igual)` : '—'} | ${nota || '—'} |`);
+    }
+  }
+
   // `no_op` es el resultado correcto de un push que no cambia lo publicado.
   // `fail_closed` con una entrega pedida es lo contrario y se marca como tal.
   if (!decision.deploy) {

@@ -21,13 +21,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PUBLISHED_GROUPS } from '../pipeline/groups.mjs';
+import { PUBLISHED_GROUPS, dataCacheRules } from '../pipeline/groups.mjs';
 import { GROUP_CONTRACTS } from '../web/group-contracts.js';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
 import { SERVICE_WORKER_MAIN, renderServiceWorker, renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
 import { fetchLiveGroups } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
-import { appPaths, redirectRules, redirects } from '../web/lib/routes.js';
+import { appPaths, historyPath, redirectRules, redirects, viewPath } from '../web/lib/routes.js';
+import { ACTIVE_VIEWS, VIEWS } from '../web/lib/catalog.js';
 import { ANALYTICS_BEACON, ANALYTICS_ENDPOINT, NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -60,8 +61,28 @@ async function bundleProblems(grupo, { manifest, state, bodies }) {
 }
 
 // Direcciones que tienen que responder 404 con la página propia: la raíz de las
-// vistas, las vistas no activadas y rutas inventadas. Ninguna puede ser la portada.
-const NO_EXISTEN = Object.freeze(['/combustibles', '/combustibles/', '/combustibles/diesel', '/combustibles/glp', '/combustibles/gnv', '/combustibles/gasolina/otra', '/tipo-de-cambio']);
+// vistas, las vistas previstas que no están activadas, el historial de una vista
+// sin histórico y rutas inventadas. Ninguna puede ser la portada. Salen del
+// catálogo: activar una vista la saca de aquí sin tocar esta lista.
+const PREVISTAS = Object.freeze(['gasolina', 'diesel', 'glp', 'gnv']);
+const NO_EXISTEN = Object.freeze([
+  '/combustibles', '/combustibles/',
+  ...PREVISTAS.filter((view) => !ACTIVE_VIEWS.includes(view)).map(viewPath),
+  ...ACTIVE_VIEWS.filter((view) => !VIEWS[view].history).map(historyPath),
+  ...ACTIVE_VIEWS.map((view) => `${viewPath(view)}/otra`),
+  '/tipo-de-cambio',
+]);
+
+/** Las reglas de caché de datos que `web/_headers` tiene que declarar, grupo por grupo. */
+export function dataHeaderProblems(cabeceras, reglas = dataCacheRules()) {
+  const bloques = new Map();
+  let actual = null;
+  for (const linea of cabeceras.split('\n')) {
+    if (/^\S/.test(linea)) { actual = linea.trim(); bloques.set(actual, []); continue; }
+    if (actual && linea.trim()) bloques.get(actual).push(linea.trim());
+  }
+  return reglas.filter((regla) => !(bloques.get(regla.path) ?? []).includes(`Cache-Control: ${regla.cacheControl}`)).map((regla) => `web/_headers no declara Cache-Control: ${regla.cacheControl} para ${regla.path}`);
+}
 
 /**
  * La tabla de rutas contra un origen: la app en cada vista, cada 301 con su
@@ -126,7 +147,6 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
       bodies: cuerpos,
     }));
   }
-  const manifest = manifiestos.gasolina;
 
   // 3. Precache: se DERIVA aquí y se compara con el módulo generado en disco.
   // Verificar no genera: publicar con un manifest viejo sería publicar un
@@ -177,6 +197,9 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // (web/sw-main.js descarta lo que no es del propio origen) y que un JSON que cambia
   // cada pocas horas no acabe cacheado como si fuera parte del shell.
   if (origin && new URL(HISTORY_ORIGIN).origin === new URL(origin).origin) errors.push('el histórico no puede servirse desde el mismo origen que la app: el service worker lo cachearía como shell');
+  // Los datos de cada grupo con su caché: un manifest guardado mezclaría
+  // revisiones y un snapshot sin `immutable` se volvería a bajar entero.
+  errors.push(...dataHeaderProblems(cabeceras));
 
   // 6. La página 404 propia: sin ella Pages sirve la portada con 200 para toda
   // ruta desconocida. Tiene que existir, respetar la CSP y llevar su módulo en
@@ -225,8 +248,10 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     // memoria con los dos contratos. `web/data/` no se toca.
     try {
       const vivos = await fetchLiveGroups({ origin });
-      servido = vivos.map((vivo) => vivo.revision_id).join(', ');
+      servido = vivos.map((vivo) => vivo.revision_id ?? `${vivo.group} sin publicar`).join(', ');
       for (const vivo of vivos) {
+        // Después del deploy todos los grupos activos tienen que estar servidos.
+        if (vivo.unpublished) { errors.push(`origen público · el grupo ${vivo.group} no está publicado`); continue; }
         const grupo = PUBLISHED_GROUPS.find((item) => item.key === vivo.group);
         const problemas = await bundleProblems(grupo, { manifest: vivo.manifest, state: JSON.parse(vivo.stateText), bodies: vivo.bodies });
         errors.push(...problemas.map((motivo) => `origen público · bundle servido · ${vivo.group} · ${motivo}`));
@@ -262,7 +287,8 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
 
   const variantes = [...brandAssets(BRAND_LOGOS)].length;
   const publico = origin ? ` · origen: bundle ${servido ?? 'sin leer'} y shell ${shell.derived.cache}` : '';
-  const summary = `Bundles gasolina válidos: ${manifest.revision_id} · Regular ${manifest.products?.regular?.bytes} bytes · Premium ${manifest.products?.premium?.bytes} bytes · cliente compatible · ${Object.keys(BRAND_LOGOS).length} marcas y ${variantes} activos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)${publico}`;
+  const grupos = PUBLISHED_GROUPS.map((grupo) => `${grupo.key} ${manifiestos[grupo.key].revision_id} (${grupo.products.map((key) => `${key} ${manifiestos[grupo.key].products?.[key]?.bytes} bytes`).join(' · ')})`).join('; ');
+  const summary = `Bundles válidos: ${grupos} · cliente compatible · ${Object.keys(BRAND_LOGOS).length} marcas y ${variantes} activos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)${publico}`;
   return { errors: [...new Set(errors)], notas, summary };
 }
 

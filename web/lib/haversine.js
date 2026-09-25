@@ -1,3 +1,5 @@
+import { PRODUCTS } from './catalog.js';
+
 const EARTH_RADIUS_KM = 6371.0088;
 const toRadians = (degrees) => degrees * Math.PI / 180;
 
@@ -14,8 +16,12 @@ export function haversineKm(origin, destination) {
 
 export function orderOffers(offers, criterion = 'distance') {
   // Una fila sin el producto activo va al final, no se descarta: sigue siendo un
-  // grifo cercano y todavía tiene el otro precio que ofrecer.
-  const accessor = { distance: (row) => row.distance_km, 'price:regular': (row) => row.prices.regular?.price ?? Infinity, 'price:premium': (row) => row.prices.premium?.price ?? Infinity }[criterion];
+  // grifo cercano y todavía tiene el otro precio que ofrecer. Se ordena por el
+  // precio de un producto del catálogo, nunca de una clave inventada.
+  const producto = /^price:([a-z]+)$/.exec(criterion)?.[1];
+  const accessor = criterion === 'distance' ? (row) => row.distance_km
+    : producto && Object.hasOwn(PRODUCTS, producto) ? (row) => row.prices[producto]?.price ?? Infinity
+      : null;
   if (!accessor) throw new Error(`Criterio de orden desconocido: ${criterion}`);
   return offers.map((offer, index) => ({ offer, index })).sort((left, right) => accessor(left.offer) - accessor(right.offer) || left.offer.establishment_id.localeCompare(right.offer.establishment_id) || left.index - right.index).map(({ offer }) => offer);
 }

@@ -70,6 +70,42 @@ export function groupsBehind({ local, published }) {
 }
 
 /**
+ * La decisión de la corrida a partir de la de cada grupo.
+ *
+ * - Una primera activación fallida detiene todo: el código ya activó la vista y
+ *   publicarla sin datos sería peor que no publicar.
+ * - Un grupo que falla conserva su versión publicada; si otro publica, la
+ *   entrega sale igual y el fallo queda dicho en el motivo.
+ * - Sin nada que publicar manda el primer grupo: `fail_closed` si alguno falló,
+ *   su propia decisión —normalmente `no_op`— si no.
+ *
+ * Con un solo grupo devuelve exactamente la decisión de ese grupo.
+ *
+ * @param {string} route
+ * @param {{group: string, decision: object, outcome: 'written'|'reused'|'unchanged'|'failed'|'first_activation_failed', error?: string|null}[]} grupos
+ */
+export function combineGroupDecisions(route, grupos) {
+  const motivo = (grupo) => grupo.error ?? grupo.decision.reason;
+  const primeraFallida = grupos.find((grupo) => grupo.outcome === 'first_activation_failed');
+  if (primeraFallida) return decision('fail_closed', { reason: `primera activación de ${primeraFallida.group} rechazada: ${motivo(primeraFallida)}` });
+  const publican = grupos.filter((grupo) => grupo.decision.deploy && ['written', 'reused'].includes(grupo.outcome));
+  const fallidos = grupos.filter((grupo) => grupo.outcome === 'failed');
+  const principal = (lista) => lista.find((grupo) => grupo.group === 'gasolina') ?? lista[0];
+  if (!publican.length) {
+    if (fallidos.length) {
+      const primero = principal(fallidos);
+      return decision('fail_closed', { reason: primero.decision.action === 'fail_closed' ? primero.decision.reason : `${route}: ${primero.group} falló: ${motivo(primero)}` });
+    }
+    const { action, project, verify, deploy, reason } = principal(grupos).decision;
+    return decision(action, { project, verify, deploy, reason });
+  }
+  const cabeza = principal(publican);
+  const otros = publican.filter((grupo) => grupo !== cabeza && grupo.decision.reason !== cabeza.decision.reason).map((grupo) => `${grupo.group}: ${grupo.decision.reason}`);
+  const avisos = fallidos.map((grupo) => `${grupo.group} conserva su versión publicada: ${motivo(grupo)}`);
+  return decision(cabeza.decision.action, { project: publican.some((grupo) => grupo.decision.project), verify: true, deploy: true, reason: [cabeza.decision.reason, ...otros, ...avisos].join('; ') });
+}
+
+/**
  * Rutas que no dependen de la fuente. `docs` no publica nada; `shell` publica el
  * cliente nuevo sobre el bundle público ya validado, y por eso no recibe —ni
  * necesita— un resultado de refresco: antes una caída de Osinergmin dejaba un

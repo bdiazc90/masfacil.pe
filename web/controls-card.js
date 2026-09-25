@@ -8,7 +8,12 @@ export function initControlsCard({ card, slot, scrim, summaryButton, doneButton,
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let overlayWatch = null;
 
-  function setState(state) {
+  const visible = (el) => el && el.offsetParent !== null;
+  // El primer control de búsqueda del panel: la cabecera de marca y tema queda
+  // fuera, porque abrir «Ajustar» es para ajustar la búsqueda, no para ir al inicio.
+  const primerControl = () => [...card.querySelectorAll('.controls__panel :is(button, a[href], input):not([disabled])')].find((el) => visible(el) && !el.closest('.appbar'));
+
+  function setState(state, { devolverFoco = false } = {}) {
     if (overlayWatch) { removeEventListener('scroll', overlayWatch); overlayWatch = null; }
     if (card.dataset.state === state) return;
     card.dataset.state = state;
@@ -19,8 +24,9 @@ export function initControlsCard({ card, slot, scrim, summaryButton, doneButton,
     // Nadie se queda enfocado dentro de un panel que acaba de cerrarse. En la
     // pantalla de distritos «Ajustar» no existe —no hay nada que desplegar—, así
     // que el foco va al primer control que sí queda visible en la barra.
-    if (!open && card.contains(document.activeElement)) {
-      const visible = (el) => el && el.offsetParent !== null;
+    // Cerrar a mano —Listo, Escape o el fondo— devuelve el foco a «Ajustar»
+    // aunque estuviera fuera del card: tocar el fondo no puede dejarlo en <body>.
+    if (!open && (devolverFoco || card.contains(document.activeElement))) {
       const destino = visible(summaryButton) ? summaryButton : [...card.querySelectorAll('.controls__bar button')].find(visible);
       destino?.focus({ preventScroll: true });
     }
@@ -31,10 +37,12 @@ export function initControlsCard({ card, slot, scrim, summaryButton, doneButton,
     }
   }
 
-  summaryButton.addEventListener('click', () => setState('overlay'));
-  doneButton.addEventListener('click', () => setState('compact'));
-  scrim.addEventListener('click', () => setState('compact'));
-  addEventListener('keydown', (event) => { if (event.key === 'Escape' && card.dataset.state === 'overlay') setState('compact'); });
+  // Abrir «Ajustar» lleva el foco al primer control; si no, quien navega con
+  // teclado tendría que recorrer la página para llegar al panel que acaba de abrir.
+  summaryButton.addEventListener('click', () => { const abria = card.dataset.state === 'compact'; setState('overlay'); if (abria) primerControl()?.focus({ preventScroll: true }); });
+  doneButton.addEventListener('click', () => setState('compact', { devolverFoco: true }));
+  scrim.addEventListener('click', () => setState('compact', { devolverFoco: true }));
+  addEventListener('keydown', (event) => { if (event.key === 'Escape' && card.dataset.state === 'overlay') setState('compact', { devolverFoco: true }); });
 
   const sentinels = new IntersectionObserver((entries) => {
     if (!isActive()) return;

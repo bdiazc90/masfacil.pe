@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { codeRegression } from '../app/route-policy.mjs';
 import { groupsBehind } from '../app/publication-policy.mjs';
 import { PUBLISHED_GROUPS } from '../pipeline/groups.mjs';
+import { fetchPublishedState } from '../pipeline/live-bundle.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const route = process.env.ROUTE || 'data';
@@ -34,17 +35,11 @@ const locales = Object.fromEntries(PUBLISHED_GROUPS.map((grupo) => {
   return [grupo.key, estado];
 }));
 
-const base = new URL(origin);
-if (!base.pathname.endsWith('/')) base.pathname = `${base.pathname}/`;
-
 // Se lee el refresh-state entero, no solo su `snapshot_id`: ordenar dos corridas
-// necesita también la consulta web, distrito por distrito.
-async function publicado(grupo) {
-  const response = await fetch(new URL(`${grupo.dataRoot}/refresh-state.json`, base), { redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' } });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`No se pudo leer el refresh-state publicado de ${grupo.key}: HTTP ${response.status}`);
-  return JSON.parse(await response.text());
-}
+// necesita también la consulta web, distrito por distrito. Un grupo sin estado
+// publicado solo cuenta como «todavía no publicado» si su página también da
+// 404; si la página existe, producción está rota y no se sube nada encima.
+const publicado = (grupo) => fetchPublishedState({ origin, group: grupo });
 
 const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
 

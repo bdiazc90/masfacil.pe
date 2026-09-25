@@ -3,14 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decodeSeed } from '../app/bootstrap-seed.mjs';
-import { readActivePointer } from '../app/snapshot-manifest.mjs';
-import { buildGasolinaProducts, GASOLINA_PRODUCTS } from './gasolina-products.mjs';
-import { GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, sha256, validateGasolinaBundle, validateGasolinaManifest, validateGasolinaRefreshState } from './gasolina-contract.mjs';
+import { pointerRelative, readActivePointer } from '../app/snapshot-manifest.mjs';
+import { buildGasolinaProducts, buildLiquidProducts } from './gasolina-products.mjs';
+import { sha256 } from './gasolina-contract.mjs';
+import { PUBLISHED_GROUPS, describeGroup } from './groups.mjs';
+import { compareGroupQuality } from './refresh-state.mjs';
+import { adoptSnapshot } from '../app/snapshot-refresh.mjs';
 import { buildCommercialCatalogIndex, staleBrandEvidence } from '../app/commercial-catalog.mjs';
 import { brandAccreditationGroups } from '../app/commercial-audit.mjs';
 import { absentCommercialResolution, commercialIdentityReport, resolveCommercialIdentity } from '../app/commercial-resolution.mjs';
 import { brandAssetFor } from '../web/brand-logos.js';
-import { GASOLINA } from '../web/lib/catalog.js';
+import { PRODUCTS } from '../web/lib/catalog.js';
 import { filterFreshOffers } from '../web/lib/freshness.js';
 import { selectOfferPrice } from '../web/lib/price-source.js';
 import { resolveFacilitoLayer } from './facilito/link.mjs';
@@ -36,9 +39,9 @@ function atomic(file, content) {
   fs.renameSync(temp, file);
 }
 
-function active(root) {
-  const pointer = readActivePointer(root);
-  if (!pointer) throw new Error('No hay pointer de snapshot activo; no hay nada que proyectar');
+function active(root, group = 'gasolina') {
+  const pointer = readActivePointer(root, { group });
+  if (!pointer) throw new Error(`No hay pointer de snapshot activo para ${group}; no hay nada que proyectar`);
   return pointer;
 }
 
@@ -85,31 +88,33 @@ function optionalSeed(root) {
   return decodeSeed(fs.readFileSync(encoded, 'utf8'), manifest);
 }
 
-export async function buildGasolinaProjectionCandidate({ pointer, temporalContext, sources = null, minimizedRoot, rawPath, bootstrapSeed = null, commercialResolution = absentCommercialResolution(), facilitoState = null, now = Date.now() }) {
+/**
+ * La candidata de un grupo, sobre productos ya proyectados: bundles, manifest y
+ * estado, validados contra el contrato del grupo antes de devolverlos.
+ *
+ * @param {object} entrada
+ * @param {ReturnType<typeof describeGroup>} entrada.group
+ * @param {Record<string, object>} entrada.results  los productos del grupo, de `buildLiquidProducts`
+ */
+export function buildGroupCandidate({ group, pointer, temporalContext, results, commercialResolution = absentCommercialResolution(), facilitoState = null, now = Date.now() }) {
+  const keys = group.products;
   // La identidad comercial ya no es una puerta: llega resuelta, con lo que tiene
   // respaldo y lo que no. Antes esta función empezaba comprobando la auditoría y
   // un nombre pendiente impedía construir un solo precio.
   const commercialCatalog = commercialResolution.catalog;
   const commercialAudit = commercialResolution.audit;
-  const input = {
-    cutoffAt: temporalContext.cutoff_at,
-    snapshotId: pointer.snapshot_id,
-    sourceMaxReportedAt: temporalContext.source_max_reported_at,
-    sourceUrl: pointer.source_url,
-  };
-  // Regular y Premium salen de las mismas tablas y de UNA sola pasada por el
-  // original de 1,2 GB: la identidad de un ID3 no depende del producto.
-  const { results } = await buildGasolinaProducts({ ...input, sources, minimizedRoot, rawPath, bootstrapSeed, productKeys: GASOLINA_KEYS });
+  const input = { cutoffAt: temporalContext.cutoff_at, sourceMaxReportedAt: temporalContext.source_max_reported_at };
   const brandGroups = brandAccreditationGroups(commercialCatalog, commercialAudit);
   const catalogIndex = buildCommercialCatalogIndex(commercialCatalog, {
-    registryIds: GASOLINA_KEYS.flatMap((key) => [...results[key].registryAnchors]),
-    offerIds: GASOLINA_KEYS.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)),
+    registryIds: keys.flatMap((key) => [...results[key].registryAnchors]),
+    offerIds: keys.flatMap((key) => results[key].offers.map((offer) => offer.establishment_id)),
   });
   // La consulta web se resuelve aquí, con el vínculo exacto que salió de la
   // misma fila del original que dio el precio publicado. Es una CAPA: el precio
   // y la fecha del CSV viajan intactos al lado, porque el respaldo tiene que
   // funcionar cuando la consulta venza y el cliente esté sin red.
-  const facilitoLayers = Object.fromEntries(GASOLINA_KEYS.map((key) => [key, resolveFacilitoLayer({ state: facilitoState, linkKeys: results[key].linkKeys, product: key, now })]));
+  const facilitoLayers = Object.fromEntries(keys.map((key) => [key, resolveFacilitoLayer({ state: facilitoState, linkKeys: results[key].linkKeys, product: key, now })]));
+  const version = group.rules.current;
   // La revisión sale del contenido, no de un sufijo que había que subir a mano y
   // que se olvidaba: mismo contenido, misma revisión; contenido distinto,
   // revisión nueva, y los snapshots siguen siendo inmutables porque un contenido
@@ -120,46 +125,46 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
   // misma revisión con bytes distintos, y esa ruta la cachean los clientes un
   // año como inmutable.
   const contenido = (key) => ({
-    schema_version: GASOLINA_MANIFEST_VERSION,
-    product: { key, canonical: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, display_unit: GASOLINA_PRODUCTS[key].unit },
-    scope: GASOLINA_SCOPE,
+    schema_version: version,
+    product: { key, canonical: PRODUCTS[key].canonical, label: PRODUCTS[key].label, display_unit: PRODUCTS[key].unit },
+    scope: group.scope,
     snapshot_date: pointer.snapshot_date,
     cutoff_at: input.cutoffAt,
     source_max_reported_at: input.sourceMaxReportedAt,
     provenance: { source: 'Osinergmin', source_url: pointer.source_url, attribution: 'Datos de precios y coordenadas: Osinergmin.' },
     offers: results[key].offers.map((offer) => ({ ...offer, commercial_identity: catalogIndex.byAnchor.get(offer.establishment_id) ?? null, facilito: facilitoLayers[key].byOfferId.get(offer.id) ?? null })),
   });
-  // Una sola huella para los dos productos: el contrato exige que regular y
-  // premium declaren la misma revisión.
-  const revisionId = `gasolina-${pointer.snapshot_id}-${sha256(GASOLINA_KEYS.map((key) => stable(contenido(key))).join('')).slice(0, 12)}`;
+  // Una sola huella para todos los productos del grupo: el contrato exige que
+  // declaren la misma revisión.
+  const revisionId = `${group.config.revisionPrefix}${pointer.snapshot_id}-${sha256(keys.map((key) => stable(contenido(key))).join('')).slice(0, 12)}`;
   const datasets = {};
   const bodies = {};
   const descriptors = {};
-  for (const key of GASOLINA_KEYS) {
+  for (const key of keys) {
     const data = {
-      schema_version: GASOLINA_MANIFEST_VERSION,
+      schema_version: version,
       revision_id: revisionId,
       ...contenido(key),
     };
     const body = stable(data);
-    const relative = `${GASOLINA.dataRoot}/snapshots/${revisionId}/${key}.json`;
+    const relative = `${group.dataRoot}/snapshots/${revisionId}/${key}.json`;
     datasets[key] = data;
     bodies[key] = body;
-    descriptors[key] = { canonical_product: GASOLINA_PRODUCTS[key].canonical, label: GASOLINA_PRODUCTS[key].label, dataset_url: relative, bytes: Buffer.byteLength(body), sha256: sha256(body), cutoff_at: input.cutoffAt };
+    descriptors[key] = { canonical_product: PRODUCTS[key].canonical, label: PRODUCTS[key].label, dataset_url: relative, bytes: Buffer.byteLength(body), sha256: sha256(body), cutoff_at: input.cutoffAt };
   }
-  const manifest = { schema_version: GASOLINA_MANIFEST_VERSION, revision_id: revisionId, scope: GASOLINA_SCOPE, products: descriptors, generated_at: pointer.promoted_at };
-  // El expediente guarda también otros combustibles; el estado de Gasolina
+  const manifest = { schema_version: version, revision_id: revisionId, scope: group.scope, products: descriptors, generated_at: pointer.promoted_at };
+  // El expediente guarda también otros combustibles; el estado de cada grupo
   // cuenta solo sus unidades, para que el preflight no compare las ajenas.
-  const facilitoPropio = facilitoStateForProducts(facilitoState, GASOLINA_KEYS);
+  const facilitoPropio = facilitoStateForProducts(facilitoState, keys);
   const refreshState = {
-    schema_version: GASOLINA_MANIFEST_VERSION,
+    schema_version: version,
     revision_id: revisionId,
     // Declarado, no deducido del identificador: recortarlo nunca funcionó y
     // apagaba en silencio los guardrails de caída.
     snapshot_id: pointer.snapshot_id,
     validators: pointer.validators,
     source_max_reported_at: input.sourceMaxReportedAt,
-    products: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, { ...results[key].metrics, cutoff_at: input.cutoffAt }])),
+    products: Object.fromEntries(keys.map((key) => [key, { ...results[key].metrics, cutoff_at: input.cutoffAt }])),
     // Captura, vínculos y precios efectivos se miden por separado a propósito:
     // un respaldo CSV que funciona no es un scraping que funcionó, y mezclarlos
     // haría que una corrida sin una sola consulta pareciera exitosa. El embudo
@@ -173,19 +178,26 @@ export async function buildGasolinaProjectionCandidate({ pointer, temporalContex
       units_observed: facilitoUnitInstants(facilitoPropio),
       units: facilitoRunCounts(facilitoPropio),
       districts: new Set(Object.values(facilitoPropio?.units ?? {}).map((unidad) => unidad.district_code)).size,
-      linked: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, facilitoLayers[key].counts.linked])),
-      ambiguous: GASOLINA_KEYS.reduce((total, key) => total + facilitoLayers[key].counts.ambiguous, 0),
-      unlinked: GASOLINA_KEYS.reduce((total, key) => total + facilitoLayers[key].counts.unlinked, 0),
-      effective: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, preciosEfectivos(contenido(key).offers, input.cutoffAt, now)])),
+      linked: Object.fromEntries(keys.map((key) => [key, facilitoLayers[key].counts.linked])),
+      ambiguous: keys.reduce((total, key) => total + facilitoLayers[key].counts.ambiguous, 0),
+      unlinked: keys.reduce((total, key) => total + facilitoLayers[key].counts.unlinked, 0),
+      effective: Object.fromEntries(keys.map((key) => [key, preciosEfectivos(contenido(key).offers, input.cutoffAt, now)])),
     },
   };
-  const errors = [...validateGasolinaManifest(manifest), ...validateGasolinaRefreshState(refreshState, manifest)];
-  for (const key of GASOLINA_KEYS) errors.push(...validateGasolinaBundle(manifest, key, bodies[key]));
-  if (errors.length) throw new Error(`Contrato gasolina inválido: ${[...new Set(errors)].join('; ')}`);
+  const errors = [...group.validate.manifest(manifest), ...group.validate.refreshState(refreshState, manifest)];
+  for (const key of keys) errors.push(...group.validate.bundle(manifest, key, bodies[key]));
+  if (errors.length) throw new Error(`Contrato ${group.key} inválido: ${[...new Set(errors)].join('; ')}`);
   // Cada identidad sin oferta viene con la etapa en la que se perdió por producto:
   // Regular y Premium pueden caerse por motivos distintos, así que se anotan los dos.
-  const catalogWithoutOffer = catalogIndex.withoutOffer.map((id) => Object.fromEntries([['id', id], ...GASOLINA_KEYS.map((key) => [key, results[key].exclusions.get(id) ?? 'fuera_del_registro_del_producto'])]));
-  return { manifest, refreshState, datasets, bodies, results, facilitoState, facilitoLayers, composedAt: now, identity: commercialIdentityReport(commercialResolution), isolatedEntries: commercialResolution.isolated ?? [], catalog: catalogIndex.metrics, catalogWithoutOffer, catalogUnknownAnchors: catalogIndex.unknownAnchors, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(GASOLINA_KEYS.map((key) => [key, descriptors[key].bytes])) };
+  const catalogWithoutOffer = catalogIndex.withoutOffer.map((id) => Object.fromEntries([['id', id], ...keys.map((key) => [key, results[key].exclusions.get(id) ?? 'fuera_del_registro_del_producto'])]));
+  return { group: group.key, manifest, refreshState, datasets, bodies, results, facilitoState, facilitoLayers, composedAt: now, identity: commercialIdentityReport(commercialResolution), isolatedEntries: commercialResolution.isolated ?? [], catalog: catalogIndex.metrics, catalogWithoutOffer, catalogUnknownAnchors: catalogIndex.unknownAnchors, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(keys.map((key) => [key, descriptors[key].bytes])) };
+}
+
+export async function buildGasolinaProjectionCandidate({ pointer, temporalContext, sources = null, minimizedRoot, rawPath, bootstrapSeed = null, commercialResolution = absentCommercialResolution(), facilitoState = null, now = Date.now() }) {
+  // Regular y Premium salen de las mismas tablas y de UNA sola pasada por el
+  // original de 1,2 GB: la identidad de un ID3 no depende del producto.
+  const { results } = await buildGasolinaProducts({ cutoffAt: temporalContext.cutoff_at, snapshotId: pointer.snapshot_id, sourceMaxReportedAt: temporalContext.source_max_reported_at, sourceUrl: pointer.source_url, sources, minimizedRoot, rawPath, bootstrapSeed });
+  return buildGroupCandidate({ group: describeGroup('gasolina'), pointer, temporalContext, results, commercialResolution, facilitoState, now });
 }
 
 /** Dónde vive el expediente. `IDENTITY_ROOT` permite trabajar sobre una copia. */
@@ -211,17 +223,17 @@ export function loadCommercialPublicationInputs(root, { identityRoot } = {}) {
  * caché, la descarga completa. Si falta un input se dice cuál, y quien llama
  * cae al refresco. No se reproyecta un snapshot más viejo que el publicado.
  */
-export function usablePrivateSnapshot(root = rootFromModule, { publishedSnapshotId = null } = {}) {
+export function usablePrivateSnapshot(root = rootFromModule, { publishedSnapshotId = null, group = 'gasolina' } = {}) {
   let pointer;
-  try { pointer = readActivePointer(root); } catch (error) { return { ok: false, snapshot_id: null, missing: [`pointer activo: ${error.message}`] }; }
-  if (!pointer) return { ok: false, snapshot_id: null, missing: ['pointer activo ausente (.local-cache/snapshots/active.json)'] };
+  try { pointer = readActivePointer(root, { group }); } catch (error) { return { ok: false, snapshot_id: null, missing: [`pointer activo: ${error.message}`] }; }
+  if (!pointer) return { ok: false, snapshot_id: null, missing: [`pointer activo ausente (${pointerRelative(group)})`] };
   const missing = [];
   const dir = path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id);
   if (!fs.existsSync(path.join(dir, 'snapshot-manifest.json'))) missing.push('snapshot-manifest.json');
   if (!fs.existsSync(path.join(dir, 'minimized'))) missing.push('minimized/');
   try { resolveGasolinaRaw(root, pointer); } catch (error) { missing.push(`raw: ${error.message}`); }
   if (publishedSnapshotId && pointer.snapshot_id < publishedSnapshotId) missing.push(`snapshot ${pointer.snapshot_id} anterior al publicado ${publishedSnapshotId}`);
-  return { ok: !missing.length, snapshot_id: pointer.snapshot_id, missing };
+  return { ok: !missing.length, snapshot_id: pointer.snapshot_id, missing, pointer };
 }
 
 /**
@@ -243,8 +255,52 @@ export async function buildGasolinaProjectionForPointer({ root = rootFromModule,
   });
 }
 
-export function writeGasolinaProjection(candidate, { root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot, facilitoRoot } = {}) {
-  for (const key of GASOLINA_KEYS) {
+/**
+ * Compone varios grupos sin escribir. Cada entrada del plan es un snapshot base
+ * con los grupos que se componen sobre él: las tablas se cargan y el original de
+ * 1,2 GB se recorre UNA vez por snapshot, no por grupo. Todos los grupos de la
+ * corrida comparten reloj, identidad comercial y expediente.
+ *
+ * @param {object} entrada
+ * @param {{pointer: object, groups: string[]}[]} entrada.plan
+ * @returns {Promise<Record<string, object>>} la candidata de cada grupo
+ */
+export async function composeGroups({ root = rootFromModule, plan, identityRoot, facilitoRoot, facilitoState, bootstrapSeed, now = Date.now(), isolate = false } = {}) {
+  const comerciales = loadCommercialPublicationInputs(root, { identityRoot });
+  const estado = facilitoState === undefined ? readFacilitoState(root, { facilitoRoot }) : facilitoState;
+  const semilla = bootstrapSeed === undefined ? optionalSeed(root) : bootstrapSeed;
+  const candidates = {};
+  // Con `isolate`, el fallo de un grupo queda en su lugar como `{ error }` y los
+  // demás se siguen componiendo: la preparación decide qué hacer con cada uno.
+  const aislar = (keys, error) => { if (!isolate) throw error; for (const key of keys) candidates[key] = { error: error.message }; };
+  for (const { pointer, groups } of plan) {
+    let temporalContext;
+    let resultsByGroup;
+    const descritos = groups.map((key) => describeGroup(key));
+    try {
+      temporalContext = temporalContextForPointer(root, pointer);
+      ({ resultsByGroup } = await buildLiquidProducts({
+        minimizedRoot: path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized'),
+        rawPath: resolveGasolinaRaw(root, pointer),
+        bootstrapSeed: semilla,
+        cutoffAt: temporalContext.cutoff_at,
+        snapshotId: pointer.snapshot_id,
+        sourceMaxReportedAt: temporalContext.source_max_reported_at,
+        sourceUrl: pointer.source_url,
+        groups: descritos.map((grupo) => ({ key: grupo.key, products: grupo.products, activities: grupo.config.activities, scope: grupo.scope, idScheme: grupo.config.idScheme })),
+      }));
+    } catch (error) { aislar(groups, error); continue; }
+    for (const grupo of descritos) {
+      try { candidates[grupo.key] = buildGroupCandidate({ group: grupo, pointer, temporalContext, results: resultsByGroup[grupo.key], ...comerciales, facilitoState: estado, now }); }
+      catch (error) { aislar([grupo.key], error); }
+    }
+  }
+  return candidates;
+}
+
+/** Escribe la candidata de un grupo en `web/<raíz del grupo>/`, en el orden que protege a los clientes. */
+export function writeGroupProjection(candidate, { root = rootFromModule, group = describeGroup(candidate.group ?? 'gasolina'), outputRoot = path.join(root, 'web', ...group.dataRoot.split('/')), identityRoot, facilitoRoot } = {}) {
+  for (const key of group.products) {
     const target = path.join(root, 'web', candidate.manifest.products[key].dataset_url);
     if (fs.existsSync(target) && fs.readFileSync(target, 'utf8') !== candidate.bodies[key]) throw new Error(`Snapshot inmutable ya existe con bytes distintos: ${target}`);
     if (!fs.existsSync(target)) atomic(target, candidate.bodies[key]);
@@ -255,13 +311,30 @@ export function writeGasolinaProjection(candidate, { root = rootFromModule, outp
   if (candidate.facilitoState) writeFacilitoRevision(root, candidate.manifest.revision_id, candidate.facilitoState, { facilitoRoot, composedAt: candidate.composedAt });
   atomic(path.join(outputRoot, 'refresh-state.json'), stable(candidate.refreshState));
   atomic(path.join(outputRoot, 'manifest.json'), stable(candidate.manifest));
-  writeCommercialCoverage(candidate, root, identityRoot);
+  writeCommercialCoverage(candidate, root, identityRoot, { group: group.key });
+  writeGroupFunnel(candidate, root, group);
   return candidate;
+}
+
+export function writeGasolinaProjection(candidate, { root = rootFromModule, outputRoot = path.join(root, 'web', 'data', 'gasolina'), identityRoot, facilitoRoot } = {}) {
+  return writeGroupProjection(candidate, { root, group: describeGroup('gasolina'), outputRoot, identityRoot, facilitoRoot });
+}
+
+/**
+ * Dónde se perdió cada reporte, por producto y distrito. Es privado aunque no
+ * lleve identidad: sirve para revisar una activación, no para el cliente.
+ */
+function writeGroupFunnel(candidate, root, group) {
+  const file = path.join(root, '.local-cache', 'publish', group.key, 'funnel.json');
+  const report = { revision_id: candidate.manifest.revision_id, products: Object.fromEntries(group.products.map((key) => [key, candidate.results[key].funnel ?? null])) };
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(file, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+  return file;
 }
 
 /**
  * La marca tal como llega a la tarjeta, contada por establecimiento único
- * —Regular y Premium no son dos grifos— y por producto. El precio vigente y el
+ * —Regular y Premium no son dos grifos— y por producto del grupo. El precio vigente y el
  * vencido se separan con el reloj del propio snapshot (`cutoff_at`), así que dos
  * proyecciones del mismo snapshot se comparan sin que el día de la corrida
  * mueva nada. `svg` dice si el registro del cliente tiene con qué pintarla.
@@ -270,7 +343,8 @@ export function brandCoverage(datasets) {
   const universo = new Set();
   const conMarca = new Set();
   const porMarca = new Map();
-  for (const key of GASOLINA_KEYS) {
+  const keys = Object.keys(datasets);
+  for (const key of keys) {
     const { offers, cutoff_at: cutoffAt } = datasets[key];
     const { offers: vigentes, expired: vencidas } = filterFreshOffers(offers, { now: () => cutoffAt, cutoffAt });
     for (const [estado, lista] of [['vigentes', vigentes], ['vencidas', vencidas]]) {
@@ -279,7 +353,7 @@ export function brandCoverage(datasets) {
         const brand = offer.commercial_identity?.brand;
         if (!brand) continue;
         conMarca.add(offer.establishment_id);
-        const grupo = porMarca.get(brand) ?? { brand, svg: Boolean(brandAssetFor({ brand })), ids: new Set(), vigentes: new Set(), productos: Object.fromEntries(GASOLINA_KEYS.map((k) => [k, { vigentes: 0, vencidas: 0 }])) };
+        const grupo = porMarca.get(brand) ?? { brand, svg: Boolean(brandAssetFor({ brand })), ids: new Set(), vigentes: new Set(), productos: Object.fromEntries(keys.map((k) => [k, { vigentes: 0, vencidas: 0 }])) };
         grupo.ids.add(offer.establishment_id);
         if (estado === 'vigentes') grupo.vigentes.add(offer.establishment_id);
         grupo.productos[key][estado] += 1;
@@ -319,8 +393,9 @@ function brandPending(identidad) {
 
 // Las identidades acreditadas que hoy no tienen oferta vigente no se borran ni
 // se publican: quedan anotadas en la caché privada para poder revisarlas.
-export function writeCommercialCoverage(candidate, root = rootFromModule, identityRoot) {
-  const file = path.join(root, '.local-cache', 'publish', 'commercial-identity-coverage.json');
+export function writeCommercialCoverage(candidate, root = rootFromModule, identityRoot, { group = 'gasolina' } = {}) {
+  // Gasolina conserva su archivo de siempre; cada grupo nuevo, el suyo.
+  const file = path.join(root, '.local-cache', 'publish', ...(group === 'gasolina' ? [] : [group]), 'commercial-identity-coverage.json');
   const report = {
     revision_id: candidate.manifest.revision_id,
     generated_at: candidate.manifest.generated_at,
@@ -356,6 +431,36 @@ export async function projectGasolina({ root = rootFromModule, outputRoot = path
   return writeGasolinaProjection(candidate, { root, outputRoot, identityRoot, facilitoRoot });
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) projectGasolina()
-  .then((result) => process.stdout.write(`Proyección gasolina: Regular ${result.datasets.regular.offers.length} · Premium ${result.datasets.premium.offers.length} · ${result.bytes.regular}/${result.bytes.premium} bytes · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca (${result.catalog.with_brand_evidence} con expediente), ${result.catalog.without_current_offer} sin reporte en el Registro\n`))
-  .catch((error) => { process.stderr.write(`No se publicó gasolina: ${error.message}\n`); process.exitCode = 1; });
+/**
+ * Proyecta todos los grupos activos desde la caché privada, como `npm run
+ * project`. Cada grupo usa su pointer; uno que todavía no tiene —su primera
+ * activación— se compone sobre el de Gasolina, se juzga contra su base auditada
+ * y, solo si pasa, adopta ese snapshot. Nada se escribe si un grupo falla.
+ */
+export async function projectGroups({ root = rootFromModule, identityRoot, facilitoRoot } = {}) {
+  const plan = new Map();
+  const primeras = [];
+  for (const grupo of PUBLISHED_GROUPS) {
+    let base = usablePrivateSnapshot(root, { group: grupo.key });
+    if (!base.ok && grupo.config.guardrails.firstActivation) { base = usablePrivateSnapshot(root, { group: 'gasolina' }); primeras.push(grupo.key); }
+    if (!base.ok) throw new Error(`${grupo.key}: sin snapshot privado utilizable: ${base.missing.join('; ')}`);
+    const entrada = plan.get(base.snapshot_id) ?? { pointer: base.pointer, groups: [] };
+    entrada.groups.push(grupo.key);
+    plan.set(base.snapshot_id, entrada);
+  }
+  const candidatas = await composeGroups({ root, plan: [...plan.values()], identityRoot, facilitoRoot });
+  for (const key of primeras) {
+    const { refreshState } = candidatas[key];
+    const calidad = compareGroupQuality({ group: key, candidateProducts: refreshState.products, candidateSourceMaxReportedAt: refreshState.source_max_reported_at });
+    if (calidad.status !== 'ready') throw new Error(`Primera versión de ${key} rechazada: ${calidad.reasons.join('; ')}`);
+  }
+  for (const key of primeras) adoptSnapshot(root, candidatas[key].refreshState.snapshot_id, { group: key });
+  for (const grupo of PUBLISHED_GROUPS) writeGroupProjection(candidatas[grupo.key], { root, group: grupo, identityRoot, facilitoRoot });
+  return candidatas;
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) projectGroups()
+  .then((candidatas) => {
+    for (const [key, result] of Object.entries(candidatas)) process.stdout.write(`Proyección ${key}: ${Object.entries(result.datasets).map(([producto, dataset]) => `${PRODUCTS[producto].short} ${dataset.offers.length} (${result.bytes[producto]} bytes)`).join(' · ')} · revisión ${result.manifest.revision_id} · identidad ${result.catalog.projected}/${result.catalog.entries} publicadas, ${result.catalog.projected_with_brand} con marca\n`);
+  })
+  .catch((error) => { process.stderr.write(`No se publicó: ${error.message}\n`); process.exitCode = 1; });

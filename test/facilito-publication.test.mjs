@@ -166,6 +166,7 @@ test('un fallo del CSV no apaga la consulta si queda un snapshot oficial válido
 // --- La compuerta completa, sin red y sin los 1,2 GB del original ----------
 
 import { prepareRelease } from '../pipeline/prepare-release.mjs';
+import { groupByKey } from '../pipeline/groups.mjs';
 
 const candidato = (precioWeb) => ({
   manifest: { revision_id: 'gasolina-X-nueva' },
@@ -179,16 +180,20 @@ const candidato = (precioWeb) => ({
 const relojEnAhora = (t) => t.mock.timers.enable({ apis: ['Date'], now: AHORA });
 
 /** `unchanged` + expediente con unidades: se compone para mirar, no para publicar. */
+// Solo Gasolina: estas pruebas miran su compuerta de la consulta web; el
+// aislamiento entre grupos tiene las suyas.
 function conDeps({ precioWeb, publicadoWeb, escrituras }) {
   return {
+    groups: [groupByKey('gasolina')],
+    estadoPublicado: () => ({ snapshot_id: 'S1' }),
     refreshSnapshot: async () => ({ status: 'unchanged' }),
     readFacilitoState: () => ({ units: { '150103:regular': {} } }),
-    composeGasolinaProjection: async () => candidato(precioWeb),
-    writeGasolinaProjection: (c) => { escrituras.push(c.manifest.revision_id); return c; },
+    composeGroups: async () => ({ gasolina: candidato(precioWeb) }),
+    writeGroupProjection: (c) => { escrituras.push(c.manifest.revision_id); return c; },
     publicadosDesdeDisco: () => datasets([oferta('g2_a', 22.99, publicadoWeb === null ? null : consulta(publicadoWeb, iso(AHORA - 7 * HORA)))]),
     writeShellManifest: () => {},
     verifyWeb: async () => ({ errors: [] }),
-    usablePrivateSnapshot: () => ({ ok: true, snapshot_id: 'S1', missing: [] }),
+    usablePrivateSnapshot: () => ({ ok: true, snapshot_id: 'S1', missing: [], pointer: { snapshot_id: 'S1' } }),
   };
 }
 

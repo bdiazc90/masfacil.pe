@@ -16,7 +16,7 @@ import test from 'node:test';
 
 import { groupsBehind } from '../app/publication-policy.mjs';
 import { PUBLISHED_GROUPS } from '../pipeline/groups.mjs';
-import { fetchLiveBundle, fetchLiveGroups, writeLiveGroups } from '../pipeline/live-bundle.mjs';
+import { fetchLiveBundle, fetchLiveGroups, fetchPublishedState, writeLiveGroups } from '../pipeline/live-bundle.mjs';
 import { bundleGasolina } from './fixtures/gasolina-bundle.mjs';
 
 const R = bundleGasolina({ revision: 'gasolina-2026-09-06-prueba-000000000001' });
@@ -34,7 +34,27 @@ function origen(extra = () => null) {
 const sinEspera = { attempts: 1, sleep: async () => {} };
 
 test('los grupos publicados son las vistas activas, cada una con su contrato', () => {
-  assert.deepEqual(PUBLISHED_GROUPS.map((grupo) => [grupo.key, grupo.dataRoot, [...grupo.products]]), [['gasolina', 'data/gasolina', ['regular', 'premium']]]);
+  assert.deepEqual(PUBLISHED_GROUPS.map((grupo) => [grupo.key, grupo.dataRoot, [...grupo.products]]), [['gasolina', 'data/gasolina', ['regular', 'premium']], ['diesel', 'data/diesel', ['diesel']]]);
+});
+
+// La primera activación de un grupo solo se reconoce cuando faltan a la vez sus
+// datos y su página. Cualquier otra ausencia es un despliegue roto y detiene la
+// corrida antes de subir nada encima.
+test('un grupo nunca publicado se reconoce sin confundirlo con uno roto', async () => {
+  const conPagina = (estado) => origen((ruta) => (ruta === 'combustibles/diesel' ? new Response('app', { status: estado }) : null));
+  const [gasolina, diesel] = await fetchLiveGroups({ origin: ORIGEN, fetchImpl: conPagina(404), ...sinEspera });
+  assert.equal(gasolina.revision_id, R.revision);
+  assert.deepEqual(diesel, { group: 'diesel', unpublished: true });
+  await assert.rejects(fetchLiveGroups({ origin: ORIGEN, fetchImpl: conPagina(200), ...sinEspera }), /Grupo diesel: .*data\/diesel\/manifest\.json/, 'datos ausentes con la página en pie');
+  const caido = async (url) => (new URL(url).pathname.startsWith('/data/diesel/') ? new Response('caído', { status: 500 }) : origen()(url));
+  await assert.rejects(fetchLiveGroups({ origin: ORIGEN, fetchImpl: caido, ...sinEspera }), /Grupo diesel: .*HTTP 500/, 'un error del servidor no es una primera vez');
+  // Gasolina no tiene primera activación: su ausencia siempre detiene todo.
+  const sinGasolina = async (url) => (new URL(url).pathname.startsWith('/data/gasolina/') ? new Response('no', { status: 404 }) : new Response('no', { status: 404 }));
+  await assert.rejects(fetchLiveGroups({ origin: ORIGEN, fetchImpl: sinGasolina, ...sinEspera }), /Grupo gasolina: /);
+  // El preflight lee lo mismo: null solo si faltan estado y página.
+  const diesel404 = PUBLISHED_GROUPS.find((grupo) => grupo.key === 'diesel');
+  assert.equal(await fetchPublishedState({ origin: ORIGEN, group: diesel404, fetchImpl: conPagina(404) }), null);
+  await assert.rejects(fetchPublishedState({ origin: ORIGEN, group: diesel404, fetchImpl: conPagina(200) }), /no está publicado pero su página responde HTTP 200/);
 });
 
 test('el bundle vivo se lee por grupo y Gasolina conserva su lectura de siempre', async () => {
@@ -59,7 +79,13 @@ test('cada grupo se escribe en su raíz, snapshots antes que el manifest', () =>
     const datos = path.join(raiz, 'web', 'data', 'gasolina');
     assert.equal(fs.readFileSync(path.join(datos, 'manifest.json'), 'utf8'), R.manifestText);
     for (const key of ['regular', 'premium']) assert.equal(fs.readFileSync(path.join(raiz, 'web', R.manifest.products[key].dataset_url), 'utf8'), R.bodies[key]);
-    assert.throws(() => writeLiveGroups([{ group: 'diesel', ...R }], { root: raiz }), /grupo no publicado: diesel/i);
+    assert.throws(() => writeLiveGroups([{ group: 'glp', ...R }], { root: raiz }), /grupo no publicado: glp/i);
+    // Los bytes de un grupo no pueden aterrizar en la raíz de otro.
+    assert.throws(() => writeLiveGroups([{ group: 'diesel', ...R }], { root: raiz }), /no declara diesel para el grupo diesel/);
+    const ajeno = { ...R, manifest: { ...R.manifest, products: { diesel: R.manifest.products.regular } } };
+    assert.throws(() => writeLiveGroups([{ group: 'diesel', ...ajeno }], { root: raiz }), /dataset_url fuera del grupo diesel/);
+    assert.deepEqual(writeLiveGroups([{ group: 'diesel', unpublished: true }], { root: raiz }), { diesel: { unpublished: true } });
+    assert.equal(fs.existsSync(path.join(raiz, 'web', 'data', 'diesel')), false, 'un grupo sin publicar no deja nada en disco');
   } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
 });
 

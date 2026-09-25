@@ -26,14 +26,17 @@ const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y'])
 export const UNCONFIRMED_LABEL = 'por confirmar';
 
 // Las claves de producto son las mismas en datos, JS y CSS ([data-key]). Nombre
-// corto y sigla salen del catálogo, en el orden de la tarjeta.
-const PRODUCTOS = Object.freeze(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, PRODUCTS[key].short])));
-export const PRODUCT_CHIPS = Object.freeze(Object.fromEntries(GASOLINA_KEYS.map((key) => [key, PRODUCTS[key].chip])));
+// y sigla salen del catálogo; los productos de la tarjeta, de la vista, en su
+// orden. Sin vista declarada, la tarjeta es la de Gasolina, como siempre.
+export const PRODUCT_CHIPS = Object.freeze(Object.fromEntries(Object.values(PRODUCTS).map((product) => [product.key, product.chip])));
+// Con un solo producto en la tarjeta, su nombre accesible es el preciso
+// —«Diésel B5 S-50 UV»—; con dos, basta el corto que los distingue.
+const nombre = (key, products) => (products.length > 1 ? PRODUCTS[key].short : PRODUCTS[key].label);
 const fechaHora = (iso) => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date(iso));
 // «S/» reducido dentro de la cifra: el número es el dato que decide, la moneda solo lo acompaña.
 const priceHtml = (value) => `<small>S/</small>${escapeHtml(value.toFixed(2))}`;
 // El chip lleva su nombre completo para lectores de pantalla; el texto visible es la sigla.
-const chip = (key, extra = '') => `<span class="chip chip--${key}${extra}" role="img" aria-label="${escapeHtml(PRODUCTOS[key])}">${PRODUCT_CHIPS[key]}</span>`;
+const chip = (key, products = GASOLINA_KEYS) => `<span class="chip chip--${key}" role="img" aria-label="${escapeHtml(nombre(key, products))}">${PRODUCT_CHIPS[key]}</span>`;
 
 export function stationIdentity(offer) {
   const identity = offer?.commercial_identity;
@@ -80,23 +83,24 @@ export function displayDistrict(district) {
   return String(district).trim().toLocaleLowerCase('es-PE').split(/\s+/).map((word, index) => index > 0 && lowercaseParticles.has(word) ? word : `${word[0]?.toLocaleUpperCase('es-PE') ?? ''}${word.slice(1)}`).join(' ');
 }
 
-export function directionsLabel(offer, { withDistance = true } = {}) {
+export function directionsLabel(offer, { withDistance = true, products = GASOLINA_KEYS } = {}) {
   const details = [`Cómo llegar a ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`];
-  for (const [key, label] of Object.entries(PRODUCTOS)) { const item = offer.prices?.[key]; if (item) details.push(`${label} ${formatPrice(item.price)}`); }
+  for (const key of products) { const item = offer.prices?.[key]; if (item) details.push(`${nombre(key, products)} ${formatPrice(item.price)}`); }
   if (withDistance) details.push(`a ${kilometers(offer.distance_km)}`);
   return details.join(', ');
 }
 
 // Panel que se despliega bajo la tarjeta. Solo usa datos que ya viajan en el
 // bundle: nada externo, así que funciona igual sin conexión.
-export function renderOfferDetail(offer, { prices = {}, attribution = null } = {}) {
-  const filas = Object.keys(PRODUCTOS).map((key) => {
+export function renderOfferDetail(offer, { prices = {}, attribution = null, products = GASOLINA_KEYS, priceUnit = null } = {}) {
+  const unidad = priceUnit ? ` <small class="detail__unit">${escapeHtml(priceUnit)}</small>` : '';
+  const filas = products.map((key) => {
     const item = prices[key];
-    if (!item) return `<div class="detail__row detail__row--empty">${chip(key)}<span class="detail__price">sin precio vigente</span><span class="detail__when"></span></div>`;
+    if (!item) return `<div class="detail__row detail__row--empty">${chip(key, products)}<span class="detail__price">sin precio vigente</span><span class="detail__when"></span></div>`;
     // Cada producto conserva su fuente y su fecha: aquí es donde se ve cuál de
     // los dos importes se leyó de la web y cuál lo registró el operador.
     const cuando = `${VERBOS[item.source ?? 'csv'].toLocaleLowerCase('es-PE')} ${fechaHora(item.at ?? item.reported_at)}`;
-    return `<div class="detail__row">${chip(key)}<span class="detail__price">${priceHtml(item.price)}</span><span class="detail__when">${escapeHtml(cuando)}</span></div>`;
+    return `<div class="detail__row">${chip(key, products)}<span class="detail__price">${priceHtml(item.price)}${unidad}</span><span class="detail__when">${escapeHtml(cuando)}</span></div>`;
   }).join('');
   const coordenada = `${offer.latitude.toFixed(5)}, ${offer.longitude.toFixed(5)}`;
   const fuente = attribution ? `<span>${escapeHtml(attribution)}</span>` : '';
@@ -117,28 +121,31 @@ export function detailLabel(offer) {
   return `Ver detalle de ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`;
 }
 
-// Los dos precios se ven a la vez porque la decisión se toma comparándolos.
-// Estado del bloque: --on (producto que ordena), --muted (el otro), --absent
-// (sin precio vigente, siempre apagado). En «Más cerca» no hay énfasis.
-function priceCell(offer, key, activeProduct) {
+// En Gasolina los dos precios se ven a la vez porque la decisión se toma
+// comparándolos. Estado del bloque: --on (producto que ordena), --muted (el
+// otro), --absent (sin precio vigente, siempre apagado). En «Más cerca» no hay
+// énfasis. Una vista de un solo producto escribe además la unidad junto a la
+// cifra: «S/ por galón» no se da por supuesto fuera de Gasolina.
+function priceCell(offer, key, activeProduct, products, priceUnit) {
   const item = offer.prices?.[key];
   const clases = ['offer__price'];
   if (!item) clases.push('offer__price--absent');
   else if (activeProduct) clases.push(activeProduct === key ? 'offer__price--on' : 'offer__price--muted');
   const cifra = item ? priceHtml(item.price) : '<span aria-hidden="true">—</span><span class="sr-only">sin precio vigente</span>';
-  return `<p class="${clases.join(' ')}" data-key="${key}"><span class="chip" role="img" aria-label="${escapeHtml(PRODUCTOS[key])}">${PRODUCT_CHIPS[key]}</span><b>${cifra}</b></p>`;
+  const unidad = item && priceUnit ? `<small class="offer__unit">${escapeHtml(priceUnit)}</small>` : '';
+  return `<p class="${clases.join(' ')}" data-key="${key}"><span class="chip" role="img" aria-label="${escapeHtml(nombre(key, products))}">${PRODUCT_CHIPS[key]}</span><b>${cifra}</b>${unidad}</p>`;
 }
 
 // Sin ningún precio vigente la tarjeta no desaparece: se encoge. Se va la fila
 // de precios —la más alta— y queda lo que sigue siendo cierto: quién es, dónde
 // está, a qué distancia y desde cuándo calla. Conserva «Ver detalle» porque el
 // Street View es justo como se averigua si el grifo sigue abierto.
-function renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail }) {
+function renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail, products }) {
   const detail = includeDetail
     ? `<button type="button" class="button button--ghost" data-detail="${escapeHtml(offer.establishment_id)}" aria-expanded="false" aria-label="${escapeHtml(detailLabel(offer))}">Ver detalle</button>`
     : '';
   const directions = includeDirections && directionsUrl
-    ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance }))}">Cómo llegar</a>`
+    ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance, products }))}">Cómo llegar</a>`
     : '';
   const actions = detail || directions ? `<div class="offer__actions">${detail}${directions}</div>` : '';
   const detailSlot = includeDetail ? `<div class="offer__detail-slot" data-detail-slot="${escapeHtml(offer.establishment_id)}" hidden></div>` : '';
@@ -151,18 +158,18 @@ function renderSilentCard(offer, { withDistance, directionsUrl, includeDirection
   return `<li class="offer offer--silent glass"${brandAttr(offer)} tabindex="-1">${brandMarkHtml(offer)}<div class="offer__grid"><h3 class="offer__identity">${escapeHtml(stationIdentity(offer))}${isUnconfirmedIdentity(offer) ? `<span class="offer__unconfirmed"> · ${UNCONFIRMED_LABEL}</span>` : ''}</h3><p class="offer__address">${address}</p><p class="offer__silence"><time${desde}>Sin precio ${escapeHtml(calladoDesde(offer.silent_days))}</time></p><p class="offer__district">${escapeHtml(ubicacion)}</p></div>${actions}${detailSlot}</li>`;
 }
 
-export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null } = {}) {
-  if (offer.has_price === false) return renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail });
+export function renderOfferCard(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null, products = GASOLINA_KEYS, priceUnit = null } = {}) {
+  if (offer.has_price === false) return renderSilentCard(offer, { withDistance, directionsUrl, includeDirections, includeDetail, products });
   // La distancia se alinea con los precios en vez de anclarse a la derecha: así
   // los tres datos que se comparan se leen de un barrido y la esquina superior
   // derecha queda libre para la marca. Sin píldora: el espacio ya la separa.
   const distance = withDistance ? `<p class="offer__distance"><span class="chip chip--distance" role="img" aria-label="Distancia">DIST</span><b>${escapeHtml(kilometers(offer.distance_km))}</b></p>` : '';
-  const precios = Object.keys(PRODUCTOS).map((key) => priceCell(offer, key, activeProduct)).join('');
+  const precios = products.map((key) => priceCell(offer, key, activeProduct, products, priceUnit)).join('');
   const detail = includeDetail
     ? `<button type="button" class="button button--ghost" data-detail="${escapeHtml(offer.establishment_id)}" aria-expanded="false" aria-label="${escapeHtml(detailLabel(offer))}">Ver detalle</button>`
     : '';
   const directions = includeDirections && directionsUrl
-    ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance }))}">Cómo llegar</a>`
+    ? `<a class="button button--primary" href="${escapeHtml(directionsUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(directionsLabel(offer, { withDistance, products }))}">Cómo llegar</a>`
     : '';
   const actions = detail || directions ? `<div class="offer__actions">${detail}${directions}</div>` : '';
   const detailSlot = includeDetail ? `<div class="offer__detail-slot" data-detail-slot="${escapeHtml(offer.establishment_id)}" hidden></div>` : '';
