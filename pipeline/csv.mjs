@@ -18,6 +18,12 @@ import { Transform } from 'node:stream';
 /** Esquemas exactos. Cualquier diferencia de nombre u orden es un fallo. */
 export const RAW_FIELDS = Object.freeze(['ID3', 'ACTIVIDAD', 'REGISTRO_DE_HIDROCARBUROS', 'RUC', 'RAZON_SOCIAL', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'DIRECCION', 'FECHA_DE_REGISTRO', 'PRODUCTO', 'PRECIO_DE_VENTA_SOLES', 'UNIDAD']);
 export const MINIMIZED_FIELDS = Object.freeze(['ID3', 'ACTIVIDAD', 'REGISTRO_DE_HIDROCARBUROS', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'FECHA_DE_REGISTRO', 'PRODUCTO', 'PRECIO_DE_VENTA_SOLES', 'UNIDAD']);
+// El CSV de GLP trae su propio identificador de fila (`ID4`), el tipo de cliente
+// y la marca de la envasadora. La marca describe el producto envasado, no al
+// grifo: se descarta al minimizar junto con los datos personales, para que
+// nunca pueda leerse como identidad de la estación.
+export const GLP_RAW_FIELDS = Object.freeze(['ID4', 'ACTIVIDAD', 'REGISTRO_DE_HIDROCARBUROS', 'RUC', 'RAZON_SOCIAL', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'DIRECCION', 'FECHA_DE_REGISTRO', 'PRODUCTO', 'TIPO_DE_CLIENTE', 'MARCA', 'PRECIO_DE_VENTA_SOLES', 'UNIDAD']);
+export const GLP_MINIMIZED_FIELDS = Object.freeze(['ID4', 'ACTIVIDAD', 'REGISTRO_DE_HIDROCARBUROS', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'FECHA_DE_REGISTRO', 'PRODUCTO', 'TIPO_DE_CLIENTE', 'PRECIO_DE_VENTA_SOLES', 'UNIDAD']);
 export const REGISTRY_FIELDS = Object.freeze(['SOURCE_ACTIVITY', 'REGISTRO', 'CODIGO_OSINERGMIN', 'CODIGO', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'ACTIVIDAD']);
 export const GIS_FIELDS = Object.freeze(['LAYER', 'OBJECTID', 'N', 'COD_OSINERGMIN', 'CODIGO_DGH', 'DEPARTAMENTO', 'PROVINCIA', 'DISTRITO', 'LONGITUDE', 'LATITUDE']);
 

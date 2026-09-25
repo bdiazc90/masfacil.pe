@@ -1,5 +1,4 @@
-import { GROUPS } from '../web/lib/catalog.js';
-import { GROUP_CONFIG } from './groups.mjs';
+import { GROUP_CONFIG, configuredGroup } from './groups.mjs';
 
 function number(value) { return typeof value === 'number' && Number.isFinite(value); }
 
@@ -40,7 +39,7 @@ function productQuality(previous, candidate, key, { maxOfferDrop, maxCoverageDro
  * hace falta que avance: la auditoría y la activación pueden usar el mismo CSV—.
  */
 export function compareGroupQuality({ group, previousProducts = null, candidateProducts, previousSourceMaxReportedAt = null, candidateSourceMaxReportedAt, forcedReprojection = false }) {
-  const keys = GROUPS[group].products;
+  const keys = configuredGroup(group).products;
   const guardrails = GROUP_CONFIG[group].guardrails;
   const primera = !previousProducts && guardrails.firstActivation ? guardrails.firstActivation : null;
   const previos = previousProducts ?? primera?.audited.products ?? null;

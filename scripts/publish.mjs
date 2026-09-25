@@ -17,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareRelease } from '../pipeline/prepare-release.mjs';
 import { refreshOptionsFromEnv } from '../pipeline/refresh-snapshot.mjs';
+import { pruneInCi } from '../pipeline/snapshot-prune.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const resultPath = process.env.PREPARE_RESULT ? path.resolve(process.env.PREPARE_RESULT) : path.join(root, '.local-cache', 'publish', 'prepare-result.json');
@@ -53,6 +54,16 @@ try {
     error: error.message,
   };
 }
+
+// Solo en CI y antes de que la caché de Actions guarde la carpeta: sin poda,
+// cada CSV nuevo se queda para siempre en la caché. En local no se toca nada.
+// Corre antes del deploy, así que protege lo que sirve producción; si la
+// preparación falló antes de leerlo, no poda. Una poda que falla no cambia la
+// decisión de publicar; queda dicho.
+try {
+  const poda = pruneInCi({ root, production: resultado.production });
+  if (poda) resultado.prune = poda;
+} catch (error) { resultado.prune = { status: 'failed', error: error.message }; }
 
 escribirResultado(resultado);
 process.stdout.write(`${JSON.stringify(resultado)}\n`);

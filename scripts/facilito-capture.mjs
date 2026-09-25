@@ -7,7 +7,7 @@
 // social y dirección de cada grifo de Lima. Lo que sale son conteos, duración y
 // motivos de fallo, que es lo que hace falta para saber si la corrida sirvió.
 //
-//   node scripts/facilito-capture.mjs [-v] [--districts "ATE,SAN LUIS"] [--products diesel]
+//   node scripts/facilito-capture.mjs [-v] [--districts "ATE,SAN LUIS"] [--products diesel,glp]
 //
 // Salidas: 0 con captura utilizable, 1 si no se pudo capturar nada, 2 en args.
 
@@ -38,7 +38,7 @@ function parseArgs(argv) {
 function main() {
   let opciones;
   try { opciones = parseArgs(process.argv.slice(2)); } catch (error) {
-    process.stderr.write(`${error.message}\nUso: node scripts/facilito-capture.mjs [-v] [--districts "ATE,SAN LUIS"] [--products regular,premium,diesel] [--budget-ms N]\n`);
+    process.stderr.write(`${error.message}\nUso: node scripts/facilito-capture.mjs [-v] [--districts "ATE,SAN LUIS"] [--products regular,premium,diesel,glp] [--budget-ms N]\n`);
     process.exitCode = 2;
     return;
   }

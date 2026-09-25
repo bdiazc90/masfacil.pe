@@ -70,6 +70,43 @@ if (stage === 'deploy') {
     }
   }
 
+  // Cada fuente consultada con sus grupos, también los que todavía no
+  // publican: GLP se adquiere y se juzga en privado, y aquí se ve sin abrir el
+  // JSON. Los motivos de los grupos publicados ya están en la tabla de arriba.
+  const fuentes = Object.entries(informe.sources ?? {});
+  // Un minimizado rechazado trae la traza del proceso hijo: en una celda va solo
+  // su causa, la línea `Error:`, en una línea.
+  const errorBreve = (error) => {
+    const texto = String(error);
+    const causa = texto.split('\n').find((linea) => /^\s*Error: /.test(linea));
+    return (causa ? `${texto.split(':')[0]}: ${causa.trim().replace(/^Error: /, '')}` : texto).replace(/\s+/g, ' ').trim().slice(0, 300);
+  };
+  if (fuentes.length) {
+    const ESTADO = { promoted: 'promovida', unchanged: 'sin cambios', unverifiable: 'no verificable', needs_review: 'pendiente de revisión', rejected: 'rechazada' };
+    lineas.push('', '| fuente | estado | snapshot | grupos | nota |', '| --- | --- | --- | --- | --- |');
+    for (const [id, fuente] of fuentes) {
+      const grupos = Object.entries(fuente.groups ?? {}).map(([clave, grupo]) => `${clave}${grupo.private ? ' (privado)' : ''}: ${grupo.status}${grupo.products ? ` · ${Object.entries(grupo.products).map(([producto, valor]) => `${producto} ${valor.offers} en ${valor.districts} distritos`).join(', ')}` : ''}`).join('<br>');
+      const nota = [fuente.error && errorBreve(fuente.error), ...Object.entries(fuente.groups ?? {}).filter(([, grupo]) => grupo.private && grupo.status !== 'promoted').flatMap(([clave, grupo]) => grupo.reasons.map((motivo) => (motivo.startsWith(`${clave}:`) ? motivo : `${clave}: ${motivo}`)))].filter(Boolean).join(' · ');
+      lineas.push(`| ${id} | ${ESTADO[fuente.status] ?? fuente.status} | ${fuente.snapshot_id ? `\`${fuente.snapshot_id}\`` : '—'} | ${grupos || '—'} | ${nota || '—'} |`);
+    }
+  }
+
+  // La poda corre antes del deploy: se dice qué protegió de cada grupo, y una
+  // poda omitida se marca como aviso, para que la caché no vuelva a crecer en
+  // silencio.
+  const poda = resultado?.prune;
+  if (poda) {
+    const mib = (valor) => `${(valor / 1024 / 1024).toFixed(1)} MiB`;
+    if (poda.status === 'pruned') {
+      const protegidos = Object.entries(poda.protected ?? {}).map(([grupo, p]) => `${grupo}: producción \`${p.production}\`, rollback ${p.rollback ? `\`${p.rollback}\`` : 'ninguno anterior'}`);
+      lineas.push('', `Poda de snapshots: ${poda.remove.length} borrados${poda.staging ? ' y staging' : ''}, ${mib(poda.freed_bytes)} liberados; se conservan ${poda.keep.length}.`);
+      if (protegidos.length) lineas.push(`Protegido: ${protegidos.join(' · ')}.`);
+    } else {
+      lineas.push('', '> [!WARNING]', `> **Poda de snapshots omitida** (\`${poda.status}\`): ${poda.reason ?? poda.error ?? 'sin motivo'}. La caché no se achica en esta corrida.`);
+    }
+    for (const aviso of poda.warnings ?? []) lineas.push(`- Aviso de poda: ${aviso}.`);
+  }
+
   // `no_op` es el resultado correcto de un push que no cambia lo publicado.
   // `fail_closed` con una entrega pedida es lo contrario y se marca como tal.
   if (!decision.deploy) {

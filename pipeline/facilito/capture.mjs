@@ -24,6 +24,7 @@ import { facilitoLinkKey } from './link.mjs';
 
 export const CAPTURE_CONTRACT = 'scrap-facilito/v1';
 export const FACILITO_URL = 'https://www.facilito.gob.pe/facilito/pages/facilito/buscadorEESS.jsp';
+export const FACILITO_GLP_URL = 'https://www.facilito.gob.pe/facilito/pages/facilito/buscadorAGranelGLP.jsp';
 
 const DEPARTAMENTO = { nombre: 'LIMA', codigo: '150000' };
 const PROVINCIA = { nombre: 'LIMA', codigo: '150100' };
@@ -34,13 +35,31 @@ const PROVINCIA = { nombre: 'LIMA', codigo: '150100' };
 // vez de guardar como Diésel los precios de otro producto. La etiqueta del sitio
 // no es el nombre del CSV («DB5 S-50 UV» frente a `Diesel B5 S-50 UV`): que sean
 // el mismo producto lo acredita la muestra de vínculos, no el parecido.
+//
+// GLP no está en la página automotora: tiene la suya, «Gas Licuado de Petróleo
+// Automotor», con un único producto ya elegido («GLP - Granel», código 49).
 export const FACILITO_PRODUCTS = Object.freeze([
-  { key: 'regular', etiqueta: 'GASOHOL REGULAR', codigo: '126' },
-  { key: 'premium', etiqueta: 'GASOHOL PREMIUM', codigo: '127' },
-  { key: 'diesel', etiqueta: 'DB5 S-50 UV', codigo: '40' },
+  { key: 'regular', etiqueta: 'GASOHOL REGULAR', codigo: '126', pagina: 'automotor' },
+  { key: 'premium', etiqueta: 'GASOHOL PREMIUM', codigo: '127', pagina: 'automotor' },
+  { key: 'diesel', etiqueta: 'DB5 S-50 UV', codigo: '40', pagina: 'automotor' },
+  { key: 'glp', etiqueta: 'GLP - GRANEL', codigo: '49', pagina: 'granel_glp' },
 ]);
 // Orden exacto de la tabla. El teléfono se valida por posición y nunca se emite.
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
+// La de GLP no dice la unidad en la cabecera del precio: la trae en una sexta
+// columna, que tiene que decir galones en cada fila.
+const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles)', 'Unidad de Medida'];
+
+/**
+ * Las páginas del buscador. Cada unidad se lee en la página de su producto; la
+ * cascada Lima / Lima / distrito y sus códigos son los mismos en las dos.
+ * `productoFijo`: la página trae un solo producto ya elegido y no se toca el
+ * select.
+ */
+export const FACILITO_PAGES = Object.freeze({
+  automotor: Object.freeze({ key: 'automotor', url: FACILITO_URL, tabla: 'tblPreciosAutomotor', cabeceras: Object.freeze(CABECERAS), unidad: null, productoFijo: false }),
+  granel_glp: Object.freeze({ key: 'granel_glp', url: FACILITO_GLP_URL, tabla: 'tblPreciosAGranelGlp', cabeceras: Object.freeze(CABECERAS_GLP), unidad: 'Galones', productoFijo: true }),
+});
 
 // Presupuestos declarados. La medición del piloto es de ~11 s por distrito con
 // los dos productos, así que 43 distritos caben de sobra en el total; el techo
@@ -50,9 +69,13 @@ export const RUN_BUDGET_MS = 20 * 60_000;
 // primero y exactamente como antes; Diésel después y aparte, para que un
 // problema de su tabla nunca le cueste a Gasolina un distrito. Un bloqueo
 // explícito, en cambio, detiene todas las pasadas.
+//
+// GLP va al final, en su página y con su presupuesto: se captura en privado
+// hasta que tenga vista, y nada suyo puede costarle a los que ya publican.
 export const FACILITO_PASSES = Object.freeze([
   { name: 'gasolina', products: ['regular', 'premium'], budgetMs: RUN_BUDGET_MS },
   { name: 'diesel', products: ['diesel'], budgetMs: 10 * 60_000 },
+  { name: 'glp', products: ['glp'], budgetMs: 10 * 60_000 },
 ]);
 const TIMEOUT_MS = 30_000;
 const OPEN_TIMEOUT_MS = 45_000;
@@ -62,21 +85,21 @@ const INTENTOS_POR_DISTRITO = 3;
 export const norm = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 export const precio = (v) => { const m = String(v ?? '').trim().match(/^(?:S\/\s*)?(\d+(?:[.,]\d{1,4})?)$/); return m ? Number(m[1].replace(',', '.')) : NaN; };
 
-const RECHAZO = `
+const RECHAZO = (pagina) => `
   const txt = (e) => (e?.innerText || e?.textContent || '').replace(/\\s+/g, ' ').trim();
   const t = performance.timeOrigin;
-  const tabla = document.querySelector('#tblPreciosAutomotor');
+  const tabla = document.querySelector('#${pagina.tabla}');
   if (/^(?:error\\s*)?(?:401|403|429)\\b/.test((document.title || '').toLowerCase())) return { t, rechazo: 'rechazo_http' };
   if (!tabla && /(unauthorized|forbidden|too many requests|access denied|verify you are human|checking your browser|security check|challenge required|just a moment)/.test(txt(document.body).toLowerCase())) return { t, rechazo: 'desafio_o_rechazo' };
 `;
 
-const SONDA = (conDistritos) => `(() => {${RECHAZO}
+const SONDA = (pagina, conDistritos) => `(() => {${RECHAZO(pagina)}
   if (!${!!conDistritos}) return { t };
   const sel = document.querySelector('select[name=distrito]');
   return { t, distritos: sel ? Array.from(sel.options).map((o) => ({ nombre: txt(o), codigo: o.value })).filter((o) => /^\\d{6}$/.test(o.codigo)) : [] };
 })()`;
 
-const TABLA = `(() => {${RECHAZO}
+const TABLA = (pagina) => `(() => {${RECHAZO(pagina)}
   const visible = (e) => { const s = getComputedStyle(e); return s.display !== 'none' && s.visibility !== 'hidden' && e.getClientRects().length > 0; };
   if (!tabla || !visible(tabla)) return { t, estado: 'sin_tabla' };
   const cab = tabla.querySelector('thead tr:last-child') || tabla.querySelector('tr');
@@ -110,16 +133,19 @@ const TABLA = `(() => {${RECHAZO}
  * código con esa etiqueta: la tabla no tiene columna de producto y su cabecera
  * es la misma para todos, así que es la única prueba de qué se está leyendo.
  */
-export function parseTabla(payload, distritoNombre, { conTexto = false, producto = null } = {}) {
+export function parseTabla(payload, distritoNombre, { conTexto = false, producto = null, pagina = FACILITO_PAGES.automotor } = {}) {
   if (payload?.rechazo) return { ok: false, razon: payload.rechazo };
   if (payload?.estado !== 'ok') return { ok: false, razon: payload?.estado ?? 'sin_respuesta' };
   if (producto && (payload.seleccion?.valor !== producto.codigo || norm(payload.seleccion?.texto) !== norm(producto.etiqueta))) return { ok: false, razon: 'producto_no_coincide' };
+  const cabeceras = pagina.cabeceras;
   const cab = (payload.cabeceras ?? []).map((c) => String(c ?? '').replace(/\s+/g, ' ').trim());
-  if (cab.length !== CABECERAS.length || cab.some((c, i) => c !== CABECERAS[i])) return { ok: false, razon: 'cabeceras_desconocidas' };
+  if (cab.length !== cabeceras.length || cab.some((c, i) => c !== cabeceras[i])) return { ok: false, razon: 'cabeceras_desconocidas' };
   const filas = [];
   for (const c of payload.filas ?? []) {
-    if (!Array.isArray(c) || c.length !== CABECERAS.length) return { ok: false, razon: 'fila_con_forma_inesperada' };
+    if (!Array.isArray(c) || c.length !== cabeceras.length) return { ok: false, razon: 'fila_con_forma_inesperada' };
     if (norm(c[0]) !== norm(distritoNombre)) return { ok: false, razon: 'distrito_no_coincide' };
+    // Un precio por kilo o por cilindro no es un precio por galón.
+    if (pagina.unidad && norm(c[5]) !== norm(pagina.unidad)) return { ok: false, razon: 'unidad_no_coincide' };
     const p = precio(c[4]);
     if (!Number.isFinite(p) || p <= 0) return { ok: false, razon: 'precio_ilegible' };
     // c[3] es el teléfono: se valida por posición y no se emite nunca. El nombre
@@ -157,7 +183,7 @@ export function agentBrowserSession({ cwd, session }) {
   });
 }
 
-function controlador(ejecutar, restante) {
+function controlador(ejecutar, restante, pagina) {
   const cmd = (args, etapa, { ms = TIMEOUT_MS, presupuesto = true } = {}) => {
     const queda = restante();
     if (presupuesto && queda <= 0) throw new Fallo('presupuesto_agotado', etapa);
@@ -175,7 +201,7 @@ function controlador(ejecutar, restante) {
     } catch { throw new Fallo('eval_ilegible', etapa); }
   };
   const sondear = (etapa, conDistritos = false) => {
-    const r = evaluar(SONDA(conDistritos), etapa);
+    const r = evaluar(SONDA(pagina, conDistritos), etapa);
     if (r?.rechazo) throw new Fallo(r.rechazo, etapa);
     return r;
   };
@@ -214,6 +240,7 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
     for (const pasada of FACILITO_PASSES) {
       const productos = FACILITO_PRODUCTS.filter((p) => pasada.products.includes(p.key) && (!soloProductos || soloProductos.includes(p.key)));
       if (!productos.length) continue;
+      if (new Set(productos.map((p) => p.pagina)).size !== 1) throw new Error(`La pasada ${pasada.name} mezcla páginas del buscador`);
       const presupuesto = budgetMs === null ? pasada.budgetMs : Math.min(budgetMs, pasada.budgetMs);
       log(`Pasada ${pasada.name}: ${productos.map((p) => p.key).join(', ')} · presupuesto ${Math.round(presupuesto / 1000)} s`);
       const resultado = recorrerLima({ ejecutar, log, now, productos, budgetMs: presupuesto, soloDistritos, conTexto });
@@ -229,18 +256,20 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
   return { units, districts: catalogo, blocked: bloqueo, elapsed_ms: Date.now() - inicioMs, passes };
 }
 
-// Una pasada: la cascada hasta los distritos y cada distrito con sus productos.
+// Una pasada: la cascada hasta los distritos y cada distrito con sus productos,
+// todo en la página de esos productos.
 function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, conTexto }) {
   const inicioMs = Date.now();
   const restante = () => budgetMs - (Date.now() - inicioMs);
   const units = [];
   let bloqueo = null;
   let catalogo = [];
+  const pagina = FACILITO_PAGES[productos[0].pagina];
 
-  const control = controlador(ejecutar, restante);
+  const control = controlador(ejecutar, restante, pagina);
   const cascadaHastaDistritos = () => {
     const { cmd, sondear, aplicar } = control;
-    cmd(['open', FACILITO_URL], 'abrir', { ms: OPEN_TIMEOUT_MS });
+    cmd(['open', pagina.url], 'abrir', { ms: OPEN_TIMEOUT_MS });
     cmd(['wait', '--fn', "!!document.querySelector('select#departmento') && !!document.getElementById('g-recaptcha-response')?.value"], 'formulario');
     let t = sondear('formulario').t;
     t = aplicar({ selector: '#departmento', espera: '#departmento,select[name=departamentoAux]', valor: DEPARTAMENTO.codigo, siguiente: 'select[name=provincia]', previo: t, etapa: 'departamento' }).t;
@@ -259,20 +288,34 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
     for (const producto of productos) {
       const etapa = `${distrito.codigo}_${producto.codigo}`;
       try {
-        control.cmd(['select', 'select[name=producto]', producto.codigo], etapa);
-        control.cmd(['wait', '--fn', `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#tblPreciosAutomotor');
+        if (pagina.productoFijo) {
+          // Un solo producto, ya elegido: la tabla del distrito es la que dejó la
+          // recarga. Elegirlo otra vez podría recargar la página a media lectura.
+          control.cmd(['wait', '--fn', `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#${pagina.tabla}');
+            if (!s || s.value !== ${JSON.stringify(producto.codigo)} || !tb || !document.getElementById('g-recaptcha-response')?.value) return false;
+            const proc = document.querySelector('#${pagina.tabla}_processing');
+            return !proc || getComputedStyle(proc).display === 'none'; })()`], etapa);
+        } else {
+          control.cmd(['select', 'select[name=producto]', producto.codigo], etapa);
+          // La sangría del guion es la de siempre: la automotora manda al
+          // navegador exactamente los mismos comandos que antes de GLP.
+          control.cmd(['wait', '--fn', `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#${pagina.tabla}');
           if (!s || s.value !== ${JSON.stringify(producto.codigo)} || !tb || !document.getElementById('g-recaptcha-response')?.value) return false;
-          const proc = document.querySelector('#tblPreciosAutomotor_processing');
+          const proc = document.querySelector('#${pagina.tabla}_processing');
           if (proc && getComputedStyle(proc).display !== 'none') return false;
           const f = JSON.stringify(Array.from(tb.querySelectorAll('tbody tr')).slice(0, 3).map((e) => (e.innerText || '').replace(/\\s+/g, ' ').trim()));
           return performance.timeOrigin !== ${Number(t)} || f !== ${JSON.stringify(firma)}; })()`], etapa);
+        }
         const observadoEn = now().toISOString();
-        const leido = parseTabla(control.evaluar(TABLA, etapa), distrito.nombre, { conTexto, producto });
+        const leido = parseTabla(control.evaluar(TABLA(pagina), etapa), distrito.nombre, { conTexto, producto, pagina });
         if (!leido.ok) throw new Fallo(leido.razon, etapa);
         firma = leido.firma;
         t = control.sondear(etapa).t;
         leidas.push({
           district_code: distrito.codigo, district_name: distrito.nombre, product: producto.key,
+          // La página va con la unidad solo cuando no es la automotora: así las
+          // unidades de Gasolina y Diésel no cambian.
+          ...(pagina.key === 'automotor' ? {} : { source_url: pagina.url }),
           status: 'ok', observed_at: observadoEn, announced_total: leido.total ?? leido.filas.length,
           rows: leido.filas.map(({ key_hash, precio, establecimiento, direccion }) => ({ key_hash, price: precio, ...(conTexto ? { establecimiento, direccion } : {}) })).filter((fila) => fila.key_hash),
           dropped_rows: leido.filas.filter((fila) => !fila.key_hash).length,

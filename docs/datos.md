@@ -57,6 +57,55 @@ El refresco construye los dos grupos con **una sola** pasada por el raw y juzga 
 
 Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026**; no fueron refrescados ni se afirma lo contrario. Los originales y derivados grandes viven solo en `.local-cache/`; la evidencia agregada de ese refresco ya no se conserva en el repositorio y queda en el historial de Git.
 
+**Una fuente, un refresco (Fase 3A).** Desde GLP hay dos fuentes de precio (`pipeline/sources.mjs`), y cada una se refresca por su cuenta:
+
+| Fuente | CSV | ID de fila | Grupos | Descarga máx. |
+| --- | --- | --- | --- | ---: |
+| `liquid-current` | `CL-Registro-precios-DMA-V-CCA-CCE.csv`, ~1,35 GB | `ID3` | Gasolina, Diésel | 60 min |
+| `glp-current` | `GLP-Registro-precios-PIC-PE-V.csv`, ~0,74 GB | `ID4` | GLP (privado) | 30 min |
+
+- **Cada fuente tiene lo suyo:** su línea base de detección, su descarga, su minimizado, sus grupos y sus pointers. Un refresco de una nunca lee ni mueve nada de la otra.
+- **Pointer por fuente:** `source-<id>.json` guarda el último snapshot de la fuente que aprobó algún grupo.
+  - Es la línea base de una fuente cuyos grupos todavía no tienen base propia.
+  - Es la base de la primera activación de un grupo que no es de líquidos. En los líquidos, esa base sigue siendo el snapshot de Gasolina.
+- **Orden y fallos:** `npm run refresh` recorre las dos fuentes bajo un solo lock, primero los líquidos; `npm run refresh -- glp-current` refresca solo una. El fallo de una fuente queda en su resultado como `rejected` y no detiene a la otra. Los campos de siempre del resultado hablan de los líquidos; `sources` trae los de cada fuente, y el resumen de CI los muestra en la tabla «Fuentes».
+- **Referencia de Registro y GIS:** antes de descargar, el refresco exige que traiga los códigos y las capas de todos los grupos de la fuente. Con la semilla v1, GLP se rechaza sin bajar nada.
+- **Recuperación:** el rollback, la adopción y la composición rechazan un snapshot de otra fuente antes de tocar un pointer.
+
+**GLP en privado.** GLP no tiene vista todavía: su grupo está configurado en `pipeline/groups.mjs`, pero no en el catálogo público.
+- **Adquisición y juicio:** el refresco lo adquiere y lo juzga, y si pasa mueve solo `active-glp.json` y `source-glp-current.json`.
+- **Qué escribe:** su juicio queda en `glp-validation.json`, dentro del snapshot. Son solo conteos: estado, embudo, exclusiones y vínculos con la consulta web. Esa validación es su línea base en la corrida siguiente.
+- **Sin línea base:** se juzga contra su base auditada (abajo). Sin ninguna de las dos no se promueve.
+- **Qué no toca:** nada de GLP llega a `web/` ni cambia la decisión de publicar.
+
+**Semilla de Registro y GIS v2.** La semilla que viaja como secret (`BOOTSTRAP_SEED_B64`, entorno `pages-production`) suma los gasocentros a lo de siempre:
+- **Contenido:** Registro 01/02/05/06/15 y capas GIS 35/36, Lima/Lima. Son 774 filas de Registro (30 del código 15) y 831 de GIS (81 de la capa 36); el base64 ocupa 28,5 KB.
+- **Formato de las filas GIS:** cada una lleva su capa, `[layer, n, dep, prov, dist, lon, lat]`, y la clave es `(capa, N)`.
+- **Qué no cambia:** amplía y no refresca. Las tablas siguen siendo las del **14/08/2026**, y `node scripts/build-seed.mjs` exige que la v2, recortada a los filtros de la v1, sea la v1 byte a byte. Por eso Gasolina y Diésel no cambian al instalarla, y además cada grupo solo mira el Registro de sus propios códigos.
+- **Caché de Actions:** su clave lleva el hash del manifest. La segunda clave de respaldo (`snapshots-`) recupera la caché de la semilla anterior, que sigue valiendo porque la nueva solo amplía.
+
+**Poda de snapshots en CI.** Sin poda, cada CSV nuevo quedaba para siempre en la caché de Actions, que llegó a 10,95 GB en 28 entradas.
+- **Cuándo:** `scripts/publish.mjs` poda `.local-cache/snapshots/` después de preparar la entrega, solo en CI (`pipeline/snapshot-prune.mjs`).
+- **Por qué no bastan los pointers:** la poda corre en `prepare`, antes del deploy. Tras promover, los pointers ya apuntan al snapshot nuevo, y el que sirve producción sigue haciendo falta si el deploy falla. La fuente solo sirve el CSV vigente: lo borrado no vuelve sin descargar, y lo viejo no vuelve nunca.
+- **Qué protege, por cada grupo publicado:**
+  - su **producción**: el snapshot del estado que sirve, leído antes de escribir nada;
+  - un **destino de rollback**: el snapshot utilizable más nuevo anterior a su producción, de la misma fuente y con otro CSV. Una revisión nueva de Facilito o una reproyección del mismo CSV no cuentan como otro destino.
+  - "Utilizable" es lo mismo que exige el rollback: manifest válido, `minimized/` y original que resuelve.
+- **Qué más conserva:**
+  - por fuente, todo lo que va desde el destino de rollback hasta lo más nuevo, incluido lo que otra corrida esté desplegando;
+  - el destino de cada pointer (`active*.json`, `source-*.json`);
+  - el dueño real de cada original y el destino de cada symlink.
+- **Qué borra:** los snapshots que quedan debajo y `staging/`. Los viejos de GLP, que todavía no publica, también.
+- **Cuándo no borra nada:**
+  - hay un refresco en curso;
+  - no hay pointers, o uno es ilegible o apunta a una carpeta que falta o no sirve;
+  - la producción es desconocida, ilegible o incompleta;
+  - hay snapshots anteriores a producción, pero ninguno sirve de destino de rollback;
+  - hay un symlink colgante o que sale de la caché, o un original que no resuelve.
+- **Informe y local:**
+  - el resumen de CI dice qué protegió de cada grupo, qué borró y cuánto liberó. Una poda omitida sale como aviso con su motivo;
+  - en local no se poda nada, porque ahí los snapshots viejos son los que permiten revertir.
+
 ## Evidencia externa verificada por el owner: EVPC
 
 `OWNER-VERIFIED / TRUSTED INPUT`, snapshot aproximado **12 de agosto de 2026**. Sus artefactos no viven en este repo y sus números no son permanentes.
@@ -300,7 +349,9 @@ J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique
 
 ## Cadencia de la fuente y frescura — medido el 25–26/08/2026
 
-**La fuente es semanal.** `CL-Registro-precios-DMA-V-CCA-CCE.csv` cambió de `Last-Modified` **mar. 18 ago 12:28:58 GMT** a **mar. 25 ago 12:29:26 GMT** (ETag `,238` → `,245`), y las cuatro sondas HEAD del lunes 24 devolvieron `unchanged`. El archivo del martes contiene registros hasta el lunes 23:59 Lima (`source_max_reported_at` 2026-08-25T04:54:33Z). Un precio cambiado un miércoles aparece el martes siguiente: hasta 6 días de retraso, que ningún cron nuestro puede acortar. La carpeta se llama `Reporte-Diario`, pero se publica semanalmente. Distribución en el bundle del 25/08: 522 de 715 grifos registraron el lunes 24 (ajuste semanal de las cadenas), 43 el 25, 128 entre 3 y 6 días, 14 con más de una semana.
+**Actualización del 25/09/2026: el CSV de líquidos ya es diario.** Del 21 al 25/09/2026 el primer cron de cada día posterior a las ~12:30 GMT promovió un CSV nuevo, y los demás salieron `unchanged` (`Last-Modified` del 24/09: 12:31:26 GMT; del 25/09: 12:31:37 GMT). Antes de eso ya se habían visto archivos fuera del martes: domingo 06/09 y jueves 24/09. El de GLP del 24/09 lleva 12:28:56 GMT. Lo que sigue es la medición de agosto, cuando la fuente era semanal.
+
+**En agosto la fuente era semanal.** `CL-Registro-precios-DMA-V-CCA-CCE.csv` cambió de `Last-Modified` **mar. 18 ago 12:28:58 GMT** a **mar. 25 ago 12:29:26 GMT** (ETag `,238` → `,245`), y las cuatro sondas HEAD del lunes 24 devolvieron `unchanged`. El archivo del martes contiene registros hasta el lunes 23:59 Lima (`source_max_reported_at` 2026-08-25T04:54:33Z). Un precio cambiado un miércoles aparece el martes siguiente: hasta 6 días de retraso, que ningún cron nuestro puede acortar. La carpeta se llama `Reporte-Diario`, pero se publica semanalmente. Distribución en el bundle del 25/08: 522 de 715 grifos registraron el lunes 24 (ajuste semanal de las cadenas), 43 el 25, 128 entre 3 y 6 días, 14 con más de una semana.
 
 **Qué es `FECHA_DE_REGISTRO`.** Por RCD 050-2017-OS/CD (leída del PDF firmado, art. 1 que modifica el art. 2 del Anexo A del procedimiento PRICE de 2005) el registro «debe ser actualizado inmediatamente después de los cambios efectuados en la lista de precios» del establecimiento, y «los precios registrados en el PRICE deben ser iguales a los que son publicados en su establecimiento». El procedimiento vigente, RCD 256-2021-OS/CD (deroga la 394-2005; modificada por RCD 051-2023-OS/CD, que añade alertas de cumplimiento), conserva la regla en su art. 3: el registro se actualiza inmediatamente cuando el precio se modifica. Conclusión: la fecha de registro es, por norma, el **inicio de vigencia** del precio en el surtidor. La app puede decir «precio desde el <fecha>»; lo que no puede afirmar es cuánto tardó el archivo semanal en recogerlo.
 
@@ -367,7 +418,7 @@ Las otras variedades con nombre parecido se cuentan y no se unen. En filas de Li
 | Con GNV | 30 | sí |
 | Distribuidor mayorista de combustibles líquidos | 8 | no: vende al por mayor |
 
-Las cuatro actividades usadas coinciden con las de la semilla de Registro y GIS, así que no hace falta tocarla. Cambiar la semilla vaciaría la caché de Actions.
+Las cuatro actividades usadas coinciden con las de la semilla de Registro y GIS, así que Diésel no la tocó. La semilla v2 de la Fase 3A las conserva byte a byte.
 
 **Embudo sobre el CSV del 24/09/2026.** Validadores `…,275` y `Thu, 24 Sep 2026 12:31:26 GMT`, el mismo CSV que publicaba Gasolina:
 
@@ -396,6 +447,55 @@ Las cuatro actividades usadas coinciden con las de la semilla de Registro y GIS,
 - **Si la primera versión no pasa:** la entrega entera termina en `fail_closed`. El código ya activó la vista y publicarla sin datos sería peor.
 - **Después:** un fallo de Diésel conserva su versión publicada y deja publicar Gasolina, y al revés.
 - **Recuperar la entrega de código:** `git revert` y redeploy por el workflow.
+
+## Grupo GLP — embudo auditado el 24/09/2026 (privado desde la Fase 3A)
+
+GLP automotor es un grupo propio de un producto, con su propia fuente:
+- producto `GLP - G` en `Galones` para «Usuario Final», del CSV `glp-current`;
+- IDs `glp1_` y revisiones `glp-`. Todavía no tiene vista, contrato público ni datos en `web/`: eso es la Fase 3B.
+
+**Actividades, con evidencia del CSV.** Son las que venden GLP a granel a vehículos. En Lima, esas cuatro actividades reportan `GLP - G` solo en galones y solo para «Usuario Final»:
+
+| Actividad | Establecimientos en Lima | Registro | Capa GIS |
+| --- | ---: | --- | --- |
+| Estación de servicio con gasocentro de GLP | 257 | 02 | 35 |
+| EE.SS con GLP y GNV | 216 | 06 | 35 |
+| Gasocentros de GLP | 23 | 15 | 36 |
+| Gasocentro de GLP con venta al público de GNV | 14 | 15 | 36 |
+
+- **Qué queda fuera:** las plantas envasadoras también reportan `GLP - G` en galones, pero a «Agentes con RHO», y además en kilogramos. Los cilindros son otros productos (`Cilindros de 10 Kg de GLP`…). Nada de eso entra.
+- **Gasocentros:** las dos etiquetas del código 15 son el mismo establecimiento para el Registro, así que la clave del último reporte usa el código y no la etiqueta. Un gasocentro se ubica en la capa 36; su N en la capa 35 no cuenta.
+- **`MARCA`:** es la envasadora, no el grifo, y aparece solo en filas de cilindros. El minimizado la quita junto con RUC, razón social y dirección.
+
+**Embudo sobre el CSV del 24/09/2026.** Validadores `…,278` y `Thu, 24 Sep 2026 12:28:56 GMT`, contra la semilla v2:
+
+| Paso | Ofertas | Distritos |
+| --- | ---: | ---: |
+| Último reporte por clave en Lima | 510 | 41 |
+| Reportadas en ≤30 días | 449 | 41 |
+| Con Registro único | 421 | 41 |
+| Con GIS seguro | 415 | 41 |
+| Listas para contrato | 415 | 41 |
+| Publicables (con precio + 10 sin precio vigente) | 425 | 41 |
+
+- **Cobertura:** 92.428 %.
+- **Conflictos:** ninguno, ni de precio ni de territorio. Tampoco hay ambigüedades ni repetidos.
+- **Motivos de pérdida** sobre los 510 últimos reportes:
+  - 415 publicables y 10 publicables sin precio vigente;
+  - 79 no están en el Registro del 14/08 (36 del código 02, 36 del 06 y 7 del 15): es la pérdida declarada de no refrescar el Registro;
+  - 6 sin punto GIS.
+- **Por distrito:** los 41 distritos tienen al menos un gasocentro ubicado, y cinco tienen uno solo.
+
+**Guardrails.** Las mismas tolerancias que Gasolina y Diésel. Sin línea base propia, GLP se juzga contra esta base auditada y no puede perder más de 2 de sus 41 distritos.
+
+**Consulta web de GLP.** GLP no está en la página automotora de Facilito, sino en la suya, «Gas Licuado de Petróleo Automotor» (`buscadorAGranelGLP.jsp`). La sonda acotada del 25/09/2026 midió:
+- **Cascada:** Lima / Lima / distrito, con los mismos códigos que la página automotora.
+- **Producto:** un único producto ya elegido, `49` «GLP - Granel».
+- **Tabla:** `#tblPreciosAGranelGlp`, con seis columnas. La sexta, «Unidad de Medida», dice «Galones».
+- **Muestra:** San Miguel 9 filas y Surquillo 6, cada una con su total anunciado cuadrado, y precios de S/ 7,29 a 7,89.
+- **Costo:** 10 navegaciones y ningún bloqueo; un solo corte intermitente, que se reintentó.
+
+GLP se lee en una tercera pasada, la última, con 10 min de presupuesto. No se toca el select de producto y se exige «Galones» en cada fila. Sus unidades guardan su página y no entran en el estado que publican Gasolina y Diésel. Sus vínculos se cuentan en la validación privada.
 
 ## Modelo útil
 

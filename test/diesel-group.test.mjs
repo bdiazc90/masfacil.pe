@@ -52,13 +52,18 @@ test('un bundle de un grupo no pasa por el contrato del otro', () => {
   assert.ok(GROUP_RULES.gasolina.datasetErrors(JSON.parse(d.bodies.diesel)).length > 0);
 });
 
-test('las actividades de cada grupo están dentro de la semilla y los IDs no se cruzan', () => {
-  const semilla = JSON.parse(fs.readFileSync(new URL('../bootstrap/seed.manifest.json', import.meta.url), 'utf8')).filters.source_activity;
+test('los códigos y las capas de cada grupo están dentro de la semilla y los IDs no se cruzan', () => {
+  const { filters } = JSON.parse(fs.readFileSync(new URL('../bootstrap/seed.manifest.json', import.meta.url), 'utf8'));
   for (const [grupo, config] of Object.entries(GROUP_CONFIG)) {
-    for (const codigo of Object.values(config.activities)) assert.ok(semilla.includes(codigo), `${grupo}: ${codigo} fuera de la semilla; cambiarla vacía la caché de Actions`);
+    for (const codigo of Object.values(config.activities)) {
+      assert.ok(filters.source_activity.includes(codigo), `${grupo}: Registro ${codigo} fuera de la semilla; ampliarla cambia la clave de la caché de Actions`);
+      const capa = config.gisLayers?.[codigo] ?? '35';
+      assert.ok(filters.layers.includes(capa), `${grupo}: capa GIS ${capa} fuera de la semilla`);
+    }
   }
-  assert.notEqual(GROUP_CONFIG.diesel.idScheme.prefix, GROUP_CONFIG.gasolina.idScheme.prefix);
-  assert.notEqual(GROUP_CONFIG.diesel.idScheme.namespace, GROUP_CONFIG.gasolina.idScheme.namespace);
+  const esquemas = Object.values(GROUP_CONFIG).map((config) => config.idScheme);
+  assert.equal(new Set(esquemas.map((esquema) => esquema.prefix)).size, esquemas.length);
+  assert.equal(new Set(esquemas.map((esquema) => esquema.namespace)).size, esquemas.length);
   assert.deepEqual(GROUP_CONFIG.gasolina.idScheme, { prefix: 'g2_', namespace: 'masfacil-pe|gasolina-v2' }, 'cambiarlo cambiaría todos los IDs publicados');
   // Diésel no es más laxo que Gasolina.
   assert.ok(GROUP_CONFIG.diesel.guardrails.maxOfferDrop <= GROUP_CONFIG.gasolina.guardrails.maxOfferDrop);

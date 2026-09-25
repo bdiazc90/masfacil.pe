@@ -3,10 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decodeSeed } from '../app/bootstrap-seed.mjs';
-import { pointerRelative, readActivePointer } from '../app/snapshot-manifest.mjs';
-import { buildGasolinaProducts, buildLiquidProducts } from './gasolina-products.mjs';
+import { pointerRelative, readActivePointer, readSourcePointer } from '../app/snapshot-manifest.mjs';
+import { buildGasolinaProducts, buildSourceProducts } from './gasolina-products.mjs';
+import { sourceById, sourceOfPointer } from './sources.mjs';
 import { sha256 } from './gasolina-contract.mjs';
-import { PUBLISHED_GROUPS, describeGroup } from './groups.mjs';
+import { PUBLISHED_GROUPS, configuredGroup, describeGroup, productGroup } from './groups.mjs';
 import { compareGroupQuality } from './refresh-state.mjs';
 import { adoptSnapshot } from '../app/snapshot-refresh.mjs';
 import { buildCommercialCatalogIndex, staleBrandEvidence } from '../app/commercial-catalog.mjs';
@@ -64,22 +65,30 @@ export function temporalContextForPointer(root = rootFromModule, pointer) {
   return { cutoff_at: legado.cutoff_at, source_max_reported_at: legado.source_max_reported_at, snapshot_date: legado.snapshot_date ?? pointer.snapshot_date };
 }
 
-export function resolveGasolinaRaw(root, pointer) {
+/**
+ * El original de un snapshot: el que declara su pointer o, si se movió, el de
+ * cualquier snapshot de la MISMA fuente con la misma huella. Un raw de otra
+ * fuente nunca sirve, aunque coincidiera el nombre del archivo.
+ */
+export function resolveSourceRaw(root, pointer) {
+  const source = sourceById(sourceOfPointer(pointer));
   const declared = pointer.lineage?.raw?.sha256;
   const declaredPath = pointer.lineage?.paths?.raw_path && path.join(root, pointer.lineage.paths.raw_path);
   if (declaredPath && fs.existsSync(declaredPath) && fs.statSync(declaredPath).isFile()) return declaredPath;
-  if (!declared) throw new Error('Pointer sin lineage raw verificable para gasolina');
+  if (!declared) throw new Error(`Pointer sin lineage raw verificable para ${source.id}`);
   const snapshots = path.join(root, '.local-cache', 'snapshots');
   for (const entry of fs.readdirSync(snapshots, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const manifestPath = path.join(snapshots, entry.name, 'snapshot-manifest.json');
     if (!fs.existsSync(manifestPath)) continue;
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    const candidate = path.join(snapshots, entry.name, 'acquired', 'price-liquid', 'CL-Registro-precios-DMA-V-CCA-CCE.csv');
+    if (sourceOfPointer(manifest) !== source.id) continue;
+    const candidate = path.join(snapshots, entry.name, source.rawRelative);
     if (manifest.lineage?.raw?.sha256 === declared && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   }
   throw new Error('No existe raw cuyo lineage coincida con el pointer');
 }
+export const resolveGasolinaRaw = resolveSourceRaw;
 
 function optionalSeed(root) {
   const encoded = path.join(root, '.local-cache', 'publish', 'bootstrap-seed.b64');
@@ -193,6 +202,35 @@ export function buildGroupCandidate({ group, pointer, temporalContext, results, 
   return { group: group.key, manifest, refreshState, datasets, bodies, results, facilitoState, facilitoLayers, composedAt: now, identity: commercialIdentityReport(commercialResolution), isolatedEntries: commercialResolution.isolated ?? [], catalog: catalogIndex.metrics, catalogWithoutOffer, catalogUnknownAnchors: catalogIndex.unknownAnchors, brandGroups: brandGroups.groups, brandEvidenceQueue: staleBrandEvidence(commercialCatalog), bytes: Object.fromEntries(keys.map((key) => [key, descriptors[key].bytes])) };
 }
 
+/**
+ * La candidata de un grupo que todavía no publica: sus métricas, su embudo y
+ * sus vínculos con la consulta web, sin bundles ni manifest. Es lo que el
+ * refresco juzga contra su base para decidir si el grupo adopta el snapshot.
+ */
+export function buildPrivateCandidate({ group, pointer, temporalContext, results, facilitoState = null, now = Date.now() }) {
+  const keys = group.products;
+  const capas = Object.fromEntries(keys.map((key) => [key, resolveFacilitoLayer({ state: facilitoState, linkKeys: results[key].linkKeys, product: key, now })]));
+  return {
+    group: group.key,
+    private: true,
+    manifest: null,
+    results,
+    refreshState: {
+      snapshot_id: pointer.snapshot_id,
+      validators: pointer.validators,
+      source_max_reported_at: temporalContext.source_max_reported_at,
+      products: Object.fromEntries(keys.map((key) => [key, { ...results[key].metrics, cutoff_at: temporalContext.cutoff_at }])),
+      facilito: {
+        linked: Object.fromEntries(keys.map((key) => [key, capas[key].counts.linked])),
+        ambiguous: keys.reduce((total, key) => total + capas[key].counts.ambiguous, 0),
+        unlinked: keys.reduce((total, key) => total + capas[key].counts.unlinked, 0),
+      },
+    },
+    funnel: Object.fromEntries(keys.map((key) => [key, results[key].funnel])),
+    rowExclusions: Object.fromEntries(keys.map((key) => [key, results[key].rowExclusions])),
+  };
+}
+
 export async function buildGasolinaProjectionCandidate({ pointer, temporalContext, sources = null, minimizedRoot, rawPath, bootstrapSeed = null, commercialResolution = absentCommercialResolution(), facilitoState = null, now = Date.now() }) {
   // Regular y Premium salen de las mismas tablas y de UNA sola pasada por el
   // original de 1,2 GB: la identidad de un ID3 no depende del producto.
@@ -227,13 +265,37 @@ export function usablePrivateSnapshot(root = rootFromModule, { publishedSnapshot
   let pointer;
   try { pointer = readActivePointer(root, { group }); } catch (error) { return { ok: false, snapshot_id: null, missing: [`pointer activo: ${error.message}`] }; }
   if (!pointer) return { ok: false, snapshot_id: null, missing: [`pointer activo ausente (${pointerRelative(group)})`] };
+  return snapshotUsable(root, pointer, { publishedSnapshotId, sourceId: configuredGroup(group).config.source });
+}
+
+/** ¿Este pointer sirve para componer un grupo de esta fuente? Es lo mismo que exige el rollback. */
+export function snapshotUsable(root, pointer, { publishedSnapshotId = null, sourceId }) {
   const missing = [];
+  if (sourceOfPointer(pointer) !== sourceId) missing.push(`el snapshot ${pointer.snapshot_id} es de ${sourceOfPointer(pointer)}, no de ${sourceId}`);
   const dir = path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id);
   if (!fs.existsSync(path.join(dir, 'snapshot-manifest.json'))) missing.push('snapshot-manifest.json');
   if (!fs.existsSync(path.join(dir, 'minimized'))) missing.push('minimized/');
-  try { resolveGasolinaRaw(root, pointer); } catch (error) { missing.push(`raw: ${error.message}`); }
+  try { resolveSourceRaw(root, pointer); } catch (error) { missing.push(`raw: ${error.message}`); }
   if (publishedSnapshotId && pointer.snapshot_id < publishedSnapshotId) missing.push(`snapshot ${pointer.snapshot_id} anterior al publicado ${publishedSnapshotId}`);
   return { ok: !missing.length, snapshot_id: pointer.snapshot_id, missing, pointer };
+}
+
+/**
+ * La base de la primera activación de un grupo sin pointer propio. En los
+ * líquidos, como siempre, el snapshot de Gasolina, que es el oficial vigente; en
+ * otra fuente, el último snapshot suyo que aprobó algún grupo. Nunca uno de otra
+ * fuente, que no tiene sus filas.
+ *
+ * @param {object} [opciones]
+ * @param {Function} [opciones.usable]  `usablePrivateSnapshot`, inyectable
+ */
+export function firstActivationBase(root = rootFromModule, key, { usable = usablePrivateSnapshot } = {}) {
+  const sourceId = configuredGroup(key).config.source;
+  if (sourceId === 'liquid-current') return usable(root, { publishedSnapshotId: null, group: 'gasolina' });
+  let pointer;
+  try { pointer = readSourcePointer(root, sourceId); } catch (error) { return { ok: false, snapshot_id: null, missing: [`pointer de ${sourceId}: ${error.message}`] }; }
+  if (!pointer) return { ok: false, snapshot_id: null, missing: [`la fuente ${sourceId} todavía no tiene snapshot aprobado`] };
+  return snapshotUsable(root, pointer, { sourceId });
 }
 
 /**
@@ -247,7 +309,7 @@ export async function buildGasolinaProjectionForPointer({ root = rootFromModule,
     pointer,
     temporalContext: temporalContextForPointer(root, pointer),
     minimizedRoot: path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized'),
-    rawPath: resolveGasolinaRaw(root, pointer),
+    rawPath: resolveSourceRaw(root, pointer),
     bootstrapSeed: bootstrapSeed === undefined ? optionalSeed(root) : bootstrapSeed,
     facilitoState: facilitoState === undefined ? readFacilitoState(root, { facilitoRoot }) : facilitoState,
     ...(now === undefined ? {} : { now }),
@@ -277,20 +339,27 @@ export async function composeGroups({ root = rootFromModule, plan, identityRoot,
     let temporalContext;
     let resultsByGroup;
     const descritos = groups.map((key) => describeGroup(key));
+    const source = sourceById(sourceOfPointer(pointer));
+    // Un grupo solo se compone sobre un snapshot de su fuente.
+    const ajenos = descritos.filter((grupo) => grupo.config.source !== source.id);
+    if (ajenos.length) aislar(ajenos.map((grupo) => grupo.key), new Error(`El snapshot ${pointer.snapshot_id} es de ${source.id}, no de la fuente de ${ajenos.map((grupo) => grupo.key).join(', ')}`));
+    const propios = descritos.filter((grupo) => grupo.config.source === source.id);
+    if (!propios.length) continue;
     try {
       temporalContext = temporalContextForPointer(root, pointer);
-      ({ resultsByGroup } = await buildLiquidProducts({
+      ({ resultsByGroup } = await buildSourceProducts({
+        source,
         minimizedRoot: path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized'),
-        rawPath: resolveGasolinaRaw(root, pointer),
+        rawPath: resolveSourceRaw(root, pointer),
         bootstrapSeed: semilla,
         cutoffAt: temporalContext.cutoff_at,
         snapshotId: pointer.snapshot_id,
         sourceMaxReportedAt: temporalContext.source_max_reported_at,
         sourceUrl: pointer.source_url,
-        groups: descritos.map((grupo) => ({ key: grupo.key, products: grupo.products, activities: grupo.config.activities, scope: grupo.scope, idScheme: grupo.config.idScheme })),
+        groups: propios.map(productGroup),
       }));
-    } catch (error) { aislar(groups, error); continue; }
-    for (const grupo of descritos) {
+    } catch (error) { aislar(propios.map((grupo) => grupo.key), error); continue; }
+    for (const grupo of propios) {
       try { candidates[grupo.key] = buildGroupCandidate({ group: grupo, pointer, temporalContext, results: resultsByGroup[grupo.key], ...comerciales, facilitoState: estado, now }); }
       catch (error) { aislar([grupo.key], error); }
     }

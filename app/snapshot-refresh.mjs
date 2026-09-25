@@ -25,10 +25,10 @@ export function validateDownloadMetadata({ status, headers, bytes, contentRange 
  * `source_max_reported_at`— más la fecha del snapshot. Con ellos ahí, un
  * snapshot nuevo no necesita escribir `dataset/` ni `evidence/`.
  */
-export function makeSnapshotPointer({ root, snapshotId, snapshotDate, datasetPath = null, evidencePath = null, acquisitionPath = null, overlayPath = null, sourceUrl, validators, promotedAt, temporalContext = null, referenceInputs, lineage }) {
+export function makeSnapshotPointer({ root, sourceId = 'liquid-current', snapshotId, snapshotDate, datasetPath = null, evidencePath = null, acquisitionPath = null, overlayPath = null, sourceUrl, validators, promotedAt, temporalContext = null, referenceInputs, lineage }) {
   return {
     schema_version: 1,
-    source_id: 'liquid-current',
+    source_id: sourceId,
     snapshot_id: snapshotId,
     snapshot_date: snapshotDate,
     temporal_context: temporalContext
@@ -58,6 +58,9 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, groups = 
   try {
     beforePointerUpdate();
     for (const group of groups) writeActivePointer(root, pointer, fsModule, { group });
+    // La fuente recuerda su último snapshot aprobado aunque ningún grupo suyo
+    // publique todavía: es su línea base de detección.
+    writeActivePointer(root, pointer, fsModule, { sourceId: pointer.source_id ?? 'liquid-current' });
   } catch (error) {
     throw new Error(`Snapshot validado movido pero pointer no actualizado: ${error.message}; snapshot_id=${pointer.snapshot_id}; recuperación: npm run rollback -- ${pointer.snapshot_id}`);
   }
@@ -71,10 +74,13 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, groups = 
  * rama que reconstruía un pointer a mano describía un dataset bajo `data/` y
  * `evidence/`, rutas que este árbol ya no tiene.
  */
-export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerUpdate = () => {}, { group = 'gasolina' } = {}) {
+export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerUpdate = () => {}, { group = 'gasolina', sourceId = 'liquid-current' } = {}) {
   const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
   if (!fsModule.existsSync(snapshotPath)) throw new Error(`No existe snapshot para rollback: ${snapshotId}`);
   const target = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
+  // Un grupo solo vuelve a un snapshot de su propia fuente: el de otra no tiene
+  // sus filas.
+  if ((target.source_id ?? 'liquid-current') !== sourceId) throw new Error(`El snapshot ${snapshotId} es de ${target.source_id}, no de ${sourceId}`);
   if (target.eligible_for_rollback === false) throw new Error(`Snapshot no elegible para rollback: ${snapshotId}`);
   const active = readActivePointer(root, { group });
   if (!active) throw new Error('No hay pointer activo desde el que revertir');
@@ -91,10 +97,11 @@ export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerU
  * snapshot declara de sí mismo, no una copia del pointer del otro grupo, que
  * podría arrastrar la marca de un rollback ajeno.
  */
-export function adoptSnapshot(root, snapshotId, { group, fsModule = fs } = {}) {
+export function adoptSnapshot(root, snapshotId, { group, sourceId = 'liquid-current', fsModule = fs } = {}) {
   const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
   if (!fsModule.existsSync(snapshotPath)) throw new Error(`No existe snapshot para adoptar: ${snapshotId}`);
   const { dataset_absolute_path, ...pointer } = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
+  if ((pointer.source_id ?? 'liquid-current') !== sourceId) throw new Error(`El snapshot ${snapshotId} es de ${pointer.source_id}, no de ${sourceId}`);
   writeActivePointer(root, pointer, fsModule, { group });
   return pointer;
 }

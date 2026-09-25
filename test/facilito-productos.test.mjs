@@ -16,9 +16,13 @@ import { capturarLima } from '../pipeline/facilito/capture.mjs';
 import { applyFacilitoRun, facilitoRunCounts, facilitoStateForProducts, facilitoStateId, facilitoUnitInstants } from '../pipeline/facilito/state.mjs';
 
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
+const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles)', 'Unidad de Medida'];
 const DISTRITOS = [{ nombre: 'ATE', codigo: '150103' }, { nombre: 'SAN LUIS', codigo: '150134' }];
-const ETIQUETAS_DEL_SITIO = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV' };
-const tabla = (distrito) => ({ estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS, filas: [[distrito, 'GRIFO', 'AV. GRIFO 1', '999999999', 'S/ 19,49']] });
+const ETIQUETAS_DEL_SITIO = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV', 49: 'GLP - Granel' };
+// La página de GLP (código 49) trae una sexta columna con la unidad.
+const tabla = (distrito, codigo = '126') => (codigo === '49'
+  ? { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS_GLP, filas: [[distrito, 'GASOCENTRO', 'AV. GAS 1', '999999999', 'S/ 7,49', 'Galones']] }
+  : { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS, filas: [[distrito, 'GRIFO', 'AV. GRIFO 1', '999999999', 'S/ 19,49']] });
 
 /** Navegador simulado: `respuesta(distrito, código)` decide qué ve cada unidad. */
 function navegador(respuesta, etiquetas = ETIQUETAS_DEL_SITIO) {
@@ -26,6 +30,8 @@ function navegador(respuesta, etiquetas = ETIQUETAS_DEL_SITIO) {
   let producto = null;
   let reloj = 1000;
   return (args) => {
+    // La página de GLP abre con su único producto ya elegido.
+    if (args[0] === 'open') producto = args[1].includes('buscadorAGranelGLP') ? '49' : null;
     if (args[0] === 'select') {
       if (args[1].includes('distrito')) distrito = DISTRITOS.find((d) => d.codigo === args[2]);
       if (args[1].includes('producto')) producto = args[2];
@@ -46,29 +52,32 @@ const estados = (resultado) => Object.fromEntries(resultado.units.map((u) => [`$
 
 test('Diésel se lee aparte y su tabla rota no le cuesta nada a Gasolina', () => {
   // `sin_tabla` es reintentable: antes, un fallo así hacía caer el distrito entero.
-  const resultado = capturarLima({ ejecutar: navegador((d, codigo) => (codigo === '40' ? { estado: 'sin_tabla' } : tabla(d.nombre))) });
+  const resultado = capturarLima({ ejecutar: navegador((d, codigo) => (codigo === '40' ? { estado: 'sin_tabla' } : tabla(d.nombre, codigo))) });
   assert.equal(resultado.blocked, null);
-  assert.deepEqual(resultado.passes.map((p) => [p.name, p.products]), [['gasolina', ['regular', 'premium']], ['diesel', ['diesel']]]);
+  assert.deepEqual(resultado.passes.map((p) => [p.name, p.products]), [['gasolina', ['regular', 'premium']], ['diesel', ['diesel']], ['glp', ['glp']]]);
   assert.deepEqual(estados(resultado), {
     'ATE:regular': 'ok', 'ATE:premium': 'ok', 'SAN LUIS:regular': 'ok', 'SAN LUIS:premium': 'ok',
     'ATE:diesel': 'sin_tabla', 'SAN LUIS:diesel': 'sin_tabla',
+    'ATE:glp': 'ok', 'SAN LUIS:glp': 'ok',
   });
 });
 
 test('si el código no muestra la etiqueta esperada, falla solo esa unidad', () => {
   // Un sitio que reasignara el 40 a otro producto no puede colar esos precios como Diésel.
-  const resultado = capturarLima({ ejecutar: navegador((d) => tabla(d.nombre), { ...ETIQUETAS_DEL_SITIO, 40: 'Gasohol Regular' }) });
+  const resultado = capturarLima({ ejecutar: navegador((d, codigo) => tabla(d.nombre, codigo), { ...ETIQUETAS_DEL_SITIO, 40: 'Gasohol Regular' }) });
   assert.deepEqual(estados(resultado), {
     'ATE:regular': 'ok', 'ATE:premium': 'ok', 'SAN LUIS:regular': 'ok', 'SAN LUIS:premium': 'ok',
     'ATE:diesel': 'producto_no_coincide', 'SAN LUIS:diesel': 'producto_no_coincide',
+    'ATE:glp': 'ok', 'SAN LUIS:glp': 'ok',
   });
 });
 
 test('un bloqueo en la pasada de Diésel detiene todo y conserva lo ya leído', () => {
-  const resultado = capturarLima({ ejecutar: navegador((d, codigo) => (codigo === '40' ? { rechazo: 'desafio_o_rechazo' } : tabla(d.nombre))) });
+  const resultado = capturarLima({ ejecutar: navegador((d, codigo) => (codigo === '40' ? { rechazo: 'desafio_o_rechazo' } : tabla(d.nombre, codigo))) });
   assert.equal(resultado.blocked?.codigo, 'desafio_o_rechazo');
   assert.equal(resultado.units.filter((u) => u.product !== 'diesel' && u.status === 'ok').length, 4);
   assert.equal(resultado.units.some((u) => u.district_name === 'SAN LUIS' && u.product === 'diesel'), false, 'no se sigue golpeando el mismo muro');
+  assert.deepEqual(resultado.passes.map((p) => p.name), ['gasolina', 'diesel'], 'tampoco se abre la página de GLP');
 });
 
 test('`soloProductos` recorre solo lo pedido', () => {

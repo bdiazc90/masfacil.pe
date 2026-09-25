@@ -56,7 +56,7 @@ export async function rollbackGroup({ root = rootFromModule, group = 'gasolina',
   const projection = (await composeGroups({ root, plan: [{ pointer: target, groups: [group] }], facilitoState: guardado ? facilitoState : null, ...(compuestoEn ? { now: Date.parse(compuestoEn) } : {}) }))[group];
   let rolledBack;
   try {
-    rolledBack = rollbackSnapshot(root, snapshotId, fs, () => {}, { group });
+    rolledBack = rollbackSnapshot(root, snapshotId, fs, () => {}, { group, sourceId: grupo.config.source });
     writeGroupProjection(projection, { root, group: grupo });
   } catch (error) {
     if (rolledBack) writeActivePointer(root, activeBefore, fs, { group });

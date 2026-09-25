@@ -11,6 +11,20 @@ export const ACTIVE_POINTER_RELATIVE = '.local-cache/snapshots/active.json';
  */
 export const pointerRelative = (group = 'gasolina') => (group === 'gasolina' ? ACTIVE_POINTER_RELATIVE : `.local-cache/snapshots/active-${group}.json`);
 
+/**
+ * El pointer de una fuente: el último snapshot suyo que aprobó algún grupo. Es
+ * la línea base de detección cuando ningún grupo de la fuente publica todavía,
+ * y la base de la primera activación de un grupo sin pointer propio. Nunca la
+ * de otra fuente.
+ */
+export const sourcePointerRelative = (sourceId) => `.local-cache/snapshots/source-${sourceId}.json`;
+
+export function readSourcePointer(root, sourceId) {
+  const pointerPath = path.join(root, sourcePointerRelative(sourceId));
+  if (!fs.existsSync(pointerPath)) return null;
+  return { ...validateSnapshotPointer(root, readJson(pointerPath)), pointer_path: pointerPath };
+}
+
 function relative(root, value) {
   const absolute = path.resolve(root, value);
   if (!absolute.startsWith(`${path.resolve(root)}${path.sep}`)) throw new Error(`Ruta de snapshot fuera del workspace: ${value}`);
@@ -53,8 +67,8 @@ export function readActivePointer(root, { group = 'gasolina' } = {}) {
   return { ...validateSnapshotPointer(root, pointer), pointer_path: pointerPath };
 }
 
-export function writeActivePointer(root, pointer, fsModule = fs, { group = 'gasolina' } = {}) {
-  const pointerPath = path.join(root, pointerRelative(group));
+export function writeActivePointer(root, pointer, fsModule = fs, { group = 'gasolina', sourceId = null } = {}) {
+  const pointerPath = path.join(root, sourceId ? sourcePointerRelative(sourceId) : pointerRelative(group));
   const value = `${JSON.stringify(pointer, null, 2)}\n`;
   fsModule.mkdirSync(path.dirname(pointerPath), { recursive: true, mode: 0o700 });
   const temporary = `${pointerPath}.${process.pid}.${Date.now()}.tmp`;

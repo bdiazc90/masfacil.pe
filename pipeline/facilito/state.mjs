@@ -136,6 +136,8 @@ export function applyFacilitoRun(previous, units, { attemptedAt, contract = null
       district_code: unidad.district_code,
       district_name: unidad.district_name,
       product: unidad.product,
+      // La página de la unidad, cuando no es la del expediente (GLP).
+      ...(unidad.source_url ? { source_url: unidad.source_url } : {}),
       observed_at: unidad.observed_at,
       announced_total: unidad.announced_total,
       rows: unidad.rows,

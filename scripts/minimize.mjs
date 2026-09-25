@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
-// Minimiza el original de precios: quita RUC, razón social y dirección, y deja
-// un CSV comprimido con las diez columnas que el pipeline público necesita.
+// Minimiza el original de precios de una fuente (`SOURCE_ID`, por defecto los
+// líquidos): quita RUC, razón social y dirección —y en GLP la marca de la
+// envasadora— y deja un CSV comprimido con las columnas que la proyección
+// necesita.
 //
 // Dos pasadas a propósito: la primera valida y mide el original entero, la
 // segunda escribe. Escribir mientras se valida dejaría un archivo a medias
@@ -14,16 +16,20 @@ import { createGzip } from 'node:zlib';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
-import { MINIMIZED_FIELDS, RAW_FIELDS, assertHeader, clean, csvLine, csvRows, normalizeHeader, parseTimestamp } from '../pipeline/csv.mjs';
+import { assertHeader, clean, csvLine, csvRows, normalizeHeader, parseTimestamp } from '../pipeline/csv.mjs';
+import { sourceById } from '../pipeline/sources.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 if (!process.env.RAW_INPUT || !process.env.MINIMIZED_OUTPUT) throw new Error('RAW_INPUT y MINIMIZED_OUTPUT son obligatorios');
 const rawPath = path.resolve(root, process.env.RAW_INPUT);
 const outputRoot = path.resolve(root, process.env.MINIMIZED_OUTPUT);
+const source = sourceById(process.env.SOURCE_ID || 'liquid-current');
+const RAW_FIELDS = source.rawFields;
+const MINIMIZED_FIELDS = source.minimizedFields;
 
 if (!fs.existsSync(rawPath)) throw new Error(`No existe raw para minimizar: ${rawPath}`);
-fs.mkdirSync(path.join(outputRoot, 'prices'), { recursive: true, mode: 0o700 });
-const destination = path.join(outputRoot, 'prices', 'liquid-current.csv.gz');
+const destination = path.join(outputRoot, source.minimizedRelative);
+fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
 const temporary = `${destination}.part`;
 if (fs.existsSync(destination) || fs.existsSync(temporary)) throw new Error(`La minimización ya existe: ${destination}`);
 let bytes = 0; let header; let rows = 0; let malformed = 0; let maxReported = null;
@@ -60,4 +66,4 @@ await writer;
 if (outputRows !== rows) throw new Error(`filas de salida ${outputRows} no coinciden con filas válidas de entrada ${rows}`);
 const outputSha256 = outputHash.digest('hex');
 fs.renameSync(temporary, destination);
-process.stdout.write(`${JSON.stringify({ raw_bytes: bytes, raw_sha256: rawDigest.digest('hex'), raw_header: [...RAW_FIELDS], minimized_path: path.relative(root, destination), minimized_bytes: fs.statSync(destination).size, minimized_sha256: outputSha256, minimized_rows: rows, source_max_reported_at: maxReported?.toISOString() ?? null }, null, 2)}\n`);
+process.stdout.write(`${JSON.stringify({ source_id: source.id, raw_bytes: bytes, raw_sha256: rawDigest.digest('hex'), raw_header: [...RAW_FIELDS], minimized_path: path.relative(root, destination), minimized_bytes: fs.statSync(destination).size, minimized_sha256: outputSha256, minimized_rows: rows, source_max_reported_at: maxReported?.toISOString() ?? null }, null, 2)}\n`);
