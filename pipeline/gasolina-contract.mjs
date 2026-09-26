@@ -11,7 +11,7 @@
 import crypto from 'node:crypto';
 import { GROUP_RULES, bundleErrors, datasetErrors, manifestErrors, sameKeys, text, timestamp } from '../web/lib/bundle-contract.js';
 
-export { CONFIDENCE_LEVELS, DIESEL_MANIFEST_VERSION, FACILITO_FIELDS, GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, GASOLINA_VERSIONS, GROUP_RULES, LEGACY_GASOLINA_MANIFEST_VERSION, PUBLIC_OFFER_FIELDS } from '../web/lib/bundle-contract.js';
+export { CONFIDENCE_LEVELS, DIESEL_MANIFEST_VERSION, FACILITO_FIELDS, GLP_MANIFEST_VERSION, GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, GASOLINA_VERSIONS, GROUP_RULES, LEGACY_GASOLINA_MANIFEST_VERSION, PUBLIC_OFFER_FIELDS } from '../web/lib/bundle-contract.js';
 
 export const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 

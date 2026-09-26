@@ -17,6 +17,9 @@ export const PRODUCTS = Object.freeze({
   // El nombre exacto del CSV, con sus mayúsculas: las otras variedades de diésel
   // son registros distintos y no se unen por parecido.
   diesel: producto('diesel', 'Diesel B5 S-50 UV', 'Diésel B5 S-50 UV', 'Diésel', 'B5 S-50 UV', 'm'),
+  // `GLP - G` es el GLP a granel que se despacha a vehículos, en galones. El
+  // mismo nombre en kilogramos y los cilindros son otros registros y no entran.
+  glp: producto('glp', 'GLP - G', 'GLP automotor', 'GLP', 'GLP', 'm'),
 });
 
 const LIMA = Object.freeze({ department: 'LIMA', province: 'LIMA' });
@@ -44,7 +47,18 @@ export const DIESEL = Object.freeze({
   dataRoot: 'data/diesel',
 });
 
-export const GROUPS = Object.freeze({ gasolina: GASOLINA, diesel: DIESEL });
+// GLP sale de su propia fuente, el CSV de GLP: su corte y su revisión no son
+// los de los líquidos.
+export const GLP_KEYS = Object.freeze(['glp']);
+
+export const GLP = Object.freeze({
+  key: 'glp',
+  products: GLP_KEYS,
+  scope: LIMA,
+  dataRoot: 'data/glp',
+});
+
+export const GROUPS = Object.freeze({ gasolina: GASOLINA, diesel: DIESEL, glp: GLP });
 
 // Vistas: lo que la persona elige ver. Cada una muestra juntos sus productos y
 // vive en `/combustibles/<clave>`. Solo existen las de `ACTIVE_VIEWS`: activar una
@@ -54,6 +68,7 @@ export const GROUPS = Object.freeze({ gasolina: GASOLINA, diesel: DIESEL });
 export const VIEWS = Object.freeze({
   gasolina: Object.freeze({ key: GASOLINA.key, label: 'Gasolina', products: GASOLINA.products, dataRoot: GASOLINA.dataRoot, history: true, priceUnit: null }),
   diesel: Object.freeze({ key: DIESEL.key, label: 'Diésel', products: DIESEL.products, dataRoot: DIESEL.dataRoot, history: false, priceUnit: 'por galón' }),
+  glp: Object.freeze({ key: GLP.key, label: 'GLP', products: GLP.products, dataRoot: GLP.dataRoot, history: false, priceUnit: 'por galón' }),
 });
-export const ACTIVE_VIEWS = Object.freeze(['gasolina', 'diesel']);
+export const ACTIVE_VIEWS = Object.freeze(['gasolina', 'diesel', 'glp']);
 export const DEFAULT_VIEW = 'gasolina';

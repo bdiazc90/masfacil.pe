@@ -53,7 +53,7 @@ else {
 // La ruta del historial es la misma portada con el gráfico enfocado.
 const enHistorial = () => resolvePath(location.pathname).history === true;
 const SCREENS = Object.freeze({ start: 'start-step', loading: 'loading-step', district: 'district-step', compare: 'compare-step', fatal: 'fatal-state' });
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text', 'sum-fuel', 'view-state', 'view-state-text', 'view-state-action', 'start-retry', 'history-chart', 'menu-history'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'radius-empty-title', 'radius-empty-text', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text', 'sum-fuel', 'view-state', 'view-state-text', 'view-state-action', 'start-retry', 'history-chart', 'menu-history'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
 
 // El card de controles solo se fija en resultados; en las demás pantallas es la
@@ -97,7 +97,7 @@ function renderRadiusControl({ inert, total }) {
   // Inerte significa que mover el radio no cambia el conteo, no que haya una
   // sola estación: en Pucusana son tres en todo el rango.
   nodes['radius-readout'].textContent = inert
-    ? (total === 1 ? `Única estación en ${formatRadius(RADIUS_MAX_KM)}` : `Las mismas ${total} estaciones en todo el radio`)
+    ? (total === 0 ? `Ninguna estación en ${formatRadius(RADIUS_MAX_KM)}` : total === 1 ? `Única estación en ${formatRadius(RADIUS_MAX_KM)}` : `Las mismas ${total} estaciones en todo el radio`)
     : `${formatRadius(search.radiusKm)} · ${total} ${total === 1 ? 'estación' : 'estaciones'}`;
 }
 // Resumen del card compacto: el lugar puede truncar; el criterio nunca.
@@ -140,6 +140,11 @@ function renderOffers() {
   nodes['price-product-toggle'].hidden = !view.productToggle;
   if (view.radius) renderRadiusControl(view.radius);
   nodes['radius-empty'].hidden = !view.radiusEmpty;
+  // Sin ninguna estación en todo el rango, ampliar el radio no sirve: se dice, y
+  // se ofrece lo que sí sirve.
+  const nadaEnElRango = view.radius?.inert && view.radius.total === 0;
+  nodes['radius-empty-title'].textContent = nadaEnElRango ? `Ningún grifo a ${formatRadius(RADIUS_MAX_KM)}` : 'Ningún grifo en este radio';
+  nodes['radius-empty-text'].textContent = nadaEnElRango ? `No hay estaciones de ${VIEWS[search.view].label} cerca de ti. Busca por distrito o elige otro combustible.` : 'Amplía el radio de búsqueda para encontrar estaciones más lejanas.';
   nodes['load-more'].hidden = view.remaining <= 0;
   // El botón carga su propio salto: la etiqueta y lo que hace salen del mismo
   // número, así que no pueden discrepar.
@@ -391,14 +396,16 @@ function mountViewPickers() {
 }
 
 // Aplica la copia cargada de la vista activa donde esté la persona: en
-// resultados conserva origen o distrito, radio y orden —no pasa por
-// `startResults`, que los recalcula— y vuelve a la primera página.
+// resultados conserva origen o distrito, el radio y el orden que la persona
+// eligió, y vuelve a la primera página. Un radio que nadie eligió no es una
+// preferencia: se recalcula con los precios de esta vista, como al abrir los
+// resultados —GLP tiene muchas menos estaciones que Gasolina—.
 function applyView(entrada) {
   data = entrada;
   applyLoaded(entrada.dataset);
   if (ui.screen === 'compare') {
     refrescar({ force: true });
-    elegir({ visibleCount: PAGE_SIZE });
+    search = startResults(search, located);
     nodes['official-source'].href = data.dataset.provenance.source_url;
     nodes['offline-note'].hidden = data.mode !== 'saved';
     nodes['offline-note'].textContent = data.mode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(data.dataset.cutoff_at)}.` : '';

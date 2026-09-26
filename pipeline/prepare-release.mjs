@@ -225,12 +225,16 @@ export async function prepareRelease({
       const candidata = candidatas[item.grupo.key];
       if (!candidata || candidata.error) { item.outcome = 'failed'; item.error = trimmed(candidata?.error) || 'la proyección falló sin mensaje'; continue; }
       try {
-        // Sin refresco que la haya juzgado, la primera versión se juzga aquí contra
-        // la base auditada; solo si pasa, el grupo adopta ese snapshot como suyo.
-        if (item.primeraActivacion && !item.propio.ok) {
+        // La primera versión pública se juzga siempre aquí contra la base
+        // auditada, también sobre un pointer propio: la cadena privada de un grupo
+        // que se preparó sin vista solo se comparó con su versión anterior, y lo
+        // que se publica por primera vez tiene que cumplir la base con la que se
+        // aprobó activarlo. Sin pointer propio, además, el grupo adopta el
+        // snapshot solo si pasa.
+        if (item.primeraActivacion) {
           const calidad = compareGroupQuality({ group: item.grupo.key, candidateProducts: candidata.refreshState.products, candidateSourceMaxReportedAt: candidata.refreshState.source_max_reported_at });
           if (calidad.status !== 'ready') { item.outcome = 'first_activation_failed'; item.error = calidad.reasons.join('; '); continue; }
-          usar.adoptSnapshot(root, item.base.snapshot_id, { group: item.grupo.key, sourceId: item.grupo.config.source });
+          if (!item.propio.ok) usar.adoptSnapshot(root, item.base.snapshot_id, { group: item.grupo.key, sourceId: item.grupo.config.source });
         }
         // Con el CSV sin cambios, la entrega solo se justifica si la consulta web
         // mueve algo que alguien pueda ver. Si no, la anterior sigue siendo
@@ -310,7 +314,7 @@ export async function prepareRelease({
     deploy: applied.deploy,
     groups: grupoInforme,
     // Cada fuente que se consultó, con los grupos que juzgó: también los que
-    // todavía no publican, como GLP. Nunca cambia la decisión de publicar.
+    // todavía no publican. Nunca cambia la decisión de publicar.
     sources: Object.fromEntries(Object.entries(refresh.sources ?? {}).map(([id, fuente]) => [id, resumenFuente(fuente)])),
   };
   return { ok: execution.ok, route, route_reason: routeReason, refresh, decision: applied, execution, informe, identity, production };

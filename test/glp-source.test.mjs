@@ -78,7 +78,7 @@ test('GLP es GLP - G en galones para «Usuario Final»; lo demás se descarta y 
     crudaGlp({ id: '5', actividad: ESTACION_GLP, registro: 'R-I', producto: 'Cilindros de 10 Kg de GLP', unidad: 'Kilogramos' }),
   ].map(minimizada);
   const grupo = configuredGroup('glp');
-  const candidatos = selectProductCandidates({ sources: { prices: precios, registry: [], gis: [] }, product: grupo.config.productDefinitions.glp, activities: grupo.config.activities, scope: grupo.scope, cutoffAt: AHORA, gisLayers: grupo.config.gisLayers, clientType: grupo.config.clientType, idField: 'ID4' });
+  const candidatos = selectProductCandidates({ sources: { prices: precios, registry: [], gis: [] }, product: PRODUCTS.glp, activities: grupo.config.activities, scope: grupo.scope, cutoffAt: AHORA, gisLayers: grupo.config.gisLayers, clientType: grupo.config.clientType, idField: 'ID4' });
   assert.deepEqual(candidatos.rowExclusions, { otra_unidad: 1, otro_tipo_de_cliente: 1 });
   assert.deepEqual(candidatos.latestLima.map((item) => item.selected.REGISTRO_DE_HIDROCARBUROS), ['R-A']);
 });

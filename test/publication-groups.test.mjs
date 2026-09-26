@@ -34,7 +34,7 @@ function origen(extra = () => null) {
 const sinEspera = { attempts: 1, sleep: async () => {} };
 
 test('los grupos publicados son las vistas activas, cada una con su contrato', () => {
-  assert.deepEqual(PUBLISHED_GROUPS.map((grupo) => [grupo.key, grupo.dataRoot, [...grupo.products]]), [['gasolina', 'data/gasolina', ['regular', 'premium']], ['diesel', 'data/diesel', ['diesel']]]);
+  assert.deepEqual(PUBLISHED_GROUPS.map((grupo) => [grupo.key, grupo.dataRoot, [...grupo.products]]), [['gasolina', 'data/gasolina', ['regular', 'premium']], ['diesel', 'data/diesel', ['diesel']], ['glp', 'data/glp', ['glp']]]);
 });
 
 // La primera activación de un grupo solo se reconoce cuando faltan a la vez sus
@@ -79,9 +79,10 @@ test('cada grupo se escribe en su raíz, snapshots antes que el manifest', () =>
     const datos = path.join(raiz, 'web', 'data', 'gasolina');
     assert.equal(fs.readFileSync(path.join(datos, 'manifest.json'), 'utf8'), R.manifestText);
     for (const key of ['regular', 'premium']) assert.equal(fs.readFileSync(path.join(raiz, 'web', R.manifest.products[key].dataset_url), 'utf8'), R.bodies[key]);
-    assert.throws(() => writeLiveGroups([{ group: 'glp', ...R }], { root: raiz }), /grupo no publicado: glp/i);
+    assert.throws(() => writeLiveGroups([{ group: 'gnv', ...R }], { root: raiz }), /grupo no publicado: gnv/i);
     // Los bytes de un grupo no pueden aterrizar en la raíz de otro.
     assert.throws(() => writeLiveGroups([{ group: 'diesel', ...R }], { root: raiz }), /no declara diesel para el grupo diesel/);
+    assert.throws(() => writeLiveGroups([{ group: 'glp', ...R }], { root: raiz }), /no declara glp para el grupo glp/);
     const ajeno = { ...R, manifest: { ...R.manifest, products: { diesel: R.manifest.products.regular } } };
     assert.throws(() => writeLiveGroups([{ group: 'diesel', ...ajeno }], { root: raiz }), /dataset_url fuera del grupo diesel/);
     assert.deepEqual(writeLiveGroups([{ group: 'diesel', unpublished: true }], { root: raiz }), { diesel: { unpublished: true } });

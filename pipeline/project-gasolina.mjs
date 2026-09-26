@@ -503,15 +503,16 @@ export async function projectGasolina({ root = rootFromModule, outputRoot = path
 /**
  * Proyecta todos los grupos activos desde la caché privada, como `npm run
  * project`. Cada grupo usa su pointer; uno que todavía no tiene —su primera
- * activación— se compone sobre el de Gasolina, se juzga contra su base auditada
- * y, solo si pasa, adopta ese snapshot. Nada se escribe si un grupo falla.
+ * activación— se compone sobre el último snapshot aprobado de SU fuente (en los
+ * líquidos, el de Gasolina), se juzga contra su base auditada y, solo si pasa,
+ * adopta ese snapshot. Nada se escribe si un grupo falla.
  */
 export async function projectGroups({ root = rootFromModule, identityRoot, facilitoRoot } = {}) {
   const plan = new Map();
   const primeras = [];
   for (const grupo of PUBLISHED_GROUPS) {
     let base = usablePrivateSnapshot(root, { group: grupo.key });
-    if (!base.ok && grupo.config.guardrails.firstActivation) { base = usablePrivateSnapshot(root, { group: 'gasolina' }); primeras.push(grupo.key); }
+    if (!base.ok && grupo.config.guardrails.firstActivation) { base = firstActivationBase(root, grupo.key); primeras.push(grupo.key); }
     if (!base.ok) throw new Error(`${grupo.key}: sin snapshot privado utilizable: ${base.missing.join('; ')}`);
     const entrada = plan.get(base.snapshot_id) ?? { pointer: base.pointer, groups: [] };
     entrada.groups.push(grupo.key);
@@ -523,7 +524,7 @@ export async function projectGroups({ root = rootFromModule, identityRoot, facil
     const calidad = compareGroupQuality({ group: key, candidateProducts: refreshState.products, candidateSourceMaxReportedAt: refreshState.source_max_reported_at });
     if (calidad.status !== 'ready') throw new Error(`Primera versión de ${key} rechazada: ${calidad.reasons.join('; ')}`);
   }
-  for (const key of primeras) adoptSnapshot(root, candidatas[key].refreshState.snapshot_id, { group: key });
+  for (const key of primeras) adoptSnapshot(root, candidatas[key].refreshState.snapshot_id, { group: key, sourceId: configuredGroup(key).config.source });
   for (const grupo of PUBLISHED_GROUPS) writeGroupProjection(candidatas[grupo.key], { root, group: grupo, identityRoot, facilitoRoot });
   return candidatas;
 }

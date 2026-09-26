@@ -53,14 +53,15 @@ function cache() {
   };
   return api;
 }
-// Lo que sirve producción, como lo devuelve `prepareRelease`.
-const produccion = (id, revision = 'aaaaaaaaaaaa') => ({ gasolina: { snapshot_id: id, revision_id: `gasolina-${id}-${revision}`, facilito: false }, diesel: { snapshot_id: id, revision_id: `diesel-${id}-bbbbbbbbbbbb`, facilito: false } });
+// Lo que sirve producción, como lo devuelve `prepareRelease`. GLP es `null`
+// mientras no se haya publicado nunca; `glp` da su snapshot si ya se publicó.
+const produccion = (id, revision = 'aaaaaaaaaaaa', { glp = null } = {}) => ({ gasolina: { snapshot_id: id, revision_id: `gasolina-${id}-${revision}`, facilito: false }, diesel: { snapshot_id: id, revision_id: `diesel-${id}-bbbbbbbbbbbb`, facilito: false }, glp: glp ? { snapshot_id: glp, revision_id: `glp-${glp}-cccccccccccc`, facilito: false } : null });
 const manifestDe = (c, id) => JSON.parse(fs.readFileSync(path.join(c.snapshots, id, 'snapshot-manifest.json'), 'utf8'));
 
 test('con los pointers ya en el snapshot nuevo, protege producción y su rollback, y tras un deploy fallido siguen recuperables', () => {
   const c = cache().snapshot('2026-09-20-viejo').snapshot('2026-09-21-s0').snapshot('2026-09-22-s1').snapshot('2026-09-23-s2').staging().pointers(LIQUIDOS, '2026-09-23-s2');
   // Sin producción que proteger —lo único que miraba la poda de 3A— se habrían ido producción y rollback.
-  const soloPointers = pruneSnapshots({ root: c.root, production: { gasolina: null, diesel: null }, dryRun: true });
+  const soloPointers = pruneSnapshots({ root: c.root, production: { gasolina: null, diesel: null, glp: null }, dryRun: true });
   assert.deepEqual(soloPointers.remove, ['2026-09-20-viejo', '2026-09-21-s0', '2026-09-22-s1']);
 
   const informe = pruneInCi({ root: c.root, env: CI, production: produccion('2026-09-22-s1') });
@@ -119,6 +120,8 @@ test('sin producción conocida, completa y legible no se borra nada', () => {
     [undefined, /producción de gasolina desconocida/],
     [produccion('2026-09-23-ausente'), /no está en la caché/],
     [{ ...produccion('2026-09-22-s1'), diesel: { error: 'el estado publicado no declara snapshot_id' } }, /producción de diesel ilegible/],
+    // Un grupo publicado del que no se dijo nada no es «nunca publicado».
+    [(({ glp: _glp, ...resto }) => resto)(produccion('2026-09-22-s1')), /producción de glp desconocida/],
   ];
   for (const [production, motivo] of casos) {
     const c = armar();
@@ -170,7 +173,7 @@ test('un snapshot marcado como no elegible no es destino de rollback', () => {
   assert.deepEqual([informe.protected.gasolina.rollback, informe.remove], ['2026-09-20-s0', ['2026-09-19-viejo']]);
 });
 
-test('los snapshots viejos de GLP se borran y su pointer no; fuera de CI no se poda', () => {
+test('sin publicar, los snapshots viejos de GLP se borran y su pointer no; fuera de CI no se poda', () => {
   const c = cache().snapshot('2026-09-21-s0').snapshot('2026-09-22-s1').pointers(LIQUIDOS, '2026-09-22-s1')
     .snapshot('2026-09-20-glp-viejo', { source: 'glp-current' }).snapshot('2026-09-22-glp', { source: 'glp-current' })
     .pointers(['active-glp.json', 'source-glp-current.json'], '2026-09-22-glp');
@@ -179,4 +182,27 @@ test('los snapshots viejos de GLP se borran y su pointer no; fuera de CI no se p
   const informe = pruneInCi({ root: c.root, env: CI, production: produccion('2026-09-22-s1') });
   assert.deepEqual([informe.remove, informe.cutoffs], [['2026-09-20-glp-viejo'], { 'liquid-current': '2026-09-21-s0' }]);
   assert.deepEqual(c.quedan(), ['2026-09-21-s0', '2026-09-22-glp', '2026-09-22-s1']);
+});
+
+test('con GLP publicado, su producción y su rollback se protegen por su fuente, sin tocar el corte de los líquidos', () => {
+  const c = cache().snapshot('2026-09-21-s0').snapshot('2026-09-22-s1').pointers(LIQUIDOS, '2026-09-22-s1')
+    .snapshot('2026-09-19-glp-viejo', { source: 'glp-current' }).snapshot('2026-09-20-glp-r', { source: 'glp-current' })
+    .snapshot('2026-09-21-glp-p', { source: 'glp-current' }).snapshot('2026-09-22-glp-nuevo', { source: 'glp-current' })
+    .pointers(['active-glp.json', 'source-glp-current.json'], '2026-09-22-glp-nuevo');
+  const informe = pruneInCi({ root: c.root, env: CI, production: produccion('2026-09-22-s1', 'aaaaaaaaaaaa', { glp: '2026-09-21-glp-p' }) });
+  assert.equal(informe.status, 'pruned');
+  assert.deepEqual(informe.protected.glp, { production: '2026-09-21-glp-p', revision: 'glp-2026-09-21-glp-p-cccccccccccc', rollback: '2026-09-20-glp-r' });
+  assert.deepEqual(informe.cutoffs, { 'liquid-current': '2026-09-21-s0', 'glp-current': '2026-09-20-glp-r' });
+  assert.deepEqual(informe.remove, ['2026-09-19-glp-viejo']);
+  assert.deepEqual(c.quedan(), ['2026-09-20-glp-r', '2026-09-21-glp-p', '2026-09-21-s0', '2026-09-22-glp-nuevo', '2026-09-22-s1']);
+});
+
+test('con GLP publicado, un anterior con su mismo CSV no es rollback y la poda se omite entera hasta el próximo CSV', () => {
+  const c = cache().snapshot('2026-09-20-viejo').snapshot('2026-09-21-s0').snapshot('2026-09-22-s1').pointers(LIQUIDOS, '2026-09-22-s1')
+    .snapshot('2026-09-20-glp-copia', { source: 'glp-current', sha: 'mismo-csv' }).snapshot('2026-09-21-glp-p', { source: 'glp-current', sha: 'mismo-csv' })
+    .pointers(['active-glp.json', 'source-glp-current.json'], '2026-09-21-glp-p');
+  const omitida = pruneInCi({ root: c.root, env: CI, production: produccion('2026-09-22-s1', 'aaaaaaaaaaaa', { glp: '2026-09-21-glp-p' }) });
+  assert.deepEqual([omitida.status, omitida.remove], ['skipped', []]);
+  assert.match(omitida.reason, /glp.*ninguno sirve de destino de rollback/);
+  assert.equal(c.quedan().includes('2026-09-20-viejo'), true, 'la omisión conserva todo, también lo de los líquidos');
 });

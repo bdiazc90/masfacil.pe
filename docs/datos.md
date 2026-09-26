@@ -62,7 +62,7 @@ Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026
 | Fuente | CSV | ID de fila | Grupos | Descarga máx. |
 | --- | --- | --- | --- | ---: |
 | `liquid-current` | `CL-Registro-precios-DMA-V-CCA-CCE.csv`, ~1,35 GB | `ID3` | Gasolina, Diésel | 60 min |
-| `glp-current` | `GLP-Registro-precios-PIC-PE-V.csv`, ~0,74 GB | `ID4` | GLP (privado) | 30 min |
+| `glp-current` | `GLP-Registro-precios-PIC-PE-V.csv`, ~0,74 GB | `ID4` | GLP | 30 min |
 
 - **Cada fuente tiene lo suyo:** su línea base de detección, su descarga, su minimizado, sus grupos y sus pointers. Un refresco de una nunca lee ni mueve nada de la otra.
 - **Pointer por fuente:** `source-<id>.json` guarda el último snapshot de la fuente que aprobó algún grupo.
@@ -72,11 +72,11 @@ Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026
 - **Referencia de Registro y GIS:** antes de descargar, el refresco exige que traiga los códigos y las capas de todos los grupos de la fuente. Con la semilla v1, GLP se rechaza sin bajar nada.
 - **Recuperación:** el rollback, la adopción y la composición rechazan un snapshot de otra fuente antes de tocar un pointer.
 
-**GLP en privado.** GLP no tiene vista todavía: su grupo está configurado en `pipeline/groups.mjs`, pero no en el catálogo público.
-- **Adquisición y juicio:** el refresco lo adquiere y lo juzga, y si pasa mueve solo `active-glp.json` y `source-glp-current.json`.
-- **Qué escribe:** su juicio queda en `glp-validation.json`, dentro del snapshot. Son solo conteos: estado, embudo, exclusiones y vínculos con la consulta web. Esa validación es su línea base en la corrida siguiente.
-- **Sin línea base:** se juzga contra su base auditada (abajo). Sin ninguna de las dos no se promueve.
-- **Qué no toca:** nada de GLP llega a `web/` ni cambia la decisión de publicar.
+**Grupos que se preparan en privado.** Un grupo configurado en `pipeline/groups.mjs` sin vista en el catálogo público se adquiere y se juzga sin publicarse. Así se preparó GLP en la Fase 3A; desde la 3B no queda ninguno.
+- **Adquisición y juicio:** si pasa, el refresco mueve solo su pointer y el de su fuente.
+- **Qué escribe:** su juicio queda en `<grupo>-validation.json`, dentro del snapshot. Son solo conteos (estado, embudo, exclusiones y vínculos con la consulta web), y esa validación es su línea base en la corrida siguiente.
+- **Sin línea base:** se juzga contra su base auditada; sin ninguna de las dos no se promueve.
+- **Qué no toca:** nada suyo llega a `web/` ni cambia la decisión de publicar.
 
 **Semilla de Registro y GIS v2.** La semilla que viaja como secret (`BOOTSTRAP_SEED_B64`, entorno `pages-production`) suma los gasocentros a lo de siempre:
 - **Contenido:** Registro 01/02/05/06/15 y capas GIS 35/36, Lima/Lima. Son 774 filas de Registro (30 del código 15) y 831 de GIS (81 de la capa 36); el base64 ocupa 28,5 KB.
@@ -95,12 +95,12 @@ Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026
   - por fuente, todo lo que va desde el destino de rollback hasta lo más nuevo, incluido lo que otra corrida esté desplegando;
   - el destino de cada pointer (`active*.json`, `source-*.json`);
   - el dueño real de cada original y el destino de cada symlink.
-- **Qué borra:** los snapshots que quedan debajo y `staging/`. Los viejos de GLP, que todavía no publica, también.
+- **Qué borra:** los snapshots que quedan debajo y `staging/`. De un grupo que todavía no se publicó solo se conserva el destino de sus pointers.
 - **Cuándo no borra nada:**
   - hay un refresco en curso;
   - no hay pointers, o uno es ilegible o apunta a una carpeta que falta o no sirve;
   - la producción es desconocida, ilegible o incompleta;
-  - hay snapshots anteriores a producción, pero ninguno sirve de destino de rollback;
+  - hay snapshots anteriores a producción, pero ninguno sirve de destino de rollback. Pasa, por ejemplo, si todos los anteriores de GLP traen el mismo CSV que su producción; la poda vuelve cuando producción avanza a otro CSV;
   - hay un symlink colgante o que sale de la caché, o un original que no resuelve.
 - **Informe y local:**
   - el resumen de CI dice qué protegió de cada grupo, qué borró y cuánto liberó. Una poda omitida sale como aviso con su motivo;
@@ -448,11 +448,12 @@ Las cuatro actividades usadas coinciden con las de la semilla de Registro y GIS,
 - **Después:** un fallo de Diésel conserva su versión publicada y deja publicar Gasolina, y al revés.
 - **Recuperar la entrega de código:** `git revert` y redeploy por el workflow.
 
-## Grupo GLP — embudo auditado el 24/09/2026 (privado desde la Fase 3A)
+## Grupo GLP — embudo auditado el 24/09/2026 (publicado desde la Fase 3B)
 
 GLP automotor es un grupo propio de un producto, con su propia fuente:
 - producto `GLP - G` en `Galones` para «Usuario Final», del CSV `glp-current`;
-- IDs `glp1_` y revisiones `glp-`. Todavía no tiene vista, contrato público ni datos en `web/`: eso es la Fase 3B.
+- IDs `glp1_`, revisiones `glp-` y contrato 1.0.0 con la forma de oferta de Gasolina 2.7.0;
+- vista `/combustibles/glp` y datos en `/data/glp` desde la Fase 3B. Se preparó en privado en la 3A.
 
 **Actividades, con evidencia del CSV.** Son las que venden GLP a granel a vehículos. En Lima, esas cuatro actividades reportan `GLP - G` solo en galones y solo para «Usuario Final»:
 
@@ -486,7 +487,23 @@ GLP automotor es un grupo propio de un producto, con su propia fuente:
   - 6 sin punto GIS.
 - **Por distrito:** los 41 distritos tienen al menos un gasocentro ubicado, y cinco tienen uno solo.
 
-**Guardrails.** Las mismas tolerancias que Gasolina y Diésel. Sin línea base propia, GLP se juzga contra esta base auditada y no puede perder más de 2 de sus 41 distritos.
+**Guardrails.** Las mismas tolerancias que Gasolina y Diésel, frente a su versión publicada (`web/data/glp/refresh-state.json`). Sin versión publicada, GLP se juzga contra esta base auditada y no puede perder más de 2 de sus 41 distritos.
+
+**Primera activación y recuperación.**
+- **Cuándo cuenta como no publicado:** solo cuando producción responde 404 a la vez en su manifest y en `/combustibles/glp`, como Diésel.
+- **Sobre qué se activa:**
+  - sobre `active-glp.json`, el pointer que dejó su preparación en privado;
+  - sin él, sobre `source-glp-current.json`, que además adopta si pasa;
+  - nunca sobre un snapshot de los líquidos. Sin ninguno de los dos utilizable, la entrega termina en `fail_closed` sin publicar ni adoptar nada.
+- **Juicio:** la primera versión pública se juzga siempre contra esta base auditada, también sobre `active-glp.json`. Su cadena privada solo se comparó con su versión anterior.
+- **Hasta la primera publicación:** la sonda compara con los validadores de `source-glp-current.json`. Si el CSV no cambió, sale `unchanged` sin descargar; un CSV nuevo se juzga contra esta base, no contra la cadena privada.
+- **Si la primera versión no pasa:** la entrega entera termina en `fail_closed`, como en Diésel. Mientras tanto Gasolina y Diésel tampoco se actualizan, así que un fallo de activación se revierte el mismo día.
+- **Después:** un fallo de GLP conserva su versión publicada y deja publicar Gasolina y Diésel, y al revés.
+- **Recuperar un grupo:** `npm run rollback -- <snapshot> [<revisión>] --group glp` no toca los demás.
+- **Recuperar la entrega de código:**
+  1. primero el push del `git revert`: las corridas de 3B que sigan en vuelo abortan en el preflight por código desactualizado;
+  2. cancelar las corridas en curso;
+  3. el rollback de Pages queda solo como parche. Si fuera primero, una corrida de 3B vería GLP en 404, lo tomaría por no publicado y lo volvería a activar.
 
 **Consulta web de GLP.** GLP no está en la página automotora de Facilito, sino en la suya, «Gas Licuado de Petróleo Automotor» (`buscadorAGranelGLP.jsp`). La sonda acotada del 25/09/2026 midió:
 - **Cascada:** Lima / Lima / distrito, con los mismos códigos que la página automotora.
@@ -495,7 +512,19 @@ GLP automotor es un grupo propio de un producto, con su propia fuente:
 - **Muestra:** San Miguel 9 filas y Surquillo 6, cada una con su total anunciado cuadrado, y precios de S/ 7,29 a 7,89.
 - **Costo:** 10 navegaciones y ningún bloqueo; un solo corte intermitente, que se reintentó.
 
-GLP se lee en una tercera pasada, la última, con 10 min de presupuesto. No se toca el select de producto y se exige «Galones» en cada fila. Sus unidades guardan su página y no entran en el estado que publican Gasolina y Diésel. Sus vínculos se cuentan en la validación privada.
+GLP se lee en una tercera pasada, la última, con 10 min de presupuesto. No se toca el select de producto y se exige «Galones» en cada fila. Sus unidades guardan su página y entran solo en el estado que publica GLP, no en el de Gasolina ni en el de Diésel.
+
+**Vínculo acreditado el 26/09/2026, antes de publicar la capa.** El método es el de Diésel: razón social + dirección + distrito exactos y únicos. Se probó contra el CSV de GLP del 25/09 y una pasada local completa.
+- **Población (43 distritos):** 390 filas vinculadas, 0 ambiguas y 36 sin par.
+- **Muestra (`scripts/facilito-sample.mjs --group glp`):** ocho distritos elegidos para cubrir estaciones con gasocentro (02/06), gasocentros puros (15) y establecimientos que también reportan GLP en kg o cilindros: La Victoria, Villa El Salvador, Comas, Ate, San Martín de Porres, Lurigancho, Puente Piedra y La Molina.
+  - 159 filas vinculadas, 0 ambiguas y 16 sin par. De las vinculadas, 14 son del código 15 y 41 tienen variantes.
+  - Las 16 sin par: 12 son gasocentros vigentes que no se publican (fuera del Registro del 14/08 o sin punto GIS); 4 tienen la misma razón social en el distrito con otra dirección, y el vínculo exacto no los empareja.
+- **Precios:** 141 de 159 coinciden al céntimo y 153 difieren 10 céntimos o menos. Mediana 0, percentil 90 de 0,05 y máximo de 0,50 (un reporte del CSV del 19/08, ya vencido).
+- **Revisión a ojo:** 24 establecimientos, 10 del código 15 y 11 con variantes.
+  - Todos son el mismo establecimiento que la dirección oficial.
+  - El precio está en soles por galón.
+  - Las diferencias se explican por la fecha del reporte.
+  - Los cilindros de 10 kg (S/ 37 a 62,5) no se confunden con el precio por galón.
 
 ## Modelo útil
 

@@ -1,6 +1,7 @@
 // Cada fuente se refresca por su cuenta: su línea base, su descarga, sus grupos
-// y sus pointers. GLP se adquiere y se juzga en privado sin leer ni mover nada
-// de los líquidos, y el fallo de una fuente no detiene a la otra.
+// y sus pointers. GLP se adquiere y se juzga contra su propio estado publicado
+// sin leer ni mover nada de los líquidos, y el fallo de una fuente no detiene a
+// la otra.
 //
 // Corre el refresco de verdad contra un origen local: sondeo, descarga,
 // minimizado, selección y promoción, con archivos de unos pocos cientos de bytes.
@@ -90,14 +91,16 @@ test('GLP sin base adquiere y, sin pasar su base auditada, no mueve ningún poin
     const glp = r.sources['glp-current'];
     assert.deepEqual([glp.status, glp.detection.baseline, glp.promoted], ['needs_review', 'sin_base', false]);
     assert.deepEqual(glp.groups.glp.products, { glp: { offers: 3, districts: 1 } });
-    assert.equal(glp.groups.glp.private, true);
+    assert.equal(glp.groups.glp.private, undefined, 'GLP es un grupo publicado');
     assert.match(glp.groups.glp.reasons.join(' '), /base auditada/);
     assert.equal(servidor.descargas('/glp.csv'), 1);
     assert.deepEqual(servidor.pedidos.filter((pedido) => pedido.includes('liquidos')), [], 'los líquidos no se consultan');
     for (const archivo of ['active-glp.json', 'source-glp-current.json']) assert.equal(fs.existsSync(path.join(snapshots(dir), archivo)), false);
     for (const archivo of ['active.json', 'active-diesel.json']) assert.equal(fs.readFileSync(path.join(snapshots(dir), archivo), 'utf8'), TRAMPA);
-    // Lo que queda del juicio son conteos: nada del original llega a la validación.
+    // Lo que queda del juicio son conteos y descriptores: nada del original
+    // llega a la validación.
     const validacion = fs.readFileSync(path.join(dir, glp.staging_path, 'glp-validation.json'), 'utf8');
+    assert.match(JSON.parse(validacion).revision_id, /^glp-/);
     for (const privado of ['RAZON', 'AV. ', 'RUC-FICTICIO', 'MARCA-SECRETA']) assert.equal(validacion.includes(privado), false);
   } finally { await servidor.cerrar(); }
 });
@@ -129,23 +132,35 @@ test('una fuente caída no detiene a la otra', async () => {
   } finally { await servidor.cerrar(); }
 });
 
-test('con base propia, GLP promueve en privado: mueve solo sus pointers y la corrida siguiente sale sin cambios', async () => {
+test('con estado publicado, GLP se juzga contra él: mueve solo sus pointers y la corrida siguiente sale sin cambios', async () => {
   const servidor = await origen();
   try {
     const dir = raiz();
     const ref = referencia();
     const url = { 'glp-current': servidor.url('/glp.csv') };
     const primera = (await refreshSnapshot({ root: dir, testSourceUrl: url, referenceMinimizedRoot: ref })).sources['glp-current'];
-    // La base: una validación anterior con las mismas cifras y una fuente un día más vieja.
+    // La base: lo que GLP publicaría con las mismas cifras sobre una fuente un
+    // día más vieja, y su pointer en ese snapshot, como lo deja un deploy.
     const juicio = leer(path.join(dir, primera.staging_path, 'glp-validation.json'));
-    const anterior = new Date(Date.parse(juicio.refresh_state.source_max_reported_at) - 86_400_000).toISOString();
+    const anterior = new Date(Date.parse(juicio.source_max_reported_at) - 86_400_000).toISOString();
     const base = '2026-01-01-base';
-    fs.mkdirSync(path.join(snapshots(dir), base), { recursive: true });
-    fs.writeFileSync(path.join(snapshots(dir), base, 'glp-validation.json'), JSON.stringify({ ...juicio, snapshot_id: base, refresh_state: { ...juicio.refresh_state, source_max_reported_at: anterior } }));
-    fs.writeFileSync(path.join(snapshots(dir), 'active-glp.json'), JSON.stringify(pointerDe(base, 'glp-current', { validators: { etag: '"glp-0"', last_modified: null } })));
+    const metricas = juicio.products.glp.metrics;
+    const estado = {
+      schema_version: '1.0.0',
+      revision_id: `glp-${base}-000000000000`,
+      snapshot_id: base,
+      validators: { etag: '"glp-0"', last_modified: null },
+      source_max_reported_at: anterior,
+      products: { glp: { ...metricas, cutoff_at: anterior } },
+      facilito: { contract: 'sin-captura', state_id: null, units_observed: {}, units: { fresh: 0, reused: 0, failed: 0 }, districts: 0, linked: { glp: 0 }, ambiguous: 0, unlinked: 0, effective: { glp: { facilito: 0, csv: 3, none: 0 } } },
+    };
+    fs.mkdirSync(path.join(dir, 'web', 'data', 'glp'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'web', 'data', 'glp', 'refresh-state.json'), JSON.stringify(estado));
+    fs.writeFileSync(path.join(snapshots(dir), 'active-glp.json'), JSON.stringify(pointerDe(base, 'glp-current', { validators: estado.validators })));
 
     const segunda = (await refreshSnapshot({ root: dir, testSourceUrl: url, referenceMinimizedRoot: ref })).sources['glp-current'];
-    assert.deepEqual([segunda.status, segunda.promoted, segunda.public_projection_validated], ['promoted', true, false]);
+    assert.deepEqual([segunda.status, segunda.promoted, segunda.public_projection_validated], ['promoted', true, true]);
+    assert.equal(segunda.groups.glp.first_activation, false, 'con estado publicado no se juzga contra la base auditada');
     assert.deepEqual(segunda.promoted_groups, ['glp']);
     const nuevo = segunda.active_after.snapshot_id;
     assert.equal(leer(path.join(snapshots(dir), 'active-glp.json')).snapshot_id, nuevo);
@@ -154,6 +169,8 @@ test('con base propia, GLP promueve en privado: mueve solo sus pointers y la cor
     for (const archivo of ['active.json', 'active-diesel.json']) assert.equal(fs.readFileSync(path.join(snapshots(dir), archivo), 'utf8'), TRAMPA);
     assert.equal(fs.existsSync(path.join(snapshots(dir), 'source-liquid-current.json')), false);
 
+    // El estado publicado ya no describe el pointer: la sonda compara con los
+    // validadores del último snapshot aprobado de la fuente.
     const tercera = (await refreshSnapshot({ root: dir, testSourceUrl: url, referenceMinimizedRoot: ref })).sources['glp-current'];
     assert.deepEqual([tercera.status, tercera.active_snapshot], ['unchanged', nuevo]);
     assert.equal(servidor.descargas('/glp.csv'), 2, 'sin cambios no se descarga');

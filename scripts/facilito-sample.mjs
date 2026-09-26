@@ -14,7 +14,7 @@
 // composición publicaría y deja una hoja privada. Nada de esto entra en el
 // expediente que viaja a la caché de Actions, y a consola solo salen conteos.
 //
-//   node scripts/facilito-sample.mjs [--group gasolina|diesel] [--districts "ATE,SAN LUIS"] [--size 20]
+//   node scripts/facilito-sample.mjs [--group gasolina|diesel|glp] [--districts "ATE,SAN LUIS"] [--size 20]
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,19 +24,21 @@ import { officialAnchorFromRegistration } from '../app/official-anchor.mjs';
 import { readActivePointer } from '../app/snapshot-manifest.mjs';
 import { agentBrowserSession, capturarLima } from '../pipeline/facilito/capture.mjs';
 import { facilitoRoot } from '../pipeline/facilito/state.mjs';
-import { loadLiquidSources } from '../pipeline/gasolina-products.mjs';
+import { loadSourceTables } from '../pipeline/gasolina-products.mjs';
 import { describeGroup } from '../pipeline/groups.mjs';
-import { composeGasolinaProjection, composeGroups } from '../pipeline/project-gasolina.mjs';
+import { composeGasolinaProjection, composeGroups, firstActivationBase } from '../pipeline/project-gasolina.mjs';
+import { sourceById } from '../pipeline/sources.mjs';
 import { PRODUCTS } from '../web/lib/catalog.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Un reparto deliberado: dos distritos grandes, uno chico, uno periférico y dos
 // de operadores con varias sedes. No es aleatorio y no se presenta como tal.
 const DISTRITOS = ['ATE', 'SAN LUIS', 'MIRAFLORES', 'SAN JUAN DE LURIGANCHO', 'PUENTE PIEDRA', 'SANTIAGO DE SURCO'];
-// Otras variedades de diésel que el CSV registra aparte. No se unen a ninguna
-// vista; en la hoja sirven para ver que la tabla consultada calza con el
-// producto publicado y no con otro que el mismo grifo también reporta.
-const PARECIDAS = /diesel|d2|db5|b5/i;
+// Otras variedades que el CSV registra aparte: las demás de diésel, y en GLP el
+// mismo `GLP - G` en kilogramos y los cilindros. No se unen a ninguna vista; en
+// la hoja sirven para ver que la tabla consultada calza con el producto
+// publicado y no con otro que el mismo establecimiento también reporta.
+const PARECIDAS = Object.freeze({ diesel: /diesel|d2|db5|b5/i, glp: /glp/i });
 
 function parseArgs(argv) {
   const opciones = { group: 'gasolina', districts: DISTRITOS, size: 20, excluir: [] };
@@ -63,9 +65,11 @@ const yaRevisados = new Set(opciones.excluir.flatMap((archivo) => {
 
 // 1. La composición que se publicaría: de ahí salen el vínculo, la identidad
 //    publicada y el precio del CSV con su fecha. Antes de su primera activación
-//    un grupo nuevo no tiene pointer propio y se compone sobre el de Gasolina,
-//    que es el snapshot que usaría.
-const pointer = readActivePointer(ROOT, { group: grupo.key }) ?? readActivePointer(ROOT);
+//    un grupo nuevo no tiene pointer propio y se compone sobre la base que
+//    usaría: el último snapshot aprobado de su fuente.
+const base = readActivePointer(ROOT, { group: grupo.key }) ? null : firstActivationBase(ROOT, grupo.key);
+if (base && !base.ok) throw new Error(`${grupo.key}: sin snapshot utilizable: ${base.missing.join('; ')}`);
+const pointer = base?.pointer ?? readActivePointer(ROOT, { group: grupo.key });
 const candidate = grupo.key === 'gasolina'
   ? await composeGasolinaProjection({ root: ROOT })
   : (await composeGroups({ root: ROOT, plan: [{ pointer, groups: [grupo.key] }] }))[grupo.key];
@@ -80,15 +84,23 @@ for (const key of grupo.products) {
   }
 }
 
-// Lo que cada establecimiento reporta de otras variedades de diésel, con el
-// último precio de cada una. Solo tiene sentido para Diésel.
+// Lo que cada establecimiento reporta de otras variedades, con el último precio
+// de cada una, y con qué actividad reporta el producto publicado. Un grupo de
+// Gasolina no tiene variedades que confundir.
 const otrasVariantes = new Map();
-if (grupo.key === 'diesel') {
+const actividades = new Map();
+if (PARECIDAS[grupo.key]) {
   const minimizedRoot = path.join(ROOT, '.local-cache', 'snapshots', pointer.snapshot_id, 'minimized');
-  const { prices } = await loadLiquidSources({ minimizedRoot });
+  const { prices } = await loadSourceTables({ source: sourceById(grupo.config.source), minimizedRoot });
   const ultimo = new Map();
   for (const row of prices) {
-    if (!PARECIDAS.test(row.PRODUCTO) || grupo.products.some((key) => PRODUCTS[key].canonical === row.PRODUCTO)) continue;
+    // El mismo nombre en otra unidad también es otra variedad: `GLP - G` en kg.
+    const publicado = grupo.products.some((key) => PRODUCTS[key].canonical === row.PRODUCTO && PRODUCTS[key].unit === row.UNIDAD);
+    if (publicado && Object.hasOwn(grupo.config.activities, row.ACTIVIDAD)) {
+      const anchor = officialAnchorFromRegistration(row.REGISTRO_DE_HIDROCARBUROS);
+      actividades.set(anchor, new Set([...(actividades.get(anchor) ?? []), grupo.config.activities[row.ACTIVIDAD]]));
+    }
+    if (!PARECIDAS[grupo.key].test(row.PRODUCTO) || publicado) continue;
     const clave = `${row.REGISTRO_DE_HIDROCARBUROS}|${row.PRODUCTO}|${row.UNIDAD}`;
     const previo = ultimo.get(clave);
     if (!previo || String(row.FECHA_DE_REGISTRO) > String(previo.FECHA_DE_REGISTRO)) ultimo.set(clave, row);
@@ -140,7 +152,7 @@ for (const unidad of lectura.units) {
       // precio cambió entre las dos lecturas» con «el vínculo está mal».
       capa_publicada: offer.facilito,
       diferencia: Number((fila.price - offer.price).toFixed(4)),
-      ...(grupo.key === 'diesel' ? { otras_variantes_en_csv: otrasVariantes.get(offer.establishment_id) ?? [] } : {}),
+      ...(PARECIDAS[grupo.key] ? { actividad: [...(actividades.get(offer.establishment_id) ?? [])].sort().join('/') || null, otras_variantes_en_csv: otrasVariantes.get(offer.establishment_id) ?? [] } : {}),
     });
   }
 }
@@ -149,9 +161,17 @@ for (const unidad of lectura.units) {
 //    la muestra entera en un producto, porque dentro de cada distrito el orden
 //    ponía primero a uno de los dos. Dentro de cada grupo mandan las diferencias
 //    de precio, que es donde un error se nota.
+//
+//    En GLP el riesgo no está en el producto sino en el establecimiento: las
+//    estaciones con gasocentro (02/06) y los gasocentros puros (15) se cruzan
+//    con capas distintas, y quien también reporta kg o cilindros podría tener en
+//    la consulta el precio de otra presentación. El reparto es por esos estratos.
+const estrato = (item) => (grupo.key === 'glp'
+  ? `${item.actividad?.split('/').includes('15') ? '15' : '02/06'}:${item.otras_variantes_en_csv.length ? 'con_variantes' : 'sin_variantes'}`
+  : `${item.distrito}:${item.producto}`);
 const grupos = new Map();
 for (const item of [...vinculadas].sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia))) {
-  const clave = `${item.distrito}:${item.producto}`;
+  const clave = estrato(item);
   grupos.set(clave, [...(grupos.get(clave) ?? []), item]);
 }
 // Un establecimiento aparece en varios productos, así que sin deduplicar una
@@ -183,6 +203,7 @@ function resumir(lista) {
 }
 const comparacion = { todas: resumir(diferencias), reporte_csv_hasta_72h: resumir(diferencias.filter((item) => item.horas <= 72)) };
 
+const cuenta = (lista) => Object.fromEntries([...lista.reduce((mapa, item) => mapa.set(estrato(item), (mapa.get(estrato(item)) ?? 0) + 1), new Map())].sort());
 const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
 const destino = path.join(facilitoRoot(ROOT), `muestra-${grupo.key === 'gasolina' ? '' : `${grupo.key}-`}${stamp}.json`);
 const hoja = {
@@ -191,7 +212,7 @@ const hoja = {
   revision_compuesta: candidate.manifest.revision_id,
   criterio: 'razón social + dirección + distrito exactos y únicos en ambos sentidos; normalización de mayúsculas, tildes y espacios',
   distritos: opciones.districts,
-  poblacion: { vinculadas: vinculadas.length, establecimientos_vinculados: new Set(vinculadas.map((item) => item.establishment_id)).size, sin_par_oficial: sinPar.length, ambiguas: ambiguas.length },
+  poblacion: { vinculadas: vinculadas.length, establecimientos_vinculados: new Set(vinculadas.map((item) => item.establishment_id)).size, sin_par_oficial: sinPar.length, ambiguas: ambiguas.length, por_estrato: cuenta(vinculadas) },
   comparacion_precios: comparacion,
   ya_revisados_en_otra_hoja: [...yaRevisados],
   // Quién revisa y qué resolvió se escribe DESPUÉS, al revisar. Se deja el hueco
@@ -221,6 +242,8 @@ process.stdout.write(`${JSON.stringify({
   con_otras_variantes: seleccion.filter((item) => item.otras_variantes_en_csv?.length).length,
   comparacion_precios: comparacion,
   por_producto: Object.fromEntries(grupo.products.map((key) => [key, seleccion.filter((item) => item.producto === key).length])),
+  vinculadas_por_estrato: cuenta(vinculadas),
+  muestra_por_estrato: cuenta(seleccion),
   distritos_en_la_muestra: new Set(seleccion.map((item) => item.distrito)).size,
   bloqueo: lectura.blocked,
 }, null, 2)}\n`);

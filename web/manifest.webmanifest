@@ -2,7 +2,7 @@
   "id": "/",
   "name": "masfacil.pe",
   "short_name": "masfacil.pe",
-  "description": "Compara precio y cercanía de gasolina y diésel en Lima provincia.",
+  "description": "Compara precio y cercanía de gasolina, diésel y GLP en Lima provincia.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

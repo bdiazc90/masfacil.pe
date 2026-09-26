@@ -19,16 +19,19 @@ import { readPreference, writePreference } from '../web/preference.js';
 const vista = (pathname, preference) => resolvePath(pathname, { preference });
 
 test('la raíz resuelve la preferencia válida y si no, Gasolina', () => {
-  for (const preference of [null, 'gasolina', 'glp', 'gnv', 'GASOLINA', 'Diesel', '', '__proto__', 'constructor']) {
+  for (const preference of [null, 'gasolina', 'gnv', 'GASOLINA', 'Diesel', 'GLP', '', '__proto__', 'constructor']) {
     assert.deepEqual(vista('/', preference), { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' }, String(preference));
   }
   assert.deepEqual(vista('/', 'diesel'), { kind: 'view', view: 'diesel', history: false, canonical: '/combustibles/diesel' });
+  assert.deepEqual(vista('/', 'glp'), { kind: 'view', view: 'glp', history: false, canonical: '/combustibles/glp' });
 });
 
 test('una ruta específica manda sobre la preferencia', () => {
   assert.deepEqual(vista('/combustibles/gasolina', 'diesel'), { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' });
   assert.deepEqual(vista('/combustibles/gasolina/historial', 'diesel'), { kind: 'view', view: 'gasolina', history: true, canonical: '/combustibles/gasolina/historial' });
   assert.deepEqual(vista('/combustibles/diesel', 'gasolina'), { kind: 'view', view: 'diesel', history: false, canonical: '/combustibles/diesel' });
+  assert.deepEqual(vista('/combustibles/glp', 'diesel'), { kind: 'view', view: 'glp', history: false, canonical: '/combustibles/glp' });
+  assert.deepEqual(vista('/combustibles/gasolina', 'glp'), { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' });
 });
 
 test('barra final y enlaces antiguos redirigen a la forma canónica', () => {
@@ -36,6 +39,7 @@ test('barra final y enlaces antiguos redirigen a la forma canónica', () => {
     '/combustibles/gasolina/': '/combustibles/gasolina',
     '/combustibles/gasolina/historial/': '/combustibles/gasolina/historial',
     '/combustibles/diesel/': '/combustibles/diesel',
+    '/combustibles/glp/': '/combustibles/glp',
     '/gasolina': '/combustibles/gasolina',
     '/gasolina/': '/combustibles/gasolina',
     '/gasolina/regular': '/combustibles/gasolina',
@@ -50,8 +54,8 @@ test('barra final y enlaces antiguos redirigen a la forma canónica', () => {
 });
 
 test('lo no activado o inventado es 404, no la portada', () => {
-  // Diésel no tiene histórico: su ruta de historial no existe.
-  for (const ruta of ['/combustibles', '/combustibles/', '/combustibles/glp', '/combustibles/gnv', '/combustibles/glp/', '/combustibles/diesel/historial', '/combustibles/diesel/otra', '/combustibles/gasolina/regular', '/combustibles/gasolina/historial/extra', '/tipo-de-cambio', '/dolar', '/gasolina/diesel', '/diesel', '/index']) {
+  // Diésel y GLP no tienen histórico: su ruta de historial no existe.
+  for (const ruta of ['/combustibles', '/combustibles/', '/combustibles/gnv', '/combustibles/gnv/', '/combustibles/diesel/historial', '/combustibles/diesel/otra', '/combustibles/glp/historial', '/combustibles/glp/otra', '/glp', '/combustibles/gasolina/regular', '/combustibles/gasolina/historial/extra', '/tipo-de-cambio', '/dolar', '/gasolina/diesel', '/diesel', '/index']) {
     assert.deepEqual(vista(ruta), { kind: 'not-found' }, ruta);
   }
 });

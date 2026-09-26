@@ -47,7 +47,7 @@ test('un distrito sin grifos del combustible elegido es un vacío propio', () =>
 });
 
 test('ordenar por un producto que no existe es un error, no un orden silencioso', () => {
-  assert.throws(() => orderOffers([], 'price:glp'), /Criterio de orden desconocido/);
+  assert.throws(() => orderOffers([], 'price:gnv'), /Criterio de orden desconocido/);
   assert.throws(() => orderOffers([], 'price:constructor'), /Criterio de orden desconocido/);
   assert.deepEqual(orderOffers([], 'price:regular'), []);
 });

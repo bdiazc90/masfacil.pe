@@ -86,5 +86,5 @@ test('cada vista pide solo lo de su grupo', async () => {
   const cargado = await loadView('sintetico', { fetchImpl, views: { sintetico }, contracts: { sintetico: contrato }, ...sinEspera });
   assert.equal(cargado.revision_id, 'sintetico-1');
   assert.ok(pedidos.every((url) => url.startsWith('/data/sintetico/')), 'no toca los datos de Gasolina');
-  await assert.rejects(loadView('glp', { fetchImpl, ...sinEspera }), /Vista sin datos publicados: glp/);
+  await assert.rejects(loadView('gnv', { fetchImpl, ...sinEspera }), /Vista sin datos publicados: gnv/);
 });

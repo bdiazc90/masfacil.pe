@@ -64,15 +64,18 @@ if (stage === 'deploy') {
   if (grupos.length > 1 || grupos.some(([, grupo]) => grupo.first_activation)) {
     const RESULTADO = { written: 'versión nueva', reused: 'reutilizada', unchanged: 'sin cambios', failed: 'conserva la publicada', first_activation_failed: 'primera activación rechazada' };
     lineas.push('', '| grupo | decisión | resultado | revisión | nota |', '| --- | --- | --- | --- | --- |');
+    // Los motivos de cada grupo vienen de SU fuente: los de GLP no están en el
+    // resultado de los líquidos.
+    const juicioDe = (clave) => Object.values(informe.sources ?? {}).map((fuente) => fuente.groups?.[clave]).find(Boolean) ?? refresh.groups?.[clave];
     for (const [clave, grupo] of grupos) {
-      const nota = [grupo.first_activation ? 'primera activación' : null, grupo.facilito_change, grupo.error, ...(refresh.groups?.[clave]?.reasons ?? []).map((motivo) => `guardrail: ${motivo}`)].filter(Boolean).join(' · ');
+      const nota = [grupo.first_activation ? 'primera activación' : null, grupo.facilito_change, grupo.error, ...(juicioDe(clave)?.reasons ?? []).map((motivo) => `guardrail: ${motivo}`)].filter(Boolean).join(' · ');
       lineas.push(`| ${clave} | \`${grupo.action}\` | ${RESULTADO[grupo.outcome] ?? grupo.outcome} | ${grupo.revision_generated ? `\`${grupo.revision_generated}\`` : grupo.revision_id ? `\`${grupo.revision_id}\` (igual)` : '—'} | ${nota || '—'} |`);
     }
   }
 
   // Cada fuente consultada con sus grupos, también los que todavía no
-  // publican: GLP se adquiere y se juzga en privado, y aquí se ve sin abrir el
-  // JSON. Los motivos de los grupos publicados ya están en la tabla de arriba.
+  // publican —así se preparó GLP en privado—, y aquí se ve sin abrir el JSON.
+  // Los motivos de los grupos publicados ya están en la tabla de arriba.
   const fuentes = Object.entries(informe.sources ?? {});
   // Un minimizado rechazado trae la traza del proceso hijo: en una celda va solo
   // su causa, la línea `Error:`, en una línea.

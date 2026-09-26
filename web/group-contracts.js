@@ -9,4 +9,5 @@ import { validBundleFor, validManifestFor, validGasolinaBundle, validateGasolina
 export const GROUP_CONTRACTS = Object.freeze({
   gasolina: Object.freeze({ validManifest: validateGasolinaManifest, validBundle: validGasolinaBundle }),
   diesel: Object.freeze({ validManifest: validManifestFor(GROUP_RULES.diesel), validBundle: validBundleFor(GROUP_RULES.diesel) }),
+  glp: Object.freeze({ validManifest: validManifestFor(GROUP_RULES.glp), validBundle: validBundleFor(GROUP_RULES.glp) }),
 });

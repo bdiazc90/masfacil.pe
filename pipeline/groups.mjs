@@ -4,8 +4,8 @@
 // `PUBLISHED_GROUPS` es la lista que recorren la descarga del bundle vivo, el
 // verificador, el preflight y la proyección, para que ninguno publique ni compare
 // un grupo y se olvide de otro. `CONFIGURED_GROUPS` suma los que se adquieren y
-// se juzgan sin publicarse, como GLP antes de tener su vista. Es de operación:
-// no viaja a `web/`.
+// se juzgan sin publicarse —así se preparó GLP antes de tener su vista—; hoy no
+// hay ninguno. Es de operación: no viaja a `web/`.
 
 import { ACTIVE_VIEWS, GROUPS } from '../web/lib/catalog.js';
 import { GROUP_RULES } from '../web/lib/bundle-contract.js';
@@ -21,7 +21,6 @@ const ESTACIONES = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'EST
 // capa 36), con o sin GNV. Las plantas envasadoras también reportan `GLP - G` en
 // galones, pero venden a agentes, no a conductores, y quedan fuera.
 const GASOCENTROS = Object.freeze({ 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GLP y GNV': '06', 'GASOCENTROS DE GLP': '15', 'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15' });
-const LIMA = Object.freeze({ department: 'LIMA', province: 'LIMA' });
 
 /**
  * Lo que cada grupo necesita para proyectarse, compararse y recuperarse.
@@ -76,14 +75,10 @@ export const GROUP_CONFIG = Object.freeze({
       }),
     }),
   }),
-  // GLP se adquiere y se juzga en privado hasta que tenga vista (Fase 3B): su
-  // producto todavía no está en el catálogo público, así que su definición vive
-  // aquí, y nada suyo llega a `web/`.
+  // GLP tiene vista desde la Fase 3B: su producto, su ámbito y su raíz de datos
+  // salen del catálogo, como los de Diésel. Aquí queda lo de operación.
   glp: Object.freeze({
     source: 'glp-current',
-    products: Object.freeze(['glp']),
-    productDefinitions: Object.freeze({ glp: Object.freeze({ key: 'glp', canonical: 'GLP - G', label: 'GLP automotor', unit: 'Galones', currency: 'PEN' }) }),
-    scope: LIMA,
     gisLayers: Object.freeze({ '02': '35', '06': '35', '15': '36' }),
     clientType: 'Usuario Final',
     activities: GASOCENTROS,

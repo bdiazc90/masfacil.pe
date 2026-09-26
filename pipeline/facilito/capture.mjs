@@ -70,8 +70,8 @@ export const RUN_BUDGET_MS = 20 * 60_000;
 // problema de su tabla nunca le cueste a Gasolina un distrito. Un bloqueo
 // explícito, en cambio, detiene todas las pasadas.
 //
-// GLP va al final, en su página y con su presupuesto: se captura en privado
-// hasta que tenga vista, y nada suyo puede costarle a los que ya publican.
+// GLP va al final, en su página y con su presupuesto: nada suyo puede costarle
+// a Gasolina ni a Diésel.
 export const FACILITO_PASSES = Object.freeze([
   { name: 'gasolina', products: ['regular', 'premium'], budgetMs: RUN_BUDGET_MS },
   { name: 'diesel', products: ['diesel'], budgetMs: 10 * 60_000 },
