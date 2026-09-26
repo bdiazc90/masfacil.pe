@@ -90,3 +90,21 @@ test('las tablas materializadas llevan la capa de cada fila', () => {
   assert.deepEqual(capas(materializeSeedTables(semillaV2().payload)), ['35', '36', '35', '36', '35']);
   assert.deepEqual(capas(materializeSeedTables(semillaV1(REGISTROS, PUNTOS).payload)), ['35', '35', '35']);
 });
+
+// La v3 suma la venta al público de GNV (Registro 59, que vive en la capa 36)
+// sin cambiar el formato: recortada a los filtros de la 2 es la 2 byte a byte.
+test('la v3 recortada a los filtros de la 2 es la 2, en su formato', () => {
+  const FILTROS_V3 = { source_activity: [...FILTROS_V2.source_activity, '59'], layers: FILTROS_V2.layers };
+  const registros = [...REGISTROS, registro('59', 'R-GNV'), registro('59', 'R-GNV-HUARAL', 'HUARAL', 'HUARAL')];
+  const puntos = [...PUNTOS, punto('36', 'R-GNV')];
+  const v2 = buildSeedPayload({ registryRows: registros, gisRows: puntos, filters: FILTROS_V2, referenceDate: FECHA });
+  const v3 = buildSeedPayload({ registryRows: registros, gisRows: puntos, filters: FILTROS_V3, referenceDate: FECHA });
+  const manifest = seedManifest(v3, { seedId: 'prueba-v3', filters: FILTROS_V3, privacy: PRIVACIDAD });
+  assert.deepEqual(decodeSeed(gzipCanonical(v3).toString('base64'), manifest), v3);
+  assert.deepEqual(v3.registry.filter((fila) => fila[0] === '59').map((fila) => fila[1]), ['R-GNV']);
+  assert.equal(stableJson(restrictSeed(v3, FILTROS_V2)), stableJson(v2));
+  // Y la 1 sigue saliendo de la 3.
+  assert.equal(stableJson(restrictSeed(v3, FILTROS_V1)), stableJson(semillaV1(registros, puntos).payload));
+  const cambiada = buildSeedPayload({ registryRows: [registro('01', 'R-1', 'SAN ISIDRO'), ...registros.slice(1)], gisRows: puntos, filters: FILTROS_V3, referenceDate: FECHA });
+  assert.notEqual(stableJson(restrictSeed(cambiada, FILTROS_V2)), stableJson(v2));
+});

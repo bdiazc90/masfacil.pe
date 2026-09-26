@@ -17,12 +17,16 @@ import { applyFacilitoRun, facilitoRunCounts, facilitoStateForProducts, facilito
 
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
 const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles)', 'Unidad de Medida'];
+const CABECERAS_GNV = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles/m3)'];
 const DISTRITOS = [{ nombre: 'ATE', codigo: '150103' }, { nombre: 'SAN LUIS', codigo: '150134' }];
-const ETIQUETAS_DEL_SITIO = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV', 49: 'GLP - Granel' };
-// La página de GLP (código 49) trae una sexta columna con la unidad.
+const ETIQUETAS_DEL_SITIO = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV', 49: 'GLP - Granel', 131: 'Gas Natural Vehicular Comprimido' };
+// La página de GLP (código 49) trae una sexta columna con la unidad; la de GNV
+// (código 131) la dice en la cabecera del precio.
 const tabla = (distrito, codigo = '126') => (codigo === '49'
   ? { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS_GLP, filas: [[distrito, 'GASOCENTRO', 'AV. GAS 1', '999999999', 'S/ 7,49', 'Galones']] }
-  : { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS, filas: [[distrito, 'GRIFO', 'AV. GRIFO 1', '999999999', 'S/ 19,49']] });
+  : codigo === '131'
+    ? { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS_GNV, filas: [[distrito, 'GNV SAC', 'AV. GNV 1', '999999999', 'S/ 1,77']] }
+    : { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS, filas: [[distrito, 'GRIFO', 'AV. GRIFO 1', '999999999', 'S/ 19,49']] });
 
 /** Navegador simulado: `respuesta(distrito, código)` decide qué ve cada unidad. */
 function navegador(respuesta, etiquetas = ETIQUETAS_DEL_SITIO) {
@@ -30,8 +34,8 @@ function navegador(respuesta, etiquetas = ETIQUETAS_DEL_SITIO) {
   let producto = null;
   let reloj = 1000;
   return (args) => {
-    // La página de GLP abre con su único producto ya elegido.
-    if (args[0] === 'open') producto = args[1].includes('buscadorAGranelGLP') ? '49' : null;
+    // Las páginas de GLP y GNV abren con su producto ya elegido.
+    if (args[0] === 'open') producto = args[1].includes('buscadorAGranelGLP') ? '49' : args[1].includes('buscadorGNV') ? '131' : null;
     if (args[0] === 'select') {
       if (args[1].includes('distrito')) distrito = DISTRITOS.find((d) => d.codigo === args[2]);
       if (args[1].includes('producto')) producto = args[2];
@@ -54,11 +58,12 @@ test('Diésel se lee aparte y su tabla rota no le cuesta nada a Gasolina', () =>
   // `sin_tabla` es reintentable: antes, un fallo así hacía caer el distrito entero.
   const resultado = capturarLima({ ejecutar: navegador((d, codigo) => (codigo === '40' ? { estado: 'sin_tabla' } : tabla(d.nombre, codigo))) });
   assert.equal(resultado.blocked, null);
-  assert.deepEqual(resultado.passes.map((p) => [p.name, p.products]), [['gasolina', ['regular', 'premium']], ['diesel', ['diesel']], ['glp', ['glp']]]);
+  assert.deepEqual(resultado.passes.map((p) => [p.name, p.products]), [['gasolina', ['regular', 'premium']], ['diesel', ['diesel']], ['glp', ['glp']], ['gnv', ['gnv']]]);
   assert.deepEqual(estados(resultado), {
     'ATE:regular': 'ok', 'ATE:premium': 'ok', 'SAN LUIS:regular': 'ok', 'SAN LUIS:premium': 'ok',
     'ATE:diesel': 'sin_tabla', 'SAN LUIS:diesel': 'sin_tabla',
     'ATE:glp': 'ok', 'SAN LUIS:glp': 'ok',
+    'ATE:gnv': 'ok', 'SAN LUIS:gnv': 'ok',
   });
 });
 
@@ -69,6 +74,7 @@ test('si el código no muestra la etiqueta esperada, falla solo esa unidad', () 
     'ATE:regular': 'ok', 'ATE:premium': 'ok', 'SAN LUIS:regular': 'ok', 'SAN LUIS:premium': 'ok',
     'ATE:diesel': 'producto_no_coincide', 'SAN LUIS:diesel': 'producto_no_coincide',
     'ATE:glp': 'ok', 'SAN LUIS:glp': 'ok',
+    'ATE:gnv': 'ok', 'SAN LUIS:gnv': 'ok',
   });
 });
 

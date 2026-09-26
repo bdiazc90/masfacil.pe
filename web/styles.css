@@ -53,6 +53,8 @@
   --product-diesel-strong:#7a5712;
   --product-glp:#8a63b8;
   --product-glp-strong:#5e3d8f;
+  --product-gnv:#b85a7a;
+  --product-gnv-strong:#8a2f55;
 
   /* Fondo: tres manchas difusas bajo el vidrio */
   --glow-1:oklch(95.3% 0.051 180.801);
@@ -117,6 +119,8 @@
   --product-diesel-strong:#ecc97e;
   --product-glp:#c3a6ec;
   --product-glp-strong:#d6c1f7;
+  --product-gnv:#eca3bd;
+  --product-gnv-strong:#f5bfd1;
   --glow-1:#815a48;
   --glow-2:#585b48;
   --glow-3:#8d6c5e;
@@ -525,6 +529,7 @@ h3{font-size:16px;margin-bottom:6px}
 .chip--premium,[data-key="premium"]{--product:var(--product-premium);--product-strong:var(--product-premium-strong)}
 .chip--diesel,[data-key="diesel"]{--product:var(--product-diesel);--product-strong:var(--product-diesel-strong)}
 .chip--glp,[data-key="glp"]{--product:var(--product-glp);--product-strong:var(--product-glp-strong)}
+.chip--gnv,[data-key="gnv"]{--product:var(--product-gnv);--product-strong:var(--product-gnv-strong)}
 /* El chip es texto de lectura, no una marca decorativa: 12 px y contraste
    exigido en todos sus estados. Pintar tinta y relleno con el mismo token
    dejaba dos valores del mismo color sin separar, en 3.01:1. El estado lo

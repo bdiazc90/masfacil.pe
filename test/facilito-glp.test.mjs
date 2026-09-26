@@ -9,16 +9,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { FACILITO_GLP_URL, FACILITO_PAGES, FACILITO_PRODUCTS, FACILITO_URL, capturarLima, parseTabla } from '../pipeline/facilito/capture.mjs';
+import { FACILITO_GLP_URL, FACILITO_GNV_URL, FACILITO_PAGES, FACILITO_PRODUCTS, FACILITO_URL, capturarLima, parseTabla } from '../pipeline/facilito/capture.mjs';
 import { applyFacilitoRun, facilitoStateForProducts, facilitoStateId, facilitoUnitInstants } from '../pipeline/facilito/state.mjs';
 
 const GLP = FACILITO_PRODUCTS.find((producto) => producto.key === 'glp');
 const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles)', 'Unidad de Medida'];
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
 const DISTRITOS = [{ nombre: 'ATE', codigo: '150103' }, { nombre: 'SAN LUIS', codigo: '150134' }];
-const ETIQUETAS = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV', 49: 'GLP - Granel' };
+const ETIQUETAS = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV', 49: 'GLP - Granel', 131: 'Gas Natural Vehicular Comprimido' };
+const CABECERAS_GNV = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles/m3)'];
 const tablaGlp = (distrito, unidad = 'Galones') => ({ estado: 'ok', completo: true, total: 1, firma: 'x', seleccion: { valor: '49', texto: 'GLP - Granel' }, cabeceras: CABECERAS_GLP, filas: [[distrito, 'GASOCENTRO SAC', 'AV. GAS 1', '999999999', '7.49', unidad]] });
-const tabla = (distrito, codigo) => (codigo === '49' ? tablaGlp(distrito) : { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS, filas: [[distrito, 'GRIFO', 'AV. GRIFO 1', '999999999', 'S/ 19,49']] });
+const tabla = (distrito, codigo) => (codigo === '49' ? tablaGlp(distrito)
+  : codigo === '131' ? { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS_GNV, filas: [[distrito, 'GNV SAC', 'AV. GNV 1', '999999999', 'S/ 1,77']] }
+    : { estado: 'ok', completo: true, total: 1, firma: 'x', cabeceras: CABECERAS, filas: [[distrito, 'GRIFO', 'AV. GRIFO 1', '999999999', 'S/ 19,49']] });
 
 /** Navegador simulado que registra qué páginas abre y qué selects toca. */
 function navegador(respuesta) {
@@ -27,7 +30,7 @@ function navegador(respuesta) {
   let reloj = 1000;
   const registro = [];
   const ejecutar = (args) => {
-    if (args[0] === 'open') { producto = args[1] === FACILITO_GLP_URL ? '49' : null; registro.push(`open ${args[1]}`); }
+    if (args[0] === 'open') { producto = args[1] === FACILITO_GLP_URL ? '49' : args[1] === FACILITO_GNV_URL ? '131' : null; registro.push(`open ${args[1]}`); }
     if (args[0] === 'select') {
       registro.push(`select ${args[1]}`);
       if (args[1].includes('distrito')) distrito = DISTRITOS.find((d) => d.codigo === args[2]);
@@ -57,16 +60,16 @@ test('la tabla de GLP exige sus seis columnas y galones en cada fila', () => {
   assert.equal(parseTabla({ ...tablaGlp('ATE'), seleccion: { valor: '49', texto: 'GLP - Envasado' } }, 'ATE', { producto: GLP, pagina }).razon, 'producto_no_coincide');
 });
 
-test('GLP se lee en su página, al final y sin tocar el select de producto', () => {
+test('GLP se lee en su página, después de los líquidos y sin tocar el select de producto', () => {
   const { ejecutar, registro } = navegador((d, codigo) => tabla(d.nombre, codigo));
   const resultado = capturarLima({ ejecutar });
-  assert.deepEqual(resultado.passes.map((p) => p.name), ['gasolina', 'diesel', 'glp']);
-  assert.deepEqual(registro.filter((linea) => linea.startsWith('open')), [`open ${FACILITO_URL}`, `open ${FACILITO_URL}`, `open ${FACILITO_GLP_URL}`]);
-  const desdeGlp = registro.slice(registro.lastIndexOf(`open ${FACILITO_GLP_URL}`));
+  assert.deepEqual(resultado.passes.map((p) => p.name), ['gasolina', 'diesel', 'glp', 'gnv']);
+  assert.deepEqual(registro.filter((linea) => linea.startsWith('open')), [`open ${FACILITO_URL}`, `open ${FACILITO_URL}`, `open ${FACILITO_GLP_URL}`, `open ${FACILITO_GNV_URL}`]);
+  const desdeGlp = registro.slice(registro.lastIndexOf(`open ${FACILITO_GLP_URL}`), registro.lastIndexOf(`open ${FACILITO_GNV_URL}`));
   assert.equal(desdeGlp.some((linea) => linea.includes('producto')), false);
   const unidades = resultado.units.filter((u) => u.status === 'ok');
   assert.deepEqual(unidades.filter((u) => u.product === 'glp').map((u) => u.source_url), [FACILITO_GLP_URL, FACILITO_GLP_URL]);
-  assert.equal(unidades.filter((u) => u.product !== 'glp').some((u) => 'source_url' in u), false, 'las unidades automotoras no cambian de forma');
+  assert.equal(unidades.filter((u) => ['regular', 'premium', 'diesel'].includes(u.product)).some((u) => 'source_url' in u), false, 'las unidades automotoras no cambian de forma');
 });
 
 test('un bloqueo en la página de GLP conserva todo lo leído de Gasolina y Diésel', () => {

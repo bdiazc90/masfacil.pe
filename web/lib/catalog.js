@@ -8,8 +8,9 @@
 // igual en Node y en el navegador.
 
 // `gender` concuerda el adjetivo con el producto que se nombra: «Regular más
-// barata» habla de la gasolina, «Diésel más barato» del diésel.
-const producto = (key, canonical, label, short, chip, gender) => Object.freeze({ key, canonical, label, short, chip, gender, unit: 'Galones', currency: 'PEN' });
+// barata» habla de la gasolina, «Diésel más barato» del diésel. La unidad es la
+// del CSV y nunca se convierte: GNV se vende por metro cúbico.
+const producto = (key, canonical, label, short, chip, gender, unit = 'Galones') => Object.freeze({ key, canonical, label, short, chip, gender, unit, currency: 'PEN' });
 
 export const PRODUCTS = Object.freeze({
   regular: producto('regular', 'GASOHOL REGULAR', 'Gasohol Regular', 'Regular', 'REG', 'f'),
@@ -20,6 +21,9 @@ export const PRODUCTS = Object.freeze({
   // `GLP - G` es el GLP a granel que se despacha a vehículos, en galones. El
   // mismo nombre en kilogramos y los cilindros son otros registros y no entran.
   glp: producto('glp', 'GLP - G', 'GLP automotor', 'GLP', 'GLP', 'm'),
+  // Solo el comprimido y solo en metros cúbicos: el licuefactado se vende por
+  // kilo y es otro registro.
+  gnv: producto('gnv', 'GAS NATURAL VEHICULAR COMPRIMIDO', 'GNV comprimido', 'GNV', 'GNV', 'm', 'Metros Cúbicos'),
 });
 
 const LIMA = Object.freeze({ department: 'LIMA', province: 'LIMA' });
@@ -58,7 +62,18 @@ export const GLP = Object.freeze({
   dataRoot: 'data/glp',
 });
 
-export const GROUPS = Object.freeze({ gasolina: GASOLINA, diesel: DIESEL, glp: GLP });
+// GNV sale de los líquidos, como Gasolina y Diésel, pero con sus propias
+// actividades y su propia revisión.
+export const GNV_KEYS = Object.freeze(['gnv']);
+
+export const GNV = Object.freeze({
+  key: 'gnv',
+  products: GNV_KEYS,
+  scope: LIMA,
+  dataRoot: 'data/gnv',
+});
+
+export const GROUPS = Object.freeze({ gasolina: GASOLINA, diesel: DIESEL, glp: GLP, gnv: GNV });
 
 // Vistas: lo que la persona elige ver. Cada una muestra juntos sus productos y
 // vive en `/combustibles/<clave>`. Solo existen las de `ACTIVE_VIEWS`: activar una
@@ -69,6 +84,7 @@ export const VIEWS = Object.freeze({
   gasolina: Object.freeze({ key: GASOLINA.key, label: 'Gasolina', products: GASOLINA.products, dataRoot: GASOLINA.dataRoot, history: true, priceUnit: null }),
   diesel: Object.freeze({ key: DIESEL.key, label: 'Diésel', products: DIESEL.products, dataRoot: DIESEL.dataRoot, history: false, priceUnit: 'por galón' }),
   glp: Object.freeze({ key: GLP.key, label: 'GLP', products: GLP.products, dataRoot: GLP.dataRoot, history: false, priceUnit: 'por galón' }),
+  gnv: Object.freeze({ key: GNV.key, label: 'GNV', products: GNV.products, dataRoot: GNV.dataRoot, history: false, priceUnit: 'por m³' }),
 });
-export const ACTIVE_VIEWS = Object.freeze(['gasolina', 'diesel', 'glp']);
+export const ACTIVE_VIEWS = Object.freeze(['gasolina', 'diesel', 'glp', 'gnv']);
 export const DEFAULT_VIEW = 'gasolina';

@@ -61,3 +61,19 @@ export function bundleGlp({ revision = 'glp-2026-09-06-prueba-000000000000', pre
   };
   return { revision, manifest, manifestText: `${JSON.stringify(manifest)}\n`, bodies: { glp: body }, state, stateText: `${JSON.stringify(state)}\n` };
 }
+
+// Un bundle de GNV válido para su contrato 1.0.0: un solo producto en metros
+// cúbicos, IDs `gnv1_` y revisión `gnv-`.
+export function bundleGnv({ revision = 'gnv-2026-09-06-prueba-000000000000', precio = 1.77, snapshot = '2026-09-06-prueba', cambios = {} } = {}) {
+  const oferta = (letra, extra = 0) => ({ id: `gnv1_${letra.repeat(24)}`, establishment_id: `est_${letra.repeat(24)}`, commercial_identity: null, address: 'Av. Larco 123', price: precio + extra, reported_at: '2026-09-01T12:00:00.000Z', facilito: null, district: 'MIRAFLORES', longitude: -77.03, latitude: -12.12 });
+  const dataset = { schema_version: '1.0.0', revision_id: revision, product: { key: 'gnv', canonical: 'GAS NATURAL VEHICULAR COMPRIMIDO', label: 'GNV comprimido', display_unit: 'Metros Cúbicos' }, scope: { department: 'LIMA', province: 'LIMA' }, snapshot_date: '2026-09-06', cutoff_at: CORTE, source_max_reported_at: '2026-09-06T21:37:00.000Z', provenance: { source: 'Osinergmin', source_url: 'https://example.test/fuente', attribution: 'Datos de prueba.' }, offers: [oferta('a'), oferta('b', 0.1)], ...cambios.dataset };
+  const body = `${JSON.stringify(dataset)}\n`;
+  const manifest = { schema_version: '1.0.0', revision_id: revision, scope: { department: 'LIMA', province: 'LIMA' }, products: { gnv: { canonical_product: 'GAS NATURAL VEHICULAR COMPRIMIDO', label: 'GNV comprimido', dataset_url: `data/gnv/snapshots/${revision}/gnv.json`, bytes: Buffer.byteLength(body), sha256: sha(body), cutoff_at: CORTE, ...cambios.descriptor } }, generated_at: CORTE, ...cambios.manifest };
+  const metricas = { contract_ready: { offers: 2, districts: 1 }, fresh_0_30_days: { offers: 2, districts: 1 }, coverage_percent: 100, conflicts: { latest_price_conflicts: 0, latest_territory_conflicts: 0 }, cutoff_at: CORTE };
+  const state = {
+    schema_version: '1.0.0', revision_id: revision, snapshot_id: snapshot, validators: { etag: null, last_modified: null }, source_max_reported_at: '2026-09-06T21:37:00.000Z',
+    products: { gnv: metricas },
+    facilito: { contract: 'scrap-facilito/v1', state_id: null, units_observed: {}, units: { fresh: 0, reused: 0, failed: 0 }, districts: 0, linked: { gnv: 0 }, ambiguous: 0, unlinked: 0, effective: { gnv: { facilito: 0, csv: 2, none: 0 } } },
+  };
+  return { revision, manifest, manifestText: `${JSON.stringify(manifest)}\n`, bodies: { gnv: body }, state, stateText: `${JSON.stringify(state)}\n` };
+}

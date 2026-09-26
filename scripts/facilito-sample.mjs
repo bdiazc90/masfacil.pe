@@ -14,7 +14,7 @@
 // composición publicaría y deja una hoja privada. Nada de esto entra en el
 // expediente que viaja a la caché de Actions, y a consola solo salen conteos.
 //
-//   node scripts/facilito-sample.mjs [--group gasolina|diesel|glp] [--districts "ATE,SAN LUIS"] [--size 20]
+//   node scripts/facilito-sample.mjs [--group gasolina|diesel|glp|gnv] [--districts "ATE,SAN LUIS"] [--size 20]
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,11 +34,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Un reparto deliberado: dos distritos grandes, uno chico, uno periférico y dos
 // de operadores con varias sedes. No es aleatorio y no se presenta como tal.
 const DISTRITOS = ['ATE', 'SAN LUIS', 'MIRAFLORES', 'SAN JUAN DE LURIGANCHO', 'PUENTE PIEDRA', 'SANTIAGO DE SURCO'];
-// Otras variedades que el CSV registra aparte: las demás de diésel, y en GLP el
-// mismo `GLP - G` en kilogramos y los cilindros. No se unen a ninguna vista; en
-// la hoja sirven para ver que la tabla consultada calza con el producto
-// publicado y no con otro que el mismo establecimiento también reporta.
-const PARECIDAS = Object.freeze({ diesel: /diesel|d2|db5|b5/i, glp: /glp/i });
+// Otras variedades que el CSV registra aparte: las demás de diésel, en GLP el
+// mismo `GLP - G` en kilogramos y los cilindros, y en GNV el licuefactado y el
+// comprimido en galones. No se unen a ninguna vista; en la hoja sirven para ver
+// que la tabla consultada calza con el producto publicado y no con otro que el
+// mismo establecimiento también reporta.
+const PARECIDAS = Object.freeze({ diesel: /diesel|d2|db5|b5/i, glp: /glp/i, gnv: /gas natural|gnv|gnc/i });
+// Los establecimientos que se cruzan con otra capa GIS que las estaciones: los
+// gasocentros de GLP (15) y, en GNV, también los locales de venta al público (59).
+const OTRA_CAPA = Object.freeze({ glp: ['15'], gnv: ['15', '59'] });
 
 function parseArgs(argv) {
   const opciones = { group: 'gasolina', districts: DISTRITOS, size: 20, excluir: [] };
@@ -162,12 +166,13 @@ for (const unidad of lectura.units) {
 //    ponía primero a uno de los dos. Dentro de cada grupo mandan las diferencias
 //    de precio, que es donde un error se nota.
 //
-//    En GLP el riesgo no está en el producto sino en el establecimiento: las
-//    estaciones con gasocentro (02/06) y los gasocentros puros (15) se cruzan
-//    con capas distintas, y quien también reporta kg o cilindros podría tener en
-//    la consulta el precio de otra presentación. El reparto es por esos estratos.
-const estrato = (item) => (grupo.key === 'glp'
-  ? `${item.actividad?.split('/').includes('15') ? '15' : '02/06'}:${item.otras_variantes_en_csv.length ? 'con_variantes' : 'sin_variantes'}`
+//    En GLP y GNV el riesgo no está en el producto sino en el establecimiento:
+//    las estaciones (02/06 en GLP, 05/06 en GNV) y los demás locales (15, y 59
+//    en GNV) se cruzan con capas distintas, y quien también reporta otra
+//    presentación —kg o cilindros de GLP, GNV licuefactado— podría tener en la
+//    consulta el precio de esa otra. El reparto es por esos estratos.
+const estrato = (item) => (OTRA_CAPA[grupo.key]
+  ? `${item.actividad?.split('/').some((codigo) => OTRA_CAPA[grupo.key].includes(codigo)) ? OTRA_CAPA[grupo.key].join('/') : 'estaciones'}:${item.otras_variantes_en_csv.length ? 'con_variantes' : 'sin_variantes'}`
   : `${item.distrito}:${item.producto}`);
 const grupos = new Map();
 for (const item of [...vinculadas].sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia))) {

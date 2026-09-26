@@ -25,6 +25,7 @@ import { facilitoLinkKey } from './link.mjs';
 export const CAPTURE_CONTRACT = 'scrap-facilito/v1';
 export const FACILITO_URL = 'https://www.facilito.gob.pe/facilito/pages/facilito/buscadorEESS.jsp';
 export const FACILITO_GLP_URL = 'https://www.facilito.gob.pe/facilito/pages/facilito/buscadorAGranelGLP.jsp';
+export const FACILITO_GNV_URL = 'https://www.facilito.gob.pe/facilito/pages/facilito/buscadorGNV.jsp';
 
 const DEPARTAMENTO = { nombre: 'LIMA', codigo: '150000' };
 const PROVINCIA = { nombre: 'LIMA', codigo: '150100' };
@@ -38,17 +39,23 @@ const PROVINCIA = { nombre: 'LIMA', codigo: '150100' };
 //
 // GLP no está en la página automotora: tiene la suya, «Gas Licuado de Petróleo
 // Automotor», con un único producto ya elegido («GLP - Granel», código 49).
+// GNV tampoco: su página, «Gas Natural Vehicular», trae ya elegido el comprimido
+// (`131`) y ofrece además el licuefactado (`129`), que no se publica.
 export const FACILITO_PRODUCTS = Object.freeze([
   { key: 'regular', etiqueta: 'GASOHOL REGULAR', codigo: '126', pagina: 'automotor' },
   { key: 'premium', etiqueta: 'GASOHOL PREMIUM', codigo: '127', pagina: 'automotor' },
   { key: 'diesel', etiqueta: 'DB5 S-50 UV', codigo: '40', pagina: 'automotor' },
   { key: 'glp', etiqueta: 'GLP - GRANEL', codigo: '49', pagina: 'granel_glp' },
+  { key: 'gnv', etiqueta: 'GAS NATURAL VEHICULAR COMPRIMIDO', codigo: '131', pagina: 'gnv' },
 ]);
 // Orden exacto de la tabla. El teléfono se valida por posición y nunca se emite.
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
 // La de GLP no dice la unidad en la cabecera del precio: la trae en una sexta
 // columna, que tiene que decir galones en cada fila.
 const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles)', 'Unidad de Medida'];
+// La de GNV dice la unidad en la cabecera del precio, como la automotora, pero en
+// metros cúbicos.
+const CABECERAS_GNV = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles/m3)'];
 
 /**
  * Las páginas del buscador. Cada unidad se lee en la página de su producto; la
@@ -59,6 +66,9 @@ const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono',
 export const FACILITO_PAGES = Object.freeze({
   automotor: Object.freeze({ key: 'automotor', url: FACILITO_URL, tabla: 'tblPreciosAutomotor', cabeceras: Object.freeze(CABECERAS), unidad: null, productoFijo: false }),
   granel_glp: Object.freeze({ key: 'granel_glp', url: FACILITO_GLP_URL, tabla: 'tblPreciosAGranelGlp', cabeceras: Object.freeze(CABECERAS_GLP), unidad: 'Galones', productoFijo: true }),
+  // El comprimido ya viene elegido: elegirlo otra vez no recarga la tabla, así
+  // que se lee como fijo y se comprueba el código y la etiqueta de la opción.
+  gnv: Object.freeze({ key: 'gnv', url: FACILITO_GNV_URL, tabla: 'tblPreciosGnv', cabeceras: Object.freeze(CABECERAS_GNV), unidad: null, productoFijo: true }),
 });
 
 // Presupuestos declarados. La medición del piloto es de ~11 s por distrito con
@@ -70,12 +80,13 @@ export const RUN_BUDGET_MS = 20 * 60_000;
 // problema de su tabla nunca le cueste a Gasolina un distrito. Un bloqueo
 // explícito, en cambio, detiene todas las pasadas.
 //
-// GLP va al final, en su página y con su presupuesto: nada suyo puede costarle
-// a Gasolina ni a Diésel.
+// GLP y GNV van al final, cada uno en su página y con su presupuesto: nada suyo
+// puede costarle a Gasolina ni a Diésel.
 export const FACILITO_PASSES = Object.freeze([
   { name: 'gasolina', products: ['regular', 'premium'], budgetMs: RUN_BUDGET_MS },
   { name: 'diesel', products: ['diesel'], budgetMs: 10 * 60_000 },
   { name: 'glp', products: ['glp'], budgetMs: 10 * 60_000 },
+  { name: 'gnv', products: ['gnv'], budgetMs: 10 * 60_000 },
 ]);
 const TIMEOUT_MS = 30_000;
 const OPEN_TIMEOUT_MS = 45_000;

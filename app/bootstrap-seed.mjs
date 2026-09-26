@@ -123,10 +123,22 @@ export function seedManifest(payload, { seedId, filters, privacy }) {
 }
 
 /**
- * Una semilla v2 recortada a los filtros de la 1, en el formato de la 1. Sirve
- * para exigir que ampliar la semilla no cambie ninguna fila existente.
+ * Una semilla recortada a los filtros de otra anterior, en el formato de esa
+ * anterior: la 1 declaraba una sola capa y sus filas GIS no la llevan; desde la
+ * 2 cada fila abre con su capa. Sirve para exigir que ampliar la semilla no
+ * cambie ninguna fila existente.
  */
 export function restrictSeed(payload, filters) {
+  if (Array.isArray(filters.layers)) {
+    return {
+      schema_version: 2,
+      reference_snapshot_date: payload.reference_snapshot_date,
+      registry_fields: [...payload.registry_fields],
+      gis_fields: [...payload.gis_fields],
+      registry: payload.registry.filter((row) => filters.source_activity.includes(row[0])),
+      gis: payload.gis.filter(([layer]) => filters.layers.includes(layer)),
+    };
+  }
   return {
     schema_version: 1,
     reference_snapshot_date: payload.reference_snapshot_date,

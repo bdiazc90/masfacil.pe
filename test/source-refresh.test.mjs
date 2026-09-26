@@ -55,12 +55,12 @@ async function origen() {
   return { url, pedidos, descargas: (ruta) => pedidos.filter((pedido) => pedido === `GET ${ruta}`).length, cerrar: () => new Promise((resolve) => server.close(resolve)) };
 }
 
-/** Registro y GIS sanitizados; sin gasocentros es la semilla v1. */
-function referencia({ gasocentros = true } = {}) {
+/** Registro y GIS sanitizados; sin gasocentros es la semilla v1, sin GNV la v2. */
+function referencia({ gasocentros = true, gnv = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'masfacil-ref-'));
   const registro = (codigo, numero) => [codigo, numero, '', '', 'LIMA', 'LIMA', 'MIRAFLORES', ''];
   const punto = (capa, numero, dLat) => [capa, '', numero, '', '', 'LIMA', 'LIMA', 'MIRAFLORES', '-77.03', String(-12.12 + dLat)];
-  const registros = [registro('01', 'R-L'), registro('02', 'R-A'), registro('05', 'R-5'), registro('06', 'R-B'), ...(gasocentros ? [registro('15', 'R-C')] : [])];
+  const registros = [registro('01', 'R-L'), registro('02', 'R-A'), registro('05', 'R-5'), registro('06', 'R-B'), ...(gasocentros ? [registro('15', 'R-C')] : []), ...(gnv ? [registro('59', 'R-G')] : [])];
   const puntos = [punto('35', 'R-L', 0), punto('35', 'R-A', 0.01), punto('35', 'R-B', 0.02), ...(gasocentros ? [punto('36', 'R-C', 0.03)] : [])];
   for (const [relativo, campos, filas] of [['registry/authorizations.csv.gz', REGISTRY_FIELDS, registros], ['gis/features.csv.gz', GIS_FIELDS, puntos]]) {
     fs.mkdirSync(path.dirname(path.join(dir, relativo)), { recursive: true });
@@ -113,8 +113,11 @@ test('con una semilla sin gasocentros, GLP se rechaza antes de descargar', async
     assert.match(r.sources['glp-current'].error, /no cubre la fuente: glp: Registro 15; glp: capa GIS 36/);
     assert.equal(servidor.descargas('/glp.csv'), 0);
   } finally { await servidor.cerrar(); }
-  // La misma referencia sí cubre los líquidos.
-  await assertReferenceCovers(referencia({ gasocentros: false }), groupsOfSource('liquid-current'));
+  // Desde GNV tampoco cubre los líquidos: su refresco se rechazaría antes de
+  // descargar. Por eso el secret v3 se sube antes del push que activa GNV.
+  await assert.rejects(assertReferenceCovers(referencia({ gasocentros: false, gnv: false }), groupsOfSource('liquid-current')), /gnv: Registro 15; gnv: capa GIS 36; gnv: Registro 59/);
+  await assert.rejects(assertReferenceCovers(referencia({ gnv: false }), groupsOfSource('liquid-current')), /no cubre la fuente: gnv: Registro 59$/);
+  await assertReferenceCovers(referencia(), groupsOfSource('liquid-current'));
 });
 
 test('una fuente caída no detiene a la otra', async () => {

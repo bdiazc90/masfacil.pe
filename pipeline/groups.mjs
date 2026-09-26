@@ -22,6 +22,13 @@ const ESTACIONES = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'EST
 // galones, pero venden a agentes, no a conductores, y quedan fuera.
 const GASOCENTROS = Object.freeze({ 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GLP y GNV': '06', 'GASOCENTROS DE GLP': '15', 'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15' });
 
+// Las que venden GNV comprimido al público, según el CSV de líquidos: las
+// estaciones con GNV (Registro 05 y 06, capa GIS 35), los gasocentros de GLP con
+// venta de GNV (15) y los establecimientos de venta al público de GNV (59), estos
+// dos en la capa 36. La «Estación de carga de GNC» reporta en galones y queda
+// fuera, igual que el licuefactado, que se vende por kilo.
+const VENTA_GNV = Object.freeze({ 'EE.SS con GNV': '05', 'EE.SS con GLP y GNV': '06', 'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15', 'ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '59' });
+
 /**
  * Lo que cada grupo necesita para proyectarse, compararse y recuperarse.
  *
@@ -98,6 +105,35 @@ export const GROUP_CONFIG = Object.freeze({
           source_max_reported_at: '2026-09-24T04:59:31.000Z',
           products: Object.freeze({
             glp: Object.freeze({ fresh_0_30_days: Object.freeze({ offers: 449, districts: 41 }), contract_ready: Object.freeze({ offers: 415, districts: 41 }), coverage_percent: 92.428, published: Object.freeze({ offers: 425, districts: 41 }) }),
+          }),
+        }),
+        maxDistrictLoss: 2,
+      }),
+    }),
+  }),
+  // GNV sale de los líquidos: comparte su descarga y su snapshot, y su primera
+  // activación se compone sobre el de Gasolina, como la de Diésel.
+  gnv: Object.freeze({
+    source: 'liquid-current',
+    gisLayers: Object.freeze({ '05': '35', '06': '35', '15': '36', '59': '36' }),
+    clientType: null,
+    activities: VENTA_GNV,
+    idScheme: Object.freeze({ prefix: 'gnv1_', namespace: 'masfacil-pe|gnv-v1' }),
+    revisionPrefix: 'gnv-',
+    guardrails: Object.freeze({
+      maxOfferDrop: 0.2,
+      maxCoverageDropPoints: 5,
+      // La base auditada: el embudo del CSV de líquidos del 24/09/2026
+      // (validadores `…,275`, `Thu, 24 Sep 2026 12:31:26 GMT`) contra la semilla
+      // v3. Solo `GAS NATURAL VEHICULAR COMPRIMIDO` en metros cúbicos. De 296
+      // últimos reportes en Lima se pierden 48 que no están en el Registro del
+      // 14/08 y 4 sin punto GIS. Son 36 distritos, y en siete hay una sola
+      // estación.
+      firstActivation: Object.freeze({
+        audited: Object.freeze({
+          source_max_reported_at: '2026-09-24T04:59:31.000Z',
+          products: Object.freeze({
+            gnv: Object.freeze({ fresh_0_30_days: Object.freeze({ offers: 238, districts: 36 }), contract_ready: Object.freeze({ offers: 212, districts: 36 }), coverage_percent: 89.076, published: Object.freeze({ offers: 244, districts: 36 }) }),
           }),
         }),
         maxDistrictLoss: 2,

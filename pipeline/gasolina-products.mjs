@@ -109,7 +109,9 @@ export const loadLiquidSources = loadGasolinaSources;
  * @param {string} [entrada.idField]   el identificador de fila de la fuente
  */
 export function selectProductCandidates({ sources, product, activities, scope, cutoffAt, gisLayers = null, clientType = null, idField = 'ID3' }) {
-  if (!product?.canonical || product.unit !== 'Galones') throw new Error(`Producto líquido inválido: ${product?.key ?? 'sin clave'}`);
+  // Las unidades del CSV que publica algún producto. Nunca se convierten: GNV se
+  // compara en metros cúbicos y los demás en galones, cada uno en su vista.
+  if (!product?.canonical || !['Galones', 'Metros Cúbicos'].includes(product.unit)) throw new Error(`Producto inválido: ${product?.key ?? 'sin clave'}`);
   const lima = (row) => enAmbito(row, scope);
   const capaDe = (codigo) => gisLayers?.[codigo] ?? '35';
   const byRegistry = new Map(); for (const row of sources.registry) { const key = `${row.SOURCE_ACTIVITY}${sep}${row.REGISTRO}`; byRegistry.set(key, [...(byRegistry.get(key) ?? []), row]); }

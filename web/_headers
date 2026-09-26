@@ -31,6 +31,15 @@
 /data/glp/snapshots/*
   Cache-Control: public, max-age=31536000, immutable
 
+/data/gnv/manifest.json
+  Cache-Control: no-store
+
+/data/gnv/refresh-state.json
+  Cache-Control: no-store
+
+/data/gnv/snapshots/*
+  Cache-Control: public, max-age=31536000, immutable
+
 /sw.js
   Cache-Control: no-cache
 

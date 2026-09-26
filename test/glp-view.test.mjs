@@ -24,7 +24,7 @@ const conjunto = (key, ofertas) => mergeProducts({ key, manifest: { revision_id:
 const filas = (key, ofertas) => evaluateRows(conjunto(key, ofertas), AHORA).rows;
 
 test('GLP es la tercera vista, sin histórico y con la unidad en la tarjeta', () => {
-  assert.deepEqual(ACTIVE_VIEWS, ['gasolina', 'diesel', 'glp']);
+  assert.deepEqual(ACTIVE_VIEWS.slice(0, 3), ['gasolina', 'diesel', 'glp']);
   assert.deepEqual([VIEWS.glp.label, VIEWS.glp.history, VIEWS.glp.priceUnit, VIEWS.glp.dataRoot], ['GLP', false, 'por galón', 'data/glp']);
 });
 

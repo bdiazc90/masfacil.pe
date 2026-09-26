@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
-  "seed_id": "registry-gis-lima-2026-08-14-v2",
+  "seed_id": "registry-gis-lima-2026-08-14-v3",
   "reference_snapshot_date": "2026-08-14",
   "registry_fields": ["source_activity", "registro", "department", "province", "district"],
   "gis_fields": ["layer", "n", "department", "province", "district", "longitude", "latitude"],
-  "filters": {"source_activity": ["01", "02", "05", "06", "15"], "layers": ["35", "36"], "department": "LIMA", "province": "LIMA"},
-  "counts": {"registry_rows": 774, "registry_unique_keys": 774, "gis_rows": 831, "gis_unique_keys": 831},
-  "sizes": {"json_bytes": 117701, "gzip_bytes": 21409, "base64_bytes": 28548},
-  "hashes": {"json_sha256": "f8ef3b9944f88b89f0e12df75b824306a96044ed5c5ac201321dc0827bb909c6", "gzip_sha256": "e218f2a2df183b793510983eae63d27957c79704ca5789e3635f03ff5b020fa2", "base64_sha256": "ddfa8dcedf569b58e38a3a4740a2fa360296e821db313c10de0dcb36f3f00883"},
+  "filters": {"source_activity": ["01", "02", "05", "06", "15", "59"], "layers": ["35", "36"], "department": "LIMA", "province": "LIMA"},
+  "counts": {"registry_rows": 819, "registry_unique_keys": 819, "gis_rows": 831, "gis_unique_keys": 831},
+  "sizes": {"json_bytes": 120221, "gzip_bytes": 21981, "base64_bytes": 29308},
+  "hashes": {"json_sha256": "dde8d64f383286d9ff734667b740c622612b2afe2ac3d86a4b71f787d4037ca4", "gzip_sha256": "3309fa41d85140274360cd55798f5d6829076de3a1cb7f50c881bc05f3055ca8", "base64_sha256": "2ae869e2026179d710de51bfd4eb4b147d58c0f0d2b19cfd91ea4230bb31ab99"},
   "privacy": {"contains": "joins sanitizados de Registro y GIS para Lima provincia", "forbids": ["OBJECTID", "CODIGO_OSINERGMIN", "CODIGO_DGH", "RUC", "razón social", "dirección", "actividad descriptiva", "overlay", "paths", "lineage"], "delivery": "secret privado BOOTSTRAP_SEED_B64; nunca Git, cache ni artifact"}
 }

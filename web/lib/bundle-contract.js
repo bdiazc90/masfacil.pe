@@ -16,7 +16,7 @@
 // proyección, `crypto.subtle` en la página y el service worker— y la entrega ya
 // calculada a `bundleErrors`. Sin imports salvo el catálogo, sin E/S.
 
-import { DIESEL, GASOLINA, GASOLINA_KEYS, GLP, PRODUCTS } from './catalog.js';
+import { DIESEL, GASOLINA, GASOLINA_KEYS, GLP, GNV, PRODUCTS } from './catalog.js';
 
 export { GASOLINA_KEYS };
 export const GASOLINA_MANIFEST_VERSION = '2.7.0';
@@ -24,6 +24,7 @@ export const LEGACY_GASOLINA_MANIFEST_VERSION = '2.0.0';
 export const GASOLINA_VERSIONS = Object.freeze(['2.0.0', '2.1.0', '2.2.0', '2.3.0', '2.4.0', '2.5.0', '2.6.0', '2.7.0']);
 export const DIESEL_MANIFEST_VERSION = '1.0.0';
 export const GLP_MANIFEST_VERSION = '1.0.0';
+export const GNV_MANIFEST_VERSION = '1.0.0';
 export const CONFIDENCE_LEVELS = Object.freeze(['verified', 'nearby']);
 export const GASOLINA_SCOPE = GASOLINA.scope;
 export const PUBLIC_OFFER_FIELDS = Object.freeze(['id', 'establishment_id', 'commercial_identity', 'address', 'price', 'reported_at', 'facilito', 'district', 'longitude', 'latitude']);
@@ -180,6 +181,8 @@ export const GROUP_RULES = Object.freeze({
   // GLP, igual que Diésel: la forma de 2.7.0 en su propia 1.0.0, sus IDs y su
   // prefijo de revisión.
   glp: groupRules({ key: GLP.key, products: GLP.products, dataRoot: GLP.dataRoot, scope: GLP.scope, versions: { [GLP_MANIFEST_VERSION]: GASOLINA_FLAGS['2.7.0'] }, current: GLP_MANIFEST_VERSION, idPattern: /^glp1_[a-f0-9]{24}$/, revisionPrefix: 'glp-' }),
+  // GNV, igual, con su unidad: el contrato exige la del catálogo, metros cúbicos.
+  gnv: groupRules({ key: GNV.key, products: GNV.products, dataRoot: GNV.dataRoot, scope: GNV.scope, versions: { [GNV_MANIFEST_VERSION]: GASOLINA_FLAGS['2.7.0'] }, current: GNV_MANIFEST_VERSION, idPattern: /^gnv1_[a-f0-9]{24}$/, revisionPrefix: 'gnv-' }),
 });
 
 // Los nombres de siempre, atados a Gasolina: la proyección, el refresco, el

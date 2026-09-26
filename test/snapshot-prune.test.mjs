@@ -53,15 +53,16 @@ function cache() {
   };
   return api;
 }
-// Lo que sirve producción, como lo devuelve `prepareRelease`. GLP es `null`
-// mientras no se haya publicado nunca; `glp` da su snapshot si ya se publicó.
-const produccion = (id, revision = 'aaaaaaaaaaaa', { glp = null } = {}) => ({ gasolina: { snapshot_id: id, revision_id: `gasolina-${id}-${revision}`, facilito: false }, diesel: { snapshot_id: id, revision_id: `diesel-${id}-bbbbbbbbbbbb`, facilito: false }, glp: glp ? { snapshot_id: glp, revision_id: `glp-${glp}-cccccccccccc`, facilito: false } : null });
+// Lo que sirve producción, como lo devuelve `prepareRelease`. GLP y GNV son
+// `null` mientras no se hayan publicado nunca; `glp` da su snapshot si ya se
+// publicó, y GNV, que es de los líquidos, comparte el de Gasolina con `gnv`.
+const produccion = (id, revision = 'aaaaaaaaaaaa', { glp = null, gnv = false } = {}) => ({ gasolina: { snapshot_id: id, revision_id: `gasolina-${id}-${revision}`, facilito: false }, diesel: { snapshot_id: id, revision_id: `diesel-${id}-bbbbbbbbbbbb`, facilito: false }, glp: glp ? { snapshot_id: glp, revision_id: `glp-${glp}-cccccccccccc`, facilito: false } : null, gnv: gnv ? { snapshot_id: id, revision_id: `gnv-${id}-dddddddddddd`, facilito: false } : null });
 const manifestDe = (c, id) => JSON.parse(fs.readFileSync(path.join(c.snapshots, id, 'snapshot-manifest.json'), 'utf8'));
 
 test('con los pointers ya en el snapshot nuevo, protege producción y su rollback, y tras un deploy fallido siguen recuperables', () => {
   const c = cache().snapshot('2026-09-20-viejo').snapshot('2026-09-21-s0').snapshot('2026-09-22-s1').snapshot('2026-09-23-s2').staging().pointers(LIQUIDOS, '2026-09-23-s2');
   // Sin producción que proteger —lo único que miraba la poda de 3A— se habrían ido producción y rollback.
-  const soloPointers = pruneSnapshots({ root: c.root, production: { gasolina: null, diesel: null, glp: null }, dryRun: true });
+  const soloPointers = pruneSnapshots({ root: c.root, production: { gasolina: null, diesel: null, glp: null, gnv: null }, dryRun: true });
   assert.deepEqual(soloPointers.remove, ['2026-09-20-viejo', '2026-09-21-s0', '2026-09-22-s1']);
 
   const informe = pruneInCi({ root: c.root, env: CI, production: produccion('2026-09-22-s1') });

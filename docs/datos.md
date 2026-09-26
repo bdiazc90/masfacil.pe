@@ -61,7 +61,7 @@ Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026
 
 | Fuente | CSV | ID de fila | Grupos | Descarga máx. |
 | --- | --- | --- | --- | ---: |
-| `liquid-current` | `CL-Registro-precios-DMA-V-CCA-CCE.csv`, ~1,35 GB | `ID3` | Gasolina, Diésel | 60 min |
+| `liquid-current` | `CL-Registro-precios-DMA-V-CCA-CCE.csv`, ~1,35 GB | `ID3` | Gasolina, Diésel, GNV | 60 min |
 | `glp-current` | `GLP-Registro-precios-PIC-PE-V.csv`, ~0,74 GB | `ID4` | GLP | 30 min |
 
 - **Cada fuente tiene lo suyo:** su línea base de detección, su descarga, su minimizado, sus grupos y sus pointers. Un refresco de una nunca lee ni mueve nada de la otra.
@@ -83,6 +83,13 @@ Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026
 - **Formato de las filas GIS:** cada una lleva su capa, `[layer, n, dep, prov, dist, lon, lat]`, y la clave es `(capa, N)`.
 - **Qué no cambia:** amplía y no refresca. Las tablas siguen siendo las del **14/08/2026**, y `node scripts/build-seed.mjs` exige que la v2, recortada a los filtros de la v1, sea la v1 byte a byte. Por eso Gasolina y Diésel no cambian al instalarla, y además cada grupo solo mira el Registro de sus propios códigos.
 - **Caché de Actions:** su clave lleva el hash del manifest. La segunda clave de respaldo (`snapshots-`) recupera la caché de la semilla anterior, que sigue valiendo porque la nueva solo amplía.
+
+**Semilla v3 (Fase 4).** Suma la venta al público de GNV, **Registro 59**, que vive en la capa 36 (45 de 45 en Lima), con el mismo formato que la v2.
+- **Contenido:** 819 filas de Registro (45 del código 59) y las mismas 831 de GIS; el base64 ocupa 28,6 KB.
+- **Garantía:** recortada a los filtros de la v2, es la v2 byte a byte.
+- **Por qué es obligatoria:** desde GNV, el refresco de los líquidos exige el código 59 antes de descargar (`assertReferenceCovers`). Con el secret v2 se rechazaría la fuente entera.
+- **Cómo se cambia:** el secret se valida contra el manifest de su commit, así que el cambio de secret y el push van seguidos. Un cron del código anterior que corra en medio falla en `seed:install` sin desplegar nada.
+- **Si hay que volver atrás:** se revierte también el secret a la v2, que queda respaldada en `.local-cache/publish/*.v2`.
 
 **Poda de snapshots en CI.** Sin poda, cada CSV nuevo quedaba para siempre en la caché de Actions, que llegó a 10,95 GB en 28 entradas.
 - **Cuándo:** `scripts/publish.mjs` poda `.local-cache/snapshots/` después de preparar la entrega, solo en CI (`pipeline/snapshot-prune.mjs`).
@@ -514,7 +521,7 @@ GLP automotor es un grupo propio de un producto, con su propia fuente:
 
 GLP se lee en una tercera pasada, la última, con 10 min de presupuesto. No se toca el select de producto y se exige «Galones» en cada fila. Sus unidades guardan su página y entran solo en el estado que publica GLP, no en el de Gasolina ni en el de Diésel.
 
-**Vínculo acreditado el 26/09/2026, antes de publicar la capa.** El método es el de Diésel: razón social + dirección + distrito exactos y únicos. Se probó contra el CSV de GLP del 25/09 y una pasada local completa.
+**Vínculo de GLP acreditado el 26/09/2026, antes de publicar la capa.** El método es el de Diésel: razón social + dirección + distrito exactos y únicos. Se probó contra el CSV de GLP del 25/09 y una pasada local completa.
 - **Población (43 distritos):** 390 filas vinculadas, 0 ambiguas y 36 sin par.
 - **Muestra (`scripts/facilito-sample.mjs --group glp`):** ocho distritos elegidos para cubrir estaciones con gasocentro (02/06), gasocentros puros (15) y establecimientos que también reportan GLP en kg o cilindros: La Victoria, Villa El Salvador, Comas, Ate, San Martín de Porres, Lurigancho, Puente Piedra y La Molina.
   - 159 filas vinculadas, 0 ambiguas y 16 sin par. De las vinculadas, 14 son del código 15 y 41 tienen variantes.
@@ -525,6 +532,68 @@ GLP se lee en una tercera pasada, la última, con 10 min de presupuesto. No se t
   - El precio está en soles por galón.
   - Las diferencias se explican por la fecha del reporte.
   - Los cilindros de 10 kg (S/ 37 a 62,5) no se confunden con el precio por galón.
+
+## Grupo GNV — embudo auditado el 24/09/2026 (publicado desde la Fase 4)
+
+GNV es un grupo propio de un producto que sale de los líquidos, con sus propias actividades:
+- producto `GAS NATURAL VEHICULAR COMPRIMIDO` en `Metros Cúbicos`;
+- IDs `gnv1_`, revisiones `gnv-` y contrato 1.0.0;
+- vista `/combustibles/gnv` con «por m³». Su precio nunca se compara con uno por galón.
+
+**Actividades, con evidencia del CSV:**
+
+| Actividad | Establecimientos vigentes en Lima | Registro | Capa GIS |
+| --- | ---: | --- | --- |
+| EE.SS con GLP y GNV | 189 | 06 | 35 |
+| EE.SS con GNV | 27 | 05 | 35 |
+| Gasocentro de GLP con venta al público de GNV | 13 | 15 | 36 |
+| Establecimiento de venta al público de GNV | 9 | 59 | 36 |
+
+- **Qué queda fuera:**
+  - el licuefactado, que se vende por kilo y es otro registro;
+  - el comprimido reportado en galones, que se cuenta como otra unidad;
+  - la «Estación de carga de GNC», que no vende al público.
+- **Precios vigentes:** de S/ 1,50 a 2,29 por m³, mediana 1,77.
+
+**Embudo sobre el CSV del 24/09/2026.** Validadores `…,275` y `Thu, 24 Sep 2026 12:31:26 GMT`, contra la semilla v3:
+
+| Paso | Ofertas | Distritos |
+| --- | ---: | ---: |
+| Último reporte por clave en Lima | 296 | 36 |
+| Reportadas en ≤30 días | 238 | 36 |
+| Con Registro único | 216 | 36 |
+| Con GIS seguro | 212 | 36 |
+| Publicables (con precio + 32 sin precio vigente) | 244 | 36 |
+
+- **Cobertura:** 89,076 %, sin conflictos.
+- **Pérdidas:** 48 no están en el Registro del 14/08 y 4 no tienen punto GIS.
+- **Por distrito:** son 36 distritos, y en siete hay una sola estación.
+- **Identidad:** 178 de 244 tienen nombre. Los códigos 15 y 59 salen neutrales.
+
+**Guardrails.** Las mismas tolerancias que los demás. Sin versión publicada, GNV se juzga contra esta base auditada y no puede perder más de 2 de sus 36 distritos.
+
+**Primera activación y recuperación:**
+- **Base:** se compone con los líquidos, sobre el snapshot de Gasolina, como Diésel, y adopta ese snapshot solo si pasa.
+- **Si no pasa:** la entrega entera termina en `fail_closed`.
+- **Después:** un fallo de GNV conserva su versión publicada y deja publicar a los demás, y al revés.
+- **Recuperar el grupo:** `npm run rollback -- <snapshot> [<revisión>] --group gnv`.
+- **Recuperar el código:** el mismo orden que en GLP: primero el secret v2 y enseguida el push del revert, después cancelar las corridas en vuelo, y el rollback de Pages solo como parche.
+
+**Consulta web de GNV** (`buscadorGNV.jsp`, sonda del 26/09/2026):
+- **Tabla:** `#tblPreciosGnv`, con la misma cascada y los mismos códigos de distrito que la automotora. La cabecera del precio dice «Soles/m3».
+- **Producto:** el select trae ya elegido `131` «Gas Natural Vehicular Comprimido» y ofrece `129`, el licuefactado. Se lee como producto fijo y se comprueba el código y la etiqueta.
+- **Pasada:** es la cuarta, después de GLP, con 10 min.
+- **Pasada local completa:** 43 de 43 distritos, 270 filas en 36 distritos, y un corte intermitente que se reintentó.
+
+**Vínculo de GNV acreditado el 26/09/2026:**
+- **Población:** 229 filas vinculadas, 0 ambiguas y 41 sin par.
+- **Muestra de siete distritos:** La Victoria, San Juan de Lurigancho, Los Olivos, San Martín de Porres, Ate, Independencia y Puente Piedra.
+  - 89 vinculadas, 0 ambiguas y 19 sin par. De las vinculadas, 22 son locales 15/59 y 2 son establecimientos que también venden licuefactado.
+  - 87 de 89 precios coinciden al céntimo, con un máximo de 0,10.
+  - Las 19 sin par: 9 son vigentes fuera del Registro o sin GIS; 6 tienen la misma razón social con otra dirección; 3 no tienen fila en el CSV; 1 solo reporta otro producto.
+- **Revisión a ojo:** 24 establecimientos, 11 de ellos 15/59.
+  - En todos la dirección coincide con la oficial.
+  - Donde también se vende licuefactado, la consulta coincide con el comprimido y no con el kilo.
 
 ## Modelo útil
 
