@@ -16,6 +16,12 @@
 /web/shell-manifest.js
 /web/sw.js
 
+# Interfaz compilada: `npm run build` la genera desde `ui/`; las fuentes son las
+# de `ui/` y estas copias nunca se editan ni se versionan.
+/web/index.html
+/web/404.html
+/web/assets/
+
 # Dependencias instaladas; el lockfile sí se versiona, el árbol nunca.
 /node_modules/
 

@@ -80,6 +80,9 @@ declara cada variante renderizable con su archivo y su función visual, y ese
 ```text
 .local-cache/{raw,snapshots,identity,publish,history}/
 web/data/
+web/index.html
+web/404.html
+web/assets/
 web/shell-manifest.js
 web/sw.js
 node_modules/
@@ -89,7 +92,8 @@ node_modules/
 
 - Los contratos se validan al proyectar y en el navegador. Es runtime, no testing.
 - Regular y Premium se promueven juntos; el manifest se escribe al final; los snapshots son inmutables y la revisión sale del contenido.
-- La precache del service worker también sale del contenido: su lista se deriva de las referencias del árbol y del registro de marcas, y su versión de la huella de esos bytes y del grafo del worker. La versión viaja en `web/sw.js`, generado, porque Chrome no reinstala un worker de módulos si solo cambia un import; la lógica vive en `web/sw-main.js`. No hay número que subir a mano.
+- La interfaz se escribe en `ui/` y Vite la compila hacia `web/`: `npm run build` instala por inventario solo `web/index.html`, `web/404.html` y `web/assets/`, sin tocar datos ni módulos compartidos, y deja su constancia en `.local-cache/ui-build/`. `verify:web` rechaza un build viejo, alterado o a medias; verificar no compila.
+- La precache del service worker también sale del contenido: su lista se deriva de lo que emitió el build, de lo que cargan las páginas compiladas y del registro de marcas, y su versión de la huella de esos bytes y del grafo del worker. La versión viaja en `web/sw.js`, generado, porque Chrome no reinstala un worker de módulos si solo cambia un import; la lógica vive en `web/sw-main.js`. No hay número que subir a mano.
 - Publicar la interfaz no depende de la fuente de datos: la ruta `shell` reutiliza el último bundle público válido y comprueba que el cliente nuevo lo acepte.
 - `npm run audit`, `npm run verify:web` y el rollback se conservan.
 - `web/` es exactamente lo que se publica: una herramienta de desarrollo no vive ahí, y una ruta que no existe responde 404 con `web/404.html`, no la portada con 200.
@@ -117,13 +121,16 @@ npm run history:observe      # requiere `pnpm install`: firma peticiones S3
 npm run history:summary
 npm test                     # comprobaciones puntuales, no una suite
 node scripts/contrast.mjs
+npm run build                # compila ui/ hacia web/ y deriva la precache
+npm run dev                  # Vite con recarga en caliente; sin service worker
 ```
 
 ## Mapa
 
 ```text
-web/         PWA Vanilla ESM
-pipeline/    proyección privada a bundle público
+ui/          fuentes de la interfaz, compiladas con Vite
+web/         lo publicado: interfaz compilada, datos, iconos, worker y reglas compartidas
+pipeline/    proyección privada a bundle público y build de la interfaz
 app/         contratos, validación de runtime, política de ruta y catálogo privado
 scripts/     operación, publicación y rollback
 docs/        fuentes, decisiones y roadmap

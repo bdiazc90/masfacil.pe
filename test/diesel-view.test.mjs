@@ -13,7 +13,7 @@ import { createSearch, evaluateRows, resultsView, withDistances } from '../web/l
 import { mergeProducts } from '../web/lib/merge-products.js';
 import { orderOffers } from '../web/lib/haversine.js';
 import { decisionTag } from '../web/lib/decision-view.js';
-import { renderOfferCard, renderOfferDetail } from '../web/offer-card.js';
+import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
 
 const AHORA = new Date('2026-09-24T12:00:00.000Z');
 const oferta = (letra, precio, distrito, dLat = 0) => ({ id: `d1_${letra.repeat(24)}`, establishment_id: `est_${letra.repeat(24)}`, commercial_identity: null, address: 'Av. Larco 123', price: precio, reported_at: '2026-09-23T12:00:00.000Z', facilito: null, district: distrito, longitude: -77.03, latitude: -12.12 + dLat });

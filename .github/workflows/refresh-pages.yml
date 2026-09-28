@@ -151,9 +151,23 @@ jobs:
         continue-on-error: true
         run: node scripts/facilito-capture.mjs -v
 
+      # La interfaz se compila con Vite en toda ruta que prepara un sitio,
+      # también en el cron: `web/` no trae la interfaz compilada. Versiones
+      # exactas del lockfile y sin scripts de instalación. El job `deploy` sube
+      # lo verificado aquí y nunca compila.
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        if: steps.route.outputs.verify == 'true' && !inputs.facilito_only
+        with:
+          version: 12.3.4
+          run_install: false
+      - name: Instalar las dependencias del build
+        if: steps.route.outputs.verify == 'true' && !inputs.facilito_only
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       # Un solo programa. `publish` decide, escribe `prepare-result.json` y anexa
       # `deploy=` a GITHUB_OUTPUT; si muere sin escribirlo no hay output, el
-      # job falla y el deployment vigente se conserva.
+      # job falla y el deployment vigente se conserva. Compila la interfaz después
+      # de tener los datos y antes de derivar la precache y verificar.
       - name: Preparar la entrega según la ruta
         if: ${{ !inputs.facilito_only }}
         id: prepare

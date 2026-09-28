@@ -191,6 +191,7 @@ function conDeps({ precioWeb, publicadoWeb, escrituras }) {
     composeGroups: async () => ({ gasolina: candidato(precioWeb) }),
     writeGroupProjection: (c) => { escrituras.push(c.manifest.revision_id); return c; },
     publicadosDesdeDisco: () => datasets([oferta('g2_a', 22.99, publicadoWeb === null ? null : consulta(publicadoWeb, iso(AHORA - 7 * HORA)))]),
+    buildUi: async () => ({}),
     writeShellManifest: () => {},
     verifyWeb: async () => ({ errors: [] }),
     usablePrivateSnapshot: () => ({ ok: true, snapshot_id: 'S1', missing: [], pointer: { snapshot_id: 'S1' } }),

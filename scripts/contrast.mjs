@@ -1,6 +1,6 @@
 // Contraste medido en el peor caso real (DESIGN.md §8).
 //
-// La paleta NO vive aquí: se lee de `web/styles.css`, que es la única fuente.
+// La paleta NO vive aquí: se lee de `ui/styles.css`, que es la única fuente.
 // Lo que este archivo declara es su contrato —qué roles se miden, sobre qué
 // fondos y con qué mínimo—, no una segunda configuración visual. Un rol que
 // falte o un valor que no se sepa leer produce error explícito, nunca una
@@ -20,7 +20,7 @@ import { color, declaracion, numero, pesosDeMezcla, tokensPorTema } from './css-
 import { BRAND_LOGOS } from '../web/brand-logos.js';
 
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const HOJA = path.join(raiz, 'web', 'styles.css');
+export const HOJA = path.join(raiz, 'ui', 'styles.css');
 
 const lum = (c) => c.map((v) => { const canal = v / 255; return canal <= 0.03928 ? canal / 12.92 : ((canal + 0.055) / 1.055) ** 2.4; })
   .reduce((total, v, i) => total + v * [0.2126, 0.7152, 0.0722][i], 0);

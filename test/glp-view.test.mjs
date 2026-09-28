@@ -14,7 +14,7 @@ import { ACTIVE_VIEWS, VIEWS } from '../web/lib/catalog.js';
 import { createSearch, evaluateRows, resultsView, startResults, withDistances } from '../web/lib/search.js';
 import { mergeProducts } from '../web/lib/merge-products.js';
 import { decisionTag } from '../web/lib/decision-view.js';
-import { renderOfferCard, renderOfferDetail } from '../web/offer-card.js';
+import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
 
 const AHORA = new Date('2026-09-24T12:00:00.000Z');
 const ORIGEN = { latitude: -12.12, longitude: -77.03 };

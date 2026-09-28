@@ -14,6 +14,7 @@ export const FORBIDDEN_PATHS = Object.freeze([
   /^data\//,
   /^web\/data\//,
   /^web\/shell-manifest\.js$/,
+  /^web\/assets\//,
   /^node_modules\//,
   /(^|\/)\.env(?:\.|$)/,
   /(^|\/)fetch-gis\.mjs$/,
@@ -26,10 +27,18 @@ export const REQUIRED_IGNORES = Object.freeze([
   ['web/data/audit-sentinel.json', '/web/data/'],
   ['web/shell-manifest.js', '/web/shell-manifest.js'],
   ['web/sw.js', '/web/sw.js'],
+  ['web/index.html', '/web/index.html'],
+  ['web/404.html', '/web/404.html'],
+  ['web/assets/audit-sentinel.js', '/web/assets/'],
   ['node_modules/audit-sentinel.js', '/node_modules/'],
   ['fetch-gis.mjs', '/fetch-gis.mjs'],
   ['gis-osinergmin.json', '/gis-osinergmin.json'],
 ]);
+
+// Salidas del build de la interfaz que antes fueron fuentes versionadas: el
+// historial las contiene legítimamente, así que se prohíben solo en el candidato.
+// Versionarlas ahora sería mantener dos copias editables de la misma página.
+export const CANDIDATE_FORBIDDEN_PATHS = Object.freeze([/^web\/index\.html$/, /^web\/404\.html$/]);
 
 const CONTENT_RULES = Object.freeze([
   ['absolute_path', /(?:\/Users\/|\/home\/|\/private\/var\/|[A-Z]:\\Users\\)/],
@@ -121,6 +130,7 @@ export function auditTreeEntries(root, entries, scope = 'candidate', revision) {
   for (const entry of entries) {
     const base = { scope, file: entry.file, ...(revision ? { revision: revision.slice(0, 12) } : {}) };
     if (pathFinding(entry.file)) findings.push({ ...base, kind: 'forbidden_path' });
+    if (scope === 'candidate' && CANDIDATE_FORBIDDEN_PATHS.some((pattern) => pattern.test(entry.file))) findings.push({ ...base, kind: 'generated_output' });
     const bytes = readBlob(root, entry.oid);
     if (bytes.length > MAX_TRACKED_BYTES && !LARGE_FILE_ALLOWLIST.has(entry.file)) {
       findings.push({ ...base, kind: 'oversized_file', bytes: bytes.length });

@@ -1,7 +1,7 @@
 /**
  * Lee del CSS los valores que la comprobación de contraste necesita medir.
  *
- * Existe para que `web/styles.css` sea la ÚNICA fuente de la paleta. Antes el
+ * Existe para que `ui/styles.css` sea la ÚNICA fuente de la paleta. Antes el
  * verificador guardaba su propia copia —54 valores a mano— y ya se había
  * desincronizado en dos sitios sin que nadie lo notara: `--border-2` no llegó a
  * copiarse nunca, y el peso del vidrio era `.144` en el script frente al 14 %
@@ -16,7 +16,7 @@
 /** Cuerpo de la primera regla cuyo selector contenga `selector`. */
 function bloque(css, selector) {
   const marca = css.indexOf(selector);
-  if (marca < 0) throw new Error(`css-tokens: no encuentro el selector «${selector}» en web/styles.css`);
+  if (marca < 0) throw new Error(`css-tokens: no encuentro el selector «${selector}» en ui/styles.css`);
   const abre = css.indexOf('{', marca);
   const cierra = css.indexOf('}', abre);
   if (abre < 0 || cierra < 0) throw new Error(`css-tokens: la regla de «${selector}» no está cerrada`);

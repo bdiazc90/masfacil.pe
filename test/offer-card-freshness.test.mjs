@@ -12,7 +12,7 @@ import test from 'node:test';
 
 import { filterFreshOffers } from '../web/lib/freshness.js';
 import { mergeOfferRows } from '../web/lib/merge-products.js';
-import { renderOfferCard, renderOfferDetail } from '../web/offer-card.js';
+import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
 
 const CORTE = '2026-09-20T12:00:00.000Z';
 const HORA = 3_600_000;

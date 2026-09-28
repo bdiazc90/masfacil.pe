@@ -4,13 +4,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeShellManifest } from '../pipeline/shell-manifest.mjs';
+import { buildUi } from '../pipeline/ui-build.mjs';
 import { resolvePath } from '../web/lib/routes.js';
 import { dataCacheControl } from '../pipeline/groups.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = path.join(root, 'web');
-// La precache se genera al arrancar: en local nunca hay que acordarse de nada
-// para que el service worker vea el shell que se está editando.
+// Se sirve el artefacto publicable: al arrancar se compila la interfaz y se
+// deriva la precache, así que nunca hay que acordarse de nada para que el
+// service worker vea el shell que se está editando. Para cambios en caliente
+// está `npm run dev`, que no acredita CSP, 404 ni funcionamiento sin red.
+await buildUi({ root });
 const shell = writeShellManifest({ root });
 const port = Number(process.env.PORT ?? 4173);
 const types = new Map([['.html','text/html; charset=utf-8'],['.js','text/javascript; charset=utf-8'],['.css','text/css; charset=utf-8'],['.json','application/json; charset=utf-8'],['.webmanifest','application/manifest+json'],['.svg','image/svg+xml']]);

@@ -142,7 +142,8 @@ export function moduleGraph({ entry, read, generated = [] }) {
     if (/\bimport\s*\(/.test(resto)) problemas.push(`web/${relativo} usa un import dinámico, que el service worker no admite`);
     else if (RASTRO_DE_IMPORT.test(resto)) problemas.push(`web/${relativo} tiene un import que no se reconoce; va al inicio de su línea`);
   }
-  return { modules: [...modulos].sort((a, b) => a.localeCompare(b, 'en')), problems: problemas };
+  // Por unidades de código: el orden entra en la huella y no puede depender del ICU.
+  return { modules: [...modulos].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), problems: problemas };
 }
 
 /**
@@ -164,11 +165,71 @@ export const ANALYTICS_ENDPOINT = 'https://cloudflareinsights.com/cdn-cgi/rum';
 /** Texto que identifica la página 404 propia, también cuando se lee desde el origen público. */
 export const NOT_FOUND_MARKER = 'No encontramos esta página';
 
+/** El bloque que Pages Analytics inyecta en cada HTML servido, delimitado por su propio comentario. */
+export const withoutPagesAnalytics = (html) => html.replace(/<!-- Cloudflare Pages Analytics -->[\s\S]*?<!-- Cloudflare Pages Analytics -->/g, '');
+
+const sinComentariosHtml = (html) => html.replace(/<!--[\s\S]*?-->/g, '');
+
 /**
- * La página 404 tiene que funcionar bajo la CSP del sitio (`style-src 'self'`,
- * `script-src 'self'`): un estilo o un script en línea no daría error de
- * publicación, solo una página rota en silencio. Y tiene que llevar a la
- * portada: para eso existe.
+ * Lo que un HTML hace cargar: hojas, módulos, precargas, manifiesto, iconos e
+ * imágenes (`link href`, `script src`, `img src`). Un `<a>` es navegación, no un
+ * recurso. Lee el HTML que escribe este proyecto y el que emite Vite: atributos
+ * entre comillas.
+ *
+ * @returns {{tag: string, rel: string|null, type: string|null, url: string}[]}
+ */
+export function htmlResources(html) {
+  const recursos = [];
+  for (const [, etiqueta, atributos] of sinComentariosHtml(html).matchAll(/<(link|script|img)\b([^>]*)>/gi)) {
+    const attr = Object.fromEntries([...atributos.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map(([, nombre, doble, simple]) => [nombre.toLowerCase(), doble ?? simple]));
+    const tag = etiqueta.toLowerCase();
+    const url = tag === 'link' ? attr.href : attr.src;
+    if (url !== undefined) recursos.push({ tag, rel: attr.rel ?? null, type: attr.type ?? null, url });
+  }
+  return recursos;
+}
+
+/**
+ * Un recurso de un HTML publicado es propio, absoluto y existe. Relativo, desde
+ * `/combustibles/gasolina` se pediría bajo esa ruta; ajeno, la CSP no lo dejaría
+ * cargar. Con `precache`, además tiene que viajar en ella: sin red, la página lo
+ * necesita igual.
+ *
+ * @param {string} nombre  para el mensaje
+ * @param {string} html
+ * @param {{exists: (ruta: string) => boolean, precache?: Set<string>|null}} opciones
+ */
+export function htmlResourceProblems(nombre, html, { exists, precache = null }) {
+  const problemas = [];
+  for (const { url } of htmlResources(html)) {
+    if (url.startsWith('data:')) continue;
+    if (url.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(url)) { problemas.push(`${nombre} carga un recurso ajeno: ${url}`); continue; }
+    if (!url.startsWith('/')) { problemas.push(`${nombre} carga ${url} con ruta relativa; desde /combustibles/… se pediría otra ruta`); continue; }
+    const ruta = url.replace(/[?#].*$/, '');
+    if (!exists(ruta)) problemas.push(`${nombre} carga ${ruta}, que no existe`);
+    else if (precache && !precache.has(ruta)) problemas.push(`${nombre} carga ${ruta}, que no está en la precache: sin red faltaría`);
+  }
+  return problemas;
+}
+
+/**
+ * La CSP del sitio (`style-src 'self'`, `script-src 'self'`) bloquea estilos y
+ * scripts en línea: no darían error de publicación, solo una página rota en
+ * silencio.
+ */
+export function inlineProblems(nombre, html) {
+  const limpio = sinComentariosHtml(html);
+  const problemas = [];
+  if (/<style\b/i.test(limpio) || /\sstyle\s*=/i.test(limpio)) problemas.push(`${nombre} lleva estilos en línea; la CSP los bloquearía`);
+  if (/<script\b(?![^>]*\bsrc\s*=)/i.test(limpio)) problemas.push(`${nombre} lleva un script en línea; la CSP lo bloquearía`);
+  return problemas;
+}
+
+/**
+ * La página 404 se verifica por lo que usa, no por nombres de archivo: tiene que
+ * funcionar bajo la CSP, llevar a la portada —para eso existe— y cargar su hoja
+ * y su módulo de tema, sin el cual sería siempre clara. Que esos recursos existan
+ * y viajen en la precache lo comprueba `htmlResourceProblems`.
  *
  * @param {string} html  contenido de web/404.html
  * @returns {string[]}
@@ -177,9 +238,9 @@ export function notFoundPageProblems(html) {
   const problems = [];
   if (!html.includes(NOT_FOUND_MARKER)) problems.push(`404.html no contiene «${NOT_FOUND_MARKER}»`);
   if (!/href="\/"/.test(html)) problems.push('404.html no enlaza a la portada (href="/")');
-  if (!/href="\/styles\.css"/.test(html)) problems.push('404.html no carga /styles.css');
-  if (!/src="\/404\.js"/.test(html)) problems.push('404.html no carga /404.js: quedaría sin tema');
-  if (/<style\b/i.test(html) || /\sstyle\s*=/i.test(html)) problems.push('404.html lleva estilos en línea; la CSP los bloquearía');
-  if (/<script\b(?![^>]*\bsrc=)/i.test(html)) problems.push('404.html lleva un script en línea; la CSP lo bloquearía');
+  const recursos = htmlResources(html);
+  if (!recursos.some(({ tag, rel }) => tag === 'link' && rel === 'stylesheet')) problems.push('404.html no carga ninguna hoja de estilos');
+  if (!recursos.some(({ tag, type }) => tag === 'script' && type === 'module')) problems.push('404.html no carga ningún módulo: quedaría sin tema');
+  problems.push(...inlineProblems('404.html', html));
   return problems;
 }

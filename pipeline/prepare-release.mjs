@@ -7,7 +7,7 @@
  * que releían el archivo resultante para decidir si desplegar. Dos programas
  * para una sola decisión, y ninguno de los dos se podía probar en local.
  *
- * Aquí se llama en proceso a `refreshSnapshot`, `composeGroups`,
+ * Aquí se llama en proceso a `refreshSnapshot`, `composeGroups`, `buildUi`,
  * `writeShellManifest` y `verifyWeb`, y se devuelve el resultado. `deps` permite
  * recorrer las cuatro rutas y todos los estados del refresco sin red y sin los
  * 1,2 GB del original.
@@ -31,6 +31,7 @@ import { PUBLISHED_GROUPS } from './groups.mjs';
 import { refreshSnapshot } from './refresh-snapshot.mjs';
 import { compareGroupQuality } from './refresh-state.mjs';
 import { writeShellManifest } from './shell-manifest.mjs';
+import { buildUi } from './ui-build.mjs';
 import { verifyWeb } from '../scripts/verify-web.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,7 +74,7 @@ function produccionPublicada(root, grupo, estado) {
   return { snapshot_id: estado.snapshot_id, revision_id: estado.revision_id ?? null, facilito: Boolean(estado.facilito?.state_id) };
 }
 
-export const DEFAULT_PREPARE_DEPS = Object.freeze({ refreshSnapshot, composeGroups, writeGroupProjection, verifyWeb, writeShellManifest, usablePrivateSnapshot, firstActivationBase, readFacilitoState, publicadosDesdeDisco, estadoPublicado, adoptSnapshot, groups: PUBLISHED_GROUPS });
+export const DEFAULT_PREPARE_DEPS = Object.freeze({ refreshSnapshot, composeGroups, writeGroupProjection, verifyWeb, buildUi, writeShellManifest, usablePrivateSnapshot, firstActivationBase, readFacilitoState, publicadosDesdeDisco, estadoPublicado, adoptSnapshot, groups: PUBLISHED_GROUPS });
 
 const trimmed = (value) => String(value ?? '').trim();
 const fallo = (reason) => ({ action: 'fail_closed', project: false, verify: false, deploy: false, reason });
@@ -264,11 +265,19 @@ export async function prepareRelease({
 
   let decision = combineGroupDecisions(route, Object.values(porGrupo).map((item) => ({ group: item.grupo.key, decision: item.decision, outcome: item.outcome, error: item.error })));
   if (decision.action === 'fail_closed') { execution.ok = false; execution.error = decision.reason; }
-  // La precache se deriva antes de verificar, en TODA ruta que publica: el
-  // shell que se sube y el módulo que lo describe salen de la misma corrida.
+  // En TODA ruta que publica y en este orden: datos disponibles → interfaz
+  // compilada → precache derivada → verificación. El shell que se sube, su lista
+  // y su comprobación salen de la misma corrida, y después de verificar no se
+  // vuelve a compilar. Compilar no toca `web/data/`; un fallo no publica nada.
+  if (execution.ok && decision.verify) {
+    execution.stage = 'build';
+    try { await usar.buildUi({ root }); }
+    catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'el build de la interfaz falló sin mensaje'; }
+  }
+  let shell = null;
   if (execution.ok && decision.verify) {
     execution.stage = 'shell';
-    try { usar.writeShellManifest({ root }); }
+    try { shell = usar.writeShellManifest({ root }) ?? null; }
     catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'la precache derivada falló sin mensaje'; }
   }
   if (execution.ok && decision.verify) {
@@ -312,6 +321,9 @@ export async function prepareRelease({
     refresh_reason: refresh.refresh_reason ?? null,
     facilito_change: gasolina.facilito_change,
     deploy: applied.deploy,
+    // La versión del shell que se sube: dos corridas del mismo código tienen que
+    // dar la misma, aunque cambien los datos.
+    shell: execution.ok ? shell?.cache ?? null : null,
     groups: grupoInforme,
     // Cada fuente que se consultó, con los grupos que juzgó: también los que
     // todavía no publican. Nunca cambia la decisión de publicar.

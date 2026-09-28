@@ -139,6 +139,7 @@ function deps({ publicados = { gasolina: { snapshot_id: 'S1' }, diesel: { snapsh
     writeGroupProjection: (c) => { escritas.push(c.manifest.revision_id); return c; },
     adoptSnapshot: (root, snapshotId, { group, sourceId }) => adoptados.push(`${group}:${snapshotId}:${sourceId}`),
     publicadosDesdeDisco: () => null,
+    buildUi: async () => ({}),
     writeShellManifest: () => {},
     verifyWeb: async () => ({ errors: [] }),
   };

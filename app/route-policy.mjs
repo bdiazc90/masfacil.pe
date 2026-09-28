@@ -17,6 +17,7 @@ const OPERATOR_ONLY = Object.freeze([
   'brand-directory.mjs',
   'brand-sample.mjs',
   'build-catalog.mjs',
+  'build-web.mjs',
   'dump-establishments.mjs',
   'harvest-centers.mjs',
   'identity-pack.mjs',
@@ -39,6 +40,13 @@ const DOCS_FILES = Object.freeze(['LICENSE', 'NOTICE', 'mockup.html']);
 // va en esta lista; si solo pinta o solo lo lee el operador —los logos, por
 // ejemplo—, no.
 const SHARED_WITH_PROJECTION = Object.freeze(['lib/catalog.js', 'lib/bundle-contract.js', 'lib/price-source.js']);
+
+// Fuentes y configuración de la interfaz compilada. Solo deciden `index.html`,
+// `404.html` y `assets/` de `web/`, nunca lo que se proyecta: un cambio aquí
+// recompila y sube el shell reutilizando el bundle publicado. `package.json` y el
+// lockfile no están: cambian dependencias de todo el repositorio.
+// Norma: si una de estas piezas llega a decidir datos publicados, sale de aquí.
+const SHELL_BUILD = Object.freeze(['vite.config.mjs', 'pipeline/ui-build.mjs']);
 
 export const ROUTES = Object.freeze(['docs', 'shell', 'data', 'project']);
 
@@ -70,6 +78,8 @@ export function classifyPath(rawPath) {
   // Norma: si un módulo de aquí llega a importarse desde el camino de precios,
   // deja de pertenecer a este directorio.
   if (head === 'pipeline' && rest[0] === 'history') return 'operator';
+  // Las fuentes de la interfaz y su build: se recompila y se sube el shell.
+  if (head === 'ui' || SHELL_BUILD.includes(parts.join('/'))) return 'shell';
   if (parts.length === 1 && (DOCS_FILES.includes(head) || head.endsWith('.md'))) return 'docs';
   return 'projection';
 }

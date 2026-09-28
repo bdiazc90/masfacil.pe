@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 import { redirectRules, resolvePath } from '../web/lib/routes.js';
-import { readPreference, writePreference } from '../web/preference.js';
+import { readPreference, writePreference } from '../ui/preference.js';
 
 const vista = (pathname, preference) => resolvePath(pathname, { preference });
 

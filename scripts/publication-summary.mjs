@@ -50,6 +50,8 @@ if (stage === 'deploy') {
   // «Prevista», no «hecha»: el preflight y la subida vienen después y tienen su
   // propio resumen. Decir «deploy: sí» aquí hacía creer que ya estaba publicado.
   lineas.push(`| entrega prevista | ${decision.deploy ? 'sí — pendiente de preflight y subida' : 'no'} |`);
+  // Con el mismo código, la misma versión: un cambio solo de datos no la mueve.
+  if (informe.shell) lineas.push(`| shell | \`${informe.shell}\` |`);
 
   // Lo que antes imprimía el bloque inline del workflow: la causa del rechazo,
   // la detección de validadores y los guardrails que se dispararon.

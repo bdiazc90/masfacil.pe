@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 // Verifica lo que se va a publicar: el bundle de datos, que el CLIENTE nuevo lo
-// acepte, que la precache derivada esté al día y que los logos registrados
-// existan, sean SVG saneado y viajen en esa precache.
+// acepte, que la interfaz compilada salga de las fuentes actuales, que la
+// precache derivada esté al día y que los logos registrados existan, sean SVG
+// saneado y viajen en esa precache. Verificar no compila ni repara: un build
+// ausente, viejo o alterado es un error, no algo que se regenera en silencio.
 //
 //   npm run verify:web                      árbol local
 //   npm run verify:web -- --origin <url>     además, contra el origen público
@@ -25,11 +27,12 @@ import { PUBLISHED_GROUPS, dataCacheRules } from '../pipeline/groups.mjs';
 import { GROUP_CONTRACTS } from '../web/group-contracts.js';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
 import { SERVICE_WORKER_MAIN, renderServiceWorker, renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
+import { UI_PAGES, uiBuildProblems } from '../pipeline/ui-build.mjs';
 import { fetchLiveGroups } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { appPaths, historyPath, redirectRules, redirects, viewPath } from '../web/lib/routes.js';
 import { ACTIVE_VIEWS, VIEWS } from '../web/lib/catalog.js';
-import { ANALYTICS_BEACON, ANALYTICS_ENDPOINT, NOT_FOUND_MARKER, brandAssetProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile } from '../app/shell-assets.mjs';
+import { ANALYTICS_BEACON, ANALYTICS_ENDPOINT, NOT_FOUND_MARKER, brandAssetProblems, htmlResourceProblems, inlineProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile, withoutPagesAnalytics } from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -87,16 +90,19 @@ export function dataHeaderProblems(cabeceras, reglas = dataCacheRules()) {
 /**
  * La tabla de rutas contra un origen: la app en cada vista, cada 301 con su
  * destino exacto y 404 propio en lo demás. Sirve para producción y para el
- * servidor local, que tienen que responder lo mismo.
+ * servidor local, que tienen que responder lo mismo. «La app» es la portada
+ * compilada de este árbol, byte a byte salvo la inyección de Pages Analytics:
+ * los nombres de sus módulos cambian con cada build.
  */
-export async function routeProblems(origin) {
+export async function routeProblems(origin, { root = rootFromModule } = {}) {
   const problemas = [];
+  const portada = fs.readFileSync(path.join(root, 'web', 'index.html'), 'utf8');
   const pedir = (ruta) => fetch(new URL(ruta, origin), { redirect: 'manual', cache: 'no-store' });
   for (const ruta of ['/', ...appPaths()]) {
     try {
       const response = await pedir(ruta);
       const cuerpo = await response.text();
-      if (response.status !== 200 || !cuerpo.includes('src="/app.js"')) problemas.push(`ruta ${ruta} respondió ${response.status} sin la app`);
+      if (response.status !== 200 || withoutPagesAnalytics(cuerpo) !== portada) problemas.push(`ruta ${ruta} respondió ${response.status} sin la portada de este árbol`);
     } catch (error) { problemas.push(`ruta ${ruta}: ${error.message}`); }
   }
   for (const [desde, hacia] of redirects()) {
@@ -148,7 +154,12 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     }));
   }
 
-  // 3. Precache: se DERIVA aquí y se compara con el módulo generado en disco.
+  // 3. La interfaz compilada: sus bytes en `web/` son los del último build y ese
+  // build salió de las fuentes, la configuración y el lockfile actuales. Un build
+  // viejo coherente consigo mismo no acredita fuentes nuevas.
+  errors.push(...uiBuildProblems({ root }));
+
+  // 3b. Precache: se DERIVA aquí y se compara con el módulo generado en disco.
   // Verificar no genera: publicar con un manifest viejo sería publicar un
   // `addAll` que no corresponde al árbol, y cache-first no lo corregiría nunca.
   const shell = shellManifestProblems({ root });
@@ -202,13 +213,22 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   errors.push(...dataHeaderProblems(cabeceras));
 
   // 6. La página 404 propia: sin ella Pages sirve la portada con 200 para toda
-  // ruta desconocida. Tiene que existir, respetar la CSP y llevar su módulo en
-  // la precache derivada.
+  // ruta desconocida. Tiene que existir, respetar la CSP y cargar su hoja y su
+  // módulo de tema. Se verifica por lo que usa, no por nombres de archivo.
   const notFoundPath = path.join(root, 'web', '404.html');
   if (!fs.existsSync(notFoundPath)) errors.push('falta web/404.html: Pages serviría la portada con 200 para cualquier ruta desconocida');
   else errors.push(...notFoundPageProblems(fs.readFileSync(notFoundPath, 'utf8')));
-  if (!shell.derived.entries.includes('/404.js')) errors.push('/404.js no está en la precache derivada');
   if (!shell.derived.entries.includes('/404.html')) errors.push('/404.html no está en la precache derivada: sin red no habría 404 propia');
+  // Lo que carga cada página existe, es propio, va por ruta absoluta —una vista
+  // anidada no lo pediría bajo `/combustibles/…`— y viaja en la precache.
+  const precache = new Set(shell.derived.entries);
+  const existe = (ruta) => { const archivo = path.join(root, 'web', ruta); return !ruta.split('/').includes('..') && fs.existsSync(archivo) && fs.statSync(archivo).isFile(); };
+  for (const pagina of UI_PAGES) {
+    const archivo = path.join(root, 'web', pagina);
+    if (!fs.existsSync(archivo)) continue;
+    const html = fs.readFileSync(archivo, 'utf8');
+    errors.push(...inlineProblems(pagina, html), ...htmlResourceProblems(pagina, html, { exists: existe, precache }));
+  }
 
   // 6b. Las reglas del hosting son las de la tabla de rutas, una a una y en el
   // mismo orden: el cliente, el service worker y el servidor local usan la tabla.
@@ -265,7 +285,7 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     // módulos que solo él importa, estén donde estén. La única alteración que se
     // descuenta es el bloque que Pages Analytics inyecta en el HTML servido,
     // delimitado por su propio comentario; cualquier otra diferencia cuenta.
-    const sinAnalytics = (bytes) => Buffer.from(bytes.toString('utf8').replace(/<!-- Cloudflare Pages Analytics -->[\s\S]*?<!-- Cloudflare Pages Analytics -->/g, ''));
+    const sinAnalytics = (bytes) => Buffer.from(withoutPagesAnalytics(bytes.toString('utf8')));
     const publicados = [...new Set([...shell.derived.entries, '/sw.js', ...(shell.derived.worker ?? []).map((relativo) => `/${relativo}`)])];
     const generados = { '/shell-manifest.js': renderShellManifest, '/sw.js': renderServiceWorker };
     const comparados = await Promise.all(publicados.map(async (entry) => {
@@ -282,7 +302,7 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     errors.push(...comparados.filter(Boolean));
 
     // 10. Las rutas, tal como responde el origen.
-    errors.push(...(await routeProblems(origin)).map((motivo) => `origen público · ${motivo}`));
+    errors.push(...(await routeProblems(origin, { root })).map((motivo) => `origen público · ${motivo}`));
   }
 
   const variantes = [...brandAssets(BRAND_LOGOS)].length;

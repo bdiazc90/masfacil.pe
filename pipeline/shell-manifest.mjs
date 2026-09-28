@@ -7,21 +7,26 @@
  * porque la estrategia es cache-first y nunca revalida. El olvido era
  * estructural: el verificador tuvo que exigir el bump a mano en el ciclo FIX.
  *
- * Aquí la lista sale de las referencias reales del árbol y la versión sale de
- * la huella de esos bytes. Registrar un logo una vez, con su procedencia, ya
- * mete su SVG en la precache; cambiar un byte de `styles.css` ya cambia la
- * versión. No hay segundo paso que olvidar.
+ * Aquí la lista sale de lo que emitió el build de la interfaz (su constancia en
+ * `.local-cache/ui-build/`), de lo que cargan las dos páginas compiladas y del
+ * registro de marcas; la versión sale de la huella de esos bytes. Registrar un
+ * logo una vez, con su procedencia, ya mete su SVG en la precache; cambiar un
+ * byte de `ui/styles.css` y recompilar ya cambia la versión. No hay segundo paso
+ * que olvidar.
  *
- * Se deriva de REFERENCIAS y de REGLAS, nunca del directorio: un archivo suelto
- * dentro de `web/` no viaja por estar ahí. Un SVG de marca entra solo si es una
- * variante registrada en `BRAND_LOGOS` —el mismo recorrido `brandAssets()` que
- * usan el verificador y la tarjeta—, y un icono solo si lo referencia
- * `index.html` o el manifiesto de la PWA.
+ * Se deriva de REFERENCIAS y de REGLAS, nunca escaneando el directorio: un
+ * archivo suelto dentro de `web/` no viaja por estar ahí. Un SVG de marca entra
+ * solo si es una variante registrada en `BRAND_LOGOS` —el mismo recorrido
+ * `brandAssets()` que usan el verificador y la tarjeta—, y un icono solo si lo
+ * carga una de las páginas o lo declara el manifiesto de la PWA. Los módulos que
+ * comparten la proyección y el worker (`web/lib/`, los contratos) viajan dentro
+ * del bundle compilado; la página no los pide sueltos.
  *
  * El mismo paso genera `web/sw.js`, el script que registra el navegador: un
  * import de la lógica (`sw-main.js`) y la versión. Chrome no reinstala un
  * service worker de módulos cuando cambia solo un import, así que la versión
- * tiene que vivir en los bytes del script registrado.
+ * tiene que vivir en los bytes del script registrado. El grafo del worker se
+ * recorre sobre sus fuentes sin compilar: `moduleGraph` no lee salidas de Vite.
  */
 
 import crypto from 'node:crypto';
@@ -29,7 +34,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
-import { moduleGraph, shellEntryFile, svgProblems } from '../app/shell-assets.mjs';
+import { htmlResources, moduleGraph, shellEntryFile, svgProblems } from '../app/shell-assets.mjs';
+import { UI_PAGES, readUiBuild } from './ui-build.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -43,27 +49,38 @@ const GENERADOS = Object.freeze(['shell-manifest.js', 'sw.js']);
 /** El worker se sirve aparte y el manifest se importa desde él: ninguno se precachea. */
 const FUERA_DE_LA_PRECACHE = new Set([...GENERADOS, SERVICE_WORKER_MAIN]);
 
-const ordenar = (valores) => [...new Set(valores)].sort((a, b) => a.localeCompare(b, 'en'));
+// Por unidades de código, no por idioma: la versión no puede depender del ICU
+// de cada Node (CI compila con 22, un equipo local puede tener otro).
+const ordenar = (valores) => [...new Set(valores)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-/** `.js` sí, `.mjs` no: una herramienta suelta en `web/` no sería shell. */
-function modulosDelCliente(webRoot) {
-  const raiz = fs.readdirSync(webRoot, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.js') && !FUERA_DE_LA_PRECACHE.has(entry.name))
-    .map((entry) => `/${entry.name}`);
-  const libDir = path.join(webRoot, 'lib');
-  const lib = fs.existsSync(libDir)
-    ? fs.readdirSync(libDir, { withFileTypes: true }).filter((entry) => entry.isFile() && entry.name.endsWith('.js')).map((entry) => `/lib/${entry.name}`)
-    : [];
-  return [...ordenar(raiz), ...ordenar(lib)];
+/**
+ * Lo que emitió el build de la interfaz, según su constancia: páginas, módulos,
+ * hojas y lo que Vite deje en `assets/`. Sin un build completo no hay shell.
+ */
+function compilados(root, problems) {
+  const build = readUiBuild({ root });
+  if (build?.status !== 'complete') {
+    problems.push(build ? `el build de la interfaz no terminó (${build.status}); ejecuta npm run build` : 'falta el build de la interfaz; ejecuta npm run build');
+    return [];
+  }
+  return Object.keys(build.outputs ?? {}).map((relativo) => `/${relativo}`);
 }
 
-/** Iconos referenciados por el HTML y por el manifiesto de la PWA. */
-function iconosReferenciados(webRoot) {
-  const html = fs.readFileSync(path.join(webRoot, 'index.html'), 'utf8');
-  const desdeLinks = [...html.matchAll(/<link\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi)].map((match) => match[1]);
+/** Recursos propios que cargan las páginas compiladas: hojas, módulos, precargas, manifiesto e iconos. */
+function cargadosPorLasPaginas(webRoot, problems) {
+  const rutas = [];
+  for (const pagina of UI_PAGES) {
+    const archivo = path.join(webRoot, pagina);
+    if (!fs.existsSync(archivo)) { problems.push(`falta web/${pagina}; ejecuta npm run build`); continue; }
+    for (const { url } of htmlResources(fs.readFileSync(archivo, 'utf8'))) if (url.startsWith('/') && !url.startsWith('//')) rutas.push(url.replace(/[?#].*$/, ''));
+  }
+  return rutas;
+}
+
+/** Iconos que declara el manifiesto de la PWA. */
+function iconosDelManifiesto(webRoot) {
   const manifiesto = JSON.parse(fs.readFileSync(path.join(webRoot, 'manifest.webmanifest'), 'utf8'));
-  const desdeManifiesto = (manifiesto.icons ?? []).map((icon) => icon.src);
-  return ordenar([...desdeLinks, ...desdeManifiesto].filter((ruta) => ruta.startsWith('/icons/')));
+  return (manifiesto.icons ?? []).map((icon) => icon.src);
 }
 
 /**
@@ -83,9 +100,14 @@ export function deriveShell({ root = rootFromModule } = {}) {
     for (const motivo of svgProblems(fs.readFileSync(archivo, 'utf8'))) problems.push(`${key}.${role}: ${ruta} ${motivo}`);
     marcas.push(ruta);
   }
-  // La 404 propia viaja en la precache: sin red, el service worker la devuelve
-  // con su estado para cualquier dirección que no sea una vista.
-  const entries = ['/', '/404.html', '/styles.css', '/manifest.webmanifest', ...modulosDelCliente(webRoot), ...iconosReferenciados(webRoot), ...ordenar(marcas)];
+  // Las dos páginas primero: la portada es cada vista, y la 404 propia viaja en
+  // la precache porque sin red el service worker la devuelve con su estado para
+  // cualquier dirección que no sea una vista. Después, ordenado, todo lo que
+  // emitió el build, lo que cargan las páginas, los iconos y las marcas.
+  const paginas = new Set(['/', ...UI_PAGES.map((pagina) => `/${pagina}`)]);
+  const resto = [...compilados(root, problems), ...cargadosPorLasPaginas(webRoot, problems), ...iconosDelManifiesto(webRoot), ...marcas]
+    .filter((entry) => !paginas.has(entry) && !FUERA_DE_LA_PRECACHE.has(entry.replace(/^\//, '')));
+  const entries = ['/', '/404.html', ...ordenar(resto)];
 
   const hash = crypto.createHash('sha256').update(`${JSON.stringify(entries)}\n`);
   for (const entry of entries) {
@@ -120,9 +142,9 @@ export function deriveShell({ root = rootFromModule } = {}) {
 export function renderShellManifest({ entries, cache }) {
   return [
     '// GENERADO por pipeline/shell-manifest.mjs. No editar a mano ni versionar.',
-    '// La lista sale de las referencias del árbol y del registro de marcas; la',
-    '// versión sale de la huella de esos bytes. Cambiar un archivo del shell',
-    '// cambia SHELL_CACHE y reinstala el service worker.',
+    '// La lista sale del build de la interfaz, de lo que cargan sus páginas y del',
+    '// registro de marcas; la versión sale de la huella de esos bytes. Cambiar un',
+    '// archivo del shell cambia SHELL_CACHE y reinstala el service worker.',
     `export const SHELL = ${JSON.stringify(entries)};`,
     `export const SHELL_CACHE = '${cache}';`,
     '',
@@ -171,7 +193,7 @@ export function shellManifestProblems({ root = rootFromModule } = {}) {
   const problems = [];
   for (const [relativo, esperado] of [[SHELL_MANIFEST_RELATIVE, renderShellManifest(derived)], [SERVICE_WORKER_RELATIVE, renderServiceWorker(derived)]]) {
     const destino = path.join(root, relativo);
-    if (!fs.existsSync(destino)) problems.push(`falta ${relativo}; ejecuta npm run serve o npm run publish para generarlo`);
+    if (!fs.existsSync(destino)) problems.push(`falta ${relativo}; ejecuta npm run build para generarlo`);
     else if (fs.readFileSync(destino, 'utf8') !== esperado) problems.push(`${relativo} no coincide con el árbol; la precache derivada es ${derived.cache}`);
   }
   return { derived, problems };

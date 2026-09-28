@@ -1,14 +1,14 @@
 import { loadView } from './data-client.js';
-import { PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM } from './lib/haversine.js';
-import { concordancia, formatRadius } from './lib/decision-view.js';
-import { MAX_OFFER_AGE_DAYS } from './lib/freshness.js';
-import { createSearch, districtsFrom, evaluateRows, resultsView, startResults, withDistances, withPrice } from './lib/search.js';
-import { safeGoogleMapsDirectionsUrl } from './lib/directions.js';
+import { PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM } from '../web/lib/haversine.js';
+import { concordancia, formatRadius } from '../web/lib/decision-view.js';
+import { MAX_OFFER_AGE_DAYS } from '../web/lib/freshness.js';
+import { createSearch, districtsFrom, evaluateRows, resultsView, startResults, withDistances, withPrice } from '../web/lib/search.js';
+import { safeGoogleMapsDirectionsUrl } from '../web/lib/directions.js';
 import { visibleDistricts } from './district-list.js';
 import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
-import { ACTIVE_VIEWS, PRODUCTS, VIEWS } from './lib/catalog.js';
+import { ACTIVE_VIEWS, PRODUCTS, VIEWS } from '../web/lib/catalog.js';
 import { createLocator } from './geolocation.js';
-import { historyPath, resolvePath, viewPath } from './lib/routes.js';
+import { historyPath, resolvePath, viewPath } from '../web/lib/routes.js';
 import { readPreference, writePreference } from './preference.js';
 import { prepareServiceWorker } from './service-worker-ready.js';
 import { initTheme } from './theme.js';
@@ -480,8 +480,12 @@ function switchView(view, { fromHistory = false } = {}) {
 // orden permanente. Localizar es siempre un gesto.
 async function initialize() {
   // Sin un worker listo los datos se piden igual a la red: esperar un
-  // controlador compatible es una mejora, no una condición.
-  try { await prepareServiceWorker(); } catch (error) { console.error(error); }
+  // controlador compatible es una mejora, no una condición. `npm run dev` no
+  // registra el worker de producción: su caché taparía los cambios en caliente.
+  // En el build `import.meta.env.DEV` es `false` y la condición desaparece.
+  if (!import.meta.env.DEV) {
+    try { await prepareServiceWorker(); } catch (error) { console.error(error); }
+  }
   await loadActiveView();
 }
 

@@ -18,13 +18,19 @@ La app nunca afirma stock, horario, descuentos o disponibilidad. Los precios de 
 
 ## Uso local
 
-Requiere Node.js. Servir la PWA y proyectar datos no necesita dependencias; el
-observador del histórico sí, porque firma peticiones S3:
+Requiere Node.js y pnpm. La interfaz vive en `ui/` y Vite la compila hacia
+`web/`, que es exactamente lo que se publica. Proyectar datos no necesita
+dependencias; compilar, servir y el observador del histórico sí:
 
 ```bash
-npm run serve          # http://127.0.0.1:4173
-pnpm install           # solo para npm run history:observe
+pnpm install           # versiones exactas del lockfile
+npm run build          # compila ui/ hacia web/ y deriva la precache
+npm run serve          # compila y sirve lo publicable en http://127.0.0.1:4173
+npm run dev            # Vite con recarga en caliente en http://127.0.0.1:5173
 ```
+
+`npm run dev` es para editar: no registra el service worker ni aplica la CSP,
+la 404 real o el modo sin red. Eso se comprueba con `npm run serve`.
 
 Para ver datos reales hace falta el bundle. Dos formas:
 
@@ -33,11 +39,17 @@ npm run fetch:live -- https://masfacil.pe   # trae el bundle público ya validad
 npm run project                              # o proyecta desde .local-cache/ autorizado
 ```
 
-`web/data/`, `web/shell-manifest.js` y `web/sw.js` se generan y nunca viven en
-Git. Los dos últimos son la precache del service worker y el script que lleva su
-versión (la lógica vive en `web/sw-main.js`): `npm run serve` y `npm run publish`
-los derivan del contenido, así que cambiar un CSS o registrar un logo no exige
-recordar ningún número de versión.
+`web/data/`, la interfaz compilada (`web/index.html`, `web/404.html` y
+`web/assets/`), `web/shell-manifest.js` y `web/sw.js` se generan y nunca viven en
+Git. Las reglas que comparten la interfaz, la proyección y el service worker
+siguen en `web/lib/`. Los dos últimos generados son la precache del service
+worker y el script que lleva su versión (la lógica vive en `web/sw-main.js`):
+`npm run build`, `npm run serve` y `npm run publish` los derivan de lo que emitió
+el build, de lo que cargan sus páginas y del registro de marcas, así que cambiar
+un CSS o registrar un logo no exige recordar ningún número de versión. La
+constancia del build queda en `.local-cache/ui-build/`, y `npm run verify:web`
+rechaza una interfaz compilada que no corresponda a las fuentes, la
+configuración y el lockfile actuales.
 
 ## Operación
 
@@ -71,6 +83,8 @@ La consulta web necesita `agent-browser` y su navegador; nada de eso viaja a
 el CSV, y el resumen de la corrida lo dice.
 
 Recuperar: `npm run rollback -- <snapshot-id>` reconstruye y valida ambos productos **antes** de mover el pointer, y restaura el anterior si algo falla. Un fallo de identidad comercial no impide recuperar. El rollback vuelve a CSV puro y nunca consulta la web; para restaurar también la consulta exacta de una entrega, `npm run rollback -- <snapshot-id> <revision-id>`.
+
+Volver a una interfaz anterior: el rollback de Pages recupera aquel deployment entero, datos incluidos, y el siguiente deploy de CI lo reemplaza con lo que haya en `main`. Para que dure, se revierte el cambio en `main`: CI compila la interfaz anterior con los datos vigentes. Cualquier `web/` que se vaya a subir a mano pasa antes por `npm run build` y `npm run verify:web`.
 
 ## Histórico de precios
 
@@ -106,8 +120,9 @@ Detalle de fuentes, permisos y degradación: [docs/datos.md](docs/datos.md).
 ## Proyecto
 
 ```text
-web/         PWA estática
-pipeline/    transformación a snapshots públicos
+ui/          fuentes de la interfaz; Vite las compila hacia web/
+web/         lo publicado: interfaz compilada, datos, iconos, worker y reglas compartidas
+pipeline/    transformación a snapshots públicos y build de la interfaz
 app/         contratos, validación en runtime, política de ruta y catálogo privado
 scripts/     refresh, publicación, auditoría y rollback
 docs/        fuentes, decisiones y roadmap

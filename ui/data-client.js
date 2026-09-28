@@ -10,9 +10,9 @@
 // El manifest se pide con `?product=`: el service worker anterior lo exige, y
 // durante una actualización puede ser él quien atienda la primera carga.
 
-import { VIEWS } from './lib/catalog.js';
-import { GROUP_CONTRACTS } from './group-contracts.js';
-import { mergeProducts } from './lib/merge-products.js';
+import { VIEWS } from '../web/lib/catalog.js';
+import { GROUP_CONTRACTS } from '../web/group-contracts.js';
+import { mergeProducts } from '../web/lib/merge-products.js';
 
 const ESPERAS_MS = Object.freeze([300, 900]);
 const desdeCopia = (response) => response.headers.get('X-Masfacil-Data-Mode') === 'saved';

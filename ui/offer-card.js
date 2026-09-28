@@ -1,5 +1,5 @@
-import { brandAssetFor } from './brand-logos.js';
-import { GASOLINA_KEYS, PRODUCTS } from './lib/catalog.js';
+import { brandAssetFor } from '../web/brand-logos.js';
+import { GASOLINA_KEYS, PRODUCTS } from '../web/lib/catalog.js';
 
 export const UNVERIFIED_STATION_LABEL = 'Estación sin nombre verificado';
 

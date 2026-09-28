@@ -124,8 +124,8 @@ que el producto no miente: se diseñan con el mismo cuidado que el camino feliz.
 
 ## 6 · Sistema visual
 
-**Tokens.** La fuente de verdad son las custom properties de `web/styles.css`: el tema
-claro en `:root`, el oscuro en `:root[data-theme="dark"]`. `web/theme.js` fija siempre
+**Tokens.** La fuente de verdad son las custom properties de `ui/styles.css`: el tema
+claro en `:root`, el oscuro en `:root[data-theme="dark"]`. `ui/theme.js` fija siempre
 `light` o `dark` (la opción «sistema» se resuelve ahí), así que el CSS nunca depende de
 `prefers-color-scheme`.
 
@@ -233,7 +233,7 @@ Android de gama baja se paga solo si mejora la decisión.
 Principios, no catálogo. Un inventario cerrado de componentes con sus reglas
 exige mantener a mano una copia del código y envejece en cada cambio de UI; lo
 que sigue vigente es cómo debe comportarse cualquier control de esta interfaz.
-El detalle de cada componente vive en `web/*.js` y `web/styles.css`.
+El detalle de cada componente vive en `ui/*.js` y `ui/styles.css`.
 
 - **Un control, una cosa.** Ordenar no filtra; filtrar no ordena. Un control cuyo
   efecto no se puede nombrar en una línea está haciendo dos cosas.
@@ -287,7 +287,7 @@ Piso no negociable, verificado y no asumido.
   —la curva y la recta del promedio— ≥ 3:1. La prueba es `node scripts/contrast.mjs`:
   imprime cada razón y falla bajo el mínimo. Se corre a mano al tocar un token, no en CI.
   Añadir un fondo nuevo sin añadirlo ahí deja el script en verde sin acreditar nada.
-  **La sonda no guarda paleta: lee los valores vigentes de `web/styles.css`** —los colores
+  **La sonda no guarda paleta: lee los valores vigentes de `ui/styles.css`** —los colores
   de tema, las opacidades y los pesos de cada mezcla, sacados de la receta que de verdad
   los pinta—. Lo que sí declara son los nombres de los roles y los mínimos: ese es su
   contrato, no una segunda configuración visual. Un rol ausente o un valor que no sepa

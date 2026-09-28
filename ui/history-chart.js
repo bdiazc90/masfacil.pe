@@ -27,10 +27,10 @@
  * un lector de pantalla anuncie lo que la persona eligió y no toda la gráfica.
  */
 
-import { HISTORY_MAX_DAYS, HISTORY_ORIGIN, HISTORY_PRODUCTS, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from './lib/history-contract.js';
-import { DEFAULT_WINDOW, STALE_HOURS, areaPath, demoSummary, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, staleHours } from './lib/history-series.js';
+import { HISTORY_MAX_DAYS, HISTORY_ORIGIN, HISTORY_PRODUCTS, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from '../web/lib/history-contract.js';
+import { DEFAULT_WINDOW, STALE_HOURS, areaPath, demoSummary, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, staleHours } from '../web/lib/history-series.js';
 import { escapeHtml } from './offer-card.js';
-import { PRODUCTS } from './lib/catalog.js';
+import { PRODUCTS } from '../web/lib/catalog.js';
 
 const GUARDADO = 'masfacil-history-daily-v1';
 const DIA_CORTO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', timeZone: 'UTC' });

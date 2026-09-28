@@ -11,7 +11,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { loadView } from '../web/data-client.js';
+import { loadView } from '../ui/data-client.js';
 import { bundleGasolina } from './fixtures/gasolina-bundle.mjs';
 
 const R1 = bundleGasolina({ revision: 'gasolina-2026-09-06-prueba-000000000001', precio: 15.49 });

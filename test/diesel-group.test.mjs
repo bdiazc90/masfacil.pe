@@ -127,6 +127,7 @@ function deps({ publicados = { gasolina: { snapshot_id: 'S1' }, diesel: { snapsh
     adoptSnapshot: (root, snapshotId, { group }) => adoptados.push(`${group}:${snapshotId}`),
     // La consulta web siempre mueve algo: aquí se mira la decisión por grupo.
     publicadosDesdeDisco: () => null,
+    buildUi: async () => ({}),
     writeShellManifest: () => {},
     verifyWeb: async () => ({ errors: [] }),
   };
@@ -177,4 +178,17 @@ test('la ruta shell no compone y exige todos los grupos', async () => {
   assert.deepEqual([r.decision.action, r.decision.deploy, compuso], ['deploy_existing_bundle', true, false]);
   const sinDiesel = await prepareRelease({ route: 'shell', deps: { ...base, verifyWeb: async () => ({ errors: ['Falta web/data/diesel/manifest.json'] }) } });
   assert.deepEqual([sinDiesel.ok, sinDiesel.decision.deploy], [false, false]);
+});
+
+test('un build de la interfaz que falla no deriva, no verifica ni publica', async () => {
+  const pasos = [];
+  const base = deps();
+  const r = await prepareRelease({ route: 'shell', deps: { ...base, buildUi: async () => { pasos.push('build'); throw new Error('vite: error de sintaxis'); }, writeShellManifest: () => { pasos.push('shell'); }, verifyWeb: async () => { pasos.push('verify'); return { errors: [] }; } } });
+  assert.deepEqual([r.ok, r.decision.deploy, r.execution.stage, pasos], [false, false, 'build', ['build']]);
+  assert.match(r.execution.error, /error de sintaxis/);
+  // Con build sano, el orden es build → precache → verificación, y el informe
+  // lleva la versión del shell.
+  const orden = [];
+  const bien = await prepareRelease({ route: 'shell', deps: { ...base, buildUi: async () => { orden.push('build'); }, writeShellManifest: () => { orden.push('shell'); return { cache: 'masfacil-shell-prueba' }; }, verifyWeb: async () => { orden.push('verify'); return { errors: [] }; } } });
+  assert.deepEqual([bien.ok, bien.decision.deploy, orden, bien.informe.shell], [true, true, ['build', 'shell', 'verify'], 'masfacil-shell-prueba']);
 });

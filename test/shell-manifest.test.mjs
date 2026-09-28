@@ -6,6 +6,10 @@
 // Chrome no reinstala un worker de módulos cuando cambia solo un import: la
 // versión va en el script registrado, y su huella cubre el grafo del worker.
 //
+// La precache sale del build de la interfaz y de lo que cargan sus páginas, no
+// de escanear `web/`. Aquí el build se simula sin Vite: dos páginas y sus assets
+// instalados por el mismo instalador que usa el build real.
+//
 // node --test test/
 // Vive fuera de `web/`, que es exactamente lo que se publica.
 
@@ -17,15 +21,56 @@ import test from 'node:test';
 
 import { moduleGraph } from '../app/shell-assets.mjs';
 import { deriveShell, renderServiceWorker, shellManifestProblems, writeShellManifest } from '../pipeline/shell-manifest.mjs';
+import { installUiBuild } from '../pipeline/ui-build.mjs';
+
+// Lo generado no se copia: ni datos, ni la interfaz compilada, ni la precache.
+const GENERADOS = new Set(['data', 'assets', 'index.html', '404.html', 'sw.js', 'shell-manifest.js']);
+
+/** Instala un build simulado: la portada, la 404 y sus assets. */
+function simularBuild(raiz, { css = 'body{color:black}\n', app = 'console.log(1);\n' } = {}) {
+  const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'masfacil-staging-'));
+  const archivos = {
+    'assets/app.js': app,
+    'assets/404.js': 'import "./tema.js";\n',
+    'assets/tema.js': 'export const t = 1;\n',
+    'assets/estilo.css': css,
+    'index.html': '<!doctype html><head><link rel="manifest" href="/manifest.webmanifest"><link rel="icon" href="/icons/logo.svg"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><script type="module" crossorigin src="/assets/app.js"></script><link rel="modulepreload" crossorigin href="/assets/tema.js"><link rel="stylesheet" crossorigin href="/assets/estilo.css"></head><body><img src="/icons/logo.svg" alt=""></body>\n',
+    '404.html': '<!doctype html><head><script type="module" crossorigin src="/assets/404.js"></script><link rel="modulepreload" crossorigin href="/assets/tema.js"><link rel="stylesheet" crossorigin href="/assets/estilo.css"></head><body><h1>No encontramos esta página</h1><a href="/">Ir a la portada</a></body>\n',
+  };
+  for (const [relativo, texto] of Object.entries(archivos)) {
+    fs.mkdirSync(path.dirname(path.join(staging, relativo)), { recursive: true });
+    fs.writeFileSync(path.join(staging, relativo), texto);
+  }
+  try {
+    return installUiBuild({ root: raiz, stagingDir: staging, archivos: Object.keys(archivos), inputs: {}, manifest: { 'index.html': { file: 'assets/app.js', isEntry: true }, '404.html': { file: 'assets/404.js', isEntry: true } }, versiones: { vite: 'simulada' } });
+  } finally { fs.rmSync(staging, { recursive: true, force: true }); }
+}
 
 function conCopiaDeWeb(prueba) {
   const raiz = fs.mkdtempSync(path.join(os.tmpdir(), 'masfacil-shell-'));
   try {
     const origen = path.resolve(new URL('..', import.meta.url).pathname, 'web');
-    fs.cpSync(origen, path.join(raiz, 'web'), { recursive: true, filter: (src) => !path.relative(origen, src).startsWith('data') });
+    fs.cpSync(origen, path.join(raiz, 'web'), { recursive: true, filter: (src) => !GENERADOS.has(path.relative(origen, src).split(path.sep)[0]) });
+    simularBuild(raiz);
     prueba(raiz, (relativo) => path.join(raiz, 'web', relativo));
   } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
 }
+
+test('la precache sale del build y de lo que cargan sus páginas, no de escanear web/', () => conCopiaDeWeb((raiz, web) => {
+  fs.writeFileSync(web('suelto.js'), 'export const SUELTO = 1;\n');
+  const { entries, problems } = deriveShell({ root: raiz });
+  assert.deepEqual(problems, []);
+  assert.deepEqual(entries.slice(0, 2), ['/', '/404.html']);
+  for (const entry of ['/assets/app.js', '/assets/404.js', '/assets/tema.js', '/assets/estilo.css', '/manifest.webmanifest', '/icons/logo.svg', '/icons/apple-touch-icon.png', '/icons/icon-192.png']) assert.ok(entries.includes(entry), entry);
+  assert.ok(entries.some((entry) => entry.startsWith('/icons/brands/')), 'las marcas registradas viajan');
+  // Lo que el bundle ya lleva dentro no se pide suelto, y un archivo suelto no viaja por estar ahí.
+  for (const entry of ['/suelto.js', '/brand-logos.js', '/lib/catalog.js', '/group-contracts.js', '/sw-cache-policy.js', '/sw-main.js', '/sw.js', '/shell-manifest.js', '/index.html']) assert.ok(!entries.includes(entry), entry);
+}));
+
+test('sin un build completo no hay shell', () => conCopiaDeWeb((raiz) => {
+  fs.rmSync(path.join(raiz, '.local-cache'), { recursive: true, force: true });
+  assert.match(deriveShell({ root: raiz }).problems.join('; '), /falta el build de la interfaz/);
+}));
 
 test('cambiar web/_headers cambia la versión del shell, no su lista', () => conCopiaDeWeb((raiz, web) => {
   const antes = deriveShell({ root: raiz });
@@ -36,6 +81,18 @@ test('cambiar web/_headers cambia la versión del shell, no su lista', () => con
   assert.notEqual(despues.cache, antes.cache);
 }));
 
+test('los datos no mueven la versión; la interfaz compilada y un icono que se carga, sí', () => conCopiaDeWeb((raiz, web) => {
+  const base = deriveShell({ root: raiz }).cache;
+  fs.mkdirSync(web('data/gasolina'), { recursive: true });
+  fs.writeFileSync(web('data/gasolina/manifest.json'), '{"revision_id":"otra"}\n');
+  assert.equal(deriveShell({ root: raiz }).cache, base, 'cambiar solo datos no cambia el shell');
+  simularBuild(raiz, { css: 'body{color:red}\n' });
+  const conOtraHoja = deriveShell({ root: raiz }).cache;
+  assert.notEqual(conOtraHoja, base);
+  fs.appendFileSync(web('icons/logo.svg'), '\n');
+  assert.notEqual(deriveShell({ root: raiz }).cache, conOtraHoja);
+}));
+
 test('la versión y los bytes de sw.js siguen al shell y a todo el grafo del worker', () => conCopiaDeWeb((raiz, web) => {
   const versiones = [deriveShell({ root: raiz })];
   assert.deepEqual(versiones[0].problems, []);
@@ -43,7 +100,7 @@ test('la versión y los bytes de sw.js siguen al shell y a todo el grafo del wor
   assert.ok(!versiones[0].entries.includes('/sw-main.js'), 'la lógica del worker no se precachea');
   assert.ok(versiones[0].worker.includes('lib/catalog.js') && versiones[0].worker.includes('shell-manifest.js'));
 
-  fs.appendFileSync(web('styles.css'), '\n/* un byte del shell */\n');
+  simularBuild(raiz, { app: 'console.log(2);\n' });
   versiones.push(deriveShell({ root: raiz }));
   fs.appendFileSync(web('sw-main.js'), '\n// solo la lógica del worker\n');
   versiones.push(deriveShell({ root: raiz }));

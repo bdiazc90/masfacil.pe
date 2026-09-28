@@ -19,7 +19,7 @@
 /* ── Tema ──────────────────────────────────────────────────────────────
    Los neutros son `oklch()` con sus tres valores escritos: para saber de qué
    color es una superficie se lee aquí, no se resuelve una cadena de knobs.
-   `web/theme.js` fija `data-theme` en claro u oscuro, así que el CSS nunca
+   `ui/theme.js` fija `data-theme` en claro u oscuro, así que el CSS nunca
    depende de `prefers-color-scheme`.
    `node scripts/contrast.mjs` lee ESTE bloque: no guarda una segunda paleta. */
 :root{
