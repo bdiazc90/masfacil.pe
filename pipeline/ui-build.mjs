@@ -229,8 +229,13 @@ export async function buildUi({ root = rootFromModule, compile = compilar } = {}
   try {
     const antes = Object.fromEntries(vigiladas(root).filter((relativo) => esArchivo(path.join(root, relativo))).map((relativo) => [relativo, huellaDe(path.join(root, relativo))]));
     const { modulos, versiones } = await compile({ root, stagingDir });
-    const ajenos = [...modulos].filter((id) => /vite\/preload-helper|__vite-browser-external/.test(id));
-    if (ajenos.length) throw new Error(`El build de la interfaz no es publicable: ${ajenos.map((id) => (id.includes('preload-helper') ? 'hay carga diferida de código' : `un módulo del navegador importa uno de Node (${id.replace(/^\0/, '')})`)).join('; ')}`);
+    // Carga diferida, un `node:` sustituido por un módulo vacío o una librería en
+    // su build de desarrollo (React con sus avisos) no se publican.
+    const motivo = (id) => (id.includes('preload-helper') ? 'hay carga diferida de código'
+      : id.includes('__vite-browser-external') ? `un módulo del navegador importa uno de Node (${id.replace(/^\0/, '')})`
+        : `entra un build de desarrollo (${path.basename(id)})`);
+    const ajenos = [...modulos].filter((id) => /vite\/preload-helper|__vite-browser-external|\.development\.js$/.test(id.replace(/[?#].*$/, '')));
+    if (ajenos.length) throw new Error(`El build de la interfaz no es publicable: ${ajenos.map(motivo).join('; ')}`);
     const { archivos, manifest } = inspectStaging({ stagingDir, webRoot: path.join(root, 'web') });
     const inputs = entradas(root, modulos);
     // Un módulo de `web/` fuera del grafo no es entrada; una fuente de `ui/` o una

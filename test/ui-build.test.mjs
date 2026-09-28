@@ -126,6 +126,17 @@ test('una instalación interrumpida se rechaza, y la siguiente retira lo que que
   assert.match(problemas, /falta web\/assets\/404\.js/);
 });
 
+test('carga diferida, `node:` sustituido o React en modo desarrollo no llegan a instalarse', async () => {
+  const raiz = temporal('masfacil-guardas-');
+  const conModulos = (ids) => async () => ({ modulos: new Set(ids), versiones: {} });
+  for (const [ids, esperado] of [
+    [['/r/ui/app.js', '/r/node_modules/react-dom/cjs/react-dom-client.development.js'], /build de desarrollo \(react-dom-client\.development\.js\)/],
+    [['\0vite/preload-helper.js'], /carga diferida/],
+    [['\0__vite-browser-external:node:fs'], /importa uno de Node/],
+  ]) await assert.rejects(buildUi({ root: raiz, compile: conModulos(ids) }), esperado);
+  assert.ok(!fs.existsSync(path.join(raiz, 'web')), 'nada llegó a web/');
+});
+
 test('la 404 se verifica por lo que usa y cada recurso de una página tiene que viajar en la precache', () => {
   assert.deepEqual(notFoundPageProblems(PAGINAS['404.html']), []);
   assert.match(notFoundPageProblems('<h1>No encontramos esta página</h1><a href="/">x</a>').join('; '), /ninguna hoja.*ningún módulo/);

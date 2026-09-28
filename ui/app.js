@@ -3,9 +3,10 @@ import { PAGE_SIZE, RADIUS_MAX_KM, RADIUS_MIN_KM } from '../web/lib/haversine.js
 import { concordancia, formatRadius } from '../web/lib/decision-view.js';
 import { MAX_OFFER_AGE_DAYS } from '../web/lib/freshness.js';
 import { createSearch, districtsFrom, evaluateRows, resultsView, startResults, withDistances, withPrice } from '../web/lib/search.js';
-import { safeGoogleMapsDirectionsUrl } from '../web/lib/directions.js';
 import { visibleDistricts } from './district-list.js';
-import { displayDistrict, escapeHtml, renderOfferCard, renderOfferDetail } from './offer-card.js';
+import { displayDistrict } from './offer-view.js';
+import { escapeHtml } from './html.js';
+import { mountResults } from './results/mount.jsx';
 import { ACTIVE_VIEWS, PRODUCTS, VIEWS } from '../web/lib/catalog.js';
 import { createLocator } from './geolocation.js';
 import { historyPath, resolvePath, viewPath } from '../web/lib/routes.js';
@@ -53,8 +54,11 @@ else {
 // La ruta del historial es la misma portada con el gráfico enfocado.
 const enHistorial = () => resolvePath(location.pathname).history === true;
 const SCREENS = Object.freeze({ start: 'start-step', loading: 'loading-step', district: 'district-step', compare: 'compare-step', fatal: 'fatal-state' });
-const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offers', 'offers-status', 'offline-note', 'empty-state', 'official-source', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'radius-empty', 'radius-empty-title', 'radius-empty-text', 'load-more', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text', 'sum-fuel', 'view-state', 'view-state-text', 'view-state-action', 'start-retry', 'history-chart', 'menu-history'].map((id) => [id, $(id)]));
+const nodes = Object.fromEntries(['start-step', 'loading-step', 'district-step', 'district-hint', 'compare-step', 'fatal-state', 'data-status', 'districts', 'district-search', 'district-empty', 'compare-title', 'place-icon', 'place-name', 'sum-place', 'sum-criteria', 'sort-toggle', 'price-product-toggle', 'offline-note', 'source-content', 'fatal-message', 'radius-control', 'radius-input', 'radius-readout', 'controls', 'controls-slot', 'controls-scrim', 'controls-summary', 'controls-done', 'refresh-location', 'refresh-location-compact', 'refresh-location-compact-label', 'place-action-label', 'place-more', 'place-menu', 'menu-back-results', 'location-update', 'location-update-text', 'sum-fuel', 'view-state', 'view-state-text', 'view-state-action', 'start-retry', 'history-chart', 'menu-history'].map((id) => [id, $(id)]));
 const formatDate = (value) => new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(new Date(value));
+// La lista de resultados es de React: el coordinador le entrega la vista ya
+// calculada y no toca nada dentro de `#results`.
+const resultados = mountResults($('results'));
 
 // El card de controles solo se fija en resultados; en las demás pantallas es la
 // appbar de siempre, en flujo.
@@ -122,58 +126,34 @@ function renderSummary(criterion) {
   nodes['sum-criteria'].textContent = search.origin ? partes.join(' · ') : `· ${partes.join(' · ')}`;
 }
 
+// «Ver más» amplía la búsqueda; la lista decide adónde va el foco.
+function verMas() {
+  elegir({ visibleCount: ui.view.nextCount });
+  renderOffers();
+}
+
 // Pinta lo que deciden las reglas. Siempre repinta; solo el recálculo de filas
 // espera a que algo venza.
 function renderOffers() {
+  // Sin datos de la vista activa no hay lista: nunca se pintan filas de otra
+  // vista bajo la etiqueta de esta.
+  if (!data.dataset) return;
   refrescar();
   const view = resultsView({ rows, located, search });
   ui.view = view;
-  const conOrigen = Boolean(search.origin);
   const { products, priceUnit } = VIEWS[search.view];
-  nodes.offers.innerHTML = view.items.map((offer, index) => renderOfferCard(offer, { withDistance: conOrigen, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: view.tags[index], activeProduct: view.activeProduct, products, priceUnit })).join('');
-  nodes.offers.hidden = view.items.length === 0;
+  resultados.render({ view, viewKey: search.view, products, priceUnit, withDistance: Boolean(search.origin), attribution: data.dataset.provenance.attribution, sourceUrl: data.dataset.provenance.source_url, onLoadMore: verMas });
   renderViewState(view.districtEmpty ? 'district-empty' : 'ready');
-  // El aviso de «sin precios recientes» acompaña a las tarjetas mudas, no las
-  // sustituye: el grifo sigue existiendo aunque hoy no diga a cuánto vende.
-  nodes['empty-state'].hidden = view.hasPrices;
   nodes['sort-toggle'].hidden = !view.sortToggle;
   nodes['price-product-toggle'].hidden = !view.productToggle;
   if (view.radius) renderRadiusControl(view.radius);
-  nodes['radius-empty'].hidden = !view.radiusEmpty;
-  // Sin ninguna estación en todo el rango, ampliar el radio no sirve: se dice, y
-  // se ofrece lo que sí sirve.
-  const nadaEnElRango = view.radius?.inert && view.radius.total === 0;
-  nodes['radius-empty-title'].textContent = nadaEnElRango ? `Ningún grifo a ${formatRadius(RADIUS_MAX_KM)}` : 'Ningún grifo en este radio';
-  nodes['radius-empty-text'].textContent = nadaEnElRango ? `No hay estaciones de ${VIEWS[search.view].label} cerca de ti. Busca por distrito o elige otro combustible.` : 'Amplía el radio de búsqueda para encontrar estaciones más lejanas.';
-  nodes['load-more'].hidden = view.remaining <= 0;
-  // El botón carga su propio salto: la etiqueta y lo que hace salen del mismo
-  // número, así que no pueden discrepar.
-  nodes['load-more'].textContent = view.nextCount >= view.ordered.length ? `Ver las ${view.remaining} restantes` : `Ver ${view.nextCount - view.items.length} más (${view.remaining} restantes)`;
-  // Cuando sí paginó, el último toque cierra con «N de N», que es lo que el botón
-  // ya no puede decir.
-  nodes['offers-status'].textContent = view.paged ? `Se muestran ${view.items.length} de ${view.ordered.length} estaciones.` : '';
   document.querySelectorAll('[data-sort]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.sort === (view.byPrice ? 'price' : 'distance'))));
   document.querySelectorAll('[data-price-product]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.priceProduct === search.priceProduct)));
   renderSummary(view.criterion);
 }
 
-// Los dos precios ya viajan en la fila, así que el panel se abre sin pedir nada
-// y funciona igual sin conexión.
-function toggleDetail(button) {
-  const slot = nodes.offers.querySelector(`[data-detail-slot="${CSS.escape(button.dataset.detail)}"]`);
-  const offer = (ui.view?.pool ?? []).concat(rows).find((item) => item.establishment_id === button.dataset.detail);
-  if (!slot || !offer) return;
-  const abierto = button.getAttribute('aria-expanded') === 'true';
-  button.setAttribute('aria-expanded', String(!abierto));
-  button.textContent = abierto ? 'Ver detalle' : 'Ocultar';
-  slot.hidden = abierto;
-  const { products, priceUnit } = VIEWS[search.view];
-  slot.innerHTML = abierto ? '' : renderOfferDetail(offer, { prices: offer.prices, attribution: data.dataset.provenance.attribution, products, priceUnit });
-}
-
 function renderResults() {
   refrescar({ force: true });
-  nodes['official-source'].href = data.dataset.provenance.source_url;
   // El nombre del lugar es el encabezado de los resultados: dice desde dónde se
   // compara, y por eso nunca es un botón.
   const lugar = search.origin ? 'Mi ubicación' : displayDistrict(search.district);
@@ -190,7 +170,6 @@ function renderResults() {
   if (!search.origin) {
     located = [];
     nodes['radius-control'].hidden = true;
-    nodes['radius-empty'].hidden = true;
   }
   renderOffers();
 }
@@ -406,7 +385,6 @@ function applyView(entrada) {
   if (ui.screen === 'compare') {
     refrescar({ force: true });
     search = startResults(search, located);
-    nodes['official-source'].href = data.dataset.provenance.source_url;
     nodes['offline-note'].hidden = data.mode !== 'saved';
     nodes['offline-note'].textContent = data.mode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(data.dataset.cutoff_at)}.` : '';
     renderOffers();
@@ -423,9 +401,8 @@ function showViewLoading() {
   data = { dataset: null, mode: 'network' };
   renderStartLoading();
   if (ui.screen === 'compare') {
-    nodes.offers.innerHTML = '';
-    nodes.offers.hidden = true;
-    for (const id of ['empty-state', 'radius-empty', 'load-more', 'sort-toggle', 'price-product-toggle']) nodes[id].hidden = true;
+    resultados.clear();
+    for (const id of ['sort-toggle', 'price-product-toggle']) nodes[id].hidden = true;
     renderViewState('loading');
   }
 }
@@ -502,19 +479,10 @@ document.querySelectorAll('[data-sort]').forEach((button) => button.addEventList
 // El sub-toggle recuerda la elección aunque se vuelva a «Más cerca», así que
 // quien compara Premium no tiene que volver a decirlo en cada vuelta.
 document.querySelectorAll('[data-price-product]').forEach((button) => button.addEventListener('click', () => { elegir({ priceProduct: button.dataset.priceProduct, visibleCount: PAGE_SIZE }); renderOffers(); controls.scrollToTop(); }));
-nodes.offers.addEventListener('click', (event) => { const button = event.target.closest('[data-detail]'); if (button) toggleDetail(button); });
 // Filtrado local sobre datos ya cargados: no hay red, así que `input` responde
 // mientras se arrastra sin costo perceptible; al soltar, la lista vuelve arriba.
 nodes['radius-input'].addEventListener('input', () => { elegir({ radiusKm: Number(nodes['radius-input'].value), preferencesTouched: true, visibleCount: PAGE_SIZE }); renderOffers(); });
 nodes['radius-input'].addEventListener('change', () => controls.scrollToTop());
-nodes['load-more'].addEventListener('click', () => {
-  const pintadas = nodes.offers.children.length;
-  elegir({ visibleCount: ui.view.nextCount });
-  renderOffers();
-  // El botón puede acabar de desaparecer y el foco caería en <body>. Pasa a la
-  // primera tarjeta nueva, que es justo lo que se acaba de pedir.
-  nodes.offers.children[pintadas]?.focus();
-});
 nodes['refresh-location'].addEventListener('click', placeAction);
 nodes['refresh-location-compact'].addEventListener('click', placeAction);
 

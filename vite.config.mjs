@@ -7,6 +7,7 @@
 //   npm run dev     servidor de desarrollo con HMR, sin service worker
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 const raiz = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +15,8 @@ const ui = path.join(raiz, 'ui');
 const web = path.join(raiz, 'web');
 
 export default defineConfig({
+  // JSX de la lista de resultados; en `npm run dev`, recarga que conserva el estado.
+  plugins: [react()],
   root: ui,
   base: '/',
   // `web/` como publicDir solo para resolver: Vite deja sin tocar `/icons/…` y

@@ -14,7 +14,7 @@ import { ACTIVE_VIEWS, VIEWS } from '../web/lib/catalog.js';
 import { createSearch, evaluateRows, resultsView, startResults, withDistances } from '../web/lib/search.js';
 import { mergeProducts } from '../web/lib/merge-products.js';
 import { decisionTag } from '../web/lib/decision-view.js';
-import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
+import { offerCardView, offerDetailView } from '../ui/offer-view.js';
 
 const AHORA = new Date('2026-09-24T12:00:00.000Z');
 const ORIGEN = { latitude: -12.12, longitude: -77.03 };
@@ -40,10 +40,10 @@ test('GLP ordena por su precio, sin selector de producto y con su etiqueta', () 
 
 test('la tarjeta de GLP dice su nombre preciso para lectores, su chip y la unidad', () => {
   const [fila] = filas('glp', [glp('a', 7.49, 'MIRAFLORES')]);
-  const tarjeta = renderOfferCard(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit });
-  assert.match(tarjeta, /data-key="glp"><span class="chip" role="img" aria-label="GLP automotor">GLP<\/span><b><small>S\/<\/small>7\.49<\/b><small class="offer__unit">por galón<\/small>/);
-  assert.match(tarjeta, /aria-label="Cómo llegar a [^"]*, GLP automotor S\/\s?7\.49"/);
-  assert.match(renderOfferDetail(fila, { prices: fila.prices, products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit }), /por galón/);
+  const tarjeta = offerCardView(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit });
+  assert.deepEqual(tarjeta.prices, [{ key: 'glp', state: null, chip: 'GLP', label: 'GLP automotor', amount: '7.49', unit: 'por galón' }]);
+  assert.match(tarjeta.directions.label, /^Cómo llegar a .*, GLP automotor S\/\s?7\.49$/);
+  assert.equal(offerDetailView(fila, { prices: fila.prices, products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit }).rows[0].unit, 'por galón');
 });
 
 test('un gasocentro que solo vende GLP aparece en GLP aunque no esté en Gasolina, y un distrito sin GLP es un vacío propio', () => {

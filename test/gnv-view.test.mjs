@@ -12,7 +12,7 @@ import { ACTIVE_VIEWS, PRODUCTS, VIEWS } from '../web/lib/catalog.js';
 import { createSearch, evaluateRows, resultsView, withDistances } from '../web/lib/search.js';
 import { mergeProducts } from '../web/lib/merge-products.js';
 import { decisionTag } from '../web/lib/decision-view.js';
-import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
+import { offerCardView, offerDetailView } from '../ui/offer-view.js';
 
 const AHORA = new Date('2026-09-24T12:00:00.000Z');
 const ORIGEN = { latitude: -12.12, longitude: -77.03 };
@@ -37,11 +37,11 @@ test('GNV ordena por su precio, sin selector de producto y con su etiqueta', () 
 
 test('la tarjeta de GNV dice «por m³» y nunca «galón»', () => {
   const [fila] = filas([oferta('a', 1.77, 'MIRAFLORES')]);
-  const tarjeta = renderOfferCard(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.gnv.products, priceUnit: VIEWS.gnv.priceUnit });
-  assert.match(tarjeta, /data-key="gnv"><span class="chip" role="img" aria-label="GNV comprimido">GNV<\/span><b><small>S\/<\/small>1\.77<\/b><small class="offer__unit">por m³<\/small>/);
-  const detalle = renderOfferDetail(fila, { prices: fila.prices, products: VIEWS.gnv.products, priceUnit: VIEWS.gnv.priceUnit });
-  assert.match(detalle, /por m³/);
-  for (const html of [tarjeta, detalle]) assert.doesNotMatch(html, /gal[oó]n/i);
+  const tarjeta = offerCardView(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.gnv.products, priceUnit: VIEWS.gnv.priceUnit });
+  assert.deepEqual(tarjeta.prices, [{ key: 'gnv', state: null, chip: 'GNV', label: 'GNV comprimido', amount: '1.77', unit: 'por m³' }]);
+  const detalle = offerDetailView(fila, { prices: fila.prices, products: VIEWS.gnv.products, priceUnit: VIEWS.gnv.priceUnit });
+  assert.equal(detalle.rows[0].unit, 'por m³');
+  for (const vista of [tarjeta, detalle]) assert.doesNotMatch(JSON.stringify(vista), /gal[oó]n/i);
 });
 
 test('un distrito sin GNV es un vacío propio', () => {

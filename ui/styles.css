@@ -501,6 +501,8 @@ h3{font-size:16px;margin-bottom:6px}
 .location-update[data-status="error"] .location-update__text{color:var(--foreground);font-weight:600}
 .location-update .button--text{flex-shrink:0;white-space:nowrap;min-height:36px;padding-block:0}
 .offers{display:grid;gap:var(--s3);list-style:none;margin:var(--s4) 0 0;padding:0}
+/* El contenedor de la lista en React no genera caja: sus hijos se maquetan como antes. */
+.results{display:contents}
 .screen-flow--results .empty,.about{margin-top:var(--s4)}
 #load-more{width:100%;margin-top:var(--s3)}
 /* El foco al paginar cae en una tarjeta nueva; sin esto quedaría bajo el card fijo. */

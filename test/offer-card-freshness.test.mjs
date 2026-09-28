@@ -12,7 +12,7 @@ import test from 'node:test';
 
 import { filterFreshOffers } from '../web/lib/freshness.js';
 import { mergeOfferRows } from '../web/lib/merge-products.js';
-import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
+import { offerCardView, offerDetailView } from '../ui/offer-view.js';
 
 const CORTE = '2026-09-20T12:00:00.000Z';
 const HORA = 3_600_000;
@@ -52,7 +52,7 @@ test('con los dos precios de la consulta, la etiqueta dice «Consultado»', () =
     premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA), facilito: consulta(24.49, iso(ahora - 2 * HORA)) }),
   }, ahora);
   assert.equal(row.age_source, 'facilito');
-  assert.match(renderOfferCard(row, { includeDetail: false, withDistance: false }), /Consultado hace 2 h/);
+  assert.equal(offerCardView(row, { includeDetail: false, withDistance: false }).freshness, 'Consultado hace 2 h');
 });
 
 test('con los dos del CSV, sigue diciendo «Reportado»', () => {
@@ -62,7 +62,7 @@ test('con los dos del CSV, sigue diciendo «Reportado»', () => {
     premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA) }),
   }, ahora);
   assert.equal(row.age_source, 'csv');
-  assert.match(renderOfferCard(row, { includeDetail: false, withDistance: false }), /Reportado hace 5 días/);
+  assert.equal(offerCardView(row, { includeDetail: false, withDistance: false }).freshness, 'Reportado hace 5 días');
 });
 
 test('con fuentes mezcladas, la etiqueta nombra la del precio más reciente y el detalle desglosa las dos', () => {
@@ -75,11 +75,11 @@ test('con fuentes mezcladas, la etiqueta nombra la del precio más reciente y el
     premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA) }),
   }, ahora);
   assert.equal(row.age_source, 'facilito');
-  assert.match(renderOfferCard(row, { includeDetail: false, withDistance: false }), /Consultado hace 2 h/);
+  assert.equal(offerCardView(row, { includeDetail: false, withDistance: false }).freshness, 'Consultado hace 2 h');
 
-  const detalle = renderOfferDetail(row, { prices: row.prices });
-  assert.match(detalle, /consultado/);
-  assert.match(detalle, /reportado/);
+  const [regular, premium] = offerDetailView(row, { prices: row.prices }).rows;
+  assert.match(regular.when, /^consultado /);
+  assert.match(premium.when, /^reportado /);
   assert.equal(row.prices.regular.source, 'facilito');
   assert.equal(row.prices.premium.source, 'csv');
 });
@@ -98,7 +98,8 @@ test('un fallo de nuestra consulta no se presenta como silencio del operador', (
   assert.ok(row.silent_days > 44, `el silencio mide el reporte del CSV, no la consulta: ${row.silent_days}`);
   assert.equal(row.last_reported_at, reportado);
   assert.equal(row.last_observed_at, iso(ahora - 30 * HORA), 'la última consulta se conserva aparte');
-  const tarjeta = renderOfferCard(row, { includeDetail: false, withDistance: false });
-  assert.match(tarjeta, /Sin precio hace 45 días/);
-  assert.doesNotMatch(tarjeta, /Consultado/);
+  const tarjeta = offerCardView(row, { includeDetail: false, withDistance: false });
+  assert.equal(tarjeta.silent, true);
+  assert.equal(tarjeta.silence.text, 'Sin precio hace 45 días');
+  assert.doesNotMatch(JSON.stringify(tarjeta), /Consultado/);
 });

@@ -13,7 +13,7 @@ import { createSearch, evaluateRows, resultsView, withDistances } from '../web/l
 import { mergeProducts } from '../web/lib/merge-products.js';
 import { orderOffers } from '../web/lib/haversine.js';
 import { decisionTag } from '../web/lib/decision-view.js';
-import { renderOfferCard, renderOfferDetail } from '../ui/offer-card.js';
+import { offerCardView, offerDetailView } from '../ui/offer-view.js';
 
 const AHORA = new Date('2026-09-24T12:00:00.000Z');
 const oferta = (letra, precio, distrito, dLat = 0) => ({ id: `d1_${letra.repeat(24)}`, establishment_id: `est_${letra.repeat(24)}`, commercial_identity: null, address: 'Av. Larco 123', price: precio, reported_at: '2026-09-23T12:00:00.000Z', facilito: null, district: distrito, longitude: -77.03, latitude: -12.12 + dLat });
@@ -54,12 +54,12 @@ test('ordenar por un producto que no existe es un error, no un orden silencioso'
 
 test('la tarjeta de Diésel dice el nombre preciso y la unidad; la de Gasolina no cambia', () => {
   const [fila] = evaluateRows(conjunto([oferta('a', 25.49, 'MIRAFLORES')]), AHORA).rows;
-  const tarjeta = renderOfferCard(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.diesel.products, priceUnit: VIEWS.diesel.priceUnit });
-  assert.match(tarjeta, /aria-label="Diésel B5 S-50 UV">B5 S-50 UV<\/span><b><small>S\/<\/small>25\.49<\/b><small class="offer__unit">por galón<\/small>/);
-  assert.match(tarjeta, /aria-label="Cómo llegar a [^"]*, Diésel B5 S-50 UV S\/\s?25\.49"/);
-  assert.match(renderOfferDetail(fila, { prices: fila.prices, products: VIEWS.diesel.products, priceUnit: VIEWS.diesel.priceUnit }), /por galón/);
-  // Gasolina: con sus productos explícitos o sin decirlos, el mismo marcado.
+  const tarjeta = offerCardView(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.diesel.products, priceUnit: VIEWS.diesel.priceUnit });
+  assert.deepEqual(tarjeta.prices, [{ key: 'diesel', state: null, chip: 'B5 S-50 UV', label: 'Diésel B5 S-50 UV', amount: '25.49', unit: 'por galón' }]);
+  assert.match(tarjeta.directions.label, /^Cómo llegar a .*, Diésel B5 S-50 UV S\/\s?25\.49$/);
+  assert.equal(offerDetailView(fila, { prices: fila.prices, products: VIEWS.diesel.products, priceUnit: VIEWS.diesel.priceUnit }).rows[0].unit, 'por galón');
+  // Gasolina: con sus productos explícitos o sin decirlos, la misma tarjeta, sin unidad.
   const gasolina = { ...fila, prices: { regular: fila.prices.diesel, premium: null } };
-  assert.equal(renderOfferCard(gasolina, { withDistance: false }), renderOfferCard(gasolina, { withDistance: false, products: GASOLINA_KEYS, priceUnit: VIEWS.gasolina.priceUnit }));
-  assert.doesNotMatch(renderOfferCard(gasolina, { withDistance: false }), /offer__unit/);
+  assert.deepEqual(offerCardView(gasolina, { withDistance: false }), offerCardView(gasolina, { withDistance: false, products: GASOLINA_KEYS, priceUnit: VIEWS.gasolina.priceUnit }));
+  assert.ok(offerCardView(gasolina, { withDistance: false }).prices.every((celda) => celda.unit === null));
 });

@@ -29,7 +29,7 @@
 
 import { HISTORY_MAX_DAYS, HISTORY_ORIGIN, HISTORY_PRODUCTS, HISTORY_SUMMARY_PATH, HISTORY_MAX_BYTES, limaDate, validateDailySummary } from '../web/lib/history-contract.js';
 import { DEFAULT_WINDOW, STALE_HOURS, areaPath, demoSummary, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, staleHours } from '../web/lib/history-series.js';
-import { escapeHtml } from './offer-card.js';
+import { escapeHtml } from './html.js';
 import { PRODUCTS } from '../web/lib/catalog.js';
 
 const GUARDADO = 'masfacil-history-daily-v1';
