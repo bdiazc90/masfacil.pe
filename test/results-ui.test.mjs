@@ -79,8 +79,26 @@ test('la lista mantiene sus nodos y conmuta `hidden` según la vista', { skip: S
   assert.match(lista, /id="official-source"[^>]*href="https:\/\/www\.facilito\.gob\.pe\/"/);
 });
 
+test('la portada pre-renderizada es la de siempre: inicio, «Cargando precios…» y el histórico reservado', { skip: SIN_REACT }, async () => {
+  const { runnerImport } = await import('vite');
+  const { module } = await runnerImport(path.join(REPO, 'ui/prerender.jsx'), { configFile: path.join(REPO, 'vite.config.mjs'), logLevel: 'error' });
+  const html = module.renderPortada();
+  assert.equal(module.renderPortada(), html, 'sin reloj ni ruta: siempre los mismos bytes');
+  assert.match(html, /<section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">/);
+  assert.match(html, /<button id="use-location" class="button button--primary" type="button" disabled="">Ver en mi ubicación<\/button>/);
+  assert.match(html, /<p id="data-status" class="hint sr-only" role="status" aria-live="polite">Cargando precios…<\/p>/);
+  assert.match(html, /<section id="history-chart" class="history plate" aria-labelledby="history-title" data-state="loading">/);
+  assert.match(html, /<p class="history__cargando">Cargando el histórico…<\/p>/);
+  assert.match(html, /id="controls" data-state="full" data-screen="other"/);
+  for (const id of ['loading-step', 'district-step', 'compare-step']) assert.match(html, new RegExp(`id="${id}"[^>]*hidden=""`), `${id} oculta`);
+  assert.doesNotMatch(html, /\sstyle=|<script/);
+  const fuente = fs.readFileSync(path.join(REPO, 'ui/index.html'), 'utf8');
+  assert.equal(fuente.split('<!--portada-->').length, 2, 'un solo lugar para la portada');
+});
+
 test('la interfaz en React no escribe HTML crudo', () => {
-  const fuentes = ['ui/offer-view.js', ...fs.readdirSync(path.join(REPO, 'ui', 'results')).map((archivo) => `ui/results/${archivo}`)];
+  const recorrer = (dir) => fs.readdirSync(path.join(REPO, dir), { withFileTypes: true }).flatMap((entrada) => (entrada.isDirectory() ? recorrer(`${dir}/${entrada.name}`) : /\.(jsx?|mjs)$/.test(entrada.name) ? [`${dir}/${entrada.name}`] : []));
+  const fuentes = recorrer('ui');
   // Sin comentarios: pueden nombrar lo que ya no se hace.
   const codigo = (texto) => texto.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   for (const archivo of fuentes) assert.doesNotMatch(codigo(fs.readFileSync(path.join(REPO, archivo), 'utf8')), /dangerouslySetInnerHTML|innerHTML|insertAdjacentHTML/, archivo);

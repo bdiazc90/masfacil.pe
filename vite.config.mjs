@@ -15,7 +15,7 @@ const ui = path.join(raiz, 'ui');
 const web = path.join(raiz, 'web');
 
 export default defineConfig({
-  // JSX de la lista de resultados; en `npm run dev`, recarga que conserva el estado.
+  // JSX de la interfaz; en `npm run dev`, recarga que conserva el estado.
   plugins: [react()],
   root: ui,
   base: '/',

@@ -233,7 +233,7 @@ Android de gama baja se paga solo si mejora la decisión.
 Principios, no catálogo. Un inventario cerrado de componentes con sus reglas
 exige mantener a mano una copia del código y envejece en cada cambio de UI; lo
 que sigue vigente es cómo debe comportarse cualquier control de esta interfaz.
-El detalle de cada componente vive en `ui/*.js` y `ui/styles.css`. La lista de resultados ya es React: la tarjeta, su detalle, los vacíos y «Ver más» están en `ui/results/*.jsx`, y lo que cada una dice —textos, estados de precio, marca y enlaces— se decide en `ui/offer-view.js`, sin JSX.
+La interfaz es React y cada componente vive en `ui/`: la cabecera en `ui/controls/`, las pantallas en `ui/screens/`, la lista de resultados en `ui/results/` y el histórico en `ui/history/`. Lo que dicen —textos, estados, marca, enlaces, geometría del gráfico— se decide sin JSX en `ui/offer-view.js`, `ui/app-view.js` y `ui/history-view.js`, y las transiciones de la búsqueda en `ui/app-state.js`. Los estilos siguen en `ui/styles.css`.
 
 - **Un control, una cosa.** Ordenar no filtra; filtrar no ordena. Un control cuyo
   efecto no se puede nombrar en una línea está haciendo dos cosas.

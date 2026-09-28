@@ -16,100 +16,12 @@
 <body>
   <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
   <a class="skip-link" href="#main">Ir al contenido</a>
-  <main id="main" tabindex="-1" class="app-shell">
-    <div class="controls-sentinel controls-sentinel--collapse" aria-hidden="true"></div>
-    <div class="controls-sentinel controls-sentinel--expand" aria-hidden="true"></div>
-    <div class="controls-slot" id="controls-slot">
-      <section class="controls plate" id="controls" data-state="full" data-screen="other" aria-label="Controles de búsqueda">
-        <div class="controls__bar">
-          <button class="controls__quick" id="refresh-location-compact" type="button" aria-label="Actualizar ubicación" title="Actualizar ubicación"><svg class="controls__quick-icon" data-place-icon="refresh" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"/><path d="M20.5 4v4.8h-4.8"/></svg><svg class="controls__quick-icon" data-place-icon="gps" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span class="controls__quick-label" id="refresh-location-compact-label">Actualizar</span></button>
-          <button class="controls__summary" id="controls-summary" type="button" aria-expanded="true" aria-controls="controls-panel">
-            <img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">
-            <span class="controls__text"><span class="controls__lead"><span class="controls__fuel" id="sum-fuel" hidden></span><span class="controls__place" id="sum-place"></span></span><span class="controls__criteria" id="sum-criteria"></span></span>
-            <span class="controls__expand">Ajustar <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
-          </button>
-        </div>
-        <div class="controls__panel" id="controls-panel">
-          <div class="controls__inner">
-            <header class="appbar">
-              <a class="brand" href="/" aria-label="masfacil.pe, inicio"><img class="brand__logo" src="/icons/logo.svg" alt="" width="28" height="29">masfacil<em>.pe</em></a>
-              <div class="theme-toggle" role="group" aria-label="Tema">
-                <button data-theme-choice="light" aria-pressed="false" aria-label="Tema claro" title="Claro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/><path d="M12 2v2.5M12 19.5V22M4.93 4.93 6.7 6.7m10.6 10.6 1.77 1.77M2 12h2.5m15 0H22M4.93 19.07 6.7 17.3m10.6-10.6 1.77-1.77"/></svg></button>
-                <button data-theme-choice="system" aria-pressed="false" aria-label="Tema del sistema" title="Sistema" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></svg></button>
-                <button data-theme-choice="dark" aria-pressed="false" aria-label="Tema oscuro" title="Oscuro" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg></button>
-              </div>
-            </header>
-            <!-- Arriba dónde estás, abajo qué puedes hacer. El nombre del lugar
-                 nunca es pulsable: sigue siendo el encabezado de los resultados. -->
-            <div class="place">
-              <h2 class="place__value" id="compare-title" tabindex="-1"><svg id="place-icon" class="place__icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg><span id="place-name">Mi ubicación</span></h2>
-              <div class="place__row">
-                <button id="refresh-location" class="place__action" type="button">
-                  <svg class="place__action-icon" data-place-icon="refresh" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 1 1-2.49-6.01"/><path d="M20.5 4v4.8h-4.8"/></svg>
-                  <svg class="place__action-icon" data-place-icon="gps" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/><path d="M12 1.5V4M12 20v2.5M1.5 12H4M20 12h2.5"/></svg>
-                  <span id="place-action-label">Actualizar ubicación</span>
-                </button>
-                <button id="place-more" class="place__more" type="button" aria-expanded="false" aria-controls="place-menu" aria-label="Más opciones" title="Más opciones"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/></svg></button>
-                <div id="place-menu" class="place__menu" hidden>
-                  <button id="menu-districts" class="place__menu-item" data-menu-screen="compare" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>Ver distritos</button>
-                  <button id="menu-back-results" class="place__menu-item" data-menu-screen="district" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg>Volver a los resultados</button>
-                  <button id="menu-history" class="place__menu-item" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.3V12l3.2 1.9"/></svg>Ver historial</button>
-                  <button id="menu-home" class="place__menu-item place__menu-item--home" type="button"><img class="brand__logo" src="/icons/logo.svg" alt="" width="20" height="21">Volver al inicio</button>
-                </div>
-              </div>
-            </div>
-            <!-- El combustible, entre el lugar y el radio como en el mockup. Viene
-                 oculto: solo el app.js que lo pinta sabe cuándo hay más de una vista. -->
-            <div id="view-picker-controls" class="toggle view-picker" role="group" aria-label="Combustible" data-view-picker data-view-options hidden></div>
-            <div id="radius-control" class="radius" hidden>
-              <div class="radius__head"><label class="radius__label" for="radius-input">Radio</label><p id="radius-readout" class="radius__readout" role="status"></p></div>
-              <input id="radius-input" class="radius__input" type="range" min="1" max="5" step="0.5" value="1" aria-describedby="radius-readout">
-            </div>
-            <div id="sort-toggle" class="toggle" role="group" aria-label="Ordenar resultados" hidden><button data-sort="distance" aria-pressed="true" type="button">Más cerca</button><button data-sort="price" aria-pressed="false" type="button">Más barata</button></div>
-            <div id="price-product-toggle" class="toggle toggle--sub" role="group" aria-label="Producto para ordenar por precio" hidden><button data-price-product="regular" aria-pressed="true" type="button">Regular</button><button data-price-product="premium" aria-pressed="false" type="button">Premium</button></div>
-            <button class="button--text controls__done" id="controls-done" type="button" aria-expanded="true" aria-controls="controls-panel">Listo <svg class="controls__chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="controls-scrim" id="controls-scrim" hidden></div>
-    <section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">
-      <h1 id="start-title">Encuentra combustible cerca de ti</h1>
-      <!-- Elegir combustible no pide ubicación ni abre otra pantalla. -->
-      <fieldset id="view-picker-start" class="view-picker view-picker--start" data-view-picker hidden><legend>Combustible</legend><div class="toggle" data-view-options></div></fieldset>
-      <button id="use-location" class="button button--primary" type="button" disabled>Ver en mi ubicación</button>
-      <button id="choose-district" class="button button--ghost" type="button" disabled>Ver distritos</button>
-      <p id="data-status" class="hint" role="status" aria-live="polite">Cargando precios…</p>
-      <button id="start-retry" class="button button--ghost" type="button" hidden>Reintentar</button>
-      <!-- Contexto, no acción: va después de los botones. Reserva su alto desde
-           el primer pintado para que la portada no salte cuando llegue el dato.
-           El subtítulo describe la ventana sin prometer cobertura: dice sobre qué
-           periodo se mira, no cuántos días tiene dato. -->
-      <section id="history-chart" class="history plate" aria-labelledby="history-title" data-state="loading">
-        <h2 id="history-title" tabindex="-1">Precio promedio en Lima</h2>
-        <p class="history__sub">S/ por galón · últimos 7 días observados</p>
-        <div id="history-body"></div>
-      </section>
-    </section>
-    <section id="loading-step" class="screen-flow loading" aria-live="polite" hidden><div class="center"><span class="dot" aria-hidden="true"></span><p class="lede">Buscando tu ubicación…</p><button id="cancel-location" class="button--text" type="button">Ver distritos</button></div></section>
-    <section id="district-step" class="screen-flow district-step" aria-labelledby="district-title" hidden><h2 id="district-title" tabindex="-1">Elige un distrito</h2><p id="district-hint" class="hint" role="status" hidden>No pudimos usar tu ubicación. Elige un distrito o vuelve a intentarlo.</p><div class="district-filter"><label for="district-search">Escribe tu distrito</label><input id="district-search" type="search" inputmode="search" autocomplete="off" spellcheck="false" placeholder="Escribe tu distrito"><p id="district-empty" class="hint" role="status" hidden>No encontramos ese distrito.</p></div><div id="districts" class="chips" aria-label="Distritos disponibles"></div></section>
-    <section id="compare-step" class="screen-flow screen-flow--results" aria-labelledby="compare-title" hidden>
-      <p id="offline-note" class="offline-note" role="status" hidden></p>
-      <div id="location-update" class="location-update" hidden>
-        <p id="location-update-text" class="location-update__text" role="status" aria-live="polite"></p>
-      </div>
-      <!-- Cargando, error o distrito sin grifos del combustible elegido. -->
-      <section id="view-state" class="plate empty view-state" hidden><p id="view-state-text" class="lede" role="status" aria-live="polite"></p><button id="view-state-action" class="button button--ghost" type="button" hidden></button></section>
-      <!-- La lista de resultados la pinta React (ui/results/): el aviso sin precios,
-           las tarjetas, el vacío por radio, «Ver más» y el recuento. -->
-      <div id="results" class="results"></div>
-      <details class="about plate"><summary>Sobre los datos</summary><div id="source-content"></div></details>
-    </section>
-    <section id="fatal-state" class="screen-flow" aria-labelledby="fatal-title" hidden><div class="plate"><p class="eyebrow">No hay datos disponibles</p><h2 id="fatal-title">No se pudieron cargar las opciones</h2><p id="fatal-message" class="lede"></p><button id="retry-load" class="button button--primary" type="button">Reintentar</button></div></section>
-  </main>
+  <!-- La aplicación es React (ui/main.jsx). El build pre-renderiza aquí la
+       portada para que se vea antes de que cargue el JavaScript. -->
+  <main id="main" tabindex="-1" class="app-shell"><!--portada--></main>
   <!-- Fuera de `main`: es el pie del documento, no parte del contenido. Aparece
        en todas las vistas porque vive fuera de los pasos que se ocultan. -->
   <footer class="firma">Hecho con amor para el Perú, por <a href="https://brunodiaz.dev" target="_blank" rel="noopener noreferrer">brunodiaz.dev</a></footer>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./main.jsx"></script>
 </body>
 </html>

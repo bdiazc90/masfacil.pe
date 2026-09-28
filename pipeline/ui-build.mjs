@@ -37,6 +37,8 @@ export const UI_BUILD_TOOLING = Object.freeze(['vite.config.mjs', 'pipeline/ui-b
 /** Las páginas que emite Vite; el resto de su salida vive en `assets/`. */
 export const UI_PAGES = Object.freeze(['index.html', '404.html']);
 const ASSETS = 'assets/';
+/** Donde el HTML fuente espera la portada pre-renderizada. */
+const MARCA_PORTADA = '<!--portada-->';
 
 /** ¿Es un destino de este build? Solo esos se escriben o se retiran en `web/`. */
 export const isUiOutput = (relativo) => UI_PAGES.includes(relativo)
@@ -152,7 +154,27 @@ async function compilar({ root, stagingDir }) {
     plugins: [{ name: 'masfacil:grafo', generateBundle() { for (const id of this.getModuleIds()) modulos.add(id); } }],
   });
   if (avisos.length) throw new Error(`Vite avisó al compilar la interfaz: ${avisos.join(' | ')}`);
+  // La portada del HTML, pintada con la misma `App` por el mismo pipeline de
+  // Vite, ya en modo producción. El HTML la trae para verse antes que el JS.
+  process.env.NODE_ENV ??= 'production';
+  const { module: portada } = await vite.runnerImport(path.join(root, 'ui', 'prerender.jsx'), {
+    configFile: path.join(root, 'vite.config.mjs'),
+    configLoader: 'native',
+    logLevel: 'warn',
+    customLogger: { ...logger, warn: anotar('warn'), warnOnce: anotar('warnOnce') },
+  });
+  if (avisos.length) throw new Error(`Vite avisó al pre-renderizar la portada: ${avisos.join(' | ')}`);
+  inyectarPortada(stagingDir, portada.renderPortada());
   return { modulos, versiones: { vite: vite.version, rolldown: vite.rolldownVersion } };
+}
+
+/** Pone la portada en el único marcador del `index.html` compilado. */
+export function inyectarPortada(stagingDir, portada) {
+  const archivo = path.join(stagingDir, 'index.html');
+  const html = fs.readFileSync(archivo, 'utf8');
+  if (html.split(MARCA_PORTADA).length !== 2) throw new Error(`index.html tiene que llevar un solo ${MARCA_PORTADA} donde va la portada`);
+  if (!portada.includes('id="start-step"')) throw new Error('la portada pre-renderizada no trae la pantalla de inicio');
+  fs.writeFileSync(archivo, html.replace(MARCA_PORTADA, portada));
 }
 
 /**

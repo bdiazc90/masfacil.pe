@@ -189,10 +189,10 @@ test('un error de compilación no toca web/ ni deja un build aceptable', { skip:
   try {
     await buildUi({ root: raiz });
     const antes = huellas(path.join(raiz, 'web'));
-    fs.appendFileSync(path.join(raiz, 'ui/app.js'), '\nconst = ;\n');
+    fs.appendFileSync(path.join(raiz, 'ui/App.jsx'), '\nconst = ;\n');
     await assert.rejects(buildUi({ root: raiz }));
     assert.deepEqual(huellas(path.join(raiz, 'web')), antes, 'web/ queda idéntico, datos incluidos');
-    assert.match(uiBuildProblems({ root: raiz }).join('; '), /ui\/app\.js/);
+    assert.match(uiBuildProblems({ root: raiz }).join('; '), /ui\/App\.jsx/);
   } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
 });
 
