@@ -1,0 +1,63 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   masfacil.pe · Tailwind: solo la configuración y las utilidades.
+
+   Este archivo es el único que procesa Tailwind. `styles.css` es CSS nativo
+   sin directivas, así que llega tal cual: Tailwind no reescribe sus colores
+   ni reordena su cascada.
+
+   El orden de capas va antes que nada: decide que las utilidades ganen a la
+   CSS de componente. Sin Preflight ni tema por defecto: el reset es el de
+   `styles.css` y las clases solo salen de `ui/`.
+   ═══════════════════════════════════════════════════════════════════════ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/utilities.css" layer(utilities) source("./");
+
+/* El tema lo fija `data-theme` (ui/theme.js), nunca `prefers-color-scheme`. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* El ancho estrecho de styles.css: `max-width`, así que 340 px incluido. */
+@custom-variant estrecho (@media (max-width: 340px));
+
+/* ── Vocabulario ───────────────────────────────────────────────────────
+   Alias de los tokens de `styles.css`, que siguen siendo la única fuente:
+   `inline` hace que la utilidad lleve `var(--token)` y no emite una paleta ni
+   una escala paralelas. Lo que no está aquí no existe como utilidad (`p-5`,
+   `text-red-500`, `sm:`); una medida de un solo uso va como valor arbitrario,
+   junto a su propiedad, y un token sin alias, como `(--radius-small)`.
+   Un alias nunca se llama igual que su token: Tailwind emitiría la variable
+   apuntándose a sí misma. Va dentro de `theme` para que, si algo se emitiera,
+   perdiera contra los tokens, que no tienen capa. */
+@layer theme {
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-2: var(--card-2);
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-serie: var(--serie);
+
+  --spacing-0: 0px;
+  --spacing-s1: var(--s1);
+  --spacing-s2: var(--s2);
+  --spacing-s3: var(--s3);
+  --spacing-s4: var(--s4);
+  --spacing-s5: var(--s5);
+
+  --radius-pill: 999px;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  --default-transition-duration: var(--motion-feedback);
+  --default-transition-timing-function: var(--motion-ease);
+}
+}

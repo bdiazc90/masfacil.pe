@@ -196,6 +196,37 @@ test('un error de compilación no toca web/ ni deja un build aceptable', { skip:
   } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
 });
 
+test('Tailwind: utilidades solo de ui/, sin Preflight ni tema por defecto, y styles.css llega tal cual', { skip: SIN_VITE }, async () => {
+  const raiz = copiaDelRepositorio();
+  try {
+    // Una clase escrita fuera de `ui/` no entra: la hoja no puede cambiar por un
+    // prototipo o un documento que CI no tiene.
+    escribir(raiz, 'ui/sonda-clase.js', "export const clase = 'tracking-[.33em]';\n");
+    escribir(raiz, 'web/lib/sonda-fuera.js', "export const clase = 'tracking-[.31em]';\n");
+    escribir(raiz, 'prototipo.html', '<p class="tracking-[.32em]"></p>\n');
+    const build = await buildUi({ root: raiz });
+    const hoja = fs.readFileSync(path.join(raiz, 'web', Object.keys(build.outputs).find((relativo) => relativo.endsWith('.css'))), 'utf8');
+    const propia = fs.readFileSync(path.join(raiz, 'ui/styles.css'), 'utf8');
+    assert.ok(hoja.endsWith(propia), 'styles.css llega byte a byte: Tailwind no reescribe sus colores ni su cascada');
+    const tailwind = hoja.slice(0, hoja.length - propia.length);
+    assert.match(tailwind, /letter-spacing: \.33em/, 'una clase de ui/ genera su utilidad');
+    assert.doesNotMatch(tailwind, /\.31em|\.32em/, 'nada fuera de ui/ genera utilidades');
+    assert.doesNotMatch(tailwind, /::file-selector-button|--default-font-family|--color-[a-z]+-\d+|prefers-color-scheme/, 'sin Preflight, paleta por defecto ni tema por media query');
+    assert.ok(tailwind.indexOf('@layer theme, base, components') >= 0 && tailwind.indexOf('@layer theme, base, components') < tailwind.indexOf('@layer utilities'), 'el orden de capas va antes: las utilidades ganan a la CSS de componente');
+    assert.equal(build.versions.tailwindcss, JSON.parse(fs.readFileSync(path.join(raiz, 'package.json'), 'utf8')).devDependencies.tailwindcss);
+  } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
+});
+
+test('un aviso de Tailwind al optimizar la hoja no se publica', { skip: SIN_VITE }, async () => {
+  const raiz = copiaDelRepositorio();
+  try {
+    // Lightning CSS descarta en silencio lo que no entiende; Tailwind lo avisa por la consola.
+    fs.appendFileSync(path.join(raiz, 'ui/tailwind.css'), '\n.sonda:::rota{color:red}\n');
+    await assert.rejects(buildUi({ root: raiz }), /avisó/);
+    assert.ok(!fs.existsSync(path.join(raiz, 'web', 'index.html')), 'nada llegó a web/');
+  } finally { fs.rmSync(raiz, { recursive: true, force: true }); }
+});
+
 test('un import con otras mayúsculas o de un módulo de Node no se publica', { skip: SIN_VITE }, async () => {
   const raiz = copiaDelRepositorio();
   try {

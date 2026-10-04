@@ -27,6 +27,12 @@ async function pintar(archivo, nombre, props) {
   return renderToStaticMarkup(createElement(module[nombre], props));
 }
 
+// Las clases son presentación (utilidades o CSS de componente) y cambian sin
+// cambiar la interfaz: las pruebas miran ids, roles, atributos y texto. La única
+// clase con significado es `sr-only` —oculto a la vista, no a los lectores—.
+const sinClases = (html) => html.replace(/ class="[^"]*"/g, '');
+const SOLO_LECTOR = '[^"]*\\bsr-only\\b[^"]*';
+
 const HOSTIL = '<img src=x onerror="alert(1)">';
 const oferta = (extra = {}) => ({
   establishment_id: 'est_1',
@@ -60,22 +66,23 @@ test('etiquetas, enlaces y marca son los de la vista, y el detalle empieza cerra
   assert.ok(html.includes(`aria-label="${atributo(vista.directions.label)}"`));
   assert.ok(html.includes(`href="${atributo(url)}"`));
   assert.ok(html.includes(`aria-label="${atributo(vista.detail.label)}" `) || html.includes(`aria-label="${atributo(vista.detail.label)}">`));
-  assert.match(html, /<li class="offer glass" data-brand="primax" tabindex="-1"><div class="offer__brandmark" aria-hidden="true"><img src="\/icons\/brands\/primax-mark\.svg" alt=""/);
+  // La marca va primera en el marcado (y detrás en pintura), como decoración.
+  assert.match(sinClases(html), /<li data-brand="primax" tabindex="-1"><div aria-hidden="true"><img src="\/icons\/brands\/primax-mark\.svg" alt=""/);
   assert.match(html, /aria-expanded="false"[^>]*>Ver detalle<\/button>/);
-  assert.match(html, /<div class="offer__detail-slot" hidden=""><\/div>/);
+  assert.match(sinClases(html), /<div hidden=""><\/div><\/li>$/);
 });
 
 test('la lista mantiene sus nodos y conmuta `hidden` según la vista', { skip: SIN_REACT }, async () => {
   const reposo = await pintar('ui/results/Results.jsx', 'Results', {});
   for (const id of ['empty-state', 'offers', 'radius-empty', 'load-more', 'offers-status']) assert.match(reposo, new RegExp(`id="${id}"`), id);
-  assert.match(reposo, /<ol id="offers" class="offers" hidden="">/);
+  assert.match(sinClases(reposo), /<ol id="offers" hidden="">/);
   const view = { items: [oferta()], ordered: [oferta(), oferta({ establishment_id: 'est_2' })], tags: ['Más barata'], activeProduct: null, hasPrices: true, radiusEmpty: false, remaining: 1, nextCount: 2, paged: true, radius: { inert: false, total: 2 } };
   const lista = await pintar('ui/results/Results.jsx', 'Results', { view, viewKey: 'gasolina', products: ['regular', 'premium'], withDistance: true, sourceUrl: 'https://www.facilito.gob.pe/', onLoadMore: () => {} });
-  assert.match(lista, /<section id="empty-state" class="plate empty" hidden="">/);
-  assert.match(lista, /<ol id="offers" class="offers"><li class="offer glass"/);
-  assert.match(lista, /<p class="offer__tag">Más barata<\/p>/);
-  assert.match(lista, /<button id="load-more" class="button button--ghost" type="button">Ver las 1 restantes<\/button>/);
-  assert.match(lista, /<p id="offers-status" class="sr-only" role="status">Se muestran 1 de 2 estaciones\.<\/p>/);
+  assert.match(sinClases(lista), /<section id="empty-state" hidden="">/);
+  assert.match(sinClases(lista), /<ol id="offers"><li data-brand="primax"/);
+  assert.match(sinClases(lista), /<p>Más barata<\/p>/);
+  assert.match(sinClases(lista), /<button id="load-more" type="button">Ver las 1 restantes<\/button>/);
+  assert.match(lista, new RegExp(`<p id="offers-status" class="${SOLO_LECTOR}" role="status">Se muestran 1 de 2 estaciones\\.</p>`));
   assert.match(lista, /id="official-source"[^>]*href="https:\/\/www\.facilito\.gob\.pe\/"/);
 });
 
@@ -84,11 +91,11 @@ test('la portada pre-renderizada es la de siempre: inicio, «Cargando precios…
   const { module } = await runnerImport(path.join(REPO, 'ui/prerender.jsx'), { configFile: path.join(REPO, 'vite.config.mjs'), logLevel: 'error' });
   const html = module.renderPortada();
   assert.equal(module.renderPortada(), html, 'sin reloj ni ruta: siempre los mismos bytes');
-  assert.match(html, /<section id="start-step" class="screen-flow start-step" aria-labelledby="start-title">/);
-  assert.match(html, /<button id="use-location" class="button button--primary" type="button" disabled="">Ver en mi ubicación<\/button>/);
-  assert.match(html, /<p id="data-status" class="hint sr-only" role="status" aria-live="polite">Cargando precios…<\/p>/);
-  assert.match(html, /<section id="history-chart" class="history plate" aria-labelledby="history-title" data-state="loading">/);
-  assert.match(html, /<p class="history__cargando">Cargando el histórico…<\/p>/);
+  assert.match(sinClases(html), /<section id="start-step" aria-labelledby="start-title">/);
+  assert.match(sinClases(html), /<button id="use-location" type="button" disabled="">Ver en mi ubicación<\/button>/);
+  assert.match(html, new RegExp(`<p id="data-status" class="${SOLO_LECTOR}" role="status" aria-live="polite">Cargando precios…</p>`));
+  assert.match(sinClases(html), /<section id="history-chart" aria-labelledby="history-title" data-state="loading">/);
+  assert.match(sinClases(html), /<p>Cargando el histórico…<\/p>/);
   assert.match(html, /id="controls" data-state="full" data-screen="other"/);
   for (const id of ['loading-step', 'district-step', 'compare-step']) assert.match(html, new RegExp(`id="${id}"[^>]*hidden=""`), `${id} oculta`);
   assert.doesNotMatch(html, /\sstyle=|<script/);

@@ -127,21 +127,46 @@ function rolldownDelLockfile(root) {
   return /^ {2}rolldown@(\d+\.\d+\.\d+[^:\s]*):$/m.exec(fs.readFileSync(lockfile, 'utf8'))?.[1] ?? null;
 }
 
+/** Las versiones instaladas de los paquetes de Tailwind que fija `package.json`; lanza si alguna no coincide. */
+function tailwindFijado(root, fijadas) {
+  const versiones = {};
+  for (const nombre of ['tailwindcss', '@tailwindcss/vite']) {
+    if (!fijadas[nombre]) continue;
+    const instalada = JSON.parse(fs.readFileSync(path.join(root, 'node_modules', nombre, 'package.json'), 'utf8')).version;
+    if (instalada !== fijadas[nombre]) throw new Error(`${nombre} ${instalada} instalada no es la fijada en package.json (${fijadas[nombre]}); ejecuta pnpm install --frozen-lockfile`);
+    versiones[nombre] = instalada;
+  }
+  return versiones;
+}
+
 /**
  * Vite con la configuración del repositorio, hacia `stagingDir`. Exige las
  * versiones exactas del lockfile y trata cualquier aviso como fallo: «no se
  * resolvió al compilar» o un `node:` sustituido por un módulo vacío son avisos
- * para Vite y una página rota para quien la abre.
+ * para Vite y una página rota para quien la abre. Tailwind avisa por la consola
+ * —Lightning CSS descarta en silencio una regla que no entiende—, así que
+ * `console.warn` también cuenta mientras se compila.
  */
 async function compilar({ root, stagingDir }) {
   const vite = await import('vite');
-  const fijada = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).devDependencies?.vite;
-  if (vite.version !== fijada) throw new Error(`vite ${vite.version} instalada no es la fijada en package.json (${fijada}); ejecuta pnpm install --frozen-lockfile`);
+  const fijadas = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).devDependencies ?? {};
+  if (vite.version !== fijadas.vite) throw new Error(`vite ${vite.version} instalada no es la fijada en package.json (${fijadas.vite}); ejecuta pnpm install --frozen-lockfile`);
   const rolldown = rolldownDelLockfile(root);
   if (rolldown && vite.rolldownVersion !== rolldown) throw new Error(`rolldown ${vite.rolldownVersion} instalado no es el del lockfile (${rolldown}); ejecuta pnpm install --frozen-lockfile`);
+  const tailwind = tailwindFijado(root, fijadas);
   const avisos = [];
   const logger = vite.createLogger('warn');
   const anotar = (metodo) => (mensaje, opciones) => { avisos.push(String(mensaje)); logger[metodo](mensaje, opciones); };
+  const avisoDeConsola = console.warn;
+  console.warn = (...partes) => { avisos.push(partes.map(String).join(' ')); avisoDeConsola(...partes); };
+  try {
+    return await compilarConAvisos({ root, stagingDir, vite, logger, anotar, avisos, versiones: { vite: vite.version, rolldown: vite.rolldownVersion, ...tailwind } });
+  } finally {
+    console.warn = avisoDeConsola;
+  }
+}
+
+async function compilarConAvisos({ root, stagingDir, vite, logger, anotar, avisos, versiones }) {
   const modulos = new Set();
   await vite.build({
     configFile: path.join(root, 'vite.config.mjs'),
@@ -165,7 +190,7 @@ async function compilar({ root, stagingDir }) {
   });
   if (avisos.length) throw new Error(`Vite avisó al pre-renderizar la portada: ${avisos.join(' | ')}`);
   inyectarPortada(stagingDir, portada.renderPortada());
-  return { modulos, versiones: { vite: vite.version, rolldown: vite.rolldownVersion } };
+  return { modulos, versiones };
 }
 
 /** Pone la portada en el único marcador del `index.html` compilado. */

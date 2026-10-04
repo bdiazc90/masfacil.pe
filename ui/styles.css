@@ -1,6 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════
    masfacil.pe · CSS nativo, escrito a mano y servido tal cual.
 
+   Aquí viven los tokens —la única fuente de colores, escala, vidrio y
+   movimiento— y el CSS que se lee mejor como CSS: vidrio, halos, chips, la
+   card de controles, el SVG del histórico. La maquetación de cada pantalla va
+   en su JSX con utilidades de Tailwind (`tailwind.css` las configura como
+   alias de estos tokens). Este archivo no lleva directivas de Tailwind: así
+   nada lo reescribe al compilar.
+
    Orden: TEMA · SUPERFICIES · BASE · y después un bloque por componente, cada
    uno con sus variantes, sus estados y sus adaptaciones juntos. No hay una capa
    final de parches: el override vive debajo de la regla que modifica.
@@ -78,9 +85,15 @@
   /* Gráfico: tope del degradado de área */
   --chart-fill-alpha:.28;
 
-  /* Vidrio: desenfoque y cuánto glow deja pasar */
-  --blur:30px;
+  /* Vidrio: desenfoque y cuánto glow deja pasar; el desenfoque de las manchas */
+  --glass-blur:30px;
   --glass-saturate:35%;
+  --glow-blur:80px;
+
+  /* Movimiento: solo existe con `prefers-reduced-motion: no-preference` */
+  --motion-feedback:.15s; /* un control responde a su cambio de estado */
+  --motion-panel:200ms; /* el colapso del card de controles: sus cuatro transiciones duran esto o se ve roto */
+  --motion-ease:ease;
 
   /* Compartidos de forma y ritmo */
   --radius-small:12px;
@@ -91,11 +104,15 @@
   --s5:24px;
   --font:Roboto,-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,sans-serif;
 
-  /* Contrato con controls-card.js: lo lee de `documentElement` con `parseFloat`,
+  /* Contrato con useControlsCard.js: lo lee de `documentElement` con `parseFloat`,
      así que el valor tiene que llevar px. `--collapse-at` no la lee JS: dimensiona
      el sentinel que observa el IntersectionObserver. */
   --collapse-at:96px;
   --expand-at:8px;
+  /* Alto de la fila compacta del card de controles. La usan el propio resumen y
+     el `scroll-margin` de la tarjeta: si cambia aquí, el foco al paginar sigue
+     cayendo donde debe. */
+  --controls-compact-h:64px;
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
@@ -140,9 +157,26 @@
 :root{
   --surface:linear-gradient(115deg,color-mix(in srgb,var(--card) 20%,transparent),color-mix(in srgb,var(--card-2) 14%,transparent) 52%,color-mix(in srgb,var(--card) 8%,transparent));
   --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 30%,transparent),color-mix(in srgb,var(--border) 15%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 22%,transparent) 100%);
+  /* Las píldoras de la barra (tema, acceso rápido, «Más opciones»): relleno y borde. */
+  --pill-fill:color-mix(in srgb,var(--card) 42%,transparent);
+  --pill-rim:color-mix(in srgb,var(--border) 32%,transparent);
+}
+/* Sin vidrio no hay desenfoque que atenúe el halo de marca contra el glow: baja
+   con la marca (ver «Capa de marca»). Va aquí, sin capa, junto al token que
+   cambia: dentro de una capa perdería contra él. Indentado a propósito: la
+   sonda de contraste mide el valor con vidrio. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root{--brand-halo-alpha:.13}
 }
 
+/* ── Capas ─────────────────────────────────────────────────────────────
+   Todo lo que no es token vive en una capa: la CSS sin capa le gana a
+   cualquier utilidad. `base` es el reset propio (no hay Preflight);
+   `components`, el CSS de cada componente. El orden lo fija `tailwind.css`:
+   theme · base · components · utilities. */
+
 /* ── Base ──────────────────────────────────────────────────────────────── */
+@layer base{
 *{box-sizing:border-box}
 /* Solo html pinta el fondo: si body también lo pinta, tapa el glow (z-index:-1). */
 html{
@@ -155,9 +189,12 @@ body{margin:0;min-width:280px;min-height:100vh}
 button,a{font:inherit;min-height:44px}
 button{touch-action:manipulation;cursor:pointer}
 h1,h2,h3,p{margin-top:0}
+/* Los títulos por defecto; cada pantalla los ajusta donde hace falta. */
+h2{font-size:25px;letter-spacing:-.03em;line-height:1.1}
+h3{font-size:16px;margin-bottom:6px}
 :focus-visible{outline:3px solid var(--ring);outline-offset:3px}
 [hidden]{display:none!important}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* `.sr-only` es la utilidad de Tailwind. */
 .skip-link{
   position:fixed;
   left:10px;
@@ -169,10 +206,12 @@ h1,h2,h3,p{margin-top:0}
   color:var(--primary-foreground);
 }
 .skip-link:focus{transform:none}
+}
 
+@layer components{
 /* ── Fondo: ground sólido (html) + tres manchas. Sin velo encima. ─────── */
 .glow{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-.glow i{position:absolute;display:block;border-radius:50%;filter:blur(80px);opacity:var(--glow-alpha)}
+.glow i{position:absolute;display:block;border-radius:50%;filter:blur(var(--glow-blur));opacity:var(--glow-alpha)}
 .glow i:nth-child(1){width:60vw;height:60vw;max-width:520px;max-height:520px;right:-14vw;top:-16vw;background:var(--glow-1)}
 .glow i:nth-child(2){width:70vw;height:70vw;max-width:600px;max-height:600px;left:-24vw;bottom:-26vw;background:var(--glow-2)}
 .glow i:nth-child(3){width:34vw;height:34vw;max-width:300px;max-height:300px;left:48%;top:42%;background:var(--glow-3);opacity:.36}
@@ -186,8 +225,8 @@ h1,h2,h3,p{margin-top:0}
   position:relative;
   border-radius:var(--radius-small);
   background:var(--surface);
-  backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 .glass:after,.plate:after,.toggle:after{
   content:"";
@@ -218,11 +257,11 @@ h1,h2,h3,p{margin-top:0}
   gap:3px;
   min-height:44px;
   padding:3px;
-  border:1px solid color-mix(in srgb,var(--border) 32%,transparent);
+  border:1px solid var(--pill-rim);
   border-radius:999px;
-  background:color-mix(in srgb,var(--card) 42%,transparent);
-  backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter:blur(var(--blur)) saturate(var(--glass-saturate));
+  background:var(--pill-fill);
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
 .theme-toggle button{display:grid;place-items:center;width:36px;min-height:38px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground)}
 .theme-toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);box-shadow:0 1px 4px #0002}
@@ -246,17 +285,12 @@ h1,h2,h3,p{margin-top:0}
      sin este número ganaba el que pinta después en el DOM —una tarjeta— y
      tapaba `.place__menu` aunque su z-index fuera mayor. */
   z-index:1;
-  /* Alto de la fila resumen. La usan el propio resumen y el `scroll-margin` de
-     la tarjeta: si cambia aquí, el foco al paginar sigue cayendo donde debe. */
-  --controls-compact-h:64px;
-  /* Las cuatro transiciones del colapso duran lo mismo o se ve roto. */
-  --controls-ease:200ms;
   --controls-shadow:0 8px 24px -10px rgb(0 0 0 / .75);
 }
 .controls-sentinel{position:absolute;left:0;top:0;width:1px;pointer-events:none;visibility:hidden}
 .controls-sentinel--collapse{height:var(--collapse-at)}
 .controls-sentinel--expand{height:var(--expand-at)}
-/* Lo escribe controls-card.js sobre este elemento; el fallback vale hasta que llegue. */
+/* Lo escribe useControlsCard.js sobre este elemento; el fallback vale hasta que llegue. */
 .controls-slot{min-height:var(--controls-slot-h,auto)}
 .controls[data-state="compact"],.controls[data-state="overlay"]{
   position:fixed;
@@ -298,9 +332,9 @@ h1,h2,h3,p{margin-top:0}
   min-width:44px;
   min-height:44px;
   padding:0 var(--s3) 0 11px;
-  border:1px solid color-mix(in srgb,var(--border) 32%,transparent);
+  border:1px solid var(--pill-rim);
   border-radius:999px;
-  background:color-mix(in srgb,var(--card) 42%,transparent);
+  background:var(--pill-fill);
   color:var(--accent);
 }
 .controls__quick-label{font-size:13px;font-weight:700;white-space:nowrap}
@@ -349,9 +383,9 @@ h1,h2,h3,p{margin-top:0}
 .controls[data-screen="district"] [data-menu-screen="compare"],
 .controls:not([data-screen="district"]) [data-menu-screen="district"]{display:none}
 @media(prefers-reduced-motion:no-preference){
-  .controls__panel{transition:grid-template-rows var(--controls-ease) ease}
-  .controls__inner{transition:padding var(--controls-ease) ease}
-  .controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--controls-ease) ease,visibility 0s var(--controls-ease)}
+  .controls__panel{transition:grid-template-rows var(--motion-panel) var(--motion-ease)}
+  .controls__inner{transition:padding var(--motion-panel) var(--motion-ease)}
+  .controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--motion-panel) var(--motion-ease),visibility 0s var(--motion-panel)}
 }
 
 /* ── Lugar y sus acciones ──────────────────────────────────────────────
@@ -385,7 +419,7 @@ h1,h2,h3,p{margin-top:0}
 .place__action[data-status="pending"]{cursor:progress;opacity:.6}
 .place__action[data-status="error"]{background:transparent;border-color:var(--foreground);color:var(--foreground)}
 .place__action-icon,.place__menu-item svg{width:19px;height:19px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.place__more{flex-shrink:0;display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid color-mix(in srgb,var(--border) 32%,transparent);border-radius:999px;background:transparent;color:var(--foreground)}
+.place__more{flex-shrink:0;display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid var(--pill-rim);border-radius:999px;background:transparent;color:var(--foreground)}
 .place__more svg{width:20px;height:20px}
 /* `.controls__inner` recorta para animar el colapso; el recorte se abre solo
    mientras el menú está desplegado, que es cuando el panel ya está expandido. */
@@ -423,7 +457,7 @@ h1,h2,h3,p{margin-top:0}
 .toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);font-weight:700}
 .toggle--sub button{font-size:14px}
 @media(prefers-reduced-motion:no-preference){
-  .toggle button{transition:color .15s,background-color .15s,opacity .15s}
+  .toggle button{transition:color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
 }
 
 /* ── Botones ───────────────────────────────────────────────────────────── */
@@ -452,27 +486,15 @@ h1,h2,h3,p{margin-top:0}
 .screen-flow{display:grid;gap:var(--s4);margin-top:var(--s4)}
 .screen-flow .button--primary,.screen-flow>.button--ghost,.screen-flow>.button--text{width:100%}
 .screen-flow>.button--primary{min-height:52px}
-.eyebrow{margin:0 0 var(--s3);color:var(--accent);font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
-h2{font-size:25px;letter-spacing:-.03em;line-height:1.1}
-h3{font-size:16px;margin-bottom:6px}
 .lede,.hint,.about p{color:var(--muted-foreground)}
 .hint,.lede{font-size:14px;line-height:1.45;margin-bottom:0}
 .start-step{padding-top:var(--s2);text-align:center}
 .start-step h1{margin:0 0 var(--s2);font-size:25px;font-weight:700;letter-spacing:-.03em;line-height:1.14;text-wrap:balance}
-/* El selector de Inicio es el mismo control segmentado que el de resultados,
-   con su nombre visible: elegir no pide ubicación ni cambia de pantalla. */
-.view-picker--start{display:grid;gap:var(--s2);margin:0 0 var(--s3);padding:0;border:0;min-width:0}
-.view-picker--start legend{padding:0;margin:0 auto var(--s2);color:var(--muted-foreground);font-size:14px;font-weight:600}
-.view-state{display:grid;gap:var(--s3);justify-items:start}
-.view-state .lede{margin:0}
-.center{text-align:center}
-.loading{min-height:55vh;place-content:center}
 .dot{display:block;width:14px;height:14px;margin:0 auto var(--s4);border-radius:50%;background:var(--primary)}
 @media(prefers-reduced-motion:no-preference){
   .dot{animation:breathe 2.6s ease-in-out infinite}
   @keyframes breathe{0%,100%{opacity:.28}50%{opacity:1}}
 }
-.district-step h2{margin:0 0 2px}
 .district-filter{display:grid;gap:6px}
 .district-filter label{color:var(--muted-foreground);font-size:14px;font-weight:600}
 .district-filter input{
@@ -487,41 +509,23 @@ h3{font-size:16px;margin-bottom:6px}
 }
 .district-filter input::placeholder{color:var(--muted-foreground);opacity:1}
 .chips{display:flex;flex-wrap:wrap;gap:var(--s3)}
-.chips button{border:0;border-radius:999px;background:var(--surface);color:var(--foreground);padding:0 var(--s4);font-weight:600;backdrop-filter:blur(var(--blur))}
-.empty h2{margin-bottom:var(--s3)}
+.chips button{border:0;border-radius:999px;background:var(--surface);color:var(--foreground);padding:0 var(--s4);font-weight:600;backdrop-filter:blur(var(--glass-blur))}
+.about{margin-top:var(--s4)}
 .about summary{min-height:44px;display:flex;align-items:center;color:var(--muted-foreground);font-weight:400;cursor:pointer}
 .about p:last-child{margin-bottom:0}
 
 /* ── Resultados ────────────────────────────────────────────────────────── */
 .screen-flow--results{display:block}
-.offline-note{margin:var(--s4) 2px 0;color:var(--muted-foreground);font-size:13px;line-height:1.4}
-/* Aviso de «Actualizar ubicación»: la lista sigue debajo, con o sin éxito. */
-.location-update{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);margin:var(--s4) 2px 0}
-.location-update__text{margin:0;color:var(--muted-foreground);font-size:13px;line-height:1.4}
-.location-update[data-status="error"] .location-update__text{color:var(--foreground);font-weight:600}
-.location-update .button--text{flex-shrink:0;white-space:nowrap;min-height:36px;padding-block:0}
-.offers{display:grid;gap:var(--s3);list-style:none;margin:var(--s4) 0 0;padding:0}
-.screen-flow--results .empty,.about{margin-top:var(--s4)}
-#load-more{width:100%;margin-top:var(--s3)}
 /* El foco al paginar cae en una tarjeta nueva; sin esto quedaría bajo el card fijo. */
-.offer{scroll-margin-top:calc(var(--s4) + var(--controls-compact-h,64px) + var(--s3))}
+.offer{scroll-margin-top:calc(var(--s4) + var(--controls-compact-h) + var(--s3))}
 
-/* ── Tarjeta de oferta ─────────────────────────────────────────────────── */
-.offer__tag{margin:0 0 var(--s2);color:var(--accent);font-size:13px;font-weight:700}
-/* Los tres datos que se comparan, en una fila y repartidos: precio Regular,
-   precio Premium y distancia se leen de un barrido, y la esquina superior
-   derecha queda libre para que la marca sangre sin pisar ningún dato. */
-.offer__topline{display:flex;justify-content: space-around;align-items:center;gap:var(--s2);margin-bottom:var(--s3)}
-@media(max-width:340px){.offer__topline{gap:var(--s1)}}
+/* ── Tarjeta de oferta ─────────────────────────────────────────────────
+   La maquetación vive en `ui/results/OfferCard.jsx`. Aquí, la celda de precio:
+   la cifra que decide y sus estados, que mezclan colores medidos. */
 .offer__price{display:grid;gap:var(--s1);margin:0;justify-items:start;min-width:0}
 .offer__price b{font-size:24px;font-weight:800;letter-spacing:-.035em;line-height:1;white-space:nowrap;color:var(--foreground)}
 .offer__price b small{font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
-/* La unidad acompaña a la cifra fuera de Gasolina: se lee, pero no compite. */
-.offer__unit,.detail__unit{font-size:12.5px;font-weight:600;color:var(--muted-foreground)}
 @media(max-width:340px){.offer__price b{font-size:21px}}
-.offer__distance{display:grid;gap:var(--s1);justify-items:start;margin:0}
-.offer__distance b{font-size:18px;font-weight:600;color:var(--muted-foreground);line-height:1;white-space:nowrap}
-@media(max-width:340px){.offer__distance b{font-size:16px}}
 
 /* Un solo sitio decide el color de producto: el chip suelto (detalle) o el
    bloque de precio. El tono base tiñe el relleno, `-strong` es la tinta. */
@@ -551,7 +555,7 @@ h3{font-size:16px;margin-bottom:6px}
 .chip--distance{--product-strong:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
 @media(forced-colors:active){.chip{border:2px solid ButtonText}}
 @media(prefers-reduced-motion:no-preference){
-  .chip,.offer__price b{transition:color .15s,background-color .15s,opacity .15s}
+  .chip,.offer__price b{transition:color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
 }
 /* Énfasis: en «Más barata» el producto elegido pinta la cifra con «strong» y su
    chip sube de peso y de borde; el otro (--muted) baja a gris. Sin precio
@@ -563,19 +567,8 @@ h3{font-size:16px;margin-bottom:6px}
 .offer__price--muted b,.offer__price--absent b{color:var(--muted-foreground);font-weight:600}
 .offer__price--muted .chip,.offer__price--absent .chip{--product-strong:var(--muted-foreground);border-color:color-mix(in srgb,var(--product) 24%,transparent)}
 
-.offer__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:2px var(--s3);margin:0 0 var(--s4)}
-.offer__grid>*{margin:0;min-width:0;overflow-wrap:anywhere}
-.offer__identity{font-size:16px;font-weight:700;line-height:1.35}
-.offer__unconfirmed{color:var(--muted-foreground);font-size:12.5px;font-weight:600;white-space:nowrap}
-.offer__address{font-size:14.5px;line-height:1.35;text-align:right}
-.offer__freshness,.offer__district{color:var(--muted-foreground);font-size:13.5px}
-.offer__district{text-align:right}
-.offer__silence{color:var(--muted-foreground);font-size:13.5px;font-weight:600}
-.offer__actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
-@media(max-width:340px){.offer__actions .button{padding-inline:10px;font-size:14px;letter-spacing:.02em}}
 /* La tarjeta muda es la misma sin su fila de precios, que es la más alta. */
 .offer--silent{padding:var(--s4) var(--s5)}
-.offer--silent .offer__grid{margin-bottom:var(--s3)}
 
 /* ── Capa de marca: la firma visual de la tarjeta ──────────────────────
    Isotipo amplio y traslúcido que sangra por la esquina superior derecha, con
@@ -622,22 +615,14 @@ h3{font-size:16px;margin-bottom:6px}
 .offer>*:not(.offer__brandmark){position:relative;z-index:1}
 @media(forced-colors:active){.offer__brandmark{display:none}}
 /* Sin vidrio no hay desenfoque que atenúe la decoración contra el glow: la
-   marca y su halo bajan para que el dato siga mandando. */
+   marca baja para que el dato siga mandando; su halo, en los tokens. */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .offer{--brand-mark-opacity:.13}
-  :root{--brand-halo-alpha:.13}
 }
 
 /* ── Panel de detalle ──────────────────────────────────────────────────── */
+/* Las filas y los textos viven en `ui/results/OfferDetail.jsx`. */
 .offer__detail{margin-top:var(--s4);padding-top:var(--s4);border-top:1.5px solid color-mix(in srgb,var(--border) 28%,transparent);display:grid;gap:var(--s2)}
-.detail__row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s3);align-items:baseline}
-.detail__row .chip{align-self:center}
-.detail__price{font-size:16px;font-weight:700}
-.detail__price small{font-size:12px;font-weight:600;color:var(--muted-foreground);margin-right:2px}
-.detail__when{color:var(--muted-foreground);font-size:13px;white-space:nowrap}
-.detail__row--empty .detail__price{color:var(--muted-foreground);font-weight:500}
-.detail__meta{margin:var(--s1) 0 0;color:var(--muted-foreground);font-size:12.5px;line-height:1.5;display:grid;gap:2px}
-.detail__meta b{font-weight:600;color:var(--foreground)}
 .offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:40px}
 
 /* ── Firma ─────────────────────────────────────────────────────────────
@@ -680,21 +665,11 @@ h3{font-size:16px;margin-bottom:6px}
 /* Los ítems de un grid traen `min-width:auto`: sin esto el SVG no se encoge y
    el bloque desborda su tarjeta a 320 px. */
 .history>*{min-width:0}
-.history h2{font-size:16px;margin:0}
-.history__sub{margin:0;color:var(--muted-foreground);font-size:12.5px}
-/* Las dos lecturas en columnas sobre el trazado. */
-.history__lecturas{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
 /* Un solo sitio decide el color de cada serie, igual que `[data-key]` en la
-   tarjeta: la lectura y su grupo del SVG heredan `--serie`. */
+   tarjeta: la lectura (`text-serie`) y su grupo del SVG heredan `--serie`. Los
+   textos del bloque viven en `ui/history/HistoryChart.jsx`. */
 [data-serie="regular"]{--serie:var(--product-regular-strong)}
 [data-serie="premium"]{--serie:var(--product-premium-strong)}
-.history__lectura-producto{display:grid;gap:2px;min-width:0}
-.history__producto{margin:0;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--serie)}
-/* El último promedio se lee en reposo, sin tocar nada: es la lectura principal. */
-.history__valor{margin:0;font-size:26px;font-weight:800;letter-spacing:-.035em;line-height:1.1;color:var(--foreground)}
-.history__valor small{font-size:14px;font-weight:600;letter-spacing:0;color:var(--muted-foreground);margin-right:3px}
-.history__valor--vacio{color:var(--muted-foreground);font-weight:600}
-.history__meta{margin:0;font-size:12.5px;color:var(--muted-foreground)}
 .history__svg{width:100%;height:auto;display:block;margin-top:var(--s1);touch-action:pan-y;overflow:visible}
 .history__svg:focus-visible{outline:3px solid var(--ring);outline-offset:3px;border-radius:var(--radius-small)}
 .history__tick line{stroke:var(--border);stroke-width:.7;opacity:.45}
@@ -724,5 +699,5 @@ h3{font-size:16px;margin-bottom:6px}
 .history__ultimo{fill:var(--serie);stroke:var(--card);stroke-width:1.8}
 .history__activo{fill:var(--card);stroke:var(--serie);stroke-width:2.4}
 .history__lectura{margin:0;font-size:12.5px;color:var(--foreground);min-height:1.5em}
-.history__nota,.history__cargando{margin:0;color:var(--muted-foreground);font-size:12.5px}
 .history[data-state=loading] .history__lectura,.history[data-state=error] .history__lectura{display:none}
+}

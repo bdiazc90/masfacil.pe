@@ -26,16 +26,22 @@ export function enfocarHistorial() {
   (bloque.querySelector('.history__svg') ?? document.getElementById('history-title') ?? bloque).focus?.({ preventScroll: true });
 }
 
+// Lo secundario del bloque —subtítulo, fecha de cada lectura, notas— se lee en
+// gris y pequeño, sin competir con las cifras.
+const SECUNDARIO = 'm-0 text-[12.5px] text-muted-foreground';
+// El último promedio se lee en reposo, sin tocar nada: es la lectura principal.
+const VALOR = 'm-0 text-[26px] leading-[1.1] tracking-[-.035em]';
+
 function Lecturas({ marco }) {
   return (
-    <div className="history__lecturas">
+    <div className="grid grid-cols-[1fr_1fr] gap-s3">
       {lecturas(marco).map((producto) => (
-        <div key={producto.key} className="history__lectura-producto" data-serie={producto.key}>
-          <h3 className="history__producto">{producto.label}</h3>
+        <div key={producto.key} className="grid min-w-0 gap-[2px]" data-serie={producto.key}>
+          <h3 className="m-0 text-[12px] font-bold tracking-[.08em] text-serie uppercase">{producto.label}</h3>
           {producto.valor !== null ? (
-            <><p className="history__valor"><small>S/</small>{producto.valor}</p><p className="history__meta"><time dateTime={producto.datetime}>{producto.fecha}</time>{` · ${producto.n} grifos`}</p></>
+            <><p className={`${VALOR} font-extrabold text-foreground`}><small className="mr-[3px] text-[14px] font-semibold tracking-[0] text-muted-foreground">S/</small>{producto.valor}</p><p className={SECUNDARIO}><time dateTime={producto.datetime}>{producto.fecha}</time>{` · ${producto.n} grifos`}</p></>
           ) : (
-            <><p className="history__valor history__valor--vacio" aria-hidden="true">—</p><p className="history__meta">Sin días registrados en esta ventana.</p></>
+            <><p className={`${VALOR} font-semibold text-muted-foreground`} aria-hidden="true">—</p><p className={SECUNDARIO}>Sin días registrados en esta ventana.</p></>
           )}
         </div>
       ))}
@@ -137,16 +143,16 @@ export function HistoryChart({ hidden, activo, demo = false }) {
 
   return (
     <section id="history-chart" className="history plate" aria-labelledby="history-title" data-state={activo ? carga.estado : 'loading'} hidden={hidden}>
-      <h2 id="history-title" tabIndex={-1}>Precio promedio en Lima</h2>
-      <p className="history__sub">S/ por galón · últimos 7 días observados</p>
+      <h2 id="history-title" className="m-0 text-[16px]" tabIndex={-1}>Precio promedio en Lima</h2>
+      <p className={SECUNDARIO}>S/ por galón · últimos 7 días observados</p>
       <div id="history-body">
-        {activo && carga.estado === 'loading' ? <p className="history__cargando">Cargando el histórico…</p> : null}
+        {activo && carga.estado === 'loading' ? <p className={SECUNDARIO}>Cargando el histórico…</p> : null}
         {marco ? <><Lecturas marco={marco} /><Plano marco={marco} seleccion={seleccion} uid={uid} onElegir={elegir} onTecla={alTeclear} /></> : null}
       </div>
       {activo ? (
         <>
           {/* Persistentes: no se rehacen, así que el lector anuncia lo que la persona eligió. */}
-          <p className="history__nota" role="status" hidden={!carga.nota}>{carga.nota}</p>
+          <p className={SECUNDARIO} role="status" hidden={!carga.nota}>{carga.nota}</p>
           <p className="history__lectura" role="status">{marco && seleccion !== null ? lectura(marco.points[seleccion]) : ''}</p>
         </>
       ) : null}

@@ -137,7 +137,7 @@ export function Controls({ screen, search, lugar, pildora, resumen, radio, orden
                 </div>
               </div>
               {/* El combustible, entre el lugar y el radio. Solo existe si hay más de una vista. */}
-              <div id="view-picker-controls" className="toggle view-picker" role="group" aria-label="Combustible" hidden={!varias}><ViewButtons view={search.view} onView={onView} /></div>
+              <div id="view-picker-controls" className="toggle" role="group" aria-label="Combustible" hidden={!varias}><ViewButtons view={search.view} onView={onView} /></div>
               <div id="radius-control" className="radius" hidden={!radio}>
                 <div className="radius__head"><label className="radius__label" htmlFor="radius-input">Radio</label><p id="radius-readout" className="radius__readout" role="status">{radio?.readout ?? ''}</p></div>
                 <input ref={radioInput} id="radius-input" className="radius__input" type="range" min={RADIUS_MIN_KM} max={RADIUS_MAX_KM} step="0.5" value={search.radiusKm} disabled={Boolean(radio?.inert)} aria-describedby="radius-readout" onChange={(event) => onRadius(Number(event.target.value))} />

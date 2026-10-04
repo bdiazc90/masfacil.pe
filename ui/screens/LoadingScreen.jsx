@@ -3,8 +3,8 @@
 
 export function LoadingScreen({ hidden, onDistricts }) {
   return (
-    <section id="loading-step" className="screen-flow loading" aria-live="polite" hidden={hidden}>
-      <div className="center"><span className="dot" aria-hidden="true"></span><p className="lede">Buscando tu ubicación…</p><button id="cancel-location" className="button--text" type="button" onClick={onDistricts}>Ver distritos</button></div>
+    <section id="loading-step" className="screen-flow min-h-[55vh] place-content-center" aria-live="polite" hidden={hidden}>
+      <div className="text-center"><span className="dot" aria-hidden="true"></span><p className="lede">Buscando tu ubicación…</p><button id="cancel-location" className="button--text" type="button" onClick={onDistricts}>Ver distritos</button></div>
     </section>
   );
 }

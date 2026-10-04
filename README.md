@@ -29,8 +29,9 @@ npm run serve          # compila y sirve lo publicable en http://127.0.0.1:4173
 npm run dev            # Vite con recarga en caliente en http://127.0.0.1:5173
 ```
 
-`npm run dev` es para editar: no registra el service worker ni aplica la CSP,
-la 404 real o el modo sin red. Eso se comprueba con `npm run serve`.
+`npm run dev` es para editar —también para afinar un token o una clase y verlo
+al instante—: no registra el service worker ni aplica la CSP, la 404 real o el
+modo sin red. Eso se comprueba con `npm run serve`.
 
 Para ver datos reales hace falta el bundle. Dos formas:
 
@@ -50,6 +51,32 @@ un CSS o registrar un logo no exige recordar ningún número de versión. La
 constancia del build queda en `.local-cache/ui-build/`, y `npm run verify:web`
 rechaza una interfaz compilada que no corresponda a las fuentes, la
 configuración y el lockfile actuales.
+
+## Dónde se cambia la interfaz
+
+- **La maquetación de una pantalla, la tarjeta o el histórico** —espacios,
+  columnas, tamaños de texto—: en su JSX (`ui/screens/`, `ui/results/`,
+  `ui/history/`), con utilidades de Tailwind. La escala es la del proyecto:
+  `p-s1`…`p-s5` (4 · 8 · 12 · 16 · 24 px), colores por rol (`text-muted-foreground`,
+  `bg-card`…) y `estrecho:` para 340 px o menos. Una medida de un solo uso va
+  como valor arbitrario (`text-[13px]`).
+- **Colores, temas, vidrio y movimiento**: los tokens al principio de
+  `ui/styles.css`, claro en `:root` y oscuro en `:root[data-theme="dark"]`. Son la
+  única fuente: Tailwind los usa por alias (`ui/tailwind.css`) y
+  `node scripts/contrast.mjs` los mide; al tocar un color, corre la sonda.
+- **Vidrio, halos de marca, chips, estados de la cifra, card de controles, radio,
+  selectores y SVG del histórico**: CSS de componente en `ui/styles.css`, porque
+  mezclan colores medidos, usan pseudo-elementos o tienen estados que una
+  utilidad pisaría.
+- **Una regla de negocio** —vigencia, orden, radio, textos—: `web/lib/` y
+  `ui/offer-view.js`, `ui/app-view.js`, `ui/history-view.js`; los componentes solo
+  pintan lo que deciden.
+- **Clases completas siempre**: una variante sale de un mapa con los nombres
+  enteros (por ejemplo `CELDA_PRECIO` en `ui/results/OfferCard.jsx`), nunca de
+  `bg-${algo}`. Tailwind solo lee `ui/`.
+
+Navegadores objetivo: Chrome/Edge 111, Safari/iOS 16.4 y Firefox 128 (de Firefox
+121 a 127 se usa, sin garantía visual).
 
 ## Operación
 

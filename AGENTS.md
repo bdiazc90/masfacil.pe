@@ -92,7 +92,7 @@ node_modules/
 
 - Los contratos se validan al proyectar y en el navegador. Es runtime, no testing.
 - Regular y Premium se promueven juntos; el manifest se escribe al final; los snapshots son inmutables y la revisión sale del contenido.
-- La interfaz se escribe en `ui/` y Vite la compila hacia `web/`: `npm run build` instala por inventario solo `web/index.html`, `web/404.html` y `web/assets/`, sin tocar datos ni módulos compartidos, y deja su constancia en `.local-cache/ui-build/`. `verify:web` rechaza un build viejo, alterado o a medias; verificar no compila.
+- La interfaz se escribe en `ui/` y Vite la compila hacia `web/`, con Tailwind solo en `ui/tailwind.css` (`ui/styles.css` no lleva directivas y llega tal cual): `npm run build` instala por inventario solo `web/index.html`, `web/404.html` y `web/assets/`, sin tocar datos ni módulos compartidos, y deja su constancia en `.local-cache/ui-build/`. `verify:web` rechaza un build viejo, alterado o a medias; verificar no compila.
 - La precache del service worker también sale del contenido: su lista se deriva de lo que emitió el build, de lo que cargan las páginas compiladas y del registro de marcas, y su versión de la huella de esos bytes y del grafo del worker. La versión viaja en `web/sw.js`, generado, porque Chrome no reinstala un worker de módulos si solo cambia un import; la lógica vive en `web/sw-main.js`. No hay número que subir a mano.
 - Publicar la interfaz no depende de la fuente de datos: la ruta `shell` reutiliza el último bundle público válido y comprueba que el cliente nuevo lo acepte.
 - `npm run audit`, `npm run verify:web` y el rollback se conservan.
@@ -128,7 +128,7 @@ npm run dev                  # Vite con recarga en caliente; sin service worker
 ## Mapa
 
 ```text
-ui/          fuentes de la interfaz, compiladas con Vite
+ui/          fuentes de la interfaz, compiladas con Vite y Tailwind
 web/         lo publicado: interfaz compilada, datos, iconos, worker y reglas compartidas
 pipeline/    proyección privada a bundle público y build de la interfaz
 app/         contratos, validación de runtime, política de ruta y catálogo privado

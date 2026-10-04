@@ -134,7 +134,7 @@ una cadena más que hay que seguir para saber de qué color es algo. Se conserva
 gana algo real:
 
 - **cambia de verdad con el tema** — todos los colores de la tabla de abajo;
-- **es contrato con JavaScript** — `--expand-at`, que `controls-card.js` lee de la raíz
+- **es contrato con JavaScript** — `--expand-at`, que `useControlsCard.js` lee de la raíz
   con `parseFloat` y por eso conserva su unidad px, y `--controls-slot-h`, que ese mismo
   módulo escribe;
 - **lo mide `scripts/contrast.mjs`** — si el CSS y su comprobación comparten un valor,
@@ -155,34 +155,45 @@ matiz y croma por escrito.
 
 | Token | Rol | Claro | Oscuro |
 |---|---|---|---|
-| `--background` | papel | `oklch(95% .01 130)` | `oklch(20% .02 130)` |
+| `--background` | papel | `oklch(96.3% 0.002 197.1)` | `oklch(21.8% 0.008 223.9)` |
 | `--foreground` | tinta: el dato que decide | `oklch(30% .01 130)` | `oklch(78% .01 130)` |
-| `--muted-foreground` | dato secundario | `oklch(46% .01 130)` | `oklch(75% .01 130)` |
+| `--muted-foreground` | dato secundario | `oklch(46% .01 130)` | `oklch(76% .01 130)` |
 | `--card` → `--card-2` | superficies de vidrio | L 98 % → 90 % | L 30 % → 23 % |
 | `--border` → `--border-2` | canto del vidrio | L 40 % → 30 % | L 62 % → 85 % |
 | `--primary` / `--primary-foreground` | la acción, una vez por pantalla | `#074b3f` / `#ffffff` | `#32b988` / `#052611` |
 | `--accent` | enlaces, etiquetas, tag de tarjeta | `#17615d` | `#63d0c9` |
 | `--ring` | anillo de foco | `#2e7d32` | `#4caf50` |
-| `--brand` | la palabra «masfacil» del logotipo, en ambos temas | `#b8071b` | `#b8071b` |
+| `--brand` | la palabra «masfacil» del logotipo, en ambos temas | `#e0581e` | `#e0581e` |
 | `--product-regular` / `-strong` | Regular: el tono base tiñe el relleno del chip; `-strong` es la tinta del chip y la cifra activa | `#708d3a` / `#207461` | `#7fc9a0` / `#8fe3b3` |
 | `--product-premium` / `-strong` | Premium, igual | `#4a78a8` / `#1d4e8e` | `#8fb4e0` / `#a4c6f2` |
 | `--product-diesel` / `-strong` | Diésel, igual; no tiene serie en el histórico | `#9a7a2c` / `#7a5712` | `#d9b56a` / `#ecc97e` |
 | `--product-glp` / `-strong` | GLP, igual; no tiene serie en el histórico | `#8a63b8` / `#5e3d8f` | `#c3a6ec` / `#d6c1f7` |
 | `--product-gnv` / `-strong` | GNV, igual; no tiene serie en el histórico | `#b85a7a` / `#8a2f55` | `#eca3bd` / `#f5bfd1` |
-| `--halo-<marca>` | halo de la marca del grifo, un token por marca registrada | tintes claros: `#d0d2fa` `#ffe0cb` `#ebd5f0` `#cdefdd` | tintes oscuros: `#171a52` `#5a2a0c` `#3a1244` `#0d3b29` |
+| `--halo-<marca>` | halo de la marca del grifo, un token por marca registrada (Primax, Repsol, AVA, Petroperú, Pecsa, Energigas, Terpel) | tintes claros: `#f2c2a6` `#899ccd` `#e3c2eb` `#ffbbbb` `#f5b8bf` `#c9e6b0` `#ffd1a8` | tintes oscuros: `#171a52` `#5a2a0c` `#3a1244` `#0d3b29` `#4a0b14` `#173d11` `#4f1a05` |
 | `--brand-halo-alpha` | cuánto pesa el halo de marca | .38 | .38 |
 | `--chart-fill-alpha` | tope del degradado de área del histórico | .28 | .18 |
-| `--glow-1` `--glow-2` `--glow-3` | las tres manchas del fondo | `#bfb6a7` `#d7d2c3` `#bb9978` | `#815a48` `#585b48` `#8d6c5e` |
+| `--glow-1` `--glow-2` `--glow-3` | las tres manchas del fondo | `oklch(95.3% 0.051 180.801)` `oklch(95.1% 0.026 236.824)` `oklch(95.6% 0.045 203.388)` | `#815a48` `#585b48` `#8d6c5e` |
 | `--glow-alpha` / `--glow-blur` | intensidad y difusión del glow | .6 / 80 px | .6 / 80 px |
-| `--blur` / `--glass-saturate` | vidrio: desenfoque y cuánto glow deja pasar | 30 px / 35 % | 30 px / 35 % |
+| `--glass-blur` / `--glass-saturate` | vidrio: desenfoque y cuánto glow deja pasar | 30 px / 35 % | 30 px / 35 % |
+| `--motion-feedback` / `--motion-panel` / `--motion-ease` | movimiento, solo con `prefers-reduced-motion: no-preference`: un control que cambia de estado; el colapso del card de controles; la curva | .15 s / 200 ms / `ease` | igual |
 | `--logo-halo` | contorno del logo para que el aro no se funda con el fondo | transparente | blanco al 45 % |
 
 Compartidos: `--font` (Roboto → stack del sistema), la escala de espaciado
-`--s1`…`--s5` (4 · 8 · 12 · 16 · 24 px), `--radius-small` 12 px, `--blur` y
-`--glass-saturate`, los dos umbrales del card de controles (`--collapse-at` 96 px,
-`--expand-at` 8 px) y las dos recetas de superficie, `--surface` y `--rim`. El resto de
-medidas —tamaños de cifra, alto del trazado, desvanecidos, duraciones— vive escrito en
-su regla, con su variación agrupada debajo.
+`--s1`…`--s5` (4 · 8 · 12 · 16 · 24 px), `--radius-small` 12 px, los dos umbrales del
+card de controles (`--collapse-at` 96 px, `--expand-at` 8 px), el alto de su fila
+compacta (`--controls-compact-h` 64 px, que también usa el `scroll-margin` de la
+tarjeta) y las recetas de superficie: `--surface` y `--rim` para el vidrio, `--pill-fill`
+y `--pill-rim` para las píldoras de la barra. El resto de medidas —tamaños de cifra,
+alto del trazado, desvanecidos— vive escrito en su regla, con su variación agrupada
+debajo.
+
+**Tokens y Tailwind.** Las utilidades no tienen paleta ni escala propias: `ui/tailwind.css`
+declara alias `inline` de estos tokens (`text-muted-foreground` es `var(--muted-foreground)`,
+`p-s3` es `var(--s3)`) y borra todo lo demás, así que `p-5` o `text-red-500` no existen.
+Una medida de un solo uso va como valor arbitrario junto a su propiedad (`text-[13px]`).
+`estrecho:` es el ancho de 340 px o menos; `dark:` sigue a `data-theme`, nunca a la media
+query. Afinar un color se hace en el token, con `npm run dev` abierto: cambia en vivo y en
+todos los sitios que lo usan.
 
 **Cuatro roles de color, separados.** Identidad de masfacil (`--brand`), acción
 (`--primary`, `--accent`, `--ring`), combustible (`--product-*`) y marca del grifo
@@ -206,7 +217,7 @@ de controles, cuando va fijo, se rellena al 90 % y lleva sombra: ahí sí hay qu
 de la lista que pasa por debajo.
 
 **Fondo.** Papel liso pintado por `html` y tres manchas difusas (`.glow`) en `z-index:-1`:
-ámbar sobre papel en claro, terracota sobre carbón en oscuro. Sin velo encima y sin
+verdeagua y celeste sobre papel en claro, terracota sobre carbón en oscuro. Sin velo encima y sin
 imágenes: `body` no pinta fondo, porque lo taparía. Detectar la violación: el glow no se
 ve.
 
@@ -221,8 +232,8 @@ que acompañan. Su nombre completo en `aria-label` es refuerzo, no sustituto: un
 `aria-label` no vuelve legible un chip que no se lee.
 
 **Las etiquetas de un SVG también son texto.** Dentro de un `viewBox` el tamaño se escala
-con el ancho: `--chart-label-size` sube a 15 unidades bajo 340 px justo para que siga
-midiendo 12 px reales. Una etiqueta ilegible no se compensa con un `aria-label`.
+con el ancho: `--chart-label-size` sube de 12.5 a 16 unidades hasta 340 px justo para que
+siga midiendo 12 px reales. Una etiqueta ilegible no se compensa con un `aria-label`.
 
 **Rendimiento como decisión de diseño.** Sesiones de diez segundos: el shell arranca en
 pocos KB y funciona offline con el último bundle validado. Un efecto que cueste en un
@@ -233,7 +244,7 @@ Android de gama baja se paga solo si mejora la decisión.
 Principios, no catálogo. Un inventario cerrado de componentes con sus reglas
 exige mantener a mano una copia del código y envejece en cada cambio de UI; lo
 que sigue vigente es cómo debe comportarse cualquier control de esta interfaz.
-La interfaz es React y cada componente vive en `ui/`: la cabecera en `ui/controls/`, las pantallas en `ui/screens/`, la lista de resultados en `ui/results/` y el histórico en `ui/history/`. Lo que dicen —textos, estados, marca, enlaces, geometría del gráfico— se decide sin JSX en `ui/offer-view.js`, `ui/app-view.js` y `ui/history-view.js`, y las transiciones de la búsqueda en `ui/app-state.js`. Los estilos siguen en `ui/styles.css`.
+La interfaz es React y cada componente vive en `ui/`: la cabecera en `ui/controls/`, las pantallas en `ui/screens/`, la lista de resultados en `ui/results/` y el histórico en `ui/history/`. Lo que dicen —textos, estados, marca, enlaces, geometría del gráfico— se decide sin JSX en `ui/offer-view.js`, `ui/app-view.js` y `ui/history-view.js`, y las transiciones de la búsqueda en `ui/app-state.js`. La maquetación de cada componente va en su JSX con utilidades de Tailwind; los tokens y el CSS que se lee mejor como CSS —vidrio, halos, chips, estados de la cifra, card de controles, range, selectores, SVG del histórico— en `ui/styles.css`, y la configuración de Tailwind en `ui/tailwind.css`.
 
 - **Un control, una cosa.** Ordenar no filtra; filtrar no ordena. Un control cuyo
   efecto no se puede nombrar en una línea está haciendo dos cosas.
@@ -368,9 +379,13 @@ un solo uso se escribe junto a su propiedad, aquí y en cualquier stack futuro. 
 se exige de una utilidad de clases es que los colores y el espaciado sigan saliendo de
 esta paleta y de esta escala, no de una tabla paralela.
 
-Tailwind v4 se evaluó y no se adoptó: incorporarlo obligaría a compilar antes de derivar
-y verificar el shell, y sus variables de tema no ahorran elegir paleta ni roles. Una
-futura migración se evalúa por su necesidad concreta, no por anticiparla.
+Tailwind v4 se adoptó con la migración a React (`SPEC-UI-REACT.md`, gate 4), con estas
+reglas: sin Preflight —el reset es el propio—, sin tema por defecto, alias `inline` de los
+tokens y nada más; `ui/styles.css` no lleva directivas, así que llega tal cual y lo que mide
+la sonda de contraste es lo que se sirve; clases completas siempre, y una variante sale de
+un mapa con los nombres enteros, nunca de interpolar `bg-${algo}`; las utilidades solo se
+leen de `ui/`. Navegadores objetivo: Chrome/Edge 111, Safari/iOS 16.4 y Firefox 128; de
+Firefox 121 a 127 la interfaz se usa, pero sin garantía visual.
 
 ## 12 · Decisiones cerradas de gasolina
 
