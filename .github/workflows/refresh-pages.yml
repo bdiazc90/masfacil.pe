@@ -68,6 +68,14 @@ jobs:
       # que auditar `:` y luego `HEAD` revisaba dos veces el mismo árbol. Esta
       # cubre además el historial, que la otra no miraba.
       - run: node scripts/audit-publication.mjs --treeish HEAD --strict-history
+      # Las pruebas puntuales del repositorio, con las versiones exactas del
+      # lockfile: main no se publica en rojo.
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 12.3.4
+          run_install: false
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: npm test
 
   prepare:
     needs: verify
