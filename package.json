@@ -20,6 +20,8 @@
     "audit": "node scripts/audit-publication.mjs",
     "verify:web": "node scripts/verify-web.mjs",
     "test": "node --test test/*.test.mjs",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
     "harvest:centers": "node scripts/harvest-centers.mjs",
     "harvest:match": "node scripts/match-identities.mjs",
     "identity:install": "node scripts/identity-install.mjs",
@@ -36,6 +38,7 @@
     "aws4fetch": "1.0.20"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@tailwindcss/vite": "4.3.3",
     "@vitejs/plugin-react": "6.1.1",
     "react": "19.3.0",

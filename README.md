@@ -28,6 +28,8 @@ npm run build          # compila ui/ hacia web/ y deriva la precache
 npm run serve          # compila y sirve lo publicable en http://127.0.0.1:4173
 npm run dev            # Vite con recarga en caliente en http://127.0.0.1:5173
 npm test               # pruebas puntuales, no una suite; CI las corre en cada push
+npm run lint           # formato y variables sin uso (Biome); CI lo exige
+npm run format         # aplica el formato
 node scripts/contrast.mjs   # mide el contraste de los tokens de ui/styles.css
 ```
 
