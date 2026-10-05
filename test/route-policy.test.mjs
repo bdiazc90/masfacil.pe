@@ -42,3 +42,8 @@ test('un cambio visual habitual sigue siendo shell', () => {
   // comprueba que el cliente acepte el bundle vigente.
   assert.equal(ruta('web/gasolina-contract.js'), 'shell');
 });
+
+test('las sondas de navegador no disparan una publicación', () => {
+  assert.equal(ruta('scripts/probes/visitor.mjs', 'scripts/probes/lib.mjs'), 'docs');
+  assert.equal(ruta('scripts/probes/touch.mjs', 'ui/app.js'), 'shell');
+});

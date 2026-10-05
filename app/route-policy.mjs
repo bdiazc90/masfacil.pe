@@ -72,6 +72,8 @@ export function classifyPath(rawPath) {
   if (head === 'web') return 'shell';
   if (head === 'docs') return 'docs';
   if (head === 'scripts' && rest.length === 1 && OPERATOR_ONLY.includes(rest[0])) return 'operator';
+  // Las sondas de navegador miran desde fuera: cambiarlas no publica nada.
+  if (head === 'scripts' && rest[0] === 'probes') return 'operator';
   // El histórico observa DESDE FUERA lo que ya sirve producción: nada de
   // `pipeline/history/` se ejecuta durante refresh, project o publish, así que
   // tocarlo no puede disparar una reproyección de precios.

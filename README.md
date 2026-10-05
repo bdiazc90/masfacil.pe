@@ -46,6 +46,18 @@ Perfil descargado y se activa en Ajustes → General → Información → Ajuste
 confianza de certificados. Al terminar, se borra en Ajustes → General → VPN y
 gestión de dispositivos.
 
+**Sondas de navegador** (`scripts/probes/`): lo que `npm test` no puede ver porque
+necesita un navegador. Usan el Chrome del sistema por CDP, sin dependencias, y
+salen con error si algo falla; cambiarlas no publica nada.
+
+```bash
+node scripts/probes/visitor.mjs        # visitante nuevo en producción, en las cuatro vistas
+node scripts/probes/update.mjs         # antes del push: instala producción y comprueba la actualización y el modo sin red
+node scripts/probes/equivalence.mjs --a <árbol> --b <árbol>   # dos builds se ven y se comportan igual
+node scripts/probes/touch.mjs          # todo lo pulsable mide al menos 44 × 44
+node scripts/probes/first-frame.mjs    # el tema correcto antes de que arranque la app
+```
+
 Para ver datos reales hace falta el bundle. Dos formas:
 
 ```bash
