@@ -4,6 +4,23 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Cada 6 h en el papel; en la práctica, no. Medido sobre 34 corridas del 15 al
+  # 22/09/2026, GitHub crea la corrida tarde y el retraso depende de la franja:
+  # +5,4 h de media en 02:17 UTC, +4,9 h en 08:17, +2,9 h en 14:17 y +2,5 h en
+  # 20:17. Los huecos reales van de 4,4 a 9,5 h —media 6,4— y salen 3,8 corridas
+  # al día en vez de 4, porque alguna franja se salta entera.
+  #
+  # El retraso NO es nuestro: `created` y `started` coinciden al segundo en las
+  # 34, así que la corrida arranca en cuanto existe. Lo que llega tarde es el
+  # despachador de `schedule` de GitHub, que en repos públicos reparte una cola
+  # compartida y se atasca en la madrugada UTC, cuando vence el cron diario de
+  # medio mundo.
+  #
+  # No se ha cambiado porque el peor hueco observado, 9,5 h, está muy por debajo
+  # de las 24 h que vale una consulta de Facilito: ninguna tarjeta ha caído al
+  # respaldo del CSV por esto. Si algún día la frescura importa más, la palanca
+  # barata es mover las horas a la tarde-noche UTC, que pierde la mitad de tiempo
+  # que la madrugada, o añadir entradas: en repo público los minutos son gratis.
   schedule:
     - cron: '17 2,8,14,20 * * *'
   workflow_dispatch:

@@ -85,7 +85,8 @@ Navegadores objetivo: Chrome/Edge 111, Safari/iOS 16.4 y Firefox 128 (de Firefox
 
 ## Operación
 
-Cuatro caminos, y el workflow elige el que corresponde según lo que cambió:
+Cuatro rutas —documentación, interfaz, datos y reproyección—, y el workflow
+elige la que corresponde según lo que cambió:
 
 | Qué cambió | Qué pasa |
 | --- | --- |
@@ -96,6 +97,11 @@ Cuatro caminos, y el workflow elige el que corresponde según lo que cambió:
 | Código de proyección o catálogo | Se reproyecta desde el snapshot privado ya restaurado, **sin consultar ninguna de las dos fuentes**: se reutiliza también la última consulta guardada. Solo si falta ese snapshot se refresca, y lo dice. |
 | Falla el CSV pero hay consulta | Se compone sobre el último snapshot oficial válido y se publica la consulta de hoy. Sin snapshot utilizable no se publica ningún vínculo nuevo: se conserva la entrega anterior y se informa la causa. |
 | Falla la consulta pero hay CSV | Se publica el CSV. Un fallo del navegador o de Facilito nunca detiene la corrida. |
+
+La ruta de datos la dispara un cron cada 6 h, pero GitHub retrasa los programados:
+las corridas reales van espaciadas entre 4 y 9 horas. Esa es la frescura que puede
+llegar a tener un «Consultado hace X», y no significa que nada esté roto; el
+detalle medido está junto al `cron`, en `.github/workflows/refresh-pages.yml`.
 
 ```bash
 npm run refresh                # refresca y promueve snapshot privado
