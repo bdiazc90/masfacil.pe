@@ -33,7 +33,12 @@ export const UI_SOURCES = 'ui';
 /** La constancia del último build, fuera de `web/`. */
 export const UI_BUILD_STATE = '.local-cache/ui-build/build.json';
 /** Lo que decide los bytes además de las fuentes: la configuración, este módulo y las versiones exactas. */
-export const UI_BUILD_TOOLING = Object.freeze(['vite.config.mjs', 'pipeline/ui-build.mjs', 'package.json', 'pnpm-lock.yaml']);
+export const UI_BUILD_TOOLING = Object.freeze([
+  'vite.config.mjs',
+  'pipeline/ui-build.mjs',
+  'package.json',
+  'pnpm-lock.yaml',
+]);
 /** Las páginas que emite Vite; el resto de su salida vive en `assets/`. */
 export const UI_PAGES = Object.freeze(['index.html', '404.html']);
 const ASSETS = 'assets/';
@@ -41,8 +46,11 @@ const ASSETS = 'assets/';
 const MARCA_PORTADA = '<!--portada-->';
 
 /** ¿Es un destino de este build? Solo esos se escriben o se retiran en `web/`. */
-export const isUiOutput = (relativo) => UI_PAGES.includes(relativo)
-  || (relativo.startsWith(ASSETS) && relativo.length > ASSETS.length && !relativo.split('/').some((parte) => parte === '..' || parte === '.' || parte === ''));
+export const isUiOutput = (relativo) =>
+  UI_PAGES.includes(relativo) ||
+  (relativo.startsWith(ASSETS) &&
+    relativo.length > ASSETS.length &&
+    !relativo.split('/').some((parte) => parte === '..' || parte === '.' || parte === ''));
 
 // Orden por unidades de código, no por idioma: la huella no puede depender de la
 // versión de ICU de cada Node.
@@ -85,16 +93,25 @@ function escribirAtomico(destino, contenido) {
 export function readUiBuild({ root = rootFromModule } = {}) {
   const archivo = path.join(root, UI_BUILD_STATE);
   if (!fs.existsSync(archivo)) return null;
-  try { return JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { return { status: 'ilegible' }; }
+  try {
+    return JSON.parse(fs.readFileSync(archivo, 'utf8'));
+  } catch {
+    return { status: 'ilegible' };
+  }
 }
 
 /** Fuentes de `ui/` y herramientas: entran siempre en la constancia. */
-const candidatas = (root) => [...archivosDe(path.join(root, UI_SOURCES)).map((relativo) => `${UI_SOURCES}/${relativo}`), ...UI_BUILD_TOOLING];
+const candidatas = (root) => [
+  ...archivosDe(path.join(root, UI_SOURCES)).map((relativo) => `${UI_SOURCES}/${relativo}`),
+  ...UI_BUILD_TOOLING,
+];
 
 /** Lo que el build puede leer: las candidatas y los módulos de `web/` que el bundle puede incluir. */
 const vigiladas = (root) => [
   ...candidatas(root),
-  ...archivosDe(path.join(root, 'web')).filter((relativo) => relativo.endsWith('.js') && !relativo.startsWith('data/') && !relativo.startsWith(ASSETS)).map((relativo) => `web/${relativo}`),
+  ...archivosDe(path.join(root, 'web'))
+    .filter((relativo) => relativo.endsWith('.js') && !relativo.startsWith('data/') && !relativo.startsWith(ASSETS))
+    .map((relativo) => `web/${relativo}`),
 ];
 
 /**
@@ -112,12 +129,16 @@ function entradas(root, modulos) {
     const archivo = id.replace(/[?#].*$/, '');
     if (!path.isAbsolute(archivo) || archivo.split(path.sep).includes('node_modules')) continue;
     const relativo = path.relative(raizReal, archivo).split(path.sep).join('/');
-    if (relativo.startsWith('../') || path.isAbsolute(relativo)) throw new Error(`el build lee ${archivo}, fuera del repositorio`);
+    if (relativo.startsWith('../') || path.isAbsolute(relativo))
+      throw new Error(`el build lee ${archivo}, fuera del repositorio`);
     if (!esArchivo(archivo)) continue;
-    if (!rutaExacta(root, relativo)) throw new Error(`el build importa ${relativo} con otras mayúsculas; en Linux, donde compila CI, no existe`);
+    if (!rutaExacta(root, relativo))
+      throw new Error(`el build importa ${relativo} con otras mayúsculas; en Linux, donde compila CI, no existe`);
     rutas.add(relativo);
   }
-  return Object.fromEntries([...rutas].sort(porCodigo).map((relativo) => [relativo, huellaDe(path.join(root, relativo))]));
+  return Object.fromEntries(
+    [...rutas].sort(porCodigo).map((relativo) => [relativo, huellaDe(path.join(root, relativo))]),
+  );
 }
 
 /** La versión de Rolldown que fija el lockfile; Vite solo declara un rango. */
@@ -132,8 +153,13 @@ function tailwindFijado(root, fijadas) {
   const versiones = {};
   for (const nombre of ['tailwindcss', '@tailwindcss/vite']) {
     if (!fijadas[nombre]) continue;
-    const instalada = JSON.parse(fs.readFileSync(path.join(root, 'node_modules', nombre, 'package.json'), 'utf8')).version;
-    if (instalada !== fijadas[nombre]) throw new Error(`${nombre} ${instalada} instalada no es la fijada en package.json (${fijadas[nombre]}); ejecuta pnpm install --frozen-lockfile`);
+    const instalada = JSON.parse(
+      fs.readFileSync(path.join(root, 'node_modules', nombre, 'package.json'), 'utf8'),
+    ).version;
+    if (instalada !== fijadas[nombre])
+      throw new Error(
+        `${nombre} ${instalada} instalada no es la fijada en package.json (${fijadas[nombre]}); ejecuta pnpm install --frozen-lockfile`,
+      );
     versiones[nombre] = instalada;
   }
   return versiones;
@@ -150,17 +176,37 @@ function tailwindFijado(root, fijadas) {
 async function compilar({ root, stagingDir }) {
   const vite = await import('vite');
   const fijadas = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).devDependencies ?? {};
-  if (vite.version !== fijadas.vite) throw new Error(`vite ${vite.version} instalada no es la fijada en package.json (${fijadas.vite}); ejecuta pnpm install --frozen-lockfile`);
+  if (vite.version !== fijadas.vite)
+    throw new Error(
+      `vite ${vite.version} instalada no es la fijada en package.json (${fijadas.vite}); ejecuta pnpm install --frozen-lockfile`,
+    );
   const rolldown = rolldownDelLockfile(root);
-  if (rolldown && vite.rolldownVersion !== rolldown) throw new Error(`rolldown ${vite.rolldownVersion} instalado no es el del lockfile (${rolldown}); ejecuta pnpm install --frozen-lockfile`);
+  if (rolldown && vite.rolldownVersion !== rolldown)
+    throw new Error(
+      `rolldown ${vite.rolldownVersion} instalado no es el del lockfile (${rolldown}); ejecuta pnpm install --frozen-lockfile`,
+    );
   const tailwind = tailwindFijado(root, fijadas);
   const avisos = [];
   const logger = vite.createLogger('warn');
-  const anotar = (metodo) => (mensaje, opciones) => { avisos.push(String(mensaje)); logger[metodo](mensaje, opciones); };
+  const anotar = (metodo) => (mensaje, opciones) => {
+    avisos.push(String(mensaje));
+    logger[metodo](mensaje, opciones);
+  };
   const avisoDeConsola = console.warn;
-  console.warn = (...partes) => { avisos.push(partes.map(String).join(' ')); avisoDeConsola(...partes); };
+  console.warn = (...partes) => {
+    avisos.push(partes.map(String).join(' '));
+    avisoDeConsola(...partes);
+  };
   try {
-    return await compilarConAvisos({ root, stagingDir, vite, logger, anotar, avisos, versiones: { vite: vite.version, rolldown: vite.rolldownVersion, ...tailwind } });
+    return await compilarConAvisos({
+      root,
+      stagingDir,
+      vite,
+      logger,
+      anotar,
+      avisos,
+      versiones: { vite: vite.version, rolldown: vite.rolldownVersion, ...tailwind },
+    });
   } finally {
     console.warn = avisoDeConsola;
   }
@@ -176,7 +222,14 @@ async function compilarConAvisos({ root, stagingDir, vite, logger, anotar, aviso
     // El staging es nuevo y vacío: no hay nada que vaciar, y así ningún error de
     // configuración puede vaciar otra carpeta.
     build: { outDir: stagingDir, emptyOutDir: false },
-    plugins: [{ name: 'masfacil:grafo', generateBundle() { for (const id of this.getModuleIds()) modulos.add(id); } }],
+    plugins: [
+      {
+        name: 'masfacil:grafo',
+        generateBundle() {
+          for (const id of this.getModuleIds()) modulos.add(id);
+        },
+      },
+    ],
   });
   if (avisos.length) throw new Error(`Vite avisó al compilar la interfaz: ${avisos.join(' | ')}`);
   // La portada del HTML, pintada con la misma `App` por el mismo pipeline de
@@ -197,7 +250,8 @@ async function compilarConAvisos({ root, stagingDir, vite, logger, anotar, aviso
 export function inyectarPortada(stagingDir, portada) {
   const archivo = path.join(stagingDir, 'index.html');
   const html = fs.readFileSync(archivo, 'utf8');
-  if (html.split(MARCA_PORTADA).length !== 2) throw new Error(`index.html tiene que llevar un solo ${MARCA_PORTADA} donde va la portada`);
+  if (html.split(MARCA_PORTADA).length !== 2)
+    throw new Error(`index.html tiene que llevar un solo ${MARCA_PORTADA} donde va la portada`);
   if (!portada.includes('id="start-step"')) throw new Error('la portada pre-renderizada no trae la pantalla de inicio');
   fs.writeFileSync(archivo, html.replace(MARCA_PORTADA, portada));
 }
@@ -211,26 +265,42 @@ export function inspectStaging({ stagingDir, webRoot }) {
   if (!esArchivo(manifestPath)) throw new Error('El build de la interfaz no dejó su manifiesto (.vite/manifest.json)');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const archivos = archivosDe(stagingDir).filter((relativo) => !relativo.startsWith('.vite/'));
-  const problemas = archivos.filter((relativo) => !isUiOutput(relativo)).map((relativo) => `salida inesperada: ${relativo}`);
+  const problemas = archivos
+    .filter((relativo) => !isUiOutput(relativo))
+    .map((relativo) => `salida inesperada: ${relativo}`);
   // Sin carga diferida: un chunk pedido después del deploy siguiente ya no existiría.
   for (const [clave, chunk] of Object.entries(manifest)) {
-    if (chunk.isDynamicEntry || chunk.dynamicImports?.length) problemas.push(`${clave} introduce carga diferida de código`);
+    if (chunk.isDynamicEntry || chunk.dynamicImports?.length)
+      problemas.push(`${clave} introduce carga diferida de código`);
   }
   const emitidos = new Set(archivos.map((relativo) => `/${relativo}`));
   // Lo que no es de `assets/` sale del árbol publicado: iconos y manifiesto.
-  const existe = (ruta) => (ruta.startsWith(`/${ASSETS}`) ? emitidos.has(ruta) : !ruta.split('/').includes('..') && esArchivo(path.join(webRoot, ruta)));
+  const existe = (ruta) =>
+    ruta.startsWith(`/${ASSETS}`)
+      ? emitidos.has(ruta)
+      : !ruta.split('/').includes('..') && esArchivo(path.join(webRoot, ruta));
   for (const pagina of UI_PAGES) {
-    if (!archivos.includes(pagina)) { problemas.push(`falta ${pagina}`); continue; }
+    if (!archivos.includes(pagina)) {
+      problemas.push(`falta ${pagina}`);
+      continue;
+    }
     const html = fs.readFileSync(path.join(stagingDir, pagina), 'utf8');
     problemas.push(...inlineProblems(pagina, html), ...htmlResourceProblems(pagina, html, { exists: existe }));
     const modulo = manifest[pagina]?.file;
-    if (!modulo || !htmlResources(html).some(({ tag, type, url }) => tag === 'script' && type === 'module' && url === `/${modulo}`)) problemas.push(`${pagina} no carga su módulo compilado`);
+    if (
+      !modulo ||
+      !htmlResources(html).some(({ tag, type, url }) => tag === 'script' && type === 'module' && url === `/${modulo}`)
+    )
+      problemas.push(`${pagina} no carga su módulo compilado`);
   }
   // Una hoja que cargara algo fuera del build lo pediría sin que viaje en la precache.
   for (const hoja of archivos.filter((relativo) => relativo.endsWith('.css'))) {
     for (const [, url] of fs.readFileSync(path.join(stagingDir, hoja), 'utf8').matchAll(/url\(\s*['"]?([^'")\s]+)/g)) {
       if (url.startsWith('data:') || url.startsWith('#')) continue;
-      const ruta = (url.startsWith('/') ? url : path.posix.join('/', path.posix.dirname(hoja), url)).replace(/[?#].*$/, '');
+      const ruta = (url.startsWith('/') ? url : path.posix.join('/', path.posix.dirname(hoja), url)).replace(
+        /[?#].*$/,
+        '',
+      );
       if (!emitidos.has(ruta)) problemas.push(`${hoja} carga ${url}, que no salió del build: sin red faltaría`);
     }
   }
@@ -247,18 +317,39 @@ export function inspectStaging({ stagingDir, webRoot }) {
  * los vigentes—, después las páginas que los cargan y al final se retira solo lo
  * que este build instaló antes y ya no emite.
  */
-export function installUiBuild({ root = rootFromModule, stagingDir, archivos, inputs, manifest, versiones, copiar = (origen, destino) => escribirAtomico(destino, fs.readFileSync(origen)) }) {
+export function installUiBuild({
+  root = rootFromModule,
+  stagingDir,
+  archivos,
+  inputs,
+  manifest,
+  versiones,
+  copiar = (origen, destino) => escribirAtomico(destino, fs.readFileSync(origen)),
+}) {
   const webRoot = path.join(root, 'web');
   const estadoPath = path.join(root, UI_BUILD_STATE);
   const anterior = readUiBuild({ root });
   const propios = (Array.isArray(anterior?.owned) ? anterior.owned : []).filter(isUiOutput);
   for (const relativo of archivos) if (!isUiOutput(relativo)) throw new Error(`destino ajeno al build: ${relativo}`);
   const outputs = Object.fromEntries(archivos.map((relativo) => [relativo, huellaDe(path.join(stagingDir, relativo))]));
-  escribirAtomico(estadoPath, `${JSON.stringify({ schema: 1, status: 'installing', owned: [...new Set([...propios, ...archivos])].sort(porCodigo) }, null, 2)}\n`);
-  const orden = [...archivos].sort((a, b) => (Number(UI_PAGES.includes(a)) - Number(UI_PAGES.includes(b))) || porCodigo(a, b));
+  escribirAtomico(
+    estadoPath,
+    `${JSON.stringify({ schema: 1, status: 'installing', owned: [...new Set([...propios, ...archivos])].sort(porCodigo) }, null, 2)}\n`,
+  );
+  const orden = [...archivos].sort(
+    (a, b) => Number(UI_PAGES.includes(a)) - Number(UI_PAGES.includes(b)) || porCodigo(a, b),
+  );
   for (const relativo of orden) copiar(path.join(stagingDir, relativo), path.join(webRoot, relativo));
   for (const relativo of propios) if (!(relativo in outputs)) fs.rmSync(path.join(webRoot, relativo), { force: true });
-  const estado = { schema: 1, status: 'complete', versions: versiones, inputs, outputs, owned: Object.keys(outputs).sort(porCodigo), manifest };
+  const estado = {
+    schema: 1,
+    status: 'complete',
+    versions: versiones,
+    inputs,
+    outputs,
+    owned: Object.keys(outputs).sort(porCodigo),
+    manifest,
+  };
   escribirAtomico(estadoPath, `${JSON.stringify(estado, null, 2)}\n`);
   return estado;
 }
@@ -274,21 +365,33 @@ export async function buildUi({ root = rootFromModule, compile = compilar } = {}
   fs.mkdirSync(base, { recursive: true });
   const stagingDir = fs.mkdtempSync(path.join(base, 'staging-'));
   try {
-    const antes = Object.fromEntries(vigiladas(root).filter((relativo) => esArchivo(path.join(root, relativo))).map((relativo) => [relativo, huellaDe(path.join(root, relativo))]));
+    const antes = Object.fromEntries(
+      vigiladas(root)
+        .filter((relativo) => esArchivo(path.join(root, relativo)))
+        .map((relativo) => [relativo, huellaDe(path.join(root, relativo))]),
+    );
     const { modulos, versiones } = await compile({ root, stagingDir });
     // Carga diferida, un `node:` sustituido por un módulo vacío o una librería en
     // su build de desarrollo (React con sus avisos) no se publican.
-    const motivo = (id) => (id.includes('preload-helper') ? 'hay carga diferida de código'
-      : id.includes('__vite-browser-external') ? `un módulo del navegador importa uno de Node (${id.replace(/^\0/, '')})`
-        : `entra un build de desarrollo (${path.basename(id)})`);
-    const ajenos = [...modulos].filter((id) => /vite\/preload-helper|__vite-browser-external|\.development\.js$/.test(id.replace(/[?#].*$/, '')));
+    const motivo = (id) =>
+      id.includes('preload-helper')
+        ? 'hay carga diferida de código'
+        : id.includes('__vite-browser-external')
+          ? `un módulo del navegador importa uno de Node (${id.replace(/^\0/, '')})`
+          : `entra un build de desarrollo (${path.basename(id)})`;
+    const ajenos = [...modulos].filter((id) =>
+      /vite\/preload-helper|__vite-browser-external|\.development\.js$/.test(id.replace(/[?#].*$/, '')),
+    );
     if (ajenos.length) throw new Error(`El build de la interfaz no es publicable: ${ajenos.map(motivo).join('; ')}`);
     const { archivos, manifest } = inspectStaging({ stagingDir, webRoot: path.join(root, 'web') });
     const inputs = entradas(root, modulos);
     // Un módulo de `web/` fuera del grafo no es entrada; una fuente de `ui/` o una
     // herramienta sí, así que su ausencia después de compilar también cuenta.
-    const movidas = Object.keys(antes).filter((relativo) => (relativo in inputs ? inputs[relativo] !== antes[relativo] : !relativo.startsWith('web/')));
-    if (movidas.length) throw new Error(`las fuentes cambiaron durante el build (${movidas.join(', ')}); vuelve a compilar`);
+    const movidas = Object.keys(antes).filter((relativo) =>
+      relativo in inputs ? inputs[relativo] !== antes[relativo] : !relativo.startsWith('web/'),
+    );
+    if (movidas.length)
+      throw new Error(`las fuentes cambiaron durante el build (${movidas.join(', ')}); vuelve a compilar`);
     return installUiBuild({ root, stagingDir, archivos, inputs, manifest, versiones });
   } finally {
     fs.rmSync(stagingDir, { recursive: true, force: true });
@@ -302,13 +405,22 @@ export async function buildUi({ root = rootFromModule, compile = compilar } = {}
 export function uiBuildProblems({ root = rootFromModule } = {}) {
   const estado = readUiBuild({ root });
   if (!estado) return [`falta la constancia del build (${UI_BUILD_STATE}); ejecuta npm run build`];
-  if (estado.status !== 'complete') return [`el último build de la interfaz no terminó (${estado.status}); ejecuta npm run build`];
+  if (estado.status !== 'complete')
+    return [`el último build de la interfaz no terminó (${estado.status}); ejecuta npm run build`];
   const problemas = [];
   const registradas = estado.inputs ?? {};
-  const distintas = Object.entries(registradas).filter(([relativo, esperada]) => !esArchivo(path.join(root, relativo)) || huellaDe(path.join(root, relativo)) !== esperada).map(([relativo]) => relativo);
+  const distintas = Object.entries(registradas)
+    .filter(
+      ([relativo, esperada]) =>
+        !esArchivo(path.join(root, relativo)) || huellaDe(path.join(root, relativo)) !== esperada,
+    )
+    .map(([relativo]) => relativo);
   const nuevas = candidatas(root).filter((relativo) => !(relativo in registradas));
   const cambios = [...new Set([...distintas, ...nuevas])].sort(porCodigo);
-  if (cambios.length) problemas.push(`el build no corresponde a las fuentes actuales (${cambios.slice(0, 5).join(', ')}${cambios.length > 5 ? ', …' : ''}); ejecuta npm run build`);
+  if (cambios.length)
+    problemas.push(
+      `el build no corresponde a las fuentes actuales (${cambios.slice(0, 5).join(', ')}${cambios.length > 5 ? ', …' : ''}); ejecuta npm run build`,
+    );
   for (const [relativo, esperada] of Object.entries(estado.outputs ?? {})) {
     const archivo = path.join(root, 'web', relativo);
     if (!esArchivo(archivo)) problemas.push(`falta web/${relativo}, salida del build`);
@@ -316,7 +428,8 @@ export function uiBuildProblems({ root = rootFromModule } = {}) {
   }
   // `web/assets/` es solo del build: nada ajeno se publica por estar ahí.
   for (const relativo of archivosDe(path.join(root, 'web', 'assets'))) {
-    if (!estado.outputs?.[`${ASSETS}${relativo}`]) problemas.push(`web/${ASSETS}${relativo} no salió de este build; retíralo o vuelve a compilar`);
+    if (!estado.outputs?.[`${ASSETS}${relativo}`])
+      problemas.push(`web/${ASSETS}${relativo} no salió de este build; retíralo o vuelve a compilar`);
   }
   return problemas;
 }

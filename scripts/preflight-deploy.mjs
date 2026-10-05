@@ -29,11 +29,16 @@ if (!origin) throw new Error('Se requiere PUBLIC_ORIGIN para revalidar antes de 
 
 // Cada grupo publicado se compara con su propio estado: la novedad de uno no
 // autoriza a retroceder otro, y un grupo que ya está publicado no puede faltar.
-const locales = Object.fromEntries(PUBLISHED_GROUPS.map((grupo) => {
-  const estado = JSON.parse(fs.readFileSync(path.join(root, 'web', ...grupo.dataRoot.split('/'), 'refresh-state.json'), 'utf8'));
-  if (!estado.snapshot_id) throw new Error(`El refresh-state local de ${grupo.key} no declara snapshot_id; no se puede ordenar la corrida`);
-  return [grupo.key, estado];
-}));
+const locales = Object.fromEntries(
+  PUBLISHED_GROUPS.map((grupo) => {
+    const estado = JSON.parse(
+      fs.readFileSync(path.join(root, 'web', ...grupo.dataRoot.split('/'), 'refresh-state.json'), 'utf8'),
+    );
+    if (!estado.snapshot_id)
+      throw new Error(`El refresh-state local de ${grupo.key} no declara snapshot_id; no se puede ordenar la corrida`);
+    return [grupo.key, estado];
+  }),
+);
 
 // Se lee el refresh-state entero, no solo su `snapshot_id`: ordenar dos corridas
 // necesita también la consulta web, distrito por distrito. Un grupo sin estado
@@ -61,28 +66,44 @@ function retrocesoDeCodigo() {
   const tip = git('rev-parse', '--verify', '--quiet', `${punta.ref}^{commit}`).stdout.trim();
   if (!tip) return { reason: `sin_verificacion_de_main: ${punta.ref} no resuelve` };
   const isAncestor = git('merge-base', '--is-ancestor', head, tip).status === 0;
-  const delta = isAncestor ? git('diff', '--name-only', '-z', `${head}..${tip}`).stdout.split('\0').filter(Boolean) : [];
+  const delta = isAncestor
+    ? git('diff', '--name-only', '-z', `${head}..${tip}`).stdout.split('\0').filter(Boolean)
+    : [];
   return codeRegression({ head, tip, isAncestor, changedPaths: delta });
 }
 
-const publicados = Object.fromEntries(await Promise.all(PUBLISHED_GROUPS.map(async (grupo) => [grupo.key, await publicado(grupo)])));
+const publicados = Object.fromEntries(
+  await Promise.all(PUBLISHED_GROUPS.map(async (grupo) => [grupo.key, await publicado(grupo)])),
+);
 const atrasados = groupsBehind({ local: locales, published: publicados });
 const retroceso = atrasados.length ? null : retrocesoDeCodigo();
 
 // Las causas se informan por grupo y pueden darse a la vez: un CSV anterior y,
 // además, distritos cuya consulta retrocede.
-const causa = (atrasado) => (atrasado.missing
-  ? `${atrasado.group}: publicado y ausente en esta corrida`
-  : [
-    atrasado.published_snapshot && atrasado.local_snapshot < atrasado.published_snapshot ? `${atrasado.group}: el CSV publicado (${atrasado.published_snapshot}) es posterior al de esta corrida (${atrasado.local_snapshot})` : null,
-    atrasado.regressions.length ? `${atrasado.group}: la consulta retrocede en ${atrasado.regressions.length} unidad(es) — ${atrasado.regressions.slice(0, 3).join('; ')}` : null,
-  ].filter(Boolean).join('; además, ') || `${atrasado.group}: el estado publicado es más nuevo`);
+const causa = (atrasado) =>
+  atrasado.missing
+    ? `${atrasado.group}: publicado y ausente en esta corrida`
+    : [
+        atrasado.published_snapshot && atrasado.local_snapshot < atrasado.published_snapshot
+          ? `${atrasado.group}: el CSV publicado (${atrasado.published_snapshot}) es posterior al de esta corrida (${atrasado.local_snapshot})`
+          : null,
+        atrasado.regressions.length
+          ? `${atrasado.group}: la consulta retrocede en ${atrasado.regressions.length} unidad(es) — ${atrasado.regressions.slice(0, 3).join('; ')}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('; además, ') || `${atrasado.group}: el estado publicado es más nuevo`;
 
 const decision = atrasados.length
   ? { deploy: false, reason: `corrida_desactualizada: ${atrasados.map(causa).join('; además, ')}` }
   : retroceso
     ? { deploy: false, reason: retroceso.reason }
-    : { deploy: true, reason: Object.values(publicados).some(Boolean) ? 'estado revalidado; esta corrida no retrocede código ni datos' : 'no hay bundle publicado todavía; primera publicación' };
+    : {
+        deploy: true,
+        reason: Object.values(publicados).some(Boolean)
+          ? 'estado revalidado; esta corrida no retrocede código ni datos'
+          : 'no hay bundle publicado todavía; primera publicación',
+      };
 
 const [local, remoto] = [locales.gasolina ?? null, publicados.gasolina ?? null];
 const salida = {
@@ -93,7 +114,13 @@ const salida = {
   local_facilito: local?.facilito?.state_id ?? null,
   published_facilito: remoto?.facilito?.state_id ?? null,
   unidades_que_retroceden: atrasados.reduce((total, atrasado) => total + atrasado.regressions.length, 0),
-  grupos: Object.fromEntries(PUBLISHED_GROUPS.map((grupo) => [grupo.key, { local: locales[grupo.key]?.snapshot_id ?? null, publicado: publicados[grupo.key]?.snapshot_id ?? null }])),
+  grupos: Object.fromEntries(
+    PUBLISHED_GROUPS.map((grupo) => [
+      grupo.key,
+      { local: locales[grupo.key]?.snapshot_id ?? null, publicado: publicados[grupo.key]?.snapshot_id ?? null },
+    ]),
+  ),
 };
-if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${decision.deploy}\npreflight_reason=${decision.reason}\n`);
+if (process.env.GITHUB_OUTPUT)
+  fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${decision.deploy}\npreflight_reason=${decision.reason}\n`);
 process.stdout.write(`${JSON.stringify(salida)}\n`);

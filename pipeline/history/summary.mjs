@@ -10,7 +10,17 @@
  * snapshot: los agregados ya están en las observaciones, que para eso existen.
  */
 
-import { HISTORY_CURRENCY, HISTORY_MAX_DAYS, HISTORY_SCHEMA_VERSION, HISTORY_SCOPE, HISTORY_TIMEZONE, HISTORY_UNIT, limaDate, validateDailySummary, windowDates } from '../../web/lib/history-contract.js';
+import {
+  HISTORY_CURRENCY,
+  HISTORY_MAX_DAYS,
+  HISTORY_SCHEMA_VERSION,
+  HISTORY_SCOPE,
+  HISTORY_TIMEZONE,
+  HISTORY_UNIT,
+  limaDate,
+  validateDailySummary,
+  windowDates,
+} from '../../web/lib/history-contract.js';
 import { METHOD_VERSION } from './daily-mean.mjs';
 import { SUMMARY_CACHE_CONTROL, JSON_CONTENT_TYPE, listAll, putMutable, sha256 } from './store.mjs';
 
@@ -41,10 +51,16 @@ function paraElResumen(observation) {
  * por identificador existe para que dos corridas den el mismo resultado.
  */
 export function lastObservationOfDay(observations) {
-  return [...observations].sort((izquierda, derecha) => {
-    const orden = Date.parse(izquierda.observed_at) - Date.parse(derecha.observed_at);
-    return orden !== 0 ? orden : String(izquierda.observation_id).localeCompare(String(derecha.observation_id), 'en');
-  }).at(-1) ?? null;
+  return (
+    [...observations]
+      .sort((izquierda, derecha) => {
+        const orden = Date.parse(izquierda.observed_at) - Date.parse(derecha.observed_at);
+        return orden !== 0
+          ? orden
+          : String(izquierda.observation_id).localeCompare(String(derecha.observation_id), 'en');
+      })
+      .at(-1) ?? null
+  );
 }
 
 /**
@@ -63,9 +79,15 @@ export async function buildDailySummary(store, { generatedAt, days = HISTORY_MAX
     const leidas = [];
     for (const { key } of claves) {
       const objeto = await store.get(key);
-      if (!objeto) { problems.push(`observación listada y ausente: ${key}`); continue; }
-      try { leidas.push(JSON.parse(objeto.body)); }
-      catch { problems.push(`observación ilegible: ${key}`); }
+      if (!objeto) {
+        problems.push(`observación listada y ausente: ${key}`);
+        continue;
+      }
+      try {
+        leidas.push(JSON.parse(objeto.body));
+      } catch {
+        problems.push(`observación ilegible: ${key}`);
+      }
     }
     observations += leidas.length;
     const elegida = lastObservationOfDay(leidas);
@@ -94,7 +116,9 @@ const sinSello = (summary) => (summary ? JSON.stringify({ ...summary, generated_
 
 /** Identificadores de observación presentes en un resumen, por fecha. */
 function porFecha(summary) {
-  return new Map((summary?.series ?? []).filter((dia) => dia.observation).map((dia) => [dia.date, dia.observation.observation_id]));
+  return new Map(
+    (summary?.series ?? []).filter((dia) => dia.observation).map((dia) => [dia.date, dia.observation.observation_id]),
+  );
 }
 
 /**
@@ -109,16 +133,28 @@ function porFecha(summary) {
 export async function publishDailySummary(store, summary, { key = SUMMARY_KEY } = {}) {
   const cuerpo = `${JSON.stringify(summary)}\n`;
   const anterior = await store.get(key);
-  const previo = (() => { try { return anterior ? JSON.parse(anterior.body) : null; } catch { return null; } })();
+  const previo = (() => {
+    try {
+      return anterior ? JSON.parse(anterior.body) : null;
+    } catch {
+      return null;
+    }
+  })();
   const previoValido = previo && validateDailySummary(previo).length === 0 ? previo : null;
 
   if (previoValido) {
     // 1. No retroceder en el tiempo. Que una corrida vieja llegue después que
     // una nueva es normal —hacen cola, no terminan en orden—, y que no escriba
     // es la guarda funcionando, no un fallo.
-    const nuevoEsAnterior = Date.parse(summary.generated_at) < Date.parse(previoValido.generated_at)
-      || String(summary.series.at(-1)?.date) < String(previoValido.series.at(-1)?.date);
-    if (nuevoEsAnterior) return { write: 'skipped_stale', reason: `lo publicado (${previoValido.generated_at}) es más nuevo que esta corrida (${summary.generated_at})`, bytes: null };
+    const nuevoEsAnterior =
+      Date.parse(summary.generated_at) < Date.parse(previoValido.generated_at) ||
+      String(summary.series.at(-1)?.date) < String(previoValido.series.at(-1)?.date);
+    if (nuevoEsAnterior)
+      return {
+        write: 'skipped_stale',
+        reason: `lo publicado (${previoValido.generated_at}) es más nuevo que esta corrida (${summary.generated_at})`,
+        bytes: null,
+      };
 
     // 2. No perder observaciones. Si una fecha que ya tenía observación llega
     // ahora vacía, o con otra distinta hacia atrás, es que el listado devolvió
@@ -127,7 +163,12 @@ export async function publishDailySummary(store, summary, { key = SUMMARY_KEY } 
     const ahora = porFecha(summary);
     const fechasNuevas = new Set(summary.series.map((dia) => dia.date));
     const perdidas = [...antes.keys()].filter((fecha) => fechasNuevas.has(fecha) && !ahora.has(fecha));
-    if (perdidas.length) return { write: 'blocked_missing_observations', reason: `faltan observaciones que sí estaban publicadas: ${perdidas.join(', ')}`, bytes: null };
+    if (perdidas.length)
+      return {
+        write: 'blocked_missing_observations',
+        reason: `faltan observaciones que sí estaban publicadas: ${perdidas.join(', ')}`,
+        bytes: null,
+      };
   }
 
   // 3. Sin cambios, sin escritura: evita invalidar la caché de borde por nada.
@@ -135,8 +176,17 @@ export async function publishDailySummary(store, summary, { key = SUMMARY_KEY } 
   // definición: sin excluirlo, cuatro corridas diarias reescribirían el mismo
   // contenido cuatro veces. Si la ventana se movió de día, la serie cambia y sí
   // se escribe, así que la última fecha nunca queda desalineada del sello.
-  if (anterior && sinSello(previo) === sinSello(summary)) return { write: 'skipped_unchanged', reason: 'el contenido del resumen no cambió', bytes: Buffer.byteLength(cuerpo) };
+  if (anterior && sinSello(previo) === sinSello(summary))
+    return {
+      write: 'skipped_unchanged',
+      reason: 'el contenido del resumen no cambió',
+      bytes: Buffer.byteLength(cuerpo),
+    };
 
   await putMutable(store, key, cuerpo, { contentType: JSON_CONTENT_TYPE, cacheControl: SUMMARY_CACHE_CONTROL });
-  return { write: 'written', reason: `resumen de ${summary.days} días publicado (${sha256(cuerpo).slice(0, 12)})`, bytes: Buffer.byteLength(cuerpo) };
+  return {
+    write: 'written',
+    reason: `resumen de ${summary.days} días publicado (${sha256(cuerpo).slice(0, 12)})`,
+    bytes: Buffer.byteLength(cuerpo),
+  };
 }

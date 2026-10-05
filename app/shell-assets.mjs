@@ -44,7 +44,8 @@ export function provenanceProblems(asset) {
   const problemas = [];
   if (!SOURCE_KINDS.includes(asset?.source_kind)) return [`source_kind ausente o desconocido: ${asset?.source_kind}`];
   if (!ASSET_FILE_PATTERN.test(asset?.file ?? '')) problemas.push(`file fuera de contrato: ${asset?.file}`);
-  if (asset.source_kind === 'official_asset' && !/^https:\/\//.test(asset.source_url ?? '')) problemas.push('declarado oficial sin URL https de origen');
+  if (asset.source_kind === 'official_asset' && !/^https:\/\//.test(asset.source_url ?? ''))
+    problemas.push('declarado oficial sin URL https de origen');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(asset?.retrieved_at ?? '')) problemas.push('retrieved_at no es una fecha AAAA-MM-DD');
   return problemas;
 }
@@ -73,10 +74,14 @@ export function brandAssetProblems({ brandLogos, shellList, read }) {
     for (const motivo of provenanceProblems(asset)) problemas.push(`${donde}: ${motivo}`);
     if (!precache.has(ruta)) problemas.push(`${donde}: ${ruta} no está en la precache del service worker`);
     const recurso = read(ruta);
-    if (!recurso?.ok) { problemas.push(`${donde}: ${ruta} no se pudo leer`); continue; }
+    if (!recurso?.ok) {
+      problemas.push(`${donde}: ${ruta} no se pudo leer`);
+      continue;
+    }
     // Una ruta inexistente puede responder 200 con HTML; se comprueba el tipo y
     // el contenido, no solo que la respuesta llegue.
-    if (recurso.contentType && !/image\/svg\+xml/i.test(recurso.contentType)) problemas.push(`${donde}: ${ruta} respondió ${recurso.contentType} en vez de image/svg+xml`);
+    if (recurso.contentType && !/image\/svg\+xml/i.test(recurso.contentType))
+      problemas.push(`${donde}: ${ruta} respondió ${recurso.contentType} en vez de image/svg+xml`);
     for (const motivo of svgProblems(recurso.body ?? '')) problemas.push(`${donde}: ${ruta} ${motivo}`);
   }
   return problemas;
@@ -93,7 +98,9 @@ export function shellEntryFile(entry) {
  * `sw-main.js` dejaría la precache fija aunque el shell cambiara.
  */
 export function serviceWorkerUpdateProblems(swMainSource) {
-  return /from\s+['"]\.\/shell-manifest\.js['"]/.test(swMainSource) ? [] : ['sw-main.js no importa ./shell-manifest.js: la precache no seguiría al shell'];
+  return /from\s+['"]\.\/shell-manifest\.js['"]/.test(swMainSource)
+    ? []
+    : ['sw-main.js no importa ./shell-manifest.js: la precache no seguiría al shell'];
 }
 
 // Declaraciones de import al inicio de línea: `import … from '…'`,
@@ -130,17 +137,28 @@ export function moduleGraph({ entry, read, generated = [] }) {
     const fuente = generados.has(relativo) ? null : read(relativo);
     if (fuente === null) continue;
     for (const [, , especificador] of fuente.matchAll(DECLARACION)) {
-      if (!/^\.{1,2}\//.test(especificador)) { problemas.push(`web/${relativo}: import no admitido «${especificador}»; solo rutas relativas dentro de web/`); continue; }
+      if (!/^\.{1,2}\//.test(especificador)) {
+        problemas.push(`web/${relativo}: import no admitido «${especificador}»; solo rutas relativas dentro de web/`);
+        continue;
+      }
       const destino = path.posix.normalize(path.posix.join(path.posix.dirname(relativo), especificador));
-      if (destino === '..' || destino.startsWith('../')) { problemas.push(`web/${relativo}: «${especificador}» sale de web/`); continue; }
+      if (destino === '..' || destino.startsWith('../')) {
+        problemas.push(`web/${relativo}: «${especificador}» sale de web/`);
+        continue;
+      }
       if (modulos.has(destino)) continue;
-      if (!generados.has(destino) && read(destino) === null) { problemas.push(`web/${relativo} importa «${especificador}», que no existe`); continue; }
+      if (!generados.has(destino) && read(destino) === null) {
+        problemas.push(`web/${relativo} importa «${especificador}», que no existe`);
+        continue;
+      }
       modulos.add(destino);
       pendientes.push(destino);
     }
     const resto = sinComentarios(fuente.replace(DECLARACION, ''));
-    if (/\bimport\s*\(/.test(resto)) problemas.push(`web/${relativo} usa un import dinámico, que el service worker no admite`);
-    else if (RASTRO_DE_IMPORT.test(resto)) problemas.push(`web/${relativo} tiene un import que no se reconoce; va al inicio de su línea`);
+    if (/\bimport\s*\(/.test(resto))
+      problemas.push(`web/${relativo} usa un import dinámico, que el service worker no admite`);
+    else if (RASTRO_DE_IMPORT.test(resto))
+      problemas.push(`web/${relativo} tiene un import que no se reconoce; va al inicio de su línea`);
   }
   // Por unidades de código: el orden entra en la huella y no puede depender del ICU.
   return { modules: [...modulos].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)), problems: problemas };
@@ -166,7 +184,8 @@ export const ANALYTICS_ENDPOINT = 'https://cloudflareinsights.com/cdn-cgi/rum';
 export const NOT_FOUND_MARKER = 'No encontramos esta página';
 
 /** El bloque que Pages Analytics inyecta en cada HTML servido, delimitado por su propio comentario. */
-export const withoutPagesAnalytics = (html) => html.replace(/<!-- Cloudflare Pages Analytics -->[\s\S]*?<!-- Cloudflare Pages Analytics -->/g, '');
+export const withoutPagesAnalytics = (html) =>
+  html.replace(/<!-- Cloudflare Pages Analytics -->[\s\S]*?<!-- Cloudflare Pages Analytics -->/g, '');
 
 const sinComentariosHtml = (html) => html.replace(/<!--[\s\S]*?-->/g, '');
 
@@ -181,7 +200,12 @@ const sinComentariosHtml = (html) => html.replace(/<!--[\s\S]*?-->/g, '');
 export function htmlResources(html) {
   const recursos = [];
   for (const [, etiqueta, atributos] of sinComentariosHtml(html).matchAll(/<(link|script|img)\b([^>]*)>/gi)) {
-    const attr = Object.fromEntries([...atributos.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map(([, nombre, doble, simple]) => [nombre.toLowerCase(), doble ?? simple]));
+    const attr = Object.fromEntries(
+      [...atributos.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].map(([, nombre, doble, simple]) => [
+        nombre.toLowerCase(),
+        doble ?? simple,
+      ]),
+    );
     const tag = etiqueta.toLowerCase();
     const url = tag === 'link' ? attr.href : attr.src;
     if (url !== undefined) recursos.push({ tag, rel: attr.rel ?? null, type: attr.type ?? null, url });
@@ -203,11 +227,18 @@ export function htmlResourceProblems(nombre, html, { exists, precache = null }) 
   const problemas = [];
   for (const { url } of htmlResources(html)) {
     if (url.startsWith('data:')) continue;
-    if (url.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(url)) { problemas.push(`${nombre} carga un recurso ajeno: ${url}`); continue; }
-    if (!url.startsWith('/')) { problemas.push(`${nombre} carga ${url} con ruta relativa; desde /combustibles/… se pediría otra ruta`); continue; }
+    if (url.startsWith('//') || /^[a-z][a-z0-9+.-]*:/i.test(url)) {
+      problemas.push(`${nombre} carga un recurso ajeno: ${url}`);
+      continue;
+    }
+    if (!url.startsWith('/')) {
+      problemas.push(`${nombre} carga ${url} con ruta relativa; desde /combustibles/… se pediría otra ruta`);
+      continue;
+    }
     const ruta = url.replace(/[?#].*$/, '');
     if (!exists(ruta)) problemas.push(`${nombre} carga ${ruta}, que no existe`);
-    else if (precache && !precache.has(ruta)) problemas.push(`${nombre} carga ${ruta}, que no está en la precache: sin red faltaría`);
+    else if (precache && !precache.has(ruta))
+      problemas.push(`${nombre} carga ${ruta}, que no está en la precache: sin red faltaría`);
   }
   return problemas;
 }
@@ -220,8 +251,10 @@ export function htmlResourceProblems(nombre, html, { exists, precache = null }) 
 export function inlineProblems(nombre, html) {
   const limpio = sinComentariosHtml(html);
   const problemas = [];
-  if (/<style\b/i.test(limpio) || /\sstyle\s*=/i.test(limpio)) problemas.push(`${nombre} lleva estilos en línea; la CSP los bloquearía`);
-  if (/<script\b(?![^>]*\bsrc\s*=)/i.test(limpio)) problemas.push(`${nombre} lleva un script en línea; la CSP lo bloquearía`);
+  if (/<style\b/i.test(limpio) || /\sstyle\s*=/i.test(limpio))
+    problemas.push(`${nombre} lleva estilos en línea; la CSP los bloquearía`);
+  if (/<script\b(?![^>]*\bsrc\s*=)/i.test(limpio))
+    problemas.push(`${nombre} lleva un script en línea; la CSP lo bloquearía`);
   return problemas;
 }
 
@@ -239,8 +272,10 @@ export function notFoundPageProblems(html) {
   if (!html.includes(NOT_FOUND_MARKER)) problems.push(`404.html no contiene «${NOT_FOUND_MARKER}»`);
   if (!/href="\/"/.test(html)) problems.push('404.html no enlaza a la portada (href="/")');
   const recursos = htmlResources(html);
-  if (!recursos.some(({ tag, rel }) => tag === 'link' && rel === 'stylesheet')) problems.push('404.html no carga ninguna hoja de estilos');
-  if (!recursos.some(({ tag, type }) => tag === 'script' && type === 'module')) problems.push('404.html no carga ningún módulo: quedaría sin tema');
+  if (!recursos.some(({ tag, rel }) => tag === 'link' && rel === 'stylesheet'))
+    problems.push('404.html no carga ninguna hoja de estilos');
+  if (!recursos.some(({ tag, type }) => tag === 'script' && type === 'module'))
+    problems.push('404.html no carga ningún módulo: quedaría sin tema');
   problems.push(...inlineProblems('404.html', html));
   return problems;
 }

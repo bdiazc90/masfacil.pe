@@ -22,7 +22,9 @@ import { createHistoryStore } from '../pipeline/history/store.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const soloResumen = process.argv.includes('--summary-only') || process.env.SUMMARY_ONLY === '1';
-const origin = process.env.PUBLIC_ORIGIN || (process.env.CLOUDFLARE_PAGES_PROJECT ? `https://${process.env.CLOUDFLARE_PAGES_PROJECT}.pages.dev` : null);
+const origin =
+  process.env.PUBLIC_ORIGIN ||
+  (process.env.CLOUDFLARE_PAGES_PROJECT ? `https://${process.env.CLOUDFLARE_PAGES_PROJECT}.pages.dev` : null);
 
 const salida = { ok: false, observation: 'none', archive: 'none', summary_write: 'none', problems: [] };
 try {
@@ -42,11 +44,19 @@ if (process.env.GITHUB_STEP_SUMMARY) {
   const lineas = [`## Histórico · ${salida.local_date || 'sin observación'}`, ''];
   lineas.push('| campo | valor |', '| --- | --- |');
   lineas.push(`| almacén | \`${salida.store ?? 'no creado'}\` |`);
-  lineas.push(`| observación | \`${salida.observation}\`${salida.observation_id ? ` · ${salida.observation_id}` : ''} |`);
-  lineas.push(`| archivo | \`${salida.archive}\`${salida.archive_hash ? ` · ${salida.archive_hash.slice(0, 12)}` : ''} |`);
+  lineas.push(
+    `| observación | \`${salida.observation}\`${salida.observation_id ? ` · ${salida.observation_id}` : ''} |`,
+  );
+  lineas.push(
+    `| archivo | \`${salida.archive}\`${salida.archive_hash ? ` · ${salida.archive_hash.slice(0, 12)}` : ''} |`,
+  );
   if (salida.revision_id) lineas.push(`| revisión | \`${salida.revision_id}\` |`);
   if (salida.observed_at) lineas.push(`| observado | ${salida.observed_at} |`);
-  if (salida.products) lineas.push(`| Regular | ${salida.products.regular.mean ?? '—'} · n ${salida.products.regular.n} |`, `| Premium | ${salida.products.premium.mean ?? '—'} · n ${salida.products.premium.n} |`);
+  if (salida.products)
+    lineas.push(
+      `| Regular | ${salida.products.regular.mean ?? '—'} · n ${salida.products.regular.n} |`,
+      `| Premium | ${salida.products.premium.mean ?? '—'} · n ${salida.products.premium.n} |`,
+    );
   lineas.push(`| resumen | \`${salida.summary_write}\`${salida.summary_reason ? ` · ${salida.summary_reason}` : ''} |`);
   lineas.push(`| días con observación | ${salida.days_with_observation ?? 0} |`);
   for (const problema of salida.problems.slice(0, 20)) lineas.push('', `> [!WARNING]`, `> ${problema}`);

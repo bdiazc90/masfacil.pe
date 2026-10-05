@@ -1,19 +1,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ACTIVE_POINTER_RELATIVE, readActivePointer, validateSnapshotPointer, writeActivePointer } from './snapshot-manifest.mjs';
+import {
+  ACTIVE_POINTER_RELATIVE,
+  readActivePointer,
+  validateSnapshotPointer,
+  writeActivePointer,
+} from './snapshot-manifest.mjs';
 
 export function validateDownloadMetadata({ status, headers, bytes, contentRange }) {
   const errors = [];
   const contentLength = Number(headers?.['content-length']);
   if (![200, 206].includes(status)) errors.push(`estado HTTP inesperado: ${status}`);
-  if (Number.isFinite(contentLength) && contentLength !== bytes) errors.push(`Content-Length ${contentLength} no coincide con ${bytes} bytes`);
-  if (!Number.isFinite(contentLength) && !contentRange) errors.push('faltan Content-Length y Content-Range para verificar integridad');
+  if (Number.isFinite(contentLength) && contentLength !== bytes)
+    errors.push(`Content-Length ${contentLength} no coincide con ${bytes} bytes`);
+  if (!Number.isFinite(contentLength) && !contentRange)
+    errors.push('faltan Content-Length y Content-Range para verificar integridad');
   if (status === 206 || contentRange) {
     const match = String(contentRange ?? '').match(/^bytes\s+(\d+)-(\d+)\/(\d+)$/i);
     if (!match) errors.push('Content-Range inválido o ausente en respuesta parcial');
     else {
       const [, start, end, total] = match.map(Number);
-      if (start !== 0 || end + 1 !== total || total !== bytes) errors.push(`Content-Range no cubre el archivo completo: ${contentRange}`);
+      if (start !== 0 || end + 1 !== total || total !== bytes)
+        errors.push(`Content-Range no cubre el archivo completo: ${contentRange}`);
     }
   }
   return errors;
@@ -25,14 +33,33 @@ export function validateDownloadMetadata({ status, headers, bytes, contentRange 
  * `source_max_reported_at`— más la fecha del snapshot. Con ellos ahí, un
  * snapshot nuevo no necesita escribir `dataset/` ni `evidence/`.
  */
-export function makeSnapshotPointer({ root, sourceId = 'liquid-current', snapshotId, snapshotDate, datasetPath = null, evidencePath = null, acquisitionPath = null, overlayPath = null, sourceUrl, validators, promotedAt, temporalContext = null, referenceInputs, lineage }) {
+export function makeSnapshotPointer({
+  root,
+  sourceId = 'liquid-current',
+  snapshotId,
+  snapshotDate,
+  datasetPath = null,
+  evidencePath = null,
+  acquisitionPath = null,
+  overlayPath = null,
+  sourceUrl,
+  validators,
+  promotedAt,
+  temporalContext = null,
+  referenceInputs,
+  lineage,
+}) {
   return {
     schema_version: 1,
     source_id: sourceId,
     snapshot_id: snapshotId,
     snapshot_date: snapshotDate,
     temporal_context: temporalContext
-      ? { cutoff_at: temporalContext.cutoff_at, source_max_reported_at: temporalContext.source_max_reported_at, snapshot_date: temporalContext.snapshot_date ?? snapshotDate }
+      ? {
+          cutoff_at: temporalContext.cutoff_at,
+          source_max_reported_at: temporalContext.source_max_reported_at,
+          snapshot_date: temporalContext.snapshot_date ?? snapshotDate,
+        }
       : null,
     dataset_path: datasetPath ? path.relative(root, datasetPath) : null,
     evidence_path: evidencePath ? path.relative(root, evidencePath) : null,
@@ -51,7 +78,15 @@ export function makeSnapshotPointer({ root, sourceId = 'liquid-current', snapsho
  * los grupos que lo aprobaron. La carpeta es una sola; la decisión de usarla es
  * de cada grupo.
  */
-export function promoteSnapshot({ root, stagePath, finalPath, pointer, groups = ['gasolina'], beforePointerUpdate = () => {}, fsModule = fs }) {
+export function promoteSnapshot({
+  root,
+  stagePath,
+  finalPath,
+  pointer,
+  groups = ['gasolina'],
+  beforePointerUpdate = () => {},
+  fsModule = fs,
+}) {
   if (fsModule.existsSync(finalPath)) throw new Error(`El snapshot destino ya existe: ${finalPath}`);
   fsModule.mkdirSync(path.dirname(finalPath), { recursive: true, mode: 0o700 });
   fsModule.renameSync(stagePath, finalPath);
@@ -62,7 +97,9 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, groups = 
     // publique todavía: es su línea base de detección.
     writeActivePointer(root, pointer, fsModule, { sourceId: pointer.source_id ?? 'liquid-current' });
   } catch (error) {
-    throw new Error(`Snapshot validado movido pero pointer no actualizado: ${error.message}; snapshot_id=${pointer.snapshot_id}; recuperación: npm run rollback -- ${pointer.snapshot_id}`);
+    throw new Error(
+      `Snapshot validado movido pero pointer no actualizado: ${error.message}; snapshot_id=${pointer.snapshot_id}; recuperación: npm run rollback -- ${pointer.snapshot_id}`,
+    );
   }
   return pointer;
 }
@@ -74,13 +111,20 @@ export function promoteSnapshot({ root, stagePath, finalPath, pointer, groups = 
  * rama que reconstruía un pointer a mano describía un dataset bajo `data/` y
  * `evidence/`, rutas que este árbol ya no tiene.
  */
-export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerUpdate = () => {}, { group = 'gasolina', sourceId = 'liquid-current' } = {}) {
+export function rollbackSnapshot(
+  root,
+  snapshotId,
+  fsModule = fs,
+  beforePointerUpdate = () => {},
+  { group = 'gasolina', sourceId = 'liquid-current' } = {},
+) {
   const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
   if (!fsModule.existsSync(snapshotPath)) throw new Error(`No existe snapshot para rollback: ${snapshotId}`);
   const target = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
   // Un grupo solo vuelve a un snapshot de su propia fuente: el de otra no tiene
   // sus filas.
-  if ((target.source_id ?? 'liquid-current') !== sourceId) throw new Error(`El snapshot ${snapshotId} es de ${target.source_id}, no de ${sourceId}`);
+  if ((target.source_id ?? 'liquid-current') !== sourceId)
+    throw new Error(`El snapshot ${snapshotId} es de ${target.source_id}, no de ${sourceId}`);
   if (target.eligible_for_rollback === false) throw new Error(`Snapshot no elegible para rollback: ${snapshotId}`);
   const active = readActivePointer(root, { group });
   if (!active) throw new Error('No hay pointer activo desde el que revertir');
@@ -100,8 +144,12 @@ export function rollbackSnapshot(root, snapshotId, fsModule = fs, beforePointerU
 export function adoptSnapshot(root, snapshotId, { group, sourceId = 'liquid-current', fsModule = fs } = {}) {
   const snapshotPath = path.join(root, '.local-cache', 'snapshots', snapshotId, 'snapshot-manifest.json');
   if (!fsModule.existsSync(snapshotPath)) throw new Error(`No existe snapshot para adoptar: ${snapshotId}`);
-  const { dataset_absolute_path, ...pointer } = validateSnapshotPointer(root, JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')));
-  if ((pointer.source_id ?? 'liquid-current') !== sourceId) throw new Error(`El snapshot ${snapshotId} es de ${pointer.source_id}, no de ${sourceId}`);
+  const { dataset_absolute_path, ...pointer } = validateSnapshotPointer(
+    root,
+    JSON.parse(fsModule.readFileSync(snapshotPath, 'utf8')),
+  );
+  if ((pointer.source_id ?? 'liquid-current') !== sourceId)
+    throw new Error(`El snapshot ${snapshotId} es de ${pointer.source_id}, no de ${sourceId}`);
   writeActivePointer(root, pointer, fsModule, { group });
   return pointer;
 }

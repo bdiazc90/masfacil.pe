@@ -10,7 +10,16 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { areaPath, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, MIN_SPAN } from '../web/lib/history-series.js';
+import {
+  areaPath,
+  frameWindow,
+  lastPoint,
+  monotonePath,
+  periodAverage,
+  planeScale,
+  segments,
+  MIN_SPAN,
+} from '../web/lib/history-series.js';
 import { addDays, windowDates } from '../web/lib/history-contract.js';
 
 const HOY = '2026-09-13';
@@ -19,9 +28,14 @@ const HOY = '2026-09-13';
 function resumen(valores) {
   const fechas = windowDates(HOY, 30);
   return {
-    schema_version: 'history-daily-1', method_version: 'daily-mean-1', timezone: 'America/Lima',
-    scope: { department: 'LIMA', province: 'LIMA' }, currency: 'PEN', unit: 'Galones',
-    generated_at: `${HOY}T20:00:00.000Z`, days: 30,
+    schema_version: 'history-daily-1',
+    method_version: 'daily-mean-1',
+    timezone: 'America/Lima',
+    scope: { department: 'LIMA', province: 'LIMA' },
+    currency: 'PEN',
+    unit: 'Galones',
+    generated_at: `${HOY}T20:00:00.000Z`,
+    days: 30,
     series: fechas.map((date) => {
       const dato = valores[date];
       if (!dato) return { date, observation: null };
@@ -78,10 +92,18 @@ test('la ventana se recorta a 7 o a 14 días terminando en hoy', () => {
 });
 
 test('un hueco corta la serie: ni la curva ni el área lo atraviesan', () => {
-  const p = puntos({ '2026-09-09': [20.5, 22], '2026-09-10': [20.6, 22], '2026-09-12': [20.9, 22], '2026-09-13': [21, 22] });
+  const p = puntos({
+    '2026-09-09': [20.5, 22],
+    '2026-09-10': [20.6, 22],
+    '2026-09-12': [20.9, 22],
+    '2026-09-13': [21, 22],
+  });
   const tramos = segments(p, 'regular');
   assert.equal(tramos.length, 2, 'el día 11 sin dato parte la serie en dos tramos');
-  assert.deepEqual(tramos.map((t) => t.length), [2, 2]);
+  assert.deepEqual(
+    tramos.map((t) => t.length),
+    [2, 2],
+  );
   const x = (i) => i * 10;
   const y = (v) => 100 - v;
   // Ningún trazo arranca ni termina sobre el día ausente (índice 11 de 14 → x 110).
@@ -117,7 +139,11 @@ test('una serie constante conserva el piso de amplitud y queda plana', () => {
   assert.ok(escala.ticks.length >= 2, 'una escala con una sola referencia no se puede leer');
   // Sin variación no se fabrican ondas: toda la curva, controles incluidos, a la
   // misma altura.
-  const d = monotonePath(segments(p, 'regular')[0], (i) => i * 10, (v) => 100 - v);
+  const d = monotonePath(
+    segments(p, 'regular')[0],
+    (i) => i * 10,
+    (v) => 100 - v,
+  );
   assert.deepEqual([...new Set(ordenadas(d))], [79.5], 'la curva se ondula sin que el dato lo diga');
 });
 
@@ -128,8 +154,14 @@ test('el suavizado no crea valores fuera del par de días contiguos', () => {
   const valores = Object.fromEntries(windowDates(HOY, 7).map((date, i) => [date, [serie[i], 22]]));
   const tramo = segments(puntos(valores, 7), 'regular')[0];
   assert.equal(tramo.length, 7);
-  const d = monotonePath(tramo, (i) => i, (v) => v);
-  const cubicas = [...d.matchAll(/C(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/g)].map((m) => m.slice(1).map(Number));
+  const d = monotonePath(
+    tramo,
+    (i) => i,
+    (v) => v,
+  );
+  const cubicas = [...d.matchAll(/C(-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)/g)].map((m) =>
+    m.slice(1).map(Number),
+  );
   assert.equal(cubicas.length, 6);
   let origen = Number(d.match(/^M-?[\d.]+ (-?[\d.]+)/)[1]);
   for (const [, c1y, , c2y, , fin] of cubicas) {

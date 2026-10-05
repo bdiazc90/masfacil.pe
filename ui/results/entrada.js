@@ -38,11 +38,16 @@ export function useEntradaTarjetas(lista, claves) {
     // primero y en su orden); cualquier otra cosa es reordenar.
     const siguen = claves.filter((clave) => vistas.has(clave));
     const enOrden = [...vistas].filter((clave) => anteriores.current.has(clave));
-    if (siguen.length && (siguen.some((clave, i) => clave !== claves[i] || clave !== enOrden[i]))) return;
+    if (siguen.length && siguen.some((clave, i) => clave !== claves[i] || clave !== enOrden[i])) return;
     const raiz = document.documentElement;
     const reducir = matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Con `reduce`, un fundido sin subir ni escalonar.
-    const cuadros = reducir ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, translate: '0 8px' }, { opacity: 1, translate: '0 0' }];
+    const cuadros = reducir
+      ? [{ opacity: 0 }, { opacity: 1 }]
+      : [
+          { opacity: 0, translate: '0 8px' },
+          { opacity: 1, translate: '0 0' },
+        ];
     const duracion = enMs(token(raiz, reducir ? '--motion-enter' : '--motion-cards'));
     const paso = reducir ? 0 : enMs(token(raiz, '--motion-stagger'));
     const curva = token(raiz, reducir ? '--motion-ease' : '--ease-out') || 'ease-out';
@@ -51,7 +56,12 @@ export function useEntradaTarjetas(lista, claves) {
       if (vistas.has(clave)) return;
       const nodo = nodos[indice];
       if (typeof nodo?.animate !== 'function') return;
-      nodo.animate(cuadros, { duration: duracion, delay: Math.min(turno, ULTIMO_TURNO) * paso, easing: curva, fill: 'backwards' });
+      nodo.animate(cuadros, {
+        duration: duracion,
+        delay: Math.min(turno, ULTIMO_TURNO) * paso,
+        easing: curva,
+        fill: 'backwards',
+      });
       turno += 1;
     });
   });

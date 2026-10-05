@@ -2,10 +2,12 @@ export const VALIDATOR_FIELDS = Object.freeze(['etag', 'last_modified']);
 export const VALIDATOR_STATES = Object.freeze(['unchanged', 'changed', 'unverifiable']);
 
 function validatorsOf(value) {
-  return Object.fromEntries(VALIDATOR_FIELDS.map((field) => {
-    const candidate = value?.[field];
-    return [field, typeof candidate === 'string' && candidate.length > 0 ? candidate : null];
-  }));
+  return Object.fromEntries(
+    VALIDATOR_FIELDS.map((field) => {
+      const candidate = value?.[field];
+      return [field, typeof candidate === 'string' && candidate.length > 0 ? candidate : null];
+    }),
+  );
 }
 
 /**

@@ -48,13 +48,34 @@ export const HISTORY_SUMMARY_PATH = '/masfacil-datos/gasolina/series/daily-v1.js
 export const HISTORY_SCOPE = Object.freeze({ department: 'LIMA', province: 'LIMA' });
 export const HISTORY_PRODUCTS = Object.freeze(['regular', 'premium']);
 
-const SUMMARY_FIELDS = Object.freeze(['schema_version', 'method_version', 'timezone', 'scope', 'currency', 'unit', 'generated_at', 'days', 'series']);
+const SUMMARY_FIELDS = Object.freeze([
+  'schema_version',
+  'method_version',
+  'timezone',
+  'scope',
+  'currency',
+  'unit',
+  'generated_at',
+  'days',
+  'series',
+]);
 const DAY_FIELDS = Object.freeze(['date', 'observation']);
-const OBSERVATION_FIELDS = Object.freeze(['observation_id', 'observed_at', 'revision_id', 'archive_hash', 'cutoff_at', 'source_max_reported_at', 'products']);
+const OBSERVATION_FIELDS = Object.freeze([
+  'observation_id',
+  'observed_at',
+  'revision_id',
+  'archive_hash',
+  'cutoff_at',
+  'source_max_reported_at',
+  'products',
+]);
 const PRODUCT_FIELDS = Object.freeze(['mean', 'n']);
 
-const sameKeys = (value, fields) => value && typeof value === 'object' && !Array.isArray(value)
-  && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...fields].sort());
+const sameKeys = (value, fields) =>
+  value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...fields].sort());
 const text = (value) => typeof value === 'string' && value.length > 0;
 const timestamp = (value) => text(value) && Number.isFinite(Date.parse(value));
 
@@ -68,7 +89,12 @@ const timestamp = (value) => text(value) && Number.isFinite(Date.parse(value));
 export function limaDate(instant) {
   const parsed = instant instanceof Date ? instant.getTime() : Date.parse(instant);
   if (!Number.isFinite(parsed)) throw new Error(`Instante inválido para derivar la fecha local: ${instant}`);
-  return new Intl.DateTimeFormat('en-CA', { timeZone: HISTORY_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(parsed));
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: HISTORY_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(parsed));
 }
 
 /**
@@ -81,7 +107,8 @@ export function limaDate(instant) {
 function dateToUtc(date, label = 'fecha') {
   if (!DATE_PATTERN.test(String(date ?? ''))) throw new Error(`${label} fuera de formato AAAA-MM-DD: ${date}`);
   const parsed = Date.parse(`${date}T00:00:00Z`);
-  if (!Number.isFinite(parsed) || new Date(parsed).toISOString().slice(0, 10) !== date) throw new Error(`${label} inexistente en el calendario: ${date}`);
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString().slice(0, 10) !== date)
+    throw new Error(`${label} inexistente en el calendario: ${date}`);
   return parsed;
 }
 
@@ -96,20 +123,30 @@ export function daysBetween(from, to) {
 
 /** Las `days` fechas consecutivas que terminan en `endDate`, ascendentes. */
 export function windowDates(endDate, days) {
-  if (!Number.isInteger(days) || days < 1 || days > HISTORY_MAX_DAYS) throw new Error(`Ventana fuera de rango: ${days}`);
+  if (!Number.isInteger(days) || days < 1 || days > HISTORY_MAX_DAYS)
+    throw new Error(`Ventana fuera de rango: ${days}`);
   return Array.from({ length: days }, (_, index) => addDays(endDate, index - days + 1));
 }
 
 /** Una fecha real, sin lanzar. */
 export function isRealDate(date) {
-  try { dateToUtc(date); return true; } catch { return false; }
+  try {
+    dateToUtc(date);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function productProblems(value, where, problems) {
-  if (!sameKeys(value, PRODUCT_FIELDS)) { problems.push(`${where}: campos inesperados o ausentes`); return; }
+  if (!sameKeys(value, PRODUCT_FIELDS)) {
+    problems.push(`${where}: campos inesperados o ausentes`);
+    return;
+  }
   const { mean, n } = value;
   if (!Number.isInteger(n) || n < 0) problems.push(`${where}.n: debe ser un entero no negativo`);
-  if (mean !== null && (!Number.isFinite(mean) || mean <= 0)) problems.push(`${where}.mean: debe ser null o un número positivo`);
+  if (mean !== null && (!Number.isFinite(mean) || mean <= 0))
+    problems.push(`${where}.mean: debe ser null o un número positivo`);
   // Un día observado sin precios elegibles es `{mean: null, n: 0}`, nunca un
   // precio cero. La equivalencia se exige en los dos sentidos para que ningún
   // productor pueda publicar una media sin denominador ni al revés.
@@ -117,7 +154,10 @@ function productProblems(value, where, problems) {
 }
 
 function observationProblems(observation, where, problems) {
-  if (!sameKeys(observation, OBSERVATION_FIELDS)) { problems.push(`${where}: campos inesperados o ausentes`); return; }
+  if (!sameKeys(observation, OBSERVATION_FIELDS)) {
+    problems.push(`${where}: campos inesperados o ausentes`);
+    return;
+  }
   if (!text(observation.observation_id)) problems.push(`${where}.observation_id: inválido`);
   if (!timestamp(observation.observed_at)) problems.push(`${where}.observed_at: inválido`);
   if (!text(observation.revision_id)) problems.push(`${where}.revision_id: inválido`);
@@ -126,9 +166,16 @@ function observationProblems(observation, where, problems) {
   if (!timestamp(observation.source_max_reported_at)) problems.push(`${where}.source_max_reported_at: inválido`);
   // El instante de observación nunca puede ser anterior al corte del snapshot
   // que observó: sería medir la vigencia contra un futuro que no existía.
-  if (timestamp(observation.observed_at) && timestamp(observation.cutoff_at)
-    && Date.parse(observation.observed_at) < Date.parse(observation.cutoff_at)) problems.push(`${where}: observed_at anterior al corte del snapshot`);
-  if (!observation.products || JSON.stringify(Object.keys(observation.products)) !== JSON.stringify([...HISTORY_PRODUCTS])) {
+  if (
+    timestamp(observation.observed_at) &&
+    timestamp(observation.cutoff_at) &&
+    Date.parse(observation.observed_at) < Date.parse(observation.cutoff_at)
+  )
+    problems.push(`${where}: observed_at anterior al corte del snapshot`);
+  if (
+    !observation.products ||
+    JSON.stringify(Object.keys(observation.products)) !== JSON.stringify([...HISTORY_PRODUCTS])
+  ) {
     problems.push(`${where}.products: productos inválidos`);
     return;
   }
@@ -144,28 +191,41 @@ function observationProblems(observation, where, problems) {
  */
 export function validateDailySummary(summary, { bytes = null } = {}) {
   const problems = [];
-  if (Number.isFinite(bytes) && bytes > HISTORY_MAX_BYTES) problems.push(`resumen de ${bytes} bytes; el tope es ${HISTORY_MAX_BYTES}`);
+  if (Number.isFinite(bytes) && bytes > HISTORY_MAX_BYTES)
+    problems.push(`resumen de ${bytes} bytes; el tope es ${HISTORY_MAX_BYTES}`);
   if (!sameKeys(summary, SUMMARY_FIELDS)) return [...problems, 'resumen: campos inesperados o ausentes'];
-  if (summary.schema_version !== HISTORY_SCHEMA_VERSION) problems.push(`resumen: versión de esquema desconocida (${summary.schema_version})`);
+  if (summary.schema_version !== HISTORY_SCHEMA_VERSION)
+    problems.push(`resumen: versión de esquema desconocida (${summary.schema_version})`);
   if (!text(summary.method_version)) problems.push('resumen: method_version inválido');
   if (summary.timezone !== HISTORY_TIMEZONE) problems.push(`resumen: el calendario debe ser ${HISTORY_TIMEZONE}`);
-  if (JSON.stringify(summary.scope) !== JSON.stringify(HISTORY_SCOPE)) problems.push('resumen: ámbito distinto de LIMA/LIMA');
+  if (JSON.stringify(summary.scope) !== JSON.stringify(HISTORY_SCOPE))
+    problems.push('resumen: ámbito distinto de LIMA/LIMA');
   if (summary.currency !== HISTORY_CURRENCY) problems.push(`resumen: moneda distinta de ${HISTORY_CURRENCY}`);
   if (summary.unit !== HISTORY_UNIT) problems.push(`resumen: unidad distinta de ${HISTORY_UNIT}`);
   if (!timestamp(summary.generated_at)) problems.push('resumen: generated_at inválido');
-  if (!Number.isInteger(summary.days) || summary.days < 1 || summary.days > HISTORY_MAX_DAYS) problems.push(`resumen: days fuera de 1..${HISTORY_MAX_DAYS}`);
+  if (!Number.isInteger(summary.days) || summary.days < 1 || summary.days > HISTORY_MAX_DAYS)
+    problems.push(`resumen: days fuera de 1..${HISTORY_MAX_DAYS}`);
   if (!Array.isArray(summary.series)) return [...problems, 'resumen: series debe ser un arreglo'];
-  if (summary.series.length !== summary.days) problems.push(`resumen: ${summary.series.length} fechas para days=${summary.days}`);
+  if (summary.series.length !== summary.days)
+    problems.push(`resumen: ${summary.series.length} fechas para days=${summary.days}`);
 
   let previa = null;
   for (const [indice, dia] of summary.series.entries()) {
     const where = `resumen.series[${indice}]`;
-    if (!sameKeys(dia, DAY_FIELDS)) { problems.push(`${where}: campos inesperados o ausentes`); continue; }
-    if (!isRealDate(dia.date)) { problems.push(`${where}.date: fecha inexistente o fuera de formato`); previa = null; continue; }
+    if (!sameKeys(dia, DAY_FIELDS)) {
+      problems.push(`${where}: campos inesperados o ausentes`);
+      continue;
+    }
+    if (!isRealDate(dia.date)) {
+      problems.push(`${where}.date: fecha inexistente o fuera de formato`);
+      previa = null;
+      continue;
+    }
     // Consecutivas y ascendentes: un hueco en el eje X tiene que ser un día con
     // `observation: null`, nunca una fecha que falta. Comprimir el calendario
     // dibujaría una tendencia que el dato no afirma.
-    if (previa !== null && daysBetween(previa, dia.date) !== 1) problems.push(`${where}.date: ${dia.date} no sigue a ${previa}`);
+    if (previa !== null && daysBetween(previa, dia.date) !== 1)
+      problems.push(`${where}.date: ${dia.date} no sigue a ${previa}`);
     previa = dia.date;
     if (dia.observation === null) continue;
     observationProblems(dia.observation, `${where}.observation`, problems);
@@ -176,7 +236,8 @@ export function validateDailySummary(summary, { bytes = null } = {}) {
   if (timestamp(summary.generated_at) && summary.series.length) {
     const ultima = summary.series.at(-1)?.date;
     const esperada = limaDate(summary.generated_at);
-    if (ultima !== esperada) problems.push(`resumen: la última fecha es ${ultima} y la generación fue el ${esperada} en Lima`);
+    if (ultima !== esperada)
+      problems.push(`resumen: la última fecha es ${ultima} y la generación fue el ${esperada} en Lima`);
   }
   return [...new Set(problems)];
 }

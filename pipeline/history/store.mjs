@@ -30,7 +30,13 @@ export const SUMMARY_CACHE_CONTROL = 'public, max-age=300';
  * bucket compartido de `datos.masfacil.pe`, no este utilitario: un utilitario
  * futuro reutiliza las mismas y solo aporta su prefijo (`HISTORY_S3_PREFIX` aquí).
  */
-export const S3_VARIABLES = Object.freeze(['DATOS_S3_ENDPOINT', 'DATOS_S3_REGION', 'DATOS_S3_BUCKET', 'DATOS_S3_ACCESS_KEY_ID', 'DATOS_S3_SECRET_ACCESS_KEY']);
+export const S3_VARIABLES = Object.freeze([
+  'DATOS_S3_ENDPOINT',
+  'DATOS_S3_REGION',
+  'DATOS_S3_BUCKET',
+  'DATOS_S3_ACCESS_KEY_ID',
+  'DATOS_S3_SECRET_ACCESS_KEY',
+]);
 export const DEFAULT_PREFIX = 'gasolina/';
 /** Tope de páginas al listar: una lista parcial silenciosa es peor que un fallo. */
 const MAX_PAGINAS = 50;
@@ -46,7 +52,12 @@ export const sha256 = (value) => crypto.createHash('sha256').update(value).diges
  *
  * @returns {Promise<{written: boolean, reused: boolean, sha256: string}>}
  */
-export async function putImmutable(store, key, body, { contentType = JSON_CONTENT_TYPE, cacheControl = IMMUTABLE_CACHE_CONTROL } = {}) {
+export async function putImmutable(
+  store,
+  key,
+  body,
+  { contentType = JSON_CONTENT_TYPE, cacheControl = IMMUTABLE_CACHE_CONTROL } = {},
+) {
   const huella = sha256(body);
   const { created } = await store.put(key, body, { contentType, cacheControl, metaSha256: huella, ifAbsent: true });
   if (created) return { written: true, reused: false, sha256: huella };
@@ -57,11 +68,18 @@ export async function putImmutable(store, key, body, { contentType = JSON_CONTEN
   const cabecera = await store.head(key);
   const existente = cabecera?.sha256 ?? (await store.get(key))?.sha256 ?? null;
   if (existente === huella) return { written: false, reused: true, sha256: huella };
-  throw new Error(`Objeto inmutable con bytes distintos bajo la misma clave: ${key} (guardado ${existente ?? 'desconocido'}, nuevo ${huella}). No se sobrescribe ni se borra. Revisa qué corrida lo escribió; si el contenido nuevo es legítimo, archívalo bajo su propio archive_hash.`);
+  throw new Error(
+    `Objeto inmutable con bytes distintos bajo la misma clave: ${key} (guardado ${existente ?? 'desconocido'}, nuevo ${huella}). No se sobrescribe ni se borra. Revisa qué corrida lo escribió; si el contenido nuevo es legítimo, archívalo bajo su propio archive_hash.`,
+  );
 }
 
 /** El resumen es el único objeto que se reemplaza. Las guardas anti-retroceso viven en quien llama. */
-export async function putMutable(store, key, body, { contentType = JSON_CONTENT_TYPE, cacheControl = SUMMARY_CACHE_CONTROL } = {}) {
+export async function putMutable(
+  store,
+  key,
+  body,
+  { contentType = JSON_CONTENT_TYPE, cacheControl = SUMMARY_CACHE_CONTROL } = {},
+) {
   await store.put(key, body, { contentType, cacheControl, metaSha256: sha256(body), ifAbsent: false });
   return { written: true, sha256: sha256(body) };
 }
@@ -81,7 +99,9 @@ export async function listAll(store, prefix, { limit } = {}) {
     cursor = salida.cursor;
     if (!cursor) return claves;
   }
-  throw new Error(`El listado de ${prefix} superó ${MAX_PAGINAS} páginas; se prefiere fallar antes que devolver una lista parcial`);
+  throw new Error(
+    `El listado de ${prefix} superó ${MAX_PAGINAS} páginas; se prefiere fallar antes que devolver una lista parcial`,
+  );
 }
 
 /** Raíz por defecto de las copias de trabajo locales; siempre fuera de Git. */
@@ -120,7 +140,11 @@ export async function createHistoryStore({ env = process.env, root = rootFromMod
   }
   // Una configuración a medias es un error, no un silencioso «pues a disco»:
   // creerse que se está escribiendo en el bucket y no estarlo es el peor de los dos.
-  if (faltan.length < S3_VARIABLES.length) throw new Error(`Configuración del almacén S3 incompleta: faltan ${faltan.join(', ')}. Defínelas todas o usa HISTORY_STORE=fs`);
-  if (env.HISTORY_STORE_ROOT === undefined) process.stdout.write(`Sin almacén S3 configurado: el histórico usa ${path.relative(root, raiz) || raiz}\n`);
+  if (faltan.length < S3_VARIABLES.length)
+    throw new Error(
+      `Configuración del almacén S3 incompleta: faltan ${faltan.join(', ')}. Defínelas todas o usa HISTORY_STORE=fs`,
+    );
+  if (env.HISTORY_STORE_ROOT === undefined)
+    process.stdout.write(`Sin almacén S3 configurado: el histórico usa ${path.relative(root, raiz) || raiz}\n`);
   return createFsStore({ root: raiz, prefix });
 }

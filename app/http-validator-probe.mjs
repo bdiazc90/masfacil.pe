@@ -16,7 +16,8 @@ function headerValidators(headers) {
 function conditionalHeaders(local) {
   const headers = {};
   if (typeof local?.etag === 'string' && local.etag.length > 0) headers['If-None-Match'] = local.etag;
-  if (typeof local?.last_modified === 'string' && local.last_modified.length > 0) headers['If-Modified-Since'] = local.last_modified;
+  if (typeof local?.last_modified === 'string' && local.last_modified.length > 0)
+    headers['If-Modified-Since'] = local.last_modified;
   return headers;
 }
 
@@ -70,7 +71,14 @@ function outcomeForResponse(response, local, attempt) {
   return compareSnapshotValidators(local, attempt.response_validators);
 }
 
-export async function probeSnapshotValidators({ url, local, fetchImpl = nativeFetch, now = () => new Date(), timeoutMs = DEFAULT_TIMEOUT_MS, maxRedirects = DEFAULT_MAX_REDIRECTS } = {}) {
+export async function probeSnapshotValidators({
+  url,
+  local,
+  fetchImpl = nativeFetch,
+  now = () => new Date(),
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxRedirects = DEFAULT_MAX_REDIRECTS,
+} = {}) {
   if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new TypeError('La URL canónica debe usar HTTP(S)');
   if (typeof fetchImpl !== 'function') throw new TypeError('fetchImpl debe ser una función');
   const startedAt = new Date(now()).toISOString();
@@ -79,33 +87,120 @@ export async function probeSnapshotValidators({ url, local, fetchImpl = nativeFe
   let head;
   try {
     head = await requestWithRedirects({ url, method: 'HEAD', headers, timeoutMs, maxRedirects, fetchImpl });
-    attempts.push(...head.redirects.map((item) => ({ ...item, method: 'HEAD', request_headers: headers, response_validators: {}, bytes_consumed: 0 })));
+    attempts.push(
+      ...head.redirects.map((item) => ({
+        ...item,
+        method: 'HEAD',
+        request_headers: headers,
+        response_validators: {},
+        bytes_consumed: 0,
+      })),
+    );
     attempts.push(head.attempt);
     if (head.response.status === 304 && Object.keys(headers).length > 0) {
-      return { status: 'unchanged', checked_at: startedAt, url: head.attempt.url, local_validators: local, attempts, bytes_consumed: 0 };
+      return {
+        status: 'unchanged',
+        checked_at: startedAt,
+        url: head.attempt.url,
+        local_validators: local,
+        attempts,
+        bytes_consumed: 0,
+      };
     }
     const headOutcome = outcomeForResponse(head.response, local, head.attempt);
     if (headOutcome !== 'unverifiable') {
-      return { status: headOutcome, checked_at: startedAt, url: head.attempt.url, local_validators: local, attempts, bytes_consumed: 0 };
+      return {
+        status: headOutcome,
+        checked_at: startedAt,
+        url: head.attempt.url,
+        local_validators: local,
+        attempts,
+        bytes_consumed: 0,
+      };
     }
-    if ((head.response.status < 200 || head.response.status >= 300) && !HEAD_FALLBACK_STATUSES.has(head.response.status)) {
-      return { status: 'unverifiable', checked_at: startedAt, url: head.attempt.url, local_validators: local, attempts, bytes_consumed: 0, reason: `HEAD respondió ${head.response.status}` };
+    if (
+      (head.response.status < 200 || head.response.status >= 300) &&
+      !HEAD_FALLBACK_STATUSES.has(head.response.status)
+    ) {
+      return {
+        status: 'unverifiable',
+        checked_at: startedAt,
+        url: head.attempt.url,
+        local_validators: local,
+        attempts,
+        bytes_consumed: 0,
+        reason: `HEAD respondió ${head.response.status}`,
+      };
     }
   } catch (error) {
-    attempts.push({ method: 'HEAD', url, status: null, request_headers: headers, response_validators: {}, bytes_consumed: 0, error: error.message });
-    return { status: 'unverifiable', checked_at: startedAt, url, local_validators: local, attempts, bytes_consumed: 0, reason: error.message };
+    attempts.push({
+      method: 'HEAD',
+      url,
+      status: null,
+      request_headers: headers,
+      response_validators: {},
+      bytes_consumed: 0,
+      error: error.message,
+    });
+    return {
+      status: 'unverifiable',
+      checked_at: startedAt,
+      url,
+      local_validators: local,
+      attempts,
+      bytes_consumed: 0,
+      reason: error.message,
+    };
   }
 
   const rangeHeaders = { ...headers, Range: 'bytes=0-0' };
   try {
-    const ranged = await requestWithRedirects({ url, method: 'GET', headers: rangeHeaders, timeoutMs, maxRedirects, fetchImpl });
-    attempts.push(...ranged.redirects.map((item) => ({ ...item, method: 'GET', request_headers: rangeHeaders, response_validators: {}, bytes_consumed: 0 })));
+    const ranged = await requestWithRedirects({
+      url,
+      method: 'GET',
+      headers: rangeHeaders,
+      timeoutMs,
+      maxRedirects,
+      fetchImpl,
+    });
+    attempts.push(
+      ...ranged.redirects.map((item) => ({
+        ...item,
+        method: 'GET',
+        request_headers: rangeHeaders,
+        response_validators: {},
+        bytes_consumed: 0,
+      })),
+    );
     cancelResponseBody(ranged.response, ranged.controller);
     attempts.push(ranged.attempt);
     const rangeOutcome = outcomeForResponse(ranged.response, local, ranged.attempt);
-    return { status: rangeOutcome, checked_at: startedAt, url: ranged.attempt.url, local_validators: local, attempts, bytes_consumed: ranged.attempt.bytes_consumed };
+    return {
+      status: rangeOutcome,
+      checked_at: startedAt,
+      url: ranged.attempt.url,
+      local_validators: local,
+      attempts,
+      bytes_consumed: ranged.attempt.bytes_consumed,
+    };
   } catch (error) {
-    attempts.push({ method: 'GET', url, status: null, request_headers: rangeHeaders, response_validators: {}, bytes_consumed: 0, error: error.message });
-    return { status: 'unverifiable', checked_at: startedAt, url, local_validators: local, attempts, bytes_consumed: 0, reason: error.message };
+    attempts.push({
+      method: 'GET',
+      url,
+      status: null,
+      request_headers: rangeHeaders,
+      response_validators: {},
+      bytes_consumed: 0,
+      error: error.message,
+    });
+    return {
+      status: 'unverifiable',
+      checked_at: startedAt,
+      url,
+      local_validators: local,
+      attempts,
+      bytes_consumed: 0,
+      reason: error.message,
+    };
   }
 }

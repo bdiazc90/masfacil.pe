@@ -19,21 +19,71 @@ import { readPreference, writePreference } from '../ui/preference.js';
 const vista = (pathname, preference) => resolvePath(pathname, { preference });
 
 test('la raíz resuelve la preferencia válida y si no, Gasolina', () => {
-  for (const preference of [null, 'gasolina', 'kerosene', 'GASOLINA', 'Diesel', 'GLP', 'GNV', '', '__proto__', 'constructor']) {
-    assert.deepEqual(vista('/', preference), { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' }, String(preference));
+  for (const preference of [
+    null,
+    'gasolina',
+    'kerosene',
+    'GASOLINA',
+    'Diesel',
+    'GLP',
+    'GNV',
+    '',
+    '__proto__',
+    'constructor',
+  ]) {
+    assert.deepEqual(
+      vista('/', preference),
+      { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' },
+      String(preference),
+    );
   }
-  assert.deepEqual(vista('/', 'diesel'), { kind: 'view', view: 'diesel', history: false, canonical: '/combustibles/diesel' });
+  assert.deepEqual(vista('/', 'diesel'), {
+    kind: 'view',
+    view: 'diesel',
+    history: false,
+    canonical: '/combustibles/diesel',
+  });
   assert.deepEqual(vista('/', 'glp'), { kind: 'view', view: 'glp', history: false, canonical: '/combustibles/glp' });
   assert.deepEqual(vista('/', 'gnv'), { kind: 'view', view: 'gnv', history: false, canonical: '/combustibles/gnv' });
 });
 
 test('una ruta específica manda sobre la preferencia', () => {
-  assert.deepEqual(vista('/combustibles/gasolina', 'diesel'), { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' });
-  assert.deepEqual(vista('/combustibles/gasolina/historial', 'diesel'), { kind: 'view', view: 'gasolina', history: true, canonical: '/combustibles/gasolina/historial' });
-  assert.deepEqual(vista('/combustibles/diesel', 'gasolina'), { kind: 'view', view: 'diesel', history: false, canonical: '/combustibles/diesel' });
-  assert.deepEqual(vista('/combustibles/glp', 'diesel'), { kind: 'view', view: 'glp', history: false, canonical: '/combustibles/glp' });
-  assert.deepEqual(vista('/combustibles/gnv', 'glp'), { kind: 'view', view: 'gnv', history: false, canonical: '/combustibles/gnv' });
-  assert.deepEqual(vista('/combustibles/gasolina', 'glp'), { kind: 'view', view: 'gasolina', history: false, canonical: '/combustibles/gasolina' });
+  assert.deepEqual(vista('/combustibles/gasolina', 'diesel'), {
+    kind: 'view',
+    view: 'gasolina',
+    history: false,
+    canonical: '/combustibles/gasolina',
+  });
+  assert.deepEqual(vista('/combustibles/gasolina/historial', 'diesel'), {
+    kind: 'view',
+    view: 'gasolina',
+    history: true,
+    canonical: '/combustibles/gasolina/historial',
+  });
+  assert.deepEqual(vista('/combustibles/diesel', 'gasolina'), {
+    kind: 'view',
+    view: 'diesel',
+    history: false,
+    canonical: '/combustibles/diesel',
+  });
+  assert.deepEqual(vista('/combustibles/glp', 'diesel'), {
+    kind: 'view',
+    view: 'glp',
+    history: false,
+    canonical: '/combustibles/glp',
+  });
+  assert.deepEqual(vista('/combustibles/gnv', 'glp'), {
+    kind: 'view',
+    view: 'gnv',
+    history: false,
+    canonical: '/combustibles/gnv',
+  });
+  assert.deepEqual(vista('/combustibles/gasolina', 'glp'), {
+    kind: 'view',
+    view: 'gasolina',
+    history: false,
+    canonical: '/combustibles/gasolina',
+  });
 });
 
 test('barra final y enlaces antiguos redirigen a la forma canónica', () => {
@@ -53,24 +103,55 @@ test('barra final y enlaces antiguos redirigen a la forma canónica', () => {
     '/gasolina/historial': '/combustibles/gasolina/historial',
     '/gasolina/historial/': '/combustibles/gasolina/historial',
   };
-  for (const [desde, hacia] of Object.entries(esperadas)) assert.deepEqual(vista(desde, 'diesel'), { kind: 'redirect', to: hacia }, desde);
+  for (const [desde, hacia] of Object.entries(esperadas))
+    assert.deepEqual(vista(desde, 'diesel'), { kind: 'redirect', to: hacia }, desde);
 });
 
 test('lo no activado o inventado es 404, no la portada', () => {
   // Diésel, GLP y GNV no tienen histórico: su ruta de historial no existe.
-  for (const ruta of ['/combustibles', '/combustibles/', '/combustibles/gnl', '/combustibles/kerosene/', '/combustibles/diesel/historial', '/combustibles/diesel/otra', '/combustibles/glp/historial', '/combustibles/glp/otra', '/combustibles/gnv/historial', '/combustibles/gnv/licuefactado', '/glp', '/gnv', '/combustibles/gasolina/regular', '/combustibles/gasolina/historial/extra', '/tipo-de-cambio', '/dolar', '/gasolina/diesel', '/diesel', '/index']) {
+  for (const ruta of [
+    '/combustibles',
+    '/combustibles/',
+    '/combustibles/gnl',
+    '/combustibles/kerosene/',
+    '/combustibles/diesel/historial',
+    '/combustibles/diesel/otra',
+    '/combustibles/glp/historial',
+    '/combustibles/glp/otra',
+    '/combustibles/gnv/historial',
+    '/combustibles/gnv/licuefactado',
+    '/glp',
+    '/gnv',
+    '/combustibles/gasolina/regular',
+    '/combustibles/gasolina/historial/extra',
+    '/tipo-de-cambio',
+    '/dolar',
+    '/gasolina/diesel',
+    '/diesel',
+    '/index',
+  ]) {
     assert.deepEqual(vista(ruta), { kind: 'not-found' }, ruta);
   }
 });
 
 test('web/_redirects dice exactamente lo que dice la tabla', () => {
-  const reglas = fs.readFileSync(new URL('../web/_redirects', import.meta.url), 'utf8')
-    .split('\n').map((linea) => linea.trim().replace(/\s+/g, ' ')).filter((linea) => linea && !linea.startsWith('#'));
+  const reglas = fs
+    .readFileSync(new URL('../web/_redirects', import.meta.url), 'utf8')
+    .split('\n')
+    .map((linea) => linea.trim().replace(/\s+/g, ' '))
+    .filter((linea) => linea && !linea.startsWith('#'));
   assert.deepEqual(reglas, redirectRules());
 });
 
 test('la preferencia sobrevive a un almacenamiento que falla', () => {
-  const roto = { getItem() { throw new Error('bloqueado'); }, setItem() { throw new Error('lleno'); } };
+  const roto = {
+    getItem() {
+      throw new Error('bloqueado');
+    },
+    setItem() {
+      throw new Error('lleno');
+    },
+  };
   assert.equal(readPreference(roto), null);
   assert.doesNotThrow(() => writePreference('gasolina', roto));
   assert.equal(readPreference(null), null);

@@ -10,7 +10,16 @@
  * marca, DOM ni almacén.
  */
 
-import { HISTORY_CURRENCY, HISTORY_MAX_DAYS, HISTORY_SCHEMA_VERSION, HISTORY_SCOPE, HISTORY_TIMEZONE, HISTORY_UNIT, addDays, windowDates } from './history-contract.js';
+import {
+  HISTORY_CURRENCY,
+  HISTORY_MAX_DAYS,
+  HISTORY_SCHEMA_VERSION,
+  HISTORY_SCOPE,
+  HISTORY_TIMEZONE,
+  HISTORY_UNIT,
+  addDays,
+  windowDates,
+} from './history-contract.js';
 
 const HORA_MS = 3_600_000;
 
@@ -39,7 +48,8 @@ export const MIN_SPAN = 0.5;
 // `mean: null` y `n: 0` viajen juntos, pero el dibujo no depende de esa promesa:
 // lo comprueba, porque un cero disfrazado de media es justo lo que no se puede
 // pintar.
-const medida = (producto) => (producto && Number.isFinite(producto.mean) && producto.n > 0 ? { mean: producto.mean, n: producto.n } : null);
+const medida = (producto) =>
+  producto && Number.isFinite(producto.mean) && producto.n > 0 ? { mean: producto.mean, n: producto.n } : null;
 
 const numero = (valor) => (Number.isFinite(valor) ? Number(valor.toFixed(2)) : 0);
 
@@ -67,7 +77,11 @@ export function frameWindow(summary, { today, days = DEFAULT_WINDOW } = {}) {
     };
   });
   const observados = points.filter((punto) => punto.observation);
-  const lastObservedAt = observados.map((punto) => punto.observation.observed_at).sort().at(-1) ?? null;
+  const lastObservedAt =
+    observados
+      .map((punto) => punto.observation.observed_at)
+      .sort()
+      .at(-1) ?? null;
   return { points, days, daysWithObservation: observados.length, lastObservedAt };
 }
 
@@ -83,7 +97,15 @@ export function frameWindow(summary, { today, days = DEFAULT_WINDOW } = {}) {
 export function lastPoint(points, key) {
   for (let i = points.length - 1; i >= 0; i -= 1) {
     const dato = points[i][key];
-    if (dato) return { mean: dato.mean, n: dato.n, date: points[i].date, index: i, observedAt: points[i].observation?.observed_at ?? null, isToday: points[i].isToday };
+    if (dato)
+      return {
+        mean: dato.mean,
+        n: dato.n,
+        date: points[i].date,
+        index: i,
+        observedAt: points[i].observation?.observed_at ?? null,
+        isToday: points[i].isToday,
+      };
   }
   return null;
 }
@@ -127,7 +149,8 @@ function niceTicks(min, max, objetivo = 6) {
   let mejor = [];
   for (const paso of pasos) {
     const marcas = [];
-    for (let valor = Math.ceil(min / paso) * paso; valor <= max + paso / 1000; valor += paso) marcas.push(Number(valor.toFixed(4)));
+    for (let valor = Math.ceil(min / paso) * paso; valor <= max + paso / 1000; valor += paso)
+      marcas.push(Number(valor.toFixed(4)));
     if (marcas.length < 2) break;
     mejor = marcas;
     if (marcas.length <= objetivo) break;
@@ -182,8 +205,14 @@ export function segments(points, key) {
   let actual = null;
   for (const punto of points) {
     const valor = punto[key]?.mean;
-    if (!Number.isFinite(valor)) { actual = null; continue; }
-    if (!actual) { actual = []; tramos.push(actual); }
+    if (!Number.isFinite(valor)) {
+      actual = null;
+      continue;
+    }
+    if (!actual) {
+      actual = [];
+      tramos.push(actual);
+    }
     actual.push({ index: punto.index, mean: valor, date: punto.date, n: punto[key].n });
   }
   return tramos;
@@ -200,14 +229,19 @@ export function segments(points, key) {
 function monotoneTangents(tramo) {
   const n = tramo.length;
   const delta = [];
-  for (let i = 0; i < n - 1; i += 1) delta.push((tramo[i + 1].mean - tramo[i].mean) / (tramo[i + 1].index - tramo[i].index));
+  for (let i = 0; i < n - 1; i += 1)
+    delta.push((tramo[i + 1].mean - tramo[i].mean) / (tramo[i + 1].index - tramo[i].index));
   const m = new Array(n);
   m[0] = delta[0];
   m[n - 1] = delta[n - 2];
   for (let i = 1; i < n - 1; i += 1) m[i] = (delta[i - 1] + delta[i]) / 2;
   for (let i = 0; i < n - 1; i += 1) {
     // Tramo plano: los dos extremos se aplanan. Una serie constante queda recta.
-    if (delta[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    if (delta[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
     // Cambio de sentido: el día es un máximo o un mínimo local y su tangente es
     // cero, o la curva se pasaría de largo.
     if (m[i] / delta[i] < 0) m[i] = 0;

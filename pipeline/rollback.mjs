@@ -31,7 +31,8 @@ export async function rollbackGroup({ root = rootFromModule, group = 'gasolina',
   if (!snapshotId) throw new Error('Falta el snapshot al que volver');
   // La revisión nombrada tiene que ser del mismo grupo: restaurar la consulta de
   // Gasolina sobre Diésel sería componer una revisión que nunca existió.
-  if (revisionId && !revisionId.startsWith(grupo.config.revisionPrefix)) throw new Error(`La revisión ${revisionId} no es de ${group}`);
+  if (revisionId && !revisionId.startsWith(grupo.config.revisionPrefix))
+    throw new Error(`La revisión ${revisionId} no es de ${group}`);
 
   // La consulta web NO se hereda. Recuperar una entrega de ayer y pintarle los
   // precios de hoy sería componer una revisión que nunca existió, así que por
@@ -53,7 +54,14 @@ export async function rollbackGroup({ root = rootFromModule, group = 'gasolina',
   const target = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
   // Todo el grupo se reconstruye y valida antes de mover el pointer privado.
-  const projection = (await composeGroups({ root, plan: [{ pointer: target, groups: [group] }], facilitoState: guardado ? facilitoState : null, ...(compuestoEn ? { now: Date.parse(compuestoEn) } : {}) }))[group];
+  const projection = (
+    await composeGroups({
+      root,
+      plan: [{ pointer: target, groups: [group] }],
+      facilitoState: guardado ? facilitoState : null,
+      ...(compuestoEn ? { now: Date.parse(compuestoEn) } : {}),
+    })
+  )[group];
   let rolledBack;
   try {
     rolledBack = rollbackSnapshot(root, snapshotId, fs, () => {}, { group, sourceId: grupo.config.source });
@@ -62,5 +70,13 @@ export async function rollbackGroup({ root = rootFromModule, group = 'gasolina',
     if (rolledBack) writeActivePointer(root, activeBefore, fs, { group });
     throw new Error(`Rollback ${group} abortado sin dejar pointer parcial: ${error.message}`);
   }
-  return { status: 'rolled_back', group, active_before: activeBefore.snapshot_id, active_after: rolledBack.snapshot_id, revision_id: projection.manifest.revision_id, facilito: projection.refreshState.facilito?.state_id ?? null, products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, value.offers.length])) };
+  return {
+    status: 'rolled_back',
+    group,
+    active_before: activeBefore.snapshot_id,
+    active_after: rolledBack.snapshot_id,
+    revision_id: projection.manifest.revision_id,
+    facilito: projection.refreshState.facilito?.state_id ?? null,
+    products: Object.fromEntries(Object.entries(projection.datasets).map(([key, value]) => [key, value.offers.length])),
+  };
 }

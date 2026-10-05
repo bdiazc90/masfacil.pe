@@ -31,9 +31,17 @@ const FUENTES = Object.freeze({
   repsol: {
     brand: 'Repsol',
     url: 'https://www.repsol.pe/content/dam/aplicaciones/repsol-paises/pe/es/estaciones-de-servicio/data/data.json',
-    referer: 'https://www.repsol.pe/es/es/productos-servicios/estaciones-servicio/localizador-de-estaciones/index.cshtml',
+    referer:
+      'https://www.repsol.pe/es/es/productos-servicios/estaciones-servicio/localizador-de-estaciones/index.cshtml',
     // El padrón de Repsol invierte los nombres: `lng` lleva la latitud.
-    normalize: (row) => ({ name: row.name, address: row.address, district: row.city, latitude: row.location?.lng, longitude: row.location?.lat, scope: `${row.department}/${row.state}` }),
+    normalize: (row) => ({
+      name: row.name,
+      address: row.address,
+      district: row.city,
+      latitude: row.location?.lng,
+      longitude: row.location?.lat,
+      scope: `${row.department}/${row.state}`,
+    }),
     inScope: (row) => row.department === 'LIMA' && row.state === 'LIMA',
   },
   petroperu: {
@@ -45,7 +53,14 @@ const FUENTES = Object.freeze({
     cosechar: cosecharWordPress,
     // `title` es la razón social del operador, no la marca: solo viaja al texto de
     // referencia. La bandera que se acredita es la del directorio, no este nombre.
-    normalize: (row) => ({ name: deHtml(row.title?.rendered), address: row.acf?.address, district: row.acf?.district, latitude: Number(row.acf?.lat), longitude: Number(row.acf?.long), scope: `${row.acf?.department}/${row.acf?.province}` }),
+    normalize: (row) => ({
+      name: deHtml(row.title?.rendered),
+      address: row.acf?.address,
+      district: row.acf?.district,
+      latitude: Number(row.acf?.lat),
+      longitude: Number(row.acf?.long),
+      scope: `${row.acf?.department}/${row.acf?.province}`,
+    }),
     inScope: (row) => row.acf?.department === 'LIMA' && row.acf?.province === 'LIMA',
   },
   ava: {
@@ -56,7 +71,14 @@ const FUENTES = Object.freeze({
     // de un bundle de Next.js cuyo hash cambia en cada build. Se redescubre desde
     // el HTML y la vigencia es el `last-modified` de ese bundle.
     cosechar: cosecharAva,
-    normalize: (row) => ({ name: row.nombre, address: row.direccion, district: row.distrito, latitude: row.coordenadas?.latitud, longitude: row.coordenadas?.longitud, scope: `${row.departamento}/${row.ciudad}` }),
+    normalize: (row) => ({
+      name: row.nombre,
+      address: row.direccion,
+      district: row.distrito,
+      latitude: row.coordenadas?.latitud,
+      longitude: row.coordenadas?.longitud,
+      scope: `${row.departamento}/${row.ciudad}`,
+    }),
     // `ciudad` es la provincia, y el padrón la declara mal en 4 de las 28 fichas
     // (Ventanilla, Chancay y dos de Barranca figuran como LIMA/LIMA). El distrito
     // sigue mandando: ninguno de esos existe en el Registro de Lima/Lima.
@@ -77,18 +99,41 @@ const FUENTES = Object.freeze({
     // decimales o menos, ~1 km de error, muy por encima del radio de selección.
     // `city` viene relleno en 5 de 720 fichas y una de ellas es el nombre de la
     // calle, no el distrito. Un distrito falso acredita mal: mejor ninguno.
-    normalize: (row) => ({ name: row.name, address: row.address, district: '', latitude: row.y, longitude: row.x, scope: 'LIMA/LIMA (por caja geográfica, no declarado por la fuente)' }),
+    normalize: (row) => ({
+      name: row.name,
+      address: row.address,
+      district: '',
+      latitude: row.y,
+      longitude: row.x,
+      scope: 'LIMA/LIMA (por caja geográfica, no declarado por la fuente)',
+    }),
     // Sin campos administrativos solo queda recortar por caja de la provincia de
     // Lima. La caja selecciona candidatos; no declara ámbito ni confirma nada.
-    inScope: (row) => row.y > -12.55 && row.y < -11.60 && row.x > -77.25 && row.x < -76.55,
+    inScope: (row) => row.y > -12.55 && row.y < -11.6 && row.x > -77.25 && row.x < -76.55,
   },
 });
 
 // Algunos padrones arrastran UTF-8 leído como CP-1252: «VIÃ‘EDOS».
-const MOJIBAKE = Object.freeze([['Ã‘', 'Ñ'], ['Ã±', 'ñ'], ['Ã¡', 'á'], ['Ã©', 'é'], ['Ã­', 'í'], ['Ã³', 'ó'], ['Ãº', 'ú'], ['Ã“', 'Ó'], ['Ã‰', 'É'], ['Ãš', 'Ú'], ['Ã¼', 'ü']]);
-const sinTildes = (value) => MOJIBAKE.reduce((texto, [roto, sano]) => texto.replaceAll(roto, sano), String(value ?? '')).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+const MOJIBAKE = Object.freeze([
+  ['Ã‘', 'Ñ'],
+  ['Ã±', 'ñ'],
+  ['Ã¡', 'á'],
+  ['Ã©', 'é'],
+  ['Ã­', 'í'],
+  ['Ã³', 'ó'],
+  ['Ãº', 'ú'],
+  ['Ã“', 'Ó'],
+  ['Ã‰', 'É'],
+  ['Ãš', 'Ú'],
+  ['Ã¼', 'ü'],
+]);
+const sinTildes = (value) =>
+  MOJIBAKE.reduce((texto, [roto, sano]) => texto.replaceAll(roto, sano), String(value ?? ''))
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase();
 const EARTH_M = 6371008.8;
-const rad = (deg) => deg * Math.PI / 180;
+const rad = (deg) => (deg * Math.PI) / 180;
 function metros(a, b) {
   const dLat = rad(b.latitude - a.latitude);
   const dLon = rad(b.longitude - a.longitude);
@@ -113,7 +158,16 @@ export const precisionDe = (ficha) => Math.min(decimales(ficha.latitude), decima
  * texto. Se mide por eje porque hay fichas con la latitud precisa y la longitud
  * redondeada: tomar el peor de los dos abría la ventana a toda la provincia.
  */
-export const toleranciaDe = (decimalesDelEje) => (decimalesDelEje >= 4 ? 200 : decimalesDelEje === 3 ? 300 : decimalesDelEje === 2 ? 1000 : decimalesDelEje === 1 ? 6000 : Infinity);
+export const toleranciaDe = (decimalesDelEje) =>
+  decimalesDelEje >= 4
+    ? 200
+    : decimalesDelEje === 3
+      ? 300
+      : decimalesDelEje === 2
+        ? 1000
+        : decimalesDelEje === 1
+          ? 6000
+          : Infinity;
 const M_POR_GRADO = 111195;
 function ventanaDe(ficha) {
   const latitud = toleranciaDe(decimales(ficha.latitude));
@@ -123,10 +177,11 @@ function ventanaDe(ficha) {
     latitud_m: Number.isFinite(latitud) ? latitud : null,
     longitud_m: Number.isFinite(longitud) ? longitud : null,
     // Coordenada precisa: el radio de siempre. Si no, un rectángulo por eje.
-    contiene: (sitio) => (precisa
-      ? metros(ficha, sitio) <= 200
-      : Math.abs(ficha.latitude - sitio.latitude) * M_POR_GRADO <= latitud
-        && Math.abs(ficha.longitude - sitio.longitude) * M_POR_GRADO * Math.cos(rad(ficha.latitude)) <= longitud),
+    contiene: (sitio) =>
+      precisa
+        ? metros(ficha, sitio) <= 200
+        : Math.abs(ficha.latitude - sitio.latitude) * M_POR_GRADO <= latitud &&
+          Math.abs(ficha.longitude - sitio.longitude) * M_POR_GRADO * Math.cos(rad(ficha.latitude)) <= longitud,
   };
 }
 
@@ -142,32 +197,207 @@ const distritoCanonico = (valor) => {
 export function estratoDe(ficha) {
   if (distritoCanonico(ficha.district)) return 'distrito_declarado';
   const precision = precisionDe(ficha);
-  return precision >= 3 ? 'sin_distrito_coordenada_precisa' : precision === 2 ? 'sin_distrito_coordenada_aproximada' : 'sin_distrito_coordenada_inutil';
+  return precision >= 3
+    ? 'sin_distrito_coordenada_precisa'
+    : precision === 2
+      ? 'sin_distrito_coordenada_aproximada'
+      : 'sin_distrito_coordenada_inutil';
 }
 
 // --- Direcciones -----------------------------------------------------------------
 
-const PREFIJOS_VIA = new Set(['AV', 'AVENIDA', 'AVDA', 'JR', 'JIRON', 'CA', 'CAL', 'CALLE', 'PSJE', 'PASAJE', 'PJE', 'PROL', 'PROLONGACION', 'MALECON', 'OVALO', 'BLVD', 'BOULEVARD', 'VIA']);
+const PREFIJOS_VIA = new Set([
+  'AV',
+  'AVENIDA',
+  'AVDA',
+  'JR',
+  'JIRON',
+  'CA',
+  'CAL',
+  'CALLE',
+  'PSJE',
+  'PASAJE',
+  'PJE',
+  'PROL',
+  'PROLONGACION',
+  'MALECON',
+  'OVALO',
+  'BLVD',
+  'BOULEVARD',
+  'VIA',
+]);
 const PREFIJOS_CARRETERA = new Set(['CARR', 'CAR', 'CARRET', 'CARRETERA', 'AUTOPISTA', 'PAN', 'PANAM', 'PANAMERICANA']);
 // Abren la localidad: lo que sigue ubica, pero no es la vía.
-const LOCALIDAD = new Set(['URB', 'URBANIZACION', 'AAHH', 'AH', 'ASOC', 'ASOCIACION', 'COOP', 'COOPERATIVA', 'PJ', 'PUEBLO', 'PROGRAMA', 'RES', 'RESIDENCIAL', 'CONJ', 'CONJUNTO', 'CH', 'HABILITACION', 'HABILIT', 'LOTIZACION', 'FUNDO', 'FDO', 'PREDIO', 'PARCELA', 'PARC', 'PARCELACION', 'SECTOR', 'ZONA', 'GRUPO', 'ETAPA', 'COMUNIDAD', 'CP', 'ANEXO', 'BARRIO', 'APV', 'UNIDAD', 'UNID', 'SECCION', 'CASERIO']);
+const LOCALIDAD = new Set([
+  'URB',
+  'URBANIZACION',
+  'AAHH',
+  'AH',
+  'ASOC',
+  'ASOCIACION',
+  'COOP',
+  'COOPERATIVA',
+  'PJ',
+  'PUEBLO',
+  'PROGRAMA',
+  'RES',
+  'RESIDENCIAL',
+  'CONJ',
+  'CONJUNTO',
+  'CH',
+  'HABILITACION',
+  'HABILIT',
+  'LOTIZACION',
+  'FUNDO',
+  'FDO',
+  'PREDIO',
+  'PARCELA',
+  'PARC',
+  'PARCELACION',
+  'SECTOR',
+  'ZONA',
+  'GRUPO',
+  'ETAPA',
+  'COMUNIDAD',
+  'CP',
+  'ANEXO',
+  'BARRIO',
+  'APV',
+  'UNIDAD',
+  'UNID',
+  'SECCION',
+  'CASERIO',
+]);
 // Abren otra vía: la de la esquina o el nombre anterior de la misma.
-const CRUCE = new Set(['ESQ', 'ESQUINA', 'CON', 'CRUCE', 'INTERSECCION', 'INTERSEC', 'INTER', 'Y', 'ENTRE', 'ANTES', 'EX']);
+const CRUCE = new Set([
+  'ESQ',
+  'ESQUINA',
+  'CON',
+  'CRUCE',
+  'INTERSECCION',
+  'INTERSEC',
+  'INTER',
+  'Y',
+  'ENTRE',
+  'ANTES',
+  'EX',
+]);
 // Una referencia («altura del paradero») no es la dirección.
 const REFERENCIA = new Set(['ALT', 'ALTURA', 'FRENTE', 'REF', 'REFERENCIA', 'PARADERO', 'COSTADO', 'ESPALDA', 'CERCA']);
-const SALTA_NUMERO = new Set(['INT', 'INTERIOR', 'PISO', 'DPTO', 'DEPARTAMENTO', 'OF', 'OFICINA', 'TIENDA', 'LOCAL', 'PUESTO', 'CDRA', 'CUADRA', 'UC', 'SUB']);
+const SALTA_NUMERO = new Set([
+  'INT',
+  'INTERIOR',
+  'PISO',
+  'DPTO',
+  'DEPARTAMENTO',
+  'OF',
+  'OFICINA',
+  'TIENDA',
+  'LOCAL',
+  'PUESTO',
+  'CDRA',
+  'CUADRA',
+  'UC',
+  'SUB',
+]);
 const MANZANA = new Set(['MZ', 'MZA', 'MANZANA']);
 const LOTE = new Set(['LT', 'LTS', 'LTE', 'LOTE', 'LOTES', 'LOT', 'SUBLOTE']);
-const MESES = new Set(['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SETIEMBRE', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']);
+const MESES = new Set([
+  'ENERO',
+  'FEBRERO',
+  'MARZO',
+  'ABRIL',
+  'MAYO',
+  'JUNIO',
+  'JULIO',
+  'AGOSTO',
+  'SETIEMBRE',
+  'SEPTIEMBRE',
+  'OCTUBRE',
+  'NOVIEMBRE',
+  'DICIEMBRE',
+]);
 const VACIAS = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'EL', 'AL', 'EN', 'SIN', 'NOMBRE']);
 // Nombres tan repetidos que solos no distinguen una vía: «Santa Rosa» y «Santa
 // Cruz» no son la misma. Cuentan solo acompañados.
-const DEBILES = new Set(['SAN', 'STA', 'STO', 'SANTA', 'SANTO', 'SENOR', 'SENORA', 'NUESTRA', 'VIRGEN', 'GENERAL', 'GRAL', 'MARISCAL', 'MCAL', 'PRESIDENTE', 'CORONEL', 'CAPITAN', 'ALMIRANTE', 'DOCTOR', 'INGENIERO', 'PADRE', 'JOSE', 'JUAN', 'MARIA', 'MANUEL', 'LUIS', 'CARLOS', 'REPUBLICA', 'PASEO', 'LIMA', 'PERU', 'INCA', 'HEROES']);
+const DEBILES = new Set([
+  'SAN',
+  'STA',
+  'STO',
+  'SANTA',
+  'SANTO',
+  'SENOR',
+  'SENORA',
+  'NUESTRA',
+  'VIRGEN',
+  'GENERAL',
+  'GRAL',
+  'MARISCAL',
+  'MCAL',
+  'PRESIDENTE',
+  'CORONEL',
+  'CAPITAN',
+  'ALMIRANTE',
+  'DOCTOR',
+  'INGENIERO',
+  'PADRE',
+  'JOSE',
+  'JUAN',
+  'MARIA',
+  'MANUEL',
+  'LUIS',
+  'CARLOS',
+  'REPUBLICA',
+  'PASEO',
+  'LIMA',
+  'PERU',
+  'INCA',
+  'HEROES',
+]);
 // Describen una carretera pero no la distinguen: valen junto al kilómetro.
 const GENERICAS = new Set(['NORTE', 'SUR', 'ESTE', 'OESTE', 'CENTRAL', 'ANTIGUA', 'NUEVA', 'NUEVO', 'PRINCIPAL']);
 const ORIENTACION = new Set(['NORTE', 'SUR', 'ESTE', 'OESTE']);
 // Rubro de la localidad, no su nombre: «Programa de Vivienda», «Pueblo Joven».
-const GENERICAS_LOCALIDAD = new Set(['JOVEN', 'PROYECTO', 'ESPECIAL', 'VIVIENDA', 'VIVIENDAS', 'POBLADO', 'ASENTAMIENTO', 'HUMANO', 'AGRUPACION', 'FAMILIAR', 'PRODUCTORES', 'AGROPECUARIA', 'AGRICOLA', 'INDUSTRIAL', 'INDUSTRIALES', 'PECUARIOS', 'INMOBILIARIA', 'RUSTICO', 'SEMI', 'MIXTA', 'NUEVO', 'NUEVA', 'VILLA', 'RESIDENCIAL', 'CAMPESINA', 'CAMPESINO', 'UNIDAD', 'VECINAL', 'SUBLOTE', 'PARCELA', 'LOTIZACION', 'HABILITACION', 'URBANA', 'COMERCIAL', 'TALLER', 'CASA'].concat([...LOCALIDAD]));
+const GENERICAS_LOCALIDAD = new Set(
+  [
+    'JOVEN',
+    'PROYECTO',
+    'ESPECIAL',
+    'VIVIENDA',
+    'VIVIENDAS',
+    'POBLADO',
+    'ASENTAMIENTO',
+    'HUMANO',
+    'AGRUPACION',
+    'FAMILIAR',
+    'PRODUCTORES',
+    'AGROPECUARIA',
+    'AGRICOLA',
+    'INDUSTRIAL',
+    'INDUSTRIALES',
+    'PECUARIOS',
+    'INMOBILIARIA',
+    'RUSTICO',
+    'SEMI',
+    'MIXTA',
+    'NUEVO',
+    'NUEVA',
+    'VILLA',
+    'RESIDENCIAL',
+    'CAMPESINA',
+    'CAMPESINO',
+    'UNIDAD',
+    'VECINAL',
+    'SUBLOTE',
+    'PARCELA',
+    'LOTIZACION',
+    'HABILITACION',
+    'URBANA',
+    'COMERCIAL',
+    'TALLER',
+    'CASA',
+  ].concat([...LOCALIDAD]),
+);
 
 function normalizarDireccion(texto) {
   return sinTildes(texto)
@@ -193,7 +423,11 @@ function leerManzana(tokens, desde, destino) {
   const id = tokens[desde];
   if (!id || MANZANA.has(id) || LOTE.has(id) || LOCALIDAD.has(id) || !/^[A-Z0-9]{1,4}$/.test(id)) return desde - 1;
   const tras = tokens[desde + 2];
-  if (/^[A-Z]{1,2}$/.test(id) && /^\d{1,2}$/.test(tokens[desde + 1] ?? '') && (tras === undefined || LOTE.has(tras) || /^(?:LOTE?S?|LTS?|LTE)\d/.test(tras))) {
+  if (
+    /^[A-Z]{1,2}$/.test(id) &&
+    /^\d{1,2}$/.test(tokens[desde + 1] ?? '') &&
+    (tras === undefined || LOTE.has(tras) || /^(?:LOTE?S?|LTS?|LTE)\d/.test(tras))
+  ) {
     destino.add(`${id}${Number(tokens[desde + 1])}`);
     return desde + 1;
   }
@@ -207,8 +441,14 @@ function leerLotes(tokens, desde, destino) {
     const token = tokens[indice];
     if (token === 'Y' || token === 'NRO' || token === 'SUB') continue;
     if (tokens[indice + 1] === 'ETAPA') break;
-    if (/^\d{1,3}[A-Z]?$/.test(token)) { destino.add(token.replace(/^0+(?=\d)/, '')); continue; }
-    if (/^[A-Z]$/.test(token)) { destino.add(token); continue; }
+    if (/^\d{1,3}[A-Z]?$/.test(token)) {
+      destino.add(token.replace(/^0+(?=\d)/, ''));
+      continue;
+    }
+    if (/^[A-Z]$/.test(token)) {
+      destino.add(token);
+      continue;
+    }
     break;
   }
   return indice - 1;
@@ -222,7 +462,15 @@ function leerLotes(tokens, desde, destino) {
  */
 export function analizarDireccion(texto) {
   const tokens = normalizarDireccion(texto).split(' ').filter(Boolean);
-  const r = { vias: new Set(), genericas: new Set(), localidad: new Set(), puertas: new Set(), km: new Set(), manzanas: new Set(), lotes: new Set() };
+  const r = {
+    vias: new Set(),
+    genericas: new Set(),
+    localidad: new Set(),
+    puertas: new Set(),
+    km: new Set(),
+    manzanas: new Set(),
+    lotes: new Set(),
+  };
   let modo = 'via';
   let palabrasDeVia = 0;
   let puertaAbierta = false;
@@ -230,19 +478,32 @@ export function analizarDireccion(texto) {
   for (let indice = 0; indice < tokens.length; indice += 1) {
     const token = tokens[indice];
     const siguiente = tokens[indice + 1];
-    if (token === 'SN') { modo = fuera(); puertaAbierta = false; continue; }
-    if (PREFIJOS_VIA.has(token) || PREFIJOS_CARRETERA.has(token)) {
-      if (PREFIJOS_CARRETERA.has(token)) r.genericas.add('CARRETERA');
-      if (modo !== 'referencia') { modo = 'via'; palabrasDeVia = 0; }
+    if (token === 'SN') {
+      modo = fuera();
       puertaAbierta = false;
       continue;
     }
-    if (MANZANA.has(token)) { indice = leerManzana(tokens, indice + 1, r.manzanas); modo = fuera(); puertaAbierta = false; continue; }
+    if (PREFIJOS_VIA.has(token) || PREFIJOS_CARRETERA.has(token)) {
+      if (PREFIJOS_CARRETERA.has(token)) r.genericas.add('CARRETERA');
+      if (modo !== 'referencia') {
+        modo = 'via';
+        palabrasDeVia = 0;
+      }
+      puertaAbierta = false;
+      continue;
+    }
+    if (MANZANA.has(token)) {
+      indice = leerManzana(tokens, indice + 1, r.manzanas);
+      modo = fuera();
+      puertaAbierta = false;
+      continue;
+    }
     const loteJunto = /^(?:LOTE?S?|LTS?|LTE)(\d{1,3})$/.exec(token);
     if (LOTE.has(token) || loteJunto) {
       if (loteJunto) r.lotes.add(String(Number(loteJunto[1])));
       indice = leerLotes(tokens, indice + 1, r.lotes);
-      modo = fuera(); puertaAbierta = false;
+      modo = fuera();
+      puertaAbierta = false;
       continue;
     }
     const kmJunto = /^KM(\d+(?:\.\d+)?)$/.exec(token);
@@ -250,27 +511,61 @@ export function analizarDireccion(texto) {
       const valor = kmJunto?.[1] ?? (/^\d+(?:\.\d+)?$/.test(siguiente ?? '') ? siguiente : null);
       if (valor && modo !== 'referencia') r.km.add(String(Number(valor)));
       if (valor && !kmJunto) indice += 1;
-      modo = fuera(); puertaAbierta = false;
+      modo = fuera();
+      puertaAbierta = false;
       continue;
     }
-    if (LOCALIDAD.has(token)) { if (modo !== 'referencia') modo = 'localidad'; puertaAbierta = false; continue; }
-    if (CRUCE.has(token)) { if (modo !== 'referencia') { modo = 'via'; palabrasDeVia = 0; } puertaAbierta = false; continue; }
-    if (REFERENCIA.has(token)) { modo = 'referencia'; puertaAbierta = false; continue; }
-    if (SALTA_NUMERO.has(token)) { if (/^\d/.test(siguiente ?? '')) indice += 1; puertaAbierta = false; continue; }
-    if (token === 'NRO') { puertaAbierta = modo !== 'referencia'; continue; }
+    if (LOCALIDAD.has(token)) {
+      if (modo !== 'referencia') modo = 'localidad';
+      puertaAbierta = false;
+      continue;
+    }
+    if (CRUCE.has(token)) {
+      if (modo !== 'referencia') {
+        modo = 'via';
+        palabrasDeVia = 0;
+      }
+      puertaAbierta = false;
+      continue;
+    }
+    if (REFERENCIA.has(token)) {
+      modo = 'referencia';
+      puertaAbierta = false;
+      continue;
+    }
+    if (SALTA_NUMERO.has(token)) {
+      if (/^\d/.test(siguiente ?? '')) indice += 1;
+      puertaAbierta = false;
+      continue;
+    }
+    if (token === 'NRO') {
+      puertaAbierta = modo !== 'referencia';
+      continue;
+    }
     const numero = /^(\d+)(?:\.\d+)?(?:[A-Z]{1,4})?$/.exec(token);
     if (numero) {
       // «28 de Julio», «15 Julio»: el número nombra la vía, no la puerta.
-      const mes = MESES.has(siguiente) ? siguiente : (siguiente === 'DE' && MESES.has(tokens[indice + 2]) ? tokens[indice + 2] : null);
+      const mes = MESES.has(siguiente)
+        ? siguiente
+        : siguiente === 'DE' && MESES.has(tokens[indice + 2])
+          ? tokens[indice + 2]
+          : null;
       if (mes) {
-        if (modo === 'via') { r.vias.add(`${Number(numero[1])}${mes}`); palabrasDeVia += 1; }
+        if (modo === 'via') {
+          r.vias.add(`${Number(numero[1])}${mes}`);
+          palabrasDeVia += 1;
+        }
         indice += siguiente === 'DE' ? 2 : 1;
         continue;
       }
-      if (!puertaAbierta && siguiente === 'ETAPA') continue;  // «3 Etapa»
-      const esPuerta = modo !== 'referencia' && modo !== 'localidad' && (puertaAbierta || (modo === 'via' && palabrasDeVia > 0));
+      if (!puertaAbierta && siguiente === 'ETAPA') continue; // «3 Etapa»
+      const esPuerta =
+        modo !== 'referencia' && modo !== 'localidad' && (puertaAbierta || (modo === 'via' && palabrasDeVia > 0));
       // «Calle 15»: un número pegado al prefijo también nombra la vía.
-      if (!esPuerta) { if (modo === 'via' && palabrasDeVia === 0) palabrasDeVia += 1; continue; }
+      if (!esPuerta) {
+        if (modo === 'via' && palabrasDeVia === 0) palabrasDeVia += 1;
+        continue;
+      }
       const valor = String(Number(numero[1]));
       if (valor.length >= 2 && valor.length <= 5) r.puertas.add(valor);
       modo = 'resto';
@@ -279,9 +574,17 @@ export function analizarDireccion(texto) {
     }
     puertaAbierta = false;
     if (token.length < 3 || VACIAS.has(token)) continue;
-    if (GENERICAS.has(token)) { if (modo === 'via') { r.genericas.add(token); palabrasDeVia += 1; } continue; }
-    if (modo === 'via') { r.vias.add(token); palabrasDeVia += 1; }
-    else if (modo === 'localidad' && !GENERICAS_LOCALIDAD.has(token)) r.localidad.add(token);
+    if (GENERICAS.has(token)) {
+      if (modo === 'via') {
+        r.genericas.add(token);
+        palabrasDeVia += 1;
+      }
+      continue;
+    }
+    if (modo === 'via') {
+      r.vias.add(token);
+      palabrasDeVia += 1;
+    } else if (modo === 'localidad' && !GENERICAS_LOCALIDAD.has(token)) r.localidad.add(token);
   }
   return r;
 }
@@ -296,8 +599,96 @@ function viaComun(a, b) {
 }
 
 // Lo que no identifica a un operador: forma legal, rubro, la propia cadena.
-const GENERICAS_NOMBRE = new Set(['CORPORATION', 'COMPANY', 'CLUB', 'ASOCIACION', 'COOPERATIVA', 'GREMIO', 'PARQUE', 'ES', 'EESS', 'ESTACION', 'ESTACIONES', 'SERVICIO', 'SERVICIOS', 'GRIFO', 'GRIFOS', 'GASOCENTRO', 'SERVICENTRO', 'CENTRO', 'COMBUSTIBLE', 'COMBUSTIBLES', 'GAS', 'GNV', 'GLP', 'SAC', 'EIRL', 'SRL', 'SOCIEDAD', 'ANONIMA', 'CERRADA', 'EMPRESA', 'EMPRESAS', 'EMPRESARIAL', 'INVERSIONES', 'INVERSION', 'CORPORACION', 'GRUPO', 'NEGOCIACIONES', 'NEGOCIACION', 'COMERCIAL', 'COMERCIALIZADORA', 'DISTRIBUIDORA', 'GENERALES', 'MULTISERVICIOS', 'AUTOSERVICIOS', 'TRANSPORTES', 'LIMITADA', 'RESPONSABILIDAD', 'INDIVIDUAL', 'IMPORTACIONES', 'EXPORTACIONES', 'HERMANOS', 'HNOS', 'CIA', 'COMPANIA', 'ASOCIADOS', 'REPRESENTACIONES', 'OPERACIONES', 'PETROLEOS', 'PETROLEO', 'ENERGY', 'ENERGIA', 'OIL', 'TRADING', 'SERVICE', 'PERU', 'LIMA', 'PRIMAX', 'REPSOL', 'PETROPERU', 'AVA', 'COESTI', 'DEL', 'LAS', 'LOS', 'SAN', 'SANTA', 'SANTO', 'NORTE', 'SUR', 'ESTE', 'OESTE']);
-const tokensDeNombre = (texto) => new Set(sinTildes(texto).replace(/[^A-Z0-9]+/g, ' ').split(' ').filter((palabra) => palabra.length >= 3 && !/^\d+$/.test(palabra) && !GENERICAS_NOMBRE.has(palabra)));
+const GENERICAS_NOMBRE = new Set([
+  'CORPORATION',
+  'COMPANY',
+  'CLUB',
+  'ASOCIACION',
+  'COOPERATIVA',
+  'GREMIO',
+  'PARQUE',
+  'ES',
+  'EESS',
+  'ESTACION',
+  'ESTACIONES',
+  'SERVICIO',
+  'SERVICIOS',
+  'GRIFO',
+  'GRIFOS',
+  'GASOCENTRO',
+  'SERVICENTRO',
+  'CENTRO',
+  'COMBUSTIBLE',
+  'COMBUSTIBLES',
+  'GAS',
+  'GNV',
+  'GLP',
+  'SAC',
+  'EIRL',
+  'SRL',
+  'SOCIEDAD',
+  'ANONIMA',
+  'CERRADA',
+  'EMPRESA',
+  'EMPRESAS',
+  'EMPRESARIAL',
+  'INVERSIONES',
+  'INVERSION',
+  'CORPORACION',
+  'GRUPO',
+  'NEGOCIACIONES',
+  'NEGOCIACION',
+  'COMERCIAL',
+  'COMERCIALIZADORA',
+  'DISTRIBUIDORA',
+  'GENERALES',
+  'MULTISERVICIOS',
+  'AUTOSERVICIOS',
+  'TRANSPORTES',
+  'LIMITADA',
+  'RESPONSABILIDAD',
+  'INDIVIDUAL',
+  'IMPORTACIONES',
+  'EXPORTACIONES',
+  'HERMANOS',
+  'HNOS',
+  'CIA',
+  'COMPANIA',
+  'ASOCIADOS',
+  'REPRESENTACIONES',
+  'OPERACIONES',
+  'PETROLEOS',
+  'PETROLEO',
+  'ENERGY',
+  'ENERGIA',
+  'OIL',
+  'TRADING',
+  'SERVICE',
+  'PERU',
+  'LIMA',
+  'PRIMAX',
+  'REPSOL',
+  'PETROPERU',
+  'AVA',
+  'COESTI',
+  'DEL',
+  'LAS',
+  'LOS',
+  'SAN',
+  'SANTA',
+  'SANTO',
+  'NORTE',
+  'SUR',
+  'ESTE',
+  'OESTE',
+]);
+const tokensDeNombre = (texto) =>
+  new Set(
+    sinTildes(texto)
+      .replace(/[^A-Z0-9]+/g, ' ')
+      .split(' ')
+      .filter((palabra) => palabra.length >= 3 && !/^\d+$/.test(palabra) && !GENERICAS_NOMBRE.has(palabra)),
+  );
 /** El nombre de la ficha es la razón social del operador: «CORGAS» y «CORGAS S.A.C.». */
 function nombreEnRazonSocial(nombre, razonSocial) {
   const deRazon = tokensDeNombre(razonSocial);
@@ -307,8 +698,15 @@ function nombreEnRazonSocial(nombre, razonSocial) {
 
 // Empresas que solo operan grifos de su propia cadena. Corroboran identidad; no
 // convierten por sí solas una razón social en bandera.
-const OPERADORES = [[/\bCOESTI\b/, 'Primax'], [/\bPERUANA DE ESTACIONES DE SERVICIOS?\b|\bPECSA\b/, 'Pecsa'], [/\bREPSOL\b/, 'Repsol'], [/\bPETROPERU\b|\bPETROLEOS DEL PERU\b/, 'Petroperú'], [/\bPRIMAX\b/, 'Primax']];
-const marcaDelOperador = (razonSocial) => OPERADORES.find(([patron]) => patron.test(sinTildes(razonSocial)))?.[1] ?? null;
+const OPERADORES = [
+  [/\bCOESTI\b/, 'Primax'],
+  [/\bPERUANA DE ESTACIONES DE SERVICIOS?\b|\bPECSA\b/, 'Pecsa'],
+  [/\bREPSOL\b/, 'Repsol'],
+  [/\bPETROPERU\b|\bPETROLEOS DEL PERU\b/, 'Petroperú'],
+  [/\bPRIMAX\b/, 'Primax'],
+];
+const marcaDelOperador = (razonSocial) =>
+  OPERADORES.find(([patron]) => patron.test(sinTildes(razonSocial)))?.[1] ?? null;
 
 /**
  * Señales de una ficha frente a un establecimiento y si alcanzan para confirmar.
@@ -322,7 +720,8 @@ function señalesDe(ficha, sitio, { conDistrito }) {
   const b = sitio.analisis;
   const via = viaComun(a, b);
   const puerta = [...a.puertas].filter((valor) => b.puertas.has(valor));
-  const mismaCarretera = via.length > 0 || [...a.genericas].some((palabra) => palabra !== 'CARRETERA' && b.genericas.has(palabra));
+  const mismaCarretera =
+    via.length > 0 || [...a.genericas].some((palabra) => palabra !== 'CARRETERA' && b.genericas.has(palabra));
   const kilometro = mismaCarretera ? [...a.km].filter((valor) => b.km.has(valor)) : [];
   const manzana = [...a.manzanas].filter((valor) => b.manzanas.has(valor));
   const lote = [...a.lotes].filter((valor) => b.lotes.has(valor));
@@ -336,12 +735,28 @@ function señalesDe(ficha, sitio, { conDistrito }) {
   const tieneNombre = nombre.length > 0;
   const confirma = conDistrito
     ? tienePuerta || tieneVia || tieneManzanaLote || tieneNombre || localidad.length >= 2
-    : (tieneVia && (tienePuerta || tieneNombre || operador)) || (tieneManzanaLote && (tieneVia || localidad.length > 0 || tieneNombre)) || (tienePuerta && tieneNombre);
-  const puntaje = (tienePuerta ? 45 : 0) + (tieneVia ? 35 : 0) + (tieneNombre ? 40 : 0) + (tieneManzanaLote ? 30 : 0) + (localidad.length ? 10 : 0) + (operador ? 10 : 0) + (conDistrito ? 10 : 0);
+    : (tieneVia && (tienePuerta || tieneNombre || operador)) ||
+      (tieneManzanaLote && (tieneVia || localidad.length > 0 || tieneNombre)) ||
+      (tienePuerta && tieneNombre);
+  const puntaje =
+    (tienePuerta ? 45 : 0) +
+    (tieneVia ? 35 : 0) +
+    (tieneNombre ? 40 : 0) +
+    (tieneManzanaLote ? 30 : 0) +
+    (localidad.length ? 10 : 0) +
+    (operador ? 10 : 0) +
+    (conDistrito ? 10 : 0);
   return {
     confirma,
     puntaje,
-    señales: { numero_de_puerta: [...puerta, ...kilometro.map((valor) => `km ${valor}`)], via, manzana_lote: manzanaLote, localidad, nombre_en_razon_social: nombre, operador_de_la_marca: operador },
+    señales: {
+      numero_de_puerta: [...puerta, ...kilometro.map((valor) => `km ${valor}`)],
+      via,
+      manzana_lote: manzanaLote,
+      localidad,
+      nombre_en_razon_social: nombre,
+      operador_de_la_marca: operador,
+    },
   };
 }
 
@@ -356,8 +771,24 @@ export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas
   const activas = new Set([...marcasActivas].map(sinTildes));
   const preparados = sitios
     .filter((sitio) => Number.isFinite(sitio.latitude) && Number.isFinite(sitio.longitude))
-    .map((sitio) => ({ ...sitio, distritoCanonico: distritoCanonico(sitio.distrito), analisis: analizarDireccion(sitio.direccion), operador: marcaDelOperador(sitio.razon_social) }));
-  const resumen = new Map(lista.map((directorio) => [directorio.archivo, { directorio: directorio.archivo, brand: directorio.brand, fichas: directorio.entries.length, acreditadas: 0, pendientes: {} }]));
+    .map((sitio) => ({
+      ...sitio,
+      distritoCanonico: distritoCanonico(sitio.distrito),
+      analisis: analizarDireccion(sitio.direccion),
+      operador: marcaDelOperador(sitio.razon_social),
+    }));
+  const resumen = new Map(
+    lista.map((directorio) => [
+      directorio.archivo,
+      {
+        directorio: directorio.archivo,
+        brand: directorio.brand,
+        fichas: directorio.entries.length,
+        acreditadas: 0,
+        pendientes: {},
+      },
+    ]),
+  );
   const pendientes = [];
   const anotar = (pendiente) => {
     pendientes.push(pendiente);
@@ -378,19 +809,39 @@ export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas
       const enVentana = preparados
         .filter((sitio) => !conCoordenada || ventana.contiene(sitio))
         .map((sitio) => ({ sitio, distancia: conCoordenada ? metros(ficha, sitio) : null }));
-      if (!enVentana.length) { anotar({ ...base, motivo: 'sin_candidato' }); continue; }
+      if (!enVentana.length) {
+        anotar({ ...base, motivo: 'sin_candidato' });
+        continue;
+      }
       const compatibles = distrito ? enVentana.filter(({ sitio }) => sitio.distritoCanonico === distrito) : enVentana;
-      if (!compatibles.length) { anotar({ ...base, motivo: 'distrito_contradictorio' }); continue; }
+      if (!compatibles.length) {
+        anotar({ ...base, motivo: 'distrito_contradictorio' });
+        continue;
+      }
       const analisis = analizarDireccion(ficha.address);
       const confirmados = compatibles
-        .map((candidato) => ({ ...candidato, ...señalesDe({ ...ficha, brand: directorio.brand, analisis }, candidato.sitio, { conDistrito: Boolean(distrito) }) }))
+        .map((candidato) => ({
+          ...candidato,
+          ...señalesDe({ ...ficha, brand: directorio.brand, analisis }, candidato.sitio, {
+            conDistrito: Boolean(distrito),
+          }),
+        }))
         .filter((candidato) => candidato.confirma)
         .sort((left, right) => right.puntaje - left.puntaje);
-      if (!confirmados.length) { anotar({ ...base, motivo: 'sin_corroboracion' }); continue; }
+      if (!confirmados.length) {
+        anotar({ ...base, motivo: 'sin_corroboracion' });
+        continue;
+      }
       const [mejor, segundo] = confirmados;
       const margen = segundo ? mejor.puntaje - segundo.puntaje : null;
       if (segundo && margen < MARGEN_MINIMO) {
-        anotar({ ...base, motivo: 'margen_insuficiente', candidatos: confirmados.filter((candidato) => mejor.puntaje - candidato.puntaje < MARGEN_MINIMO).map((candidato) => candidato.sitio.establishment_id) });
+        anotar({
+          ...base,
+          motivo: 'margen_insuficiente',
+          candidatos: confirmados
+            .filter((candidato) => mejor.puntaje - candidato.puntaje < MARGEN_MINIMO)
+            .map((candidato) => candidato.sitio.establishment_id),
+        });
         continue;
       }
       const operador = mejor.sitio.operador;
@@ -410,7 +861,11 @@ export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas
         señales: mejor.señales,
         // La razón social pertenece a otra cadena con directorio propio: no se
         // decide aquí cuál de las dos fuentes quedó vieja.
-        choque_con_operador: Boolean(operador && activas.has(sinTildes(operador)) && sinTildes(operador) !== sinTildes(directorio.brand)) ? operador : null,
+        choque_con_operador: Boolean(
+          operador && activas.has(sinTildes(operador)) && sinTildes(operador) !== sinTildes(directorio.brand),
+        )
+          ? operador
+          : null,
         nombre_ficha: ficha.name,
         ficha: clave,
       });
@@ -420,7 +875,8 @@ export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas
   // Un establecimiento reclamado con banderas distintas no se resuelve por
   // puntaje, orden de archivos ni distancia: queda en conflicto.
   const porSitio = new Map();
-  for (const propuesta of propuestas) porSitio.set(propuesta.establishment_id, [...(porSitio.get(propuesta.establishment_id) ?? []), propuesta]);
+  for (const propuesta of propuestas)
+    porSitio.set(propuesta.establishment_id, [...(porSitio.get(propuesta.establishment_id) ?? []), propuesta]);
   const aceptadas = [];
   const conflictos = [];
   for (const [establishmentId, grupo] of [...porSitio.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -428,16 +884,40 @@ export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas
     const choque = grupo.find((propuesta) => propuesta.choque_con_operador);
     if (marcas.length > 1 || choque) {
       const motivo = marcas.length > 1 ? 'conflicto_entre_directorios' : 'choque_con_operador';
-      conflictos.push({ establishment_id: establishmentId, motivo, marcas: choque && marcas.length === 1 ? [...marcas, choque.choque_con_operador] : marcas, fichas: grupo.map((propuesta) => propuesta.ficha) });
-      for (const propuesta of grupo) anotar({ ficha: propuesta.ficha, brand: propuesta.brand, nombre: propuesta.nombre_ficha, estrato: propuesta.estrato, motivo, establishment_id: establishmentId });
+      conflictos.push({
+        establishment_id: establishmentId,
+        motivo,
+        marcas: choque && marcas.length === 1 ? [...marcas, choque.choque_con_operador] : marcas,
+        fichas: grupo.map((propuesta) => propuesta.ficha),
+      });
+      for (const propuesta of grupo)
+        anotar({
+          ficha: propuesta.ficha,
+          brand: propuesta.brand,
+          nombre: propuesta.nombre_ficha,
+          estrato: propuesta.estrato,
+          motivo,
+          establishment_id: establishmentId,
+        });
       continue;
     }
     // Varias fichas de una misma cadena sobre un grifo —la ficha repetida del
     // padrón— acreditan una sola vez: gana la de más señales.
-    const [ganadora, ...resto] = [...grupo].sort((left, right) => right.puntaje - left.puntaje || left.ficha.localeCompare(right.ficha));
+    const [ganadora, ...resto] = [...grupo].sort(
+      (left, right) => right.puntaje - left.puntaje || left.ficha.localeCompare(right.ficha),
+    );
     aceptadas.push(ganadora);
     resumen.get(ganadora.ficha.split('#')[0]).acreditadas += 1;
-    for (const propuesta of resto) anotar({ ficha: propuesta.ficha, brand: propuesta.brand, nombre: propuesta.nombre_ficha, estrato: propuesta.estrato, motivo: 'perdio_asignacion', establishment_id: establishmentId, ganadora: ganadora.ficha });
+    for (const propuesta of resto)
+      anotar({
+        ficha: propuesta.ficha,
+        brand: propuesta.brand,
+        nombre: propuesta.nombre_ficha,
+        estrato: propuesta.estrato,
+        motivo: 'perdio_asignacion',
+        establishment_id: establishmentId,
+        ganadora: ganadora.ficha,
+      });
   }
   return { aceptadas, conflictos, pendientes, resumen: [...resumen.values()] };
 }
@@ -445,25 +925,49 @@ export function emparejarDirectorios({ sitios, directorios: lista, marcasActivas
 function establecimientos() {
   const texto = fs.readFileSync(path.join(identidad, 'establecimientos.csv'), 'utf8').replace(/^﻿/, '');
   const filas = [];
-  let campo = ''; let fila = []; let comillas = false;
+  let campo = '';
+  let fila = [];
+  let comillas = false;
   for (let index = 0; index < texto.length; index += 1) {
     const char = texto[index];
-    if (comillas) { if (char === '"') { if (texto[index + 1] === '"') { campo += '"'; index += 1; } else comillas = false; } else campo += char; }
-    else if (char === '"') comillas = true;
-    else if (char === ',') { fila.push(campo); campo = ''; }
-    else if (char === '\n') { fila.push(campo.replace(/\r$/, '')); filas.push(fila); fila = []; campo = ''; }
-    else campo += char;
+    if (comillas) {
+      if (char === '"') {
+        if (texto[index + 1] === '"') {
+          campo += '"';
+          index += 1;
+        } else comillas = false;
+      } else campo += char;
+    } else if (char === '"') comillas = true;
+    else if (char === ',') {
+      fila.push(campo);
+      campo = '';
+    } else if (char === '\n') {
+      fila.push(campo.replace(/\r$/, ''));
+      filas.push(fila);
+      fila = [];
+      campo = '';
+    } else campo += char;
   }
-  if (campo || fila.length) { fila.push(campo.replace(/\r$/, '')); filas.push(fila); }
+  if (campo || fila.length) {
+    fila.push(campo.replace(/\r$/, ''));
+    filas.push(fila);
+  }
   const cabecera = filas.shift();
-  return filas.filter((f) => f.length === cabecera.length).map((f) => Object.fromEntries(cabecera.map((k, i) => [k, f[i]])));
+  return filas
+    .filter((f) => f.length === cabecera.length)
+    .map((f) => Object.fromEntries(cabecera.map((k, i) => [k, f[i]])));
 }
 
-const deHtml = (valor) => String(valor ?? '')
-  .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-  .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
-  .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ')
-  .trim();
+const deHtml = (valor) =>
+  String(valor ?? '')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 
 const traer = async (url, fuente, accept = 'application/json,text/plain,*/*') => {
   const respuesta = await fetch(url, { headers: { 'User-Agent': UA, Accept: accept, Referer: fuente.referer } });
@@ -490,22 +994,39 @@ async function cosecharWordPress(fuente) {
   for (let pagina = 1; pagina <= paginas; pagina += 1) {
     const respuesta = await traer(`${fuente.url}?per_page=100&page=${pagina}`, fuente);
     if (pagina === 1) paginas = Number(respuesta.headers.get('x-wp-totalpages')) || 1;
-    filas.push(...await respuesta.json());
+    filas.push(...(await respuesta.json()));
   }
-  const modificado = filas.map((fila) => fila.modified_gmt).filter(Boolean).sort().at(-1);
+  const modificado = filas
+    .map((fila) => fila.modified_gmt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
   return { filas, evidencedAt: modificado ? new Date(`${modificado}Z`).toISOString() : null };
 }
 
 // Recorta el literal que empieza en `desde` equilibrando corchetes y llaves,
 // ignorando lo que caiga dentro de comillas.
 function literalBalanceado(texto, desde) {
-  let profundidad = 0; let enCadena = false; let escape = false;
+  let profundidad = 0;
+  let enCadena = false;
+  let escape = false;
   for (let indice = desde; indice < texto.length; indice += 1) {
     const char = texto[indice];
-    if (enCadena) { if (escape) escape = false; else if (char === '\\') escape = true; else if (char === '"') enCadena = false; continue; }
-    if (char === '"') { enCadena = true; continue; }
+    if (enCadena) {
+      if (escape) escape = false;
+      else if (char === '\\') escape = true;
+      else if (char === '"') enCadena = false;
+      continue;
+    }
+    if (char === '"') {
+      enCadena = true;
+      continue;
+    }
     if (char === '[' || char === '{') profundidad += 1;
-    else if (char === ']' || char === '}') { profundidad -= 1; if (profundidad === 0) return texto.slice(desde, indice + 1); }
+    else if (char === ']' || char === '}') {
+      profundidad -= 1;
+      if (profundidad === 0) return texto.slice(desde, indice + 1);
+    }
   }
   throw new Error('literal sin cerrar');
 }
@@ -517,12 +1038,18 @@ async function cosecharAva(fuente) {
   const html = await (await traer(fuente.url, fuente, 'text/html,*/*')).text();
   const chunks = [...new Set([...html.matchAll(/\/_next\/static\/chunks\/[A-Za-z0-9._%()-]+\.js/g)].map((m) => m[0]))];
   for (const chunk of chunks) {
-    const respuesta = await traer(`https://ava.pe${chunk.replace(/\(/g, '%28').replace(/\)/g, '%29')}`, fuente, 'application/javascript,*/*');
+    const respuesta = await traer(
+      `https://ava.pe${chunk.replace(/\(/g, '%28').replace(/\)/g, '%29')}`,
+      fuente,
+      'application/javascript,*/*',
+    );
     const js = await respuesta.text();
     const inicio = /\[\{"id":"\d+","departamento":/.exec(js);
     if (!inicio) continue;
     // El literal viene con escapes de JS (\xNN, \') que JSON no admite.
-    const json = literalBalanceado(js, inicio.index).replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => `\\u00${hex}`).replace(/\\'/g, "'");
+    const json = literalBalanceado(js, inicio.index)
+      .replace(/\\x([0-9a-fA-F]{2})/g, (_, hex) => `\\u00${hex}`)
+      .replace(/\\'/g, "'");
     return { filas: JSON.parse(json), evidencedAt: fechaDeCabecera(respuesta) };
   }
   throw new Error(`${fuente.brand}: el padrón ya no está en ningún chunk; cambió el bundle`);
@@ -538,16 +1065,26 @@ function hidratarTurboStream(plano) {
     if (indice < 0) return CONSTANTES[String(indice)] ?? null;
     if (memoria.has(indice)) return memoria.get(indice);
     const valor = plano[indice];
-    if (valor === null || typeof valor !== 'object') { memoria.set(indice, valor); return valor; }
+    if (valor === null || typeof valor !== 'object') {
+      memoria.set(indice, valor);
+      return valor;
+    }
     if (Array.isArray(valor)) {
       // Un primer elemento de tipo texto es un marcador de tipo, no un índice.
-      if (typeof valor[0] === 'string') { const tipado = { __tipo: valor[0], valor: valor.slice(1).map(hidratar) }; memoria.set(indice, tipado); return tipado; }
-      const lista = []; memoria.set(indice, lista);
+      if (typeof valor[0] === 'string') {
+        const tipado = { __tipo: valor[0], valor: valor.slice(1).map(hidratar) };
+        memoria.set(indice, tipado);
+        return tipado;
+      }
+      const lista = [];
+      memoria.set(indice, lista);
       for (const referencia of valor) lista.push(hidratar(referencia));
       return lista;
     }
-    const objeto = {}; memoria.set(indice, objeto);
-    for (const [clave, referencia] of Object.entries(valor)) objeto[clave.startsWith('_') ? hidratar(Number(clave.slice(1))) : clave] = hidratar(referencia);
+    const objeto = {};
+    memoria.set(indice, objeto);
+    for (const [clave, referencia] of Object.entries(valor))
+      objeto[clave.startsWith('_') ? hidratar(Number(clave.slice(1))) : clave] = hidratar(referencia);
     return objeto;
   };
   return hidratar(0);
@@ -561,7 +1098,11 @@ async function cosecharPrimax(fuente) {
   if (!Array.isArray(filas)) throw new Error(`${fuente.brand}: el payload ya no trae el bloque de estaciones`);
   // El `last-modified` del blob solo dice cuándo se recompiló el sitio; la
   // vigencia del padrón es el `publishedAt` más reciente de sus fichas.
-  const publicado = filas.map((fila) => fila.publishedAt ?? fila.updatedAt).filter(Boolean).sort().at(-1);
+  const publicado = filas
+    .map((fila) => fila.publishedAt ?? fila.updatedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
   return { filas, evidencedAt: publicado ? new Date(publicado).toISOString() : null };
 }
 
@@ -571,12 +1112,25 @@ async function descargar(clave) {
   const { filas, evidencedAt } = await (fuente.cosechar ?? cosecharJson)(fuente);
   // La fecha de la EVIDENCIA es la del padrón, no la de la consulta: abrir hoy
   // una fuente vieja no la vuelve actual.
-  if (!evidencedAt) throw new Error(`${clave}: el padrón no declara fecha de vigencia; no se puede fechar la evidencia`);
-  const entradas = filas.filter(fuente.inScope).map(fuente.normalize).filter((row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
-  const salida = { brand: fuente.brand, source_url: fuente.url, evidenced_at: evidencedAt, consulted_at: new Date().toISOString(), total_source_rows: filas.length, entries: entradas };
+  if (!evidencedAt)
+    throw new Error(`${clave}: el padrón no declara fecha de vigencia; no se puede fechar la evidencia`);
+  const entradas = filas
+    .filter(fuente.inScope)
+    .map(fuente.normalize)
+    .filter((row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
+  const salida = {
+    brand: fuente.brand,
+    source_url: fuente.url,
+    evidenced_at: evidencedAt,
+    consulted_at: new Date().toISOString(),
+    total_source_rows: filas.length,
+    entries: entradas,
+  };
   fs.mkdirSync(directorios, { recursive: true, mode: 0o700 });
   fs.writeFileSync(path.join(directorios, `${clave}.json`), `${JSON.stringify(salida, null, 2)}\n`, { mode: 0o600 });
-  process.stdout.write(`${JSON.stringify({ directorio: clave, brand: fuente.brand, en_ambito: entradas.length, de: filas.length, evidenced_at: evidencedAt })}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ directorio: clave, brand: fuente.brand, en_ambito: entradas.length, de: filas.length, evidenced_at: evidencedAt })}\n`,
+  );
 }
 
 function emparejar() {
@@ -591,21 +1145,48 @@ function emparejar() {
   }));
   // Los `raw-*.json` son el volcado crudo de cada fuente, guardado para auditar;
   // no son directorios normalizados y no se emparejan.
-  const lista = fs.readdirSync(directorios)
+  const lista = fs
+    .readdirSync(directorios)
     .filter((name) => name.endsWith('.json') && !name.startsWith('raw-'))
     .sort()
     .map((archivo) => ({ archivo, ...JSON.parse(fs.readFileSync(path.join(directorios, archivo), 'utf8')) }));
-  const { aceptadas, conflictos, pendientes, resumen } = emparejarDirectorios({ sitios, directorios: lista, marcasActivas: Object.values(FUENTES).map((fuente) => fuente.brand) });
+  const { aceptadas, conflictos, pendientes, resumen } = emparejarDirectorios({
+    sitios,
+    directorios: lista,
+    marcasActivas: Object.values(FUENTES).map((fuente) => fuente.brand),
+  });
 
   const generado = new Date().toISOString();
   // `estrato` viaja con la entrada para muestrear cada regla por separado; el
   // catálogo solo toma los campos de su contrato.
-  const entradas = Object.fromEntries(aceptadas.map((item) => [item.establishment_id, { brand: item.brand, method: item.method, reference: item.reference, evidenced_at: item.evidenced_at, consulted_at: item.consulted_at, estrato: item.estrato }]));
-  fs.writeFileSync(path.join(identidad, 'brand-evidence.json'), `${JSON.stringify({ generated_at: generado, margen_minimo: MARGEN_MINIMO, resumen, entradas, conflictos }, null, 2)}\n`, { mode: 0o600 });
-  fs.writeFileSync(path.join(identidad, 'brand-evidence-detalle.json'), `${JSON.stringify({ generated_at: generado, aceptadas, conflictos, pendientes }, null, 2)}\n`, { mode: 0o600 });
+  const entradas = Object.fromEntries(
+    aceptadas.map((item) => [
+      item.establishment_id,
+      {
+        brand: item.brand,
+        method: item.method,
+        reference: item.reference,
+        evidenced_at: item.evidenced_at,
+        consulted_at: item.consulted_at,
+        estrato: item.estrato,
+      },
+    ]),
+  );
+  fs.writeFileSync(
+    path.join(identidad, 'brand-evidence.json'),
+    `${JSON.stringify({ generated_at: generado, margen_minimo: MARGEN_MINIMO, resumen, entradas, conflictos }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
+  fs.writeFileSync(
+    path.join(identidad, 'brand-evidence-detalle.json'),
+    `${JSON.stringify({ generated_at: generado, aceptadas, conflictos, pendientes }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
   const porEstrato = {};
   for (const item of aceptadas) porEstrato[item.estrato] = (porEstrato[item.estrato] ?? 0) + 1;
-  process.stdout.write(`${JSON.stringify({ acreditadas: aceptadas.length, por_estrato: porEstrato, conflictos: conflictos.length, resumen }, null, 2)}\n`);
+  process.stdout.write(
+    `${JSON.stringify({ acreditadas: aceptadas.length, por_estrato: porEstrato, conflictos: conflictos.length, resumen }, null, 2)}\n`,
+  );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

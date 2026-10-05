@@ -46,13 +46,27 @@ function validatePrefix(prefix) {
   const valor = String(prefix ?? '');
   if (valor === '') return '';
   const partes = valor.split('/');
-  if (!valor.endsWith('/') || valor.startsWith('/') || valor.includes('\\') || partes.slice(0, -1).some((parte) => parte === '' || parte === '.' || parte === '..')) {
+  if (
+    !valor.endsWith('/') ||
+    valor.startsWith('/') ||
+    valor.includes('\\') ||
+    partes.slice(0, -1).some((parte) => parte === '' || parte === '.' || parte === '..')
+  ) {
     throw new Error(`Prefijo de almacén inválido: ${valor} (se espera algo como "gasolina/")`);
   }
   return valor;
 }
 
-export function createS3Store({ endpoint, region, bucket, prefix = '', accessKeyId, secretAccessKey, fetchImpl = fetch, sleep = espera }) {
+export function createS3Store({
+  endpoint,
+  region,
+  bucket,
+  prefix = '',
+  accessKeyId,
+  secretAccessKey,
+  fetchImpl = fetch,
+  sleep = espera,
+}) {
   for (const [nombre, valor] of Object.entries({ endpoint, region, bucket, accessKeyId, secretAccessKey })) {
     if (typeof valor !== 'string' || !valor) throw new Error(`Almacén S3 sin ${nombre}`);
   }
@@ -81,7 +95,9 @@ export function createS3Store({ endpoint, region, bucket, prefix = '', accessKey
 
   async function fallo(accion, key, response) {
     const codigo = codigoS3(await response.text().catch(() => ''));
-    return new Error(`No se pudo ${accion} ${key} en el almacén S3: HTTP ${response.status}${codigo ? ` ${codigo}` : ''}`);
+    return new Error(
+      `No se pudo ${accion} ${key} en el almacén S3: HTTP ${response.status}${codigo ? ` ${codigo}` : ''}`,
+    );
   }
 
   async function head(key) {
@@ -110,7 +126,8 @@ export function createS3Store({ endpoint, region, bucket, prefix = '', accessKey
       // puede distinguirlos, pero el PUT o el listado siguientes sí fallan.
       if (response.status === 404) {
         const codigo = codigoS3(await response.text().catch(() => ''));
-        if (codigo && codigo !== 'NoSuchKey') throw new Error(`No se pudo leer ${key} en el almacén S3: HTTP 404 ${codigo}`);
+        if (codigo && codigo !== 'NoSuchKey')
+          throw new Error(`No se pudo leer ${key} en el almacén S3: HTTP 404 ${codigo}`);
         return null;
       }
       if (!response.ok) throw await fallo('leer', key, response);
@@ -125,7 +142,8 @@ export function createS3Store({ endpoint, region, bucket, prefix = '', accessKey
       // HEAD es barato; pisar un objeto inmutable no tiene vuelta.
       if (ifAbsent && (await head(key))) return { created: false };
       const headers = { 'Content-Type': contentType, 'Cache-Control': cacheControl, [META_SHA256]: metaSha256 };
-      for (const nombre of Object.keys(headers)) if (headers[nombre] === undefined || headers[nombre] === null) delete headers[nombre];
+      for (const nombre of Object.keys(headers))
+        if (headers[nombre] === undefined || headers[nombre] === null) delete headers[nombre];
       const response = await pedir(url(key), { method: 'PUT', body, headers });
       if (!response.ok) throw await fallo('escribir', key, response);
       return { created: true };
@@ -145,7 +163,8 @@ export function createS3Store({ endpoint, region, bucket, prefix = '', accessKey
       return {
         cursor: salida.cursor,
         keys: salida.keys.map(({ key, bytes }) => {
-          if (!key.startsWith(prefijo)) throw new Error(`El listado devolvió una clave fuera del prefijo ${prefijo}: ${key}`);
+          if (!key.startsWith(prefijo))
+            throw new Error(`El listado devolvió una clave fuera del prefijo ${prefijo}: ${key}`);
           return { key: key.slice(prefijo.length), bytes };
         }),
       };

@@ -47,40 +47,97 @@ export function transicion(estado, accion) {
       const recordado = ordenPorVista[accion.view];
       const productos = VIEWS[accion.view].products;
       return {
-        ...conBusqueda(estado, { view: accion.view, priceProduct: productos.includes(recordado) ? recordado : productos[0], visibleCount: PAGE_SIZE }),
+        ...conBusqueda(estado, {
+          view: accion.view,
+          priceProduct: productos.includes(recordado) ? recordado : productos[0],
+          visibleCount: PAGE_SIZE,
+        }),
         ordenPorVista,
         historyMounted: estado.historyMounted || Boolean(VIEWS[accion.view].history),
       };
     }
     // Cambiar un filtro vuelve a la primera página; el radio y el criterio,
     // además, pasan a ser preferencia de la persona.
-    case 'orden': return conBusqueda(estado, { sort: accion.sort === 'price' ? 'price' : 'distance', preferencesTouched: true, visibleCount: PAGE_SIZE });
-    case 'producto': return conBusqueda(estado, { priceProduct: accion.product, visibleCount: PAGE_SIZE });
-    case 'radio': return conBusqueda(estado, { radiusKm: accion.km, preferencesTouched: true, visibleCount: PAGE_SIZE });
-    case 'verMas': return conBusqueda(estado, { visibleCount: accion.count });
-    case 'pantalla': return { ...estado, screen: accion.screen };
+    case 'orden':
+      return conBusqueda(estado, {
+        sort: accion.sort === 'price' ? 'price' : 'distance',
+        preferencesTouched: true,
+        visibleCount: PAGE_SIZE,
+      });
+    case 'producto':
+      return conBusqueda(estado, { priceProduct: accion.product, visibleCount: PAGE_SIZE });
+    case 'radio':
+      return conBusqueda(estado, { radiusKm: accion.km, preferencesTouched: true, visibleCount: PAGE_SIZE });
+    case 'verMas':
+      return conBusqueda(estado, { visibleCount: accion.count });
+    case 'pantalla':
+      return { ...estado, screen: accion.screen };
     // Elegir distrito descarta cualquier ubicación en vuelo; el buscador empieza vacío.
-    case 'distritos': return { ...estado, screen: 'district', updatingLocation: false, placeStatus: 'idle', districtHint: Boolean(accion.fromError), districtQuery: '' };
-    case 'buscar': return { ...estado, districtQuery: accion.query };
-    case 'distrito': return conBusqueda(estado, { origin: null, district: accion.district });
-    case 'localizando': return { ...estado, screen: 'loading' };
-    case 'ubicado': return conBusqueda(estado, { origin: accion.origin, district: null });
-    case 'sinUbicacion': return conBusqueda(estado, { origin: null });
+    case 'distritos':
+      return {
+        ...estado,
+        screen: 'district',
+        updatingLocation: false,
+        placeStatus: 'idle',
+        districtHint: Boolean(accion.fromError),
+        districtQuery: '',
+      };
+    case 'buscar':
+      return { ...estado, districtQuery: accion.query };
+    case 'distrito':
+      return conBusqueda(estado, { origin: null, district: accion.district });
+    case 'localizando':
+      return { ...estado, screen: 'loading' };
+    case 'ubicado':
+      return conBusqueda(estado, { origin: accion.origin, district: null });
+    case 'sinUbicacion':
+      return conBusqueda(estado, { origin: null });
     // Abrir resultados: la lista vuelve a su primera página y, con GPS y sin
     // preferencia de la persona, el radio se abre donde caben seis precios.
-    case 'resultados': return { ...estado, screen: 'compare', resultsShown: true, updatingLocation: false, placeStatus: 'idle', locationUpdate: { status: 'idle', message: '' }, search: startResults(estado.search, accion.located) };
+    case 'resultados':
+      return {
+        ...estado,
+        screen: 'compare',
+        resultsShown: true,
+        updatingLocation: false,
+        placeStatus: 'idle',
+        locationUpdate: { status: 'idle', message: '' },
+        search: startResults(estado.search, accion.located),
+      };
     // Los datos de la vista llegaron estando en resultados: misma regla.
-    case 'datosAplicados': return { ...estado, search: startResults(estado.search, accion.located) };
+    case 'datosAplicados':
+      return { ...estado, search: startResults(estado.search, accion.located) };
     // Actualizar ubicación conserva radio, producto y criterio; un fallo deja
     // intacta la posición anterior.
-    case 'actualizando': return { ...estado, updatingLocation: true, placeStatus: 'pending', locationUpdate: { status: 'pending', message: null } };
-    case 'actualizada': return { ...conBusqueda(estado, { origin: accion.origin, visibleCount: PAGE_SIZE }), updatingLocation: false, placeStatus: 'done', locationUpdate: { status: 'done', message: accion.message } };
-    case 'actualizacionFallida': return { ...estado, updatingLocation: false, placeStatus: 'error', locationUpdate: { status: 'error', message: null } };
+    case 'actualizando':
+      return {
+        ...estado,
+        updatingLocation: true,
+        placeStatus: 'pending',
+        locationUpdate: { status: 'pending', message: null },
+      };
+    case 'actualizada':
+      return {
+        ...conBusqueda(estado, { origin: accion.origin, visibleCount: PAGE_SIZE }),
+        updatingLocation: false,
+        placeStatus: 'done',
+        locationUpdate: { status: 'done', message: accion.message },
+      };
+    case 'actualizacionFallida':
+      return {
+        ...estado,
+        updatingLocation: false,
+        placeStatus: 'error',
+        locationUpdate: { status: 'error', message: null },
+      };
     // Volver al inicio conserva radio y criterio: son preferencias, no
     // consecuencias del origen.
-    case 'inicio': return { ...estado, screen: 'start', updatingLocation: false };
+    case 'inicio':
+      return { ...estado, screen: 'start', updatingLocation: false };
     // Volver a los resultados los devuelve tal como estaban.
-    case 'volver': return { ...estado, screen: 'compare', placeStatus: 'idle' };
-    default: throw new Error(`Transición desconocida: ${accion.type}`);
+    case 'volver':
+      return { ...estado, screen: 'compare', placeStatus: 'idle' };
+    default:
+      throw new Error(`Transición desconocida: ${accion.type}`);
   }
 }

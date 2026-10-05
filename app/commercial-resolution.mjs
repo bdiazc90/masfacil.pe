@@ -13,9 +13,15 @@
 
 import fs from 'node:fs';
 import { commercialNameBacking, loadValidatedCommercialAudit } from './commercial-audit.mjs';
-import { emptyCommercialCatalog, isPublicCommercialEntry, isolateCommercialCatalog, validateCommercialCatalog } from './commercial-catalog.mjs';
+import {
+  emptyCommercialCatalog,
+  isPublicCommercialEntry,
+  isolateCommercialCatalog,
+  validateCommercialCatalog,
+} from './commercial-catalog.mjs';
 
-const CAUSAS_CONOCIDAS = /fuera de contrato|Unexpected token|Unexpected end of JSON|JSON at position|is not valid JSON/i;
+const CAUSAS_CONOCIDAS =
+  /fuera de contrato|Unexpected token|Unexpected end of JSON|JSON at position|is not valid JSON/i;
 
 /**
  * El catálogo se carga aislando entradas defectuosas: un duplicado o una fila
@@ -24,22 +30,46 @@ const CAUSAS_CONOCIDAS = /fuera de contrato|Unexpected token|Unexpected end of J
  * para el reporte privado; en los problemas públicos solo va el conteo.
  */
 function cargarCatalogo(archivo, problems) {
-  if (!archivo || !fs.existsSync(archivo)) { problems.push({ scope: 'catalog', reason: 'archivo_ausente', affected: null }); return { catalog: null, isolated: [] }; }
+  if (!archivo || !fs.existsSync(archivo)) {
+    problems.push({ scope: 'catalog', reason: 'archivo_ausente', affected: null });
+    return { catalog: null, isolated: [] };
+  }
   let crudo;
-  try { crudo = JSON.parse(fs.readFileSync(archivo, 'utf8')); }
-  catch (error) { problems.push({ scope: 'catalog', reason: 'json_ilegible', affected: null, detail: error.message.split('\n')[0] }); return { catalog: null, isolated: [] }; }
+  try {
+    crudo = JSON.parse(fs.readFileSync(archivo, 'utf8'));
+  } catch (error) {
+    problems.push({ scope: 'catalog', reason: 'json_ilegible', affected: null, detail: error.message.split('\n')[0] });
+    return { catalog: null, isolated: [] };
+  }
   const aislado = isolateCommercialCatalog(crudo);
-  if (!aislado) { problems.push({ scope: 'catalog', reason: 'fuera_de_contrato', affected: null, detail: validateCommercialCatalog(crudo)[0] }); return { catalog: null, isolated: [] }; }
+  if (!aislado) {
+    problems.push({
+      scope: 'catalog',
+      reason: 'fuera_de_contrato',
+      affected: null,
+      detail: validateCommercialCatalog(crudo)[0],
+    });
+    return { catalog: null, isolated: [] };
+  }
   problems.push(...aislado.problems);
   return { catalog: aislado.catalog, isolated: aislado.dropped };
 }
 
 function cargar(descripcion, archivo, cargador, problems) {
-  if (!archivo || !fs.existsSync(archivo)) { problems.push({ scope: descripcion, reason: 'archivo_ausente', affected: null }); return null; }
-  try { return cargador(archivo); }
-  catch (error) {
+  if (!archivo || !fs.existsSync(archivo)) {
+    problems.push({ scope: descripcion, reason: 'archivo_ausente', affected: null });
+    return null;
+  }
+  try {
+    return cargador(archivo);
+  } catch (error) {
     if (!CAUSAS_CONOCIDAS.test(error.message)) throw error;
-    problems.push({ scope: descripcion, reason: 'fuera_de_contrato', affected: null, detail: error.message.split('\n')[0] });
+    problems.push({
+      scope: descripcion,
+      reason: 'fuera_de_contrato',
+      affected: null,
+      detail: error.message.split('\n')[0],
+    });
     return null;
   }
 }
@@ -54,9 +84,15 @@ function catalogoUtilizable(catalog, aprobadas) {
   let nombresRetirados = 0;
   let neutralizadas = 0;
   for (const entry of catalog.entries) {
-    if (!isPublicCommercialEntry(entry) || !entry.public_site_name || aprobadas.has(entry.establishment_id)) { entries.push(entry); continue; }
+    if (!isPublicCommercialEntry(entry) || !entry.public_site_name || aprobadas.has(entry.establishment_id)) {
+      entries.push(entry);
+      continue;
+    }
     nombresRetirados += 1;
-    if (!entry.brand) { neutralizadas += 1; continue; }
+    if (!entry.brand) {
+      neutralizadas += 1;
+      continue;
+    }
     entries.push({ ...entry, public_site_name: null });
   }
   return { catalog: { ...catalog, entries }, nombresRetirados, neutralizadas };
@@ -74,7 +110,14 @@ export function absentCommercialResolution(problems = []) {
     audit: null,
     problems: Object.freeze(problems),
     isolated: Object.freeze([]),
-    counts: Object.freeze({ entries: 0, publishable: 0, name_published: 0, brand_published: 0, name_withdrawn: 0, neutralized: 0 }),
+    counts: Object.freeze({
+      entries: 0,
+      publishable: 0,
+      name_published: 0,
+      brand_published: 0,
+      name_withdrawn: 0,
+      neutralized: 0,
+    }),
   });
 }
 
@@ -89,7 +132,8 @@ export function resolveCommercialIdentity({ catalogPath, auditPath } = {}) {
 
   // Una auditoría que no corresponde al catálogo no acredita nada de él, pero
   // tampoco lo invalida: se pierde el nombre, no la bandera.
-  if (audit && audit.catalog_id !== catalogoOriginal.catalog_id) problems.push({ scope: 'audit', reason: 'catalog_id_no_corresponde', affected: null });
+  if (audit && audit.catalog_id !== catalogoOriginal.catalog_id)
+    problems.push({ scope: 'audit', reason: 'catalog_id_no_corresponde', affected: null });
 
   const backing = commercialNameBacking(catalogoOriginal, audit);
   problems.push(...backing.problems);
@@ -111,7 +155,7 @@ export function resolveCommercialIdentity({ catalogPath, auditPath } = {}) {
   });
 
   return Object.freeze({
-    status: problems.length ? 'degraded' : (publicables.length ? 'complete' : 'absent'),
+    status: problems.length ? 'degraded' : publicables.length ? 'complete' : 'absent',
     catalog,
     audit,
     problems: Object.freeze(problems),

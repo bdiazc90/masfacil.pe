@@ -12,15 +12,27 @@ export function createLocator({ geolocation = globalThis.navigator?.geolocation,
   let turno = 0;
   return {
     /** Sin API de geolocalización no hay nada que pedir. */
-    get available() { return Boolean(geolocation); },
+    get available() {
+      return Boolean(geolocation);
+    },
     /** Descarta la respuesta del pedido en vuelo, si lo hay. */
-    cancel() { turno += 1; },
+    cancel() {
+      turno += 1;
+    },
     /** @returns {Promise<{status: 'ok', origin: {latitude: number, longitude: number}} | {status: 'error' | 'stale'}>} */
     request() {
       const mio = ++turno;
       return new Promise((resolve) => {
         geolocation.getCurrentPosition(
-          (position) => resolve(mio !== turno ? { status: 'stale' } : { status: 'ok', origin: { latitude: position.coords.latitude, longitude: position.coords.longitude } }),
+          (position) =>
+            resolve(
+              mio !== turno
+                ? { status: 'stale' }
+                : {
+                    status: 'ok',
+                    origin: { latitude: position.coords.latitude, longitude: position.coords.longitude },
+                  },
+            ),
           () => resolve(mio !== turno ? { status: 'stale' } : { status: 'error' }),
           options,
         );

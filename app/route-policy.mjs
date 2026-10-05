@@ -53,13 +53,48 @@ export const ROUTES = Object.freeze(['docs', 'shell', 'data', 'project']);
 // Qué necesita cada ruta. `deploy` es la intención; en las rutas de datos la
 // decisión final la sigue tomando el resultado del refresco.
 const PLAN = Object.freeze({
-  docs: { fetchLive: false, needsSeed: false, needsIdentity: false, needsRefresh: false, forceProject: false, verify: false, deploy: false },
-  shell: { fetchLive: true, needsSeed: false, needsIdentity: false, needsRefresh: false, forceProject: false, verify: true, deploy: true },
-  data: { fetchLive: true, needsSeed: true, needsIdentity: true, needsRefresh: true, forceProject: false, verify: true, deploy: true },
-  project: { fetchLive: true, needsSeed: true, needsIdentity: true, needsRefresh: true, forceProject: true, verify: true, deploy: true },
+  docs: {
+    fetchLive: false,
+    needsSeed: false,
+    needsIdentity: false,
+    needsRefresh: false,
+    forceProject: false,
+    verify: false,
+    deploy: false,
+  },
+  shell: {
+    fetchLive: true,
+    needsSeed: false,
+    needsIdentity: false,
+    needsRefresh: false,
+    forceProject: false,
+    verify: true,
+    deploy: true,
+  },
+  data: {
+    fetchLive: true,
+    needsSeed: true,
+    needsIdentity: true,
+    needsRefresh: true,
+    forceProject: false,
+    verify: true,
+    deploy: true,
+  },
+  project: {
+    fetchLive: true,
+    needsSeed: true,
+    needsIdentity: true,
+    needsRefresh: true,
+    forceProject: true,
+    verify: true,
+    deploy: true,
+  },
 });
 
-const segments = (value) => String(value ?? '').split('/').filter(Boolean);
+const segments = (value) =>
+  String(value ?? '')
+    .split('/')
+    .filter(Boolean);
 
 /** docs | shell | operator | projection — un cambio, un efecto. */
 export function classifyPath(rawPath) {
@@ -93,8 +128,10 @@ function routeFromPaths(changedPaths) {
       ? { route: 'project', reason: 'cambio mixto de interfaz y proyección; se reproyecta y se sube el shell nuevo' }
       : { route: 'project', reason: 'cambia código o entradas de proyección' };
   }
-  if (efectos.has('shell')) return { route: 'shell', reason: 'solo interfaz y assets; se reutiliza el bundle publicado' };
-  if (efectos.has('operator')) return { route: 'docs', reason: 'solo documentación y herramientas de operador; nada que publicar' };
+  if (efectos.has('shell'))
+    return { route: 'shell', reason: 'solo interfaz y assets; se reutiliza el bundle publicado' };
+  if (efectos.has('operator'))
+    return { route: 'docs', reason: 'solo documentación y herramientas de operador; nada que publicar' };
   return { route: 'docs', reason: 'solo documentación; nada que publicar' };
 }
 
@@ -109,7 +146,8 @@ export function resolveRoute({ eventName, changedPaths = [], inputs = {}, previo
   const decidida = (() => {
     if (eventName === 'schedule') return { route: 'data', reason: 'refresco programado de la fuente' };
     if (eventName === 'workflow_dispatch') {
-      if (inputs.forceProject && inputs.deployShell) return { route: 'project', reason: 'se pidieron reproyección y shell; la reproyección los cubre a los dos' };
+      if (inputs.forceProject && inputs.deployShell)
+        return { route: 'project', reason: 'se pidieron reproyección y shell; la reproyección los cubre a los dos' };
       if (inputs.forceProject) return { route: 'project', reason: 'reproyección pedida a mano' };
       if (inputs.deployShell) return { route: 'shell', reason: 'publicación de shell pedida a mano' };
       return { route: 'data', reason: 'ejecución manual sin opciones; se refresca la fuente' };
@@ -117,7 +155,8 @@ export function resolveRoute({ eventName, changedPaths = [], inputs = {}, previo
     if (eventName === 'push') {
       // Sin rango previo resoluble —primer push, force-push, historial recortado—
       // no se compara a medias: se reproyecta todo, que es el superconjunto seguro.
-      if (!previousCommitValid) return { route: 'project', reason: 'sin rango previo válido; se reproyecta todo por precaución' };
+      if (!previousCommitValid)
+        return { route: 'project', reason: 'sin rango previo válido; se reproyecta todo por precaución' };
       return routeFromPaths(changedPaths);
     }
     return { route: 'docs', reason: `evento sin ruta de publicación: ${eventName ?? 'desconocido'}` };
@@ -139,5 +178,7 @@ export function codeRegression({ head, tip, isAncestor, changedPaths = [] }) {
   if (!isAncestor) return { reason: `codigo_desactualizado: ${corto(head)} no es ancestro de main (${corto(tip)})` };
   const ruta = resolveRoute({ eventName: 'push', changedPaths });
   if (ruta.route === 'docs') return null;
-  return { reason: `codigo_desactualizado: main avanzó a ${corto(tip)} con cambios de ${ruta.route}; esta corrida trae ${corto(head)}` };
+  return {
+    reason: `codigo_desactualizado: main avanzó a ${corto(tip)} con cambios de ${ruta.route}; esta corrida trae ${corto(head)}`,
+  };
 }

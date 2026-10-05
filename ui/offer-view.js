@@ -16,9 +16,15 @@ import { RADIUS_MAX_KM } from '../web/lib/haversine.js';
 export const UNVERIFIED_STATION_LABEL = 'Estación sin nombre verificado';
 export const UNCONFIRMED_LABEL = 'por confirmar';
 
-export const formatPrice = (value) => new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 }).format(value);
+export const formatPrice = (value) =>
+  new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 }).format(value);
 // «hace 24 h» y «hace 1 día» son lo mismo; a partir de 23.5 h se redondea a día.
-const ago = (days) => { const horas = Math.max(1, Math.round(days * 24)); return horas < 24 ? `hace ${horas} h` : `hace ${Math.max(1, Math.floor(days))} ${Math.floor(days) <= 1 ? 'día' : 'días'}`; };
+const ago = (days) => {
+  const horas = Math.max(1, Math.round(days * 24));
+  return horas < 24
+    ? `hace ${horas} h`
+    : `hace ${Math.max(1, Math.floor(days))} ${Math.floor(days) <= 1 ? 'día' : 'días'}`;
+};
 // El silencio se mide en meses porque casi siempre son meses: «hace 190 días»
 // es exacto y no se siente. `ago` se queda para la tarjeta con precio, donde el
 // día sí importa.
@@ -31,15 +37,28 @@ const calladoDesde = (days) => {
 // operador lo registró, y uno de la consulta web solo consta desde que lo
 // leímos. Decir «reportado» de lo segundo afirmaría una fecha que nadie nos dio.
 const VERBOS = Object.freeze({ csv: 'Reportado', facilito: 'Consultado' });
-const desde = (days, source) => { const relativo = ago(days); return source ? `${VERBOS[source]} ${relativo}` : `${relativo[0].toLocaleUpperCase('es-PE')}${relativo.slice(1)}`; };
-const kilometers = (value) => value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`;
+const desde = (days, source) => {
+  const relativo = ago(days);
+  return source ? `${VERBOS[source]} ${relativo}` : `${relativo[0].toLocaleUpperCase('es-PE')}${relativo.slice(1)}`;
+};
+const kilometers = (value) => (value < 1 ? `${Math.round(value * 1000)} m` : `${value.toFixed(value < 10 ? 1 : 0)} km`);
 const lowercaseParticles = new Set(['de', 'del', 'el', 'la', 'las', 'los', 'y']);
-const fechaHora = (iso) => new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Lima' }).format(new Date(iso));
+const fechaHora = (iso) =>
+  new Intl.DateTimeFormat('es-PE', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Lima',
+  }).format(new Date(iso));
 
 // Las claves de producto son las mismas en datos, JS y CSS ([data-key]). Nombre
 // y sigla salen del catálogo; los productos de la tarjeta, de la vista, en su
 // orden. Sin vista declarada, la tarjeta es la de Gasolina, como siempre.
-export const PRODUCT_CHIPS = Object.freeze(Object.fromEntries(Object.values(PRODUCTS).map((product) => [product.key, product.chip])));
+export const PRODUCT_CHIPS = Object.freeze(
+  Object.fromEntries(Object.values(PRODUCTS).map((product) => [product.key, product.chip])),
+);
 // Con un solo producto en la tarjeta, su nombre accesible es el preciso
 // —«Diésel B5 S-50 UV»—; con dos, basta el corto que los distingue.
 const nombre = (key, products) => (products.length > 1 ? PRODUCTS[key].short : PRODUCTS[key].label);
@@ -49,7 +68,9 @@ const chip = (key, products) => ({ key, text: PRODUCT_CHIPS[key], label: nombre(
 export function stationIdentity(offer) {
   const identity = offer?.commercial_identity;
   if (!identity) return UNVERIFIED_STATION_LABEL;
-  const labels = [identity.brand, identity.public_site_name].filter((value) => typeof value === 'string' && value.trim());
+  const labels = [identity.brand, identity.public_site_name].filter(
+    (value) => typeof value === 'string' && value.trim(),
+  );
   if (!labels.length) return UNVERIFIED_STATION_LABEL;
   // "Primax · Primax Granada" repite la marca. Cuando el nombre de sede ya la
   // contiene, basta con el nombre de sede.
@@ -64,12 +85,22 @@ export function isUnconfirmedIdentity(offer) {
 }
 
 export function displayDistrict(district) {
-  return String(district).trim().toLocaleLowerCase('es-PE').split(/\s+/).map((word, index) => index > 0 && lowercaseParticles.has(word) ? word : `${word[0]?.toLocaleUpperCase('es-PE') ?? ''}${word.slice(1)}`).join(' ');
+  return String(district)
+    .trim()
+    .toLocaleLowerCase('es-PE')
+    .split(/\s+/)
+    .map((word, index) =>
+      index > 0 && lowercaseParticles.has(word) ? word : `${word[0]?.toLocaleUpperCase('es-PE') ?? ''}${word.slice(1)}`,
+    )
+    .join(' ');
 }
 
 export function directionsLabel(offer, { withDistance = true, products = GASOLINA_KEYS } = {}) {
   const details = [`Cómo llegar a ${stationIdentity(offer)} en ${displayDistrict(offer.district)}`];
-  for (const key of products) { const item = offer.prices?.[key]; if (item) details.push(`${nombre(key, products)} ${formatPrice(item.price)}`); }
+  for (const key of products) {
+    const item = offer.prices?.[key];
+    if (item) details.push(`${nombre(key, products)} ${formatPrice(item.price)}`);
+  }
   if (withDistance) details.push(`a ${kilometers(offer.distance_km)}`);
   return details.join(', ');
 }
@@ -93,7 +124,9 @@ export function streetViewUrl(offer) {
 // estilo en línea: la CSP del sitio es `style-src 'self'`.
 function brandMark(offer) {
   const variante = brandAssetFor(offer?.commercial_identity, 'mark');
-  return variante ? { key: variante.key, src: variante.path, width: variante.asset.width, height: variante.asset.height } : null;
+  return variante
+    ? { key: variante.key, src: variante.path, width: variante.asset.width, height: variante.asset.height }
+    : null;
 }
 
 // En Gasolina los dos precios se ven a la vez porque la decisión se toma
@@ -104,7 +137,14 @@ function brandMark(offer) {
 function priceCell(offer, key, activeProduct, products, priceUnit) {
   const item = offer.prices?.[key];
   const state = !item ? 'absent' : activeProduct ? (activeProduct === key ? 'on' : 'muted') : null;
-  return { key, state, chip: PRODUCT_CHIPS[key], label: nombre(key, products), amount: item ? item.price.toFixed(2) : null, unit: item && priceUnit ? priceUnit : null };
+  return {
+    key,
+    state,
+    chip: PRODUCT_CHIPS[key],
+    label: nombre(key, products),
+    amount: item ? item.price.toFixed(2) : null,
+    unit: item && priceUnit ? priceUnit : null,
+  };
 }
 
 /**
@@ -115,7 +155,19 @@ function priceCell(offer, key, activeProduct, products, priceUnit) {
  * a qué distancia y desde cuándo calla. Conserva «Ver detalle» porque el Street
  * View es justo como se averigua si el grifo sigue abierto.
  */
-export function offerCardView(offer, { withDistance = true, directionsUrl = null, includeDirections = true, includeDetail = true, tag = null, activeProduct = null, products = GASOLINA_KEYS, priceUnit = null } = {}) {
+export function offerCardView(
+  offer,
+  {
+    withDistance = true,
+    directionsUrl = null,
+    includeDirections = true,
+    includeDetail = true,
+    tag = null,
+    activeProduct = null,
+    products = GASOLINA_KEYS,
+    priceUnit = null,
+  } = {},
+) {
   const silent = offer.has_price === false;
   const address = offer.address ? String(offer.address) : '';
   const base = {
@@ -124,7 +176,10 @@ export function offerCardView(offer, { withDistance = true, directionsUrl = null
     identity: stationIdentity(offer),
     unconfirmed: isUnconfirmedIdentity(offer),
     detail: includeDetail ? { label: detailLabel(offer) } : null,
-    directions: includeDirections && directionsUrl ? { url: directionsUrl, label: directionsLabel(offer, { withDistance, products }) } : null,
+    directions:
+      includeDirections && directionsUrl
+        ? { url: directionsUrl, label: directionsLabel(offer, { withDistance, products }) }
+        : null,
   };
   if (silent) {
     // Sin precios que alinear, la distancia baja a la columna derecha, junto al
@@ -132,7 +187,9 @@ export function offerCardView(offer, { withDistance = true, directionsUrl = null
     return {
       ...base,
       address,
-      district: [withDistance ? kilometers(offer.distance_km) : '', displayDistrict(offer.district)].filter(Boolean).join(' · '),
+      district: [withDistance ? kilometers(offer.distance_km) : '', displayDistrict(offer.district)]
+        .filter(Boolean)
+        .join(' · '),
       silence: { text: `Sin precio ${calladoDesde(offer.silent_days)}`, dateTime: offer.last_reported_at ?? null },
       freshness: null,
       prices: [],
@@ -160,14 +217,22 @@ export function offerCardView(offer, { withDistance = true, directionsUrl = null
  * El panel que se despliega bajo la tarjeta. Solo usa datos que ya viajan en el
  * bundle: nada externo, así que funciona igual sin conexión.
  */
-export function offerDetailView(offer, { prices = offer.prices ?? {}, attribution = null, products = GASOLINA_KEYS, priceUnit = null } = {}) {
+export function offerDetailView(
+  offer,
+  { prices = offer.prices ?? {}, attribution = null, products = GASOLINA_KEYS, priceUnit = null } = {},
+) {
   return {
     // Cada producto conserva su fuente y su fecha: aquí es donde se ve cuál de
     // los dos importes se leyó de la web y cuál lo registró el operador.
     rows: products.map((key) => {
       const item = prices[key];
       if (!item) return { ...chip(key, products), amount: null, unit: null, when: '' };
-      return { ...chip(key, products), amount: item.price.toFixed(2), unit: priceUnit, when: `${VERBOS[item.source ?? 'csv'].toLocaleLowerCase('es-PE')} ${fechaHora(item.at ?? item.reported_at)}` };
+      return {
+        ...chip(key, products),
+        amount: item.price.toFixed(2),
+        unit: priceUnit,
+        when: `${VERBOS[item.source ?? 'csv'].toLocaleLowerCase('es-PE')} ${fechaHora(item.at ?? item.reported_at)}`,
+      };
     }),
     // En una fila muda las filas de arriba dicen «sin precio vigente»; lo que el
     // panel puede añadir es cuándo fue la última vez que reportó. Última consulta
@@ -186,19 +251,36 @@ export function offerDetailView(offer, { prices = offer.prices ?? {}, attributio
  * lectores de pantalla y el vacío por radio. Sin vista, los de reposo.
  */
 export function resultsCopy(view, viewKey) {
-  if (!view) return { loadMore: '', status: '', radiusEmpty: { title: 'Ningún grifo en este radio', text: 'Amplía el radio de búsqueda para encontrar estaciones más lejanas.' } };
+  if (!view)
+    return {
+      loadMore: '',
+      status: '',
+      radiusEmpty: {
+        title: 'Ningún grifo en este radio',
+        text: 'Amplía el radio de búsqueda para encontrar estaciones más lejanas.',
+      },
+    };
   // Sin ninguna estación en todo el rango, ampliar el radio no sirve: se dice, y
   // se ofrece lo que sí sirve.
   const nadaEnElRango = view.radius?.inert && view.radius.total === 0;
   return {
     // El botón carga su propio salto: la etiqueta y lo que hace salen del mismo
     // número, así que no pueden discrepar.
-    loadMore: view.nextCount >= view.ordered.length ? `Ver las ${view.remaining} restantes` : `Ver ${view.nextCount - view.items.length} más (${view.remaining} restantes)`,
+    loadMore:
+      view.nextCount >= view.ordered.length
+        ? `Ver las ${view.remaining} restantes`
+        : `Ver ${view.nextCount - view.items.length} más (${view.remaining} restantes)`,
     // Cuando sí paginó, el último toque cierra con «N de N», que es lo que el
     // botón ya no puede decir.
     status: view.paged ? `Se muestran ${view.items.length} de ${view.ordered.length} estaciones.` : '',
     radiusEmpty: nadaEnElRango
-      ? { title: `Ningún grifo a ${formatRadius(RADIUS_MAX_KM)}`, text: `No hay estaciones de ${VIEWS[viewKey].label} cerca de ti. Busca por distrito o elige otro combustible.` }
-      : { title: 'Ningún grifo en este radio', text: 'Amplía el radio de búsqueda para encontrar estaciones más lejanas.' },
+      ? {
+          title: `Ningún grifo a ${formatRadius(RADIUS_MAX_KM)}`,
+          text: `No hay estaciones de ${VIEWS[viewKey].label} cerca de ti. Busca por distrito o elige otro combustible.`,
+        }
+      : {
+          title: 'Ningún grifo en este radio',
+          text: 'Amplía el radio de búsqueda para encontrar estaciones más lejanas.',
+        },
   };
 }

@@ -30,7 +30,12 @@ import { canUseCurlFallback } from '../app/refresh-policy.mjs';
 import { findMatchingRaw } from '../app/raw-reuse.mjs';
 import { acquireExclusiveLock } from '../app/exclusive-lock.mjs';
 import { validateGasolinaRefreshState } from './gasolina-contract.mjs';
-import { buildGroupCandidate, buildPrivateCandidate, loadCommercialPublicationInputs, temporalContextForPointer } from './project-gasolina.mjs';
+import {
+  buildGroupCandidate,
+  buildPrivateCandidate,
+  loadCommercialPublicationInputs,
+  temporalContextForPointer,
+} from './project-gasolina.mjs';
 import { buildSourceProducts, loadSourceTables } from './gasolina-products.mjs';
 import { configuredGroup, groupsOfSource, productGroup } from './groups.mjs';
 import { compareGroupQuality, snapshotIdFromGasolinaRevision } from './refresh-state.mjs';
@@ -69,22 +74,53 @@ export function refreshOptionsFromEnv(env = process.env, argv = process.argv) {
   };
 }
 
-function readJson(file) { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
 
 function materialHeaders(headers) {
-  const names = ['accept-ranges', 'cache-control', 'content-disposition', 'content-length', 'content-range', 'content-type', 'date', 'etag', 'last-modified', 'location'];
+  const names = [
+    'accept-ranges',
+    'cache-control',
+    'content-disposition',
+    'content-length',
+    'content-range',
+    'content-type',
+    'date',
+    'etag',
+    'last-modified',
+    'location',
+  ];
   return Object.fromEntries(names.filter((name) => headers[name] !== undefined).map((name) => [name, headers[name]]));
 }
 
 function curlHeadFetch(url, options = {}, { probeTimeoutMs, userAgent, maxRedirects }) {
   if ((options.method ?? 'GET') !== 'HEAD') throw new Error('curl fallback solo admite HEAD');
-  const args = ['--silent', '--show-error', '--location', '--max-redirs', String(maxRedirects), '--max-time', String(Math.ceil(probeTimeoutMs / 1000)), '--head', '--dump-header', '-', '--output', '/dev/null', '--user-agent', userAgent];
+  const args = [
+    '--silent',
+    '--show-error',
+    '--location',
+    '--max-redirs',
+    String(maxRedirects),
+    '--max-time',
+    String(Math.ceil(probeTimeoutMs / 1000)),
+    '--head',
+    '--dump-header',
+    '-',
+    '--output',
+    '/dev/null',
+    '--user-agent',
+    userAgent,
+  ];
   for (const [name, value] of Object.entries(options.headers ?? {})) args.push('--header', `${name}: ${value}`);
   args.push(url);
   const result = spawnSync('curl', args, { encoding: 'utf8', timeout: probeTimeoutMs + 2000, maxBuffer: 1024 * 1024 });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr?.trim() || `curl terminó con ${result.status}`);
-  const blocks = result.stdout.replace(/\r\n/g, '\n').split(/\n\n+/).filter((block) => /^HTTP\//.test(block.trim()));
+  const blocks = result.stdout
+    .replace(/\r\n/g, '\n')
+    .split(/\n\n+/)
+    .filter((block) => /^HTTP\//.test(block.trim()));
   const block = blocks.at(-1);
   if (!block) throw new Error('curl no devolvió cabeceras HTTP');
   const lines = block.trim().split('\n');
@@ -130,14 +166,30 @@ async function fetchFull(url, destination, { userAgent, maxRedirects, downloadTi
     }
     const headers = Object.fromEntries(response.headers.entries());
     const partial = `${destination}.part`;
-    if (fs.existsSync(partial) || fs.existsSync(destination)) throw new Error(`destino de descarga ya existe: ${destination}`);
+    if (fs.existsSync(partial) || fs.existsSync(destination))
+      throw new Error(`destino de descarga ya existe: ${destination}`);
     fs.mkdirSync(path.dirname(destination), { recursive: true, mode: 0o700 });
     const hash = crypto.createHash('sha256');
     let bytes = 0;
-    const meter = new Transform({ transform(chunk, encoding, callback) { hash.update(chunk); bytes += chunk.length; callback(null, chunk); } });
+    const meter = new Transform({
+      transform(chunk, encoding, callback) {
+        hash.update(chunk);
+        bytes += chunk.length;
+        callback(null, chunk);
+      },
+    });
     try {
-      await pipeline(Readable.fromWeb(response.body), meter, fs.createWriteStream(partial, { flags: 'wx', mode: 0o600 }));
-      const errors = validateDownloadMetadata({ status: response.status, headers, bytes, contentRange: headers['content-range'] });
+      await pipeline(
+        Readable.fromWeb(response.body),
+        meter,
+        fs.createWriteStream(partial, { flags: 'wx', mode: 0o600 }),
+      );
+      const errors = validateDownloadMetadata({
+        status: response.status,
+        headers,
+        bytes,
+        contentRange: headers['content-range'],
+      });
       if (errors.length) throw new Error(errors.join('; '));
       fs.chmodSync(partial, 0o600);
       fs.renameSync(partial, destination);
@@ -173,16 +225,21 @@ function writeRecord(stage, record, cachePath, { sourceId, refreshSourceUrl, use
     ...record,
     cache_path: cachePath,
   };
-  fs.writeFileSync(path.join(provenanceDir, 'acquisitions.jsonl'), `${JSON.stringify(acquisition)}\n`, { mode: 0o600, flag: 'wx' });
+  fs.writeFileSync(path.join(provenanceDir, 'acquisitions.jsonl'), `${JSON.stringify(acquisition)}\n`, {
+    mode: 0o600,
+    flag: 'wx',
+  });
   return acquisition;
 }
 
 function rewriteFinalAcquisition(root, final, snapshotDate, rawRelativePath, sourceId) {
   const file = path.join(final, 'provenance', snapshotDate, 'acquisitions.jsonl');
   const records = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(JSON.parse);
-  const updated = records.map((record) => record.source_id === sourceId
-    ? { ...record, cache_path: path.relative(root, path.join(final, rawRelativePath)) }
-    : record);
+  const updated = records.map((record) =>
+    record.source_id === sourceId
+      ? { ...record, cache_path: path.relative(root, path.join(final, rawRelativePath)) }
+      : record,
+  );
   fs.writeFileSync(file, `${updated.map((record) => JSON.stringify(record)).join('\n')}\n`, { mode: 0o600 });
 }
 
@@ -201,7 +258,10 @@ function refreshBaseline({ root, publicRefreshStatePath }) {
     const errors = validateGasolinaRefreshState(state, { revision_id: state.revision_id });
     if (errors.length) throw new Error(`Refresh-state público inválido: ${errors.join('; ')}`);
     return {
-      active: { snapshot_id: state.snapshot_id ?? snapshotIdFromGasolinaRevision(state.revision_id), validators: state.validators },
+      active: {
+        snapshot_id: state.snapshot_id ?? snapshotIdFromGasolinaRevision(state.revision_id),
+        validators: state.validators,
+      },
       localValidators: state.validators,
       previousProducts: state.products,
       previousSourceMaxReportedAt: state.source_max_reported_at,
@@ -220,7 +280,10 @@ function refreshBaseline({ root, publicRefreshStatePath }) {
     // quitaba el sufijo la igualdad era siempre falsa: `previousProducts` quedaba
     // en null y los guardrails de caída de ofertas y de cobertura no llegaban a
     // evaluarse. Ahora el snapshot viene declarado.
-    if (!errors.length && (state.snapshot_id ?? snapshotIdFromGasolinaRevision(state.revision_id)) === active.snapshot_id) {
+    if (
+      !errors.length &&
+      (state.snapshot_id ?? snapshotIdFromGasolinaRevision(state.revision_id)) === active.snapshot_id
+    ) {
       previousProducts = state.products;
       previousSourceMaxReportedAt = state.source_max_reported_at;
     }
@@ -238,15 +301,22 @@ function refreshBaseline({ root, publicRefreshStatePath }) {
  */
 function groupBaseline({ root, group, ci }) {
   const file = path.join(root, 'web', ...group.dataRoot.split('/'), 'refresh-state.json');
-  if (!fs.existsSync(file)) return { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
+  if (!fs.existsSync(file))
+    return { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
   const state = readJson(file);
   const errors = group.validate.refreshState(state, { revision_id: state.revision_id });
   if (errors.length) throw new Error(`Refresh-state ${group.key} inválido: ${errors.join('; ')}`);
   if (!ci) {
     const pointer = readActivePointer(root, { group: group.key });
-    if (!pointer || pointer.snapshot_id !== state.snapshot_id) return { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
+    if (!pointer || pointer.snapshot_id !== state.snapshot_id)
+      return { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
   }
-  return { previousProducts: state.products, previousSourceMaxReportedAt: state.source_max_reported_at, validators: state.validators, snapshot_id: state.snapshot_id };
+  return {
+    previousProducts: state.products,
+    previousSourceMaxReportedAt: state.source_max_reported_at,
+    validators: state.validators,
+    snapshot_id: state.snapshot_id,
+  };
 }
 
 /**
@@ -259,12 +329,18 @@ function privateBaseline({ root, group }) {
   const vacia = { previousProducts: null, previousSourceMaxReportedAt: null, validators: null, snapshot_id: null };
   const pointer = readActivePointer(root, { group: group.key });
   if (!pointer) return vacia;
-  if (sourceOfPointer(pointer) !== group.config.source) throw new Error(`El pointer de ${group.key} es de ${sourceOfPointer(pointer)}, no de ${group.config.source}`);
+  if (sourceOfPointer(pointer) !== group.config.source)
+    throw new Error(`El pointer de ${group.key} es de ${sourceOfPointer(pointer)}, no de ${group.config.source}`);
   const file = path.join(root, '.local-cache', 'snapshots', pointer.snapshot_id, `${group.key}-validation.json`);
   if (!fs.existsSync(file)) return vacia;
   const validation = readJson(file);
   if (validation.snapshot_id !== pointer.snapshot_id || !validation.refresh_state?.products) return vacia;
-  return { previousProducts: validation.refresh_state.products, previousSourceMaxReportedAt: validation.refresh_state.source_max_reported_at, validators: pointer.validators, snapshot_id: pointer.snapshot_id };
+  return {
+    previousProducts: validation.refresh_state.products,
+    previousSourceMaxReportedAt: validation.refresh_state.source_max_reported_at,
+    validators: pointer.validators,
+    snapshot_id: pointer.snapshot_id,
+  };
 }
 
 /**
@@ -279,7 +355,9 @@ export async function assertReferenceCovers(referenceMinimizedRoot, groups) {
     if (!fs.existsSync(file)) throw new Error(`Falta input sanitizado de bootstrap: ${relative}`);
     return readTable(file, fields);
   };
-  const codigos = new Set((await tabla('registry/authorizations.csv.gz', REGISTRY_FIELDS)).map((fila) => fila.SOURCE_ACTIVITY));
+  const codigos = new Set(
+    (await tabla('registry/authorizations.csv.gz', REGISTRY_FIELDS)).map((fila) => fila.SOURCE_ACTIVITY),
+  );
   const capas = new Set((await tabla('gis/features.csv.gz', GIS_FIELDS)).map((fila) => fila.LAYER));
   const faltan = new Set();
   for (const grupo of groups) {
@@ -293,7 +371,11 @@ export async function assertReferenceCovers(referenceMinimizedRoot, groups) {
 }
 
 /** Los validadores que respondió el origen en la sonda, si respondió alguno. */
-const validadoresRemotos = (detection) => [...(detection.attempts ?? [])].reverse().find((attempt) => attempt.response_validators?.etag || attempt.response_validators?.last_modified)?.response_validators ?? null;
+const validadoresRemotos = (detection) =>
+  [...(detection.attempts ?? [])]
+    .reverse()
+    .find((attempt) => attempt.response_validators?.etag || attempt.response_validators?.last_modified)
+    ?.response_validators ?? null;
 
 /**
  * Refresca UNA fuente: sondea contra su propia línea base, adquiere, minimiza,
@@ -302,23 +384,41 @@ const validadoresRemotos = (detection) => [...(detection.attempts ?? [])].revers
  */
 async function runRefresh(options, source, url) {
   const {
-    root, forceRefresh, publicRefreshStatePath, referenceMinimizedRoot,
-    probeTimeoutMs, userAgent, maxRedirects, referenceSnapshot, identityRoot,
+    root,
+    forceRefresh,
+    publicRefreshStatePath,
+    referenceMinimizedRoot,
+    probeTimeoutMs,
+    userAgent,
+    maxRedirects,
+    referenceSnapshot,
+    identityRoot,
   } = options;
   const sourceId = source.id;
   const grupos = groupsOfSource(sourceId);
   if (!grupos.length) throw new Error(`La fuente ${sourceId} no alimenta ningún grupo`);
-  const baseline = grupos.some((grupo) => grupo.key === ANCLA) ? refreshBaseline({ root, publicRefreshStatePath }) : null;
+  const baseline = grupos.some((grupo) => grupo.key === ANCLA)
+    ? refreshBaseline({ root, publicRefreshStatePath })
+    : null;
   const active = baseline?.active ?? null;
-  const otros = Object.fromEntries(grupos.filter((grupo) => grupo.key !== ANCLA).map((grupo) => [grupo.key, grupo.private
-    ? privateBaseline({ root, group: grupo })
-    : groupBaseline({ root, group: grupo, ci: Boolean(publicRefreshStatePath) })]));
+  const otros = Object.fromEntries(
+    grupos
+      .filter((grupo) => grupo.key !== ANCLA)
+      .map((grupo) => [
+        grupo.key,
+        grupo.private
+          ? privateBaseline({ root, group: grupo })
+          : groupBaseline({ root, group: grupo, ci: Boolean(publicRefreshStatePath) }),
+      ]),
+  );
   // Se compara contra el CSV más nuevo que algún grupo de la fuente ya aprobó.
   // Si Gasolina rechazó un archivo que Diésel sí publicó, volver a bajarlo en
   // cada corrida solo repetiría el mismo rechazo: Gasolina espera al próximo
   // CSV. Una fuente sin ancla ni grupo con base usa el último snapshot que
   // aprobó; sin ninguno no hay con qué comparar.
-  const masNuevo = Object.values(otros).filter((base) => base.validators && base.snapshot_id > (active?.snapshot_id ?? '')).sort((a, b) => (a.snapshot_id < b.snapshot_id ? 1 : -1))[0];
+  const masNuevo = Object.values(otros)
+    .filter((base) => base.validators && base.snapshot_id > (active?.snapshot_id ?? ''))
+    .sort((a, b) => (a.snapshot_id < b.snapshot_id ? 1 : -1))[0];
   const deLaFuente = baseline || masNuevo ? null : readSourcePointer(root, sourceId);
   const local = masNuevo?.validators ?? baseline?.localValidators ?? deLaFuente?.validators ?? null;
   const activeSnapshot = active?.snapshot_id ?? masNuevo?.snapshot_id ?? deLaFuente?.snapshot_id ?? null;
@@ -334,13 +434,16 @@ async function runRefresh(options, source, url) {
   }
   // Sin base la sonda no puede decir «sin cambios»: si el origen respondió con
   // sus validadores, se adquiere.
-  if (!local && detection.status === 'unverifiable' && validadoresRemotos(detection)) detection = { ...detection, status: 'changed', baseline: 'sin_base' };
+  if (!local && detection.status === 'unverifiable' && validadoresRemotos(detection))
+    detection = { ...detection, status: 'changed', baseline: 'sin_base' };
   // Un runner limpio no conserva snapshots entre corridas: si el origen no
   // cambió, no descarga y no queda nada que proyectar. Por eso una reproyección
   // forzada —cambio de contrato o de catálogo, no de datos— tiene que pagar la
   // descarga completa igual. Es caro y por eso es manual.
-  if (detection.status === 'unchanged' && !forceRefresh) return { status: 'unchanged', active_snapshot: activeSnapshot, detection, downloaded: false, promoted: false };
-  if (detection.status === 'unverifiable') return { status: 'unverifiable', active_snapshot: activeSnapshot, detection, downloaded: false, promoted: false };
+  if (detection.status === 'unchanged' && !forceRefresh)
+    return { status: 'unchanged', active_snapshot: activeSnapshot, detection, downloaded: false, promoted: false };
+  if (detection.status === 'unverifiable')
+    return { status: 'unverifiable', active_snapshot: activeSnapshot, detection, downloaded: false, promoted: false };
   await assertReferenceCovers(referenceMinimizedRoot, grupos);
 
   const runId = `${new Date().toISOString().replace(/[-:.]/g, '')}-${process.pid}-${crypto.randomBytes(3).toString('hex')}`;
@@ -349,23 +452,61 @@ async function runRefresh(options, source, url) {
   fs.mkdirSync(stage, { recursive: true, mode: 0o700 });
   try {
     const remoteValidators = validadoresRemotos(detection) ?? { etag: null, last_modified: null };
-    const reusable = await findMatchingRaw({ root, snapshotsRoot: path.join(root, '.local-cache', 'snapshots'), sourceId, validators: remoteValidators });
+    const reusable = await findMatchingRaw({
+      root,
+      snapshotsRoot: path.join(root, '.local-cache', 'snapshots'),
+      sourceId,
+      validators: remoteValidators,
+    });
     let downloaded;
     if (reusable) {
       fs.mkdirSync(path.dirname(rawPath), { recursive: true, mode: 0o700 });
       fs.symlinkSync(reusable.path, rawPath);
-      downloaded = { requested_at: reusable.record.requested_at, completed_at: reusable.record.completed_at, final_url: reusable.record.final_url ?? url, response_status: reusable.record.response_status, response_headers: { ...reusable.record.response_headers, 'content-length': String(reusable.record.bytes), etag: remoteValidators.etag, 'last-modified': remoteValidators.last_modified }, response_chain: reusable.record.response_chain ?? [], bytes: Number(reusable.record.bytes), sha256: reusable.record.sha256, reused_local_raw: true };
-    } else downloaded = await fetchFull(url, rawPath, { userAgent, maxRedirects, downloadTimeoutMs: source.downloadTimeoutMs });
-    const snapshotDate = new Date(downloaded.response_headers['last-modified'] ?? downloaded.completed_at).toISOString().slice(0, 10);
-    writeRecord(stage, { ...downloaded, snapshot_date: snapshotDate, source_id: sourceId, final_url: downloaded.final_url }, path.relative(root, rawPath), { sourceId, refreshSourceUrl: url, userAgent });
+      downloaded = {
+        requested_at: reusable.record.requested_at,
+        completed_at: reusable.record.completed_at,
+        final_url: reusable.record.final_url ?? url,
+        response_status: reusable.record.response_status,
+        response_headers: {
+          ...reusable.record.response_headers,
+          'content-length': String(reusable.record.bytes),
+          etag: remoteValidators.etag,
+          'last-modified': remoteValidators.last_modified,
+        },
+        response_chain: reusable.record.response_chain ?? [],
+        bytes: Number(reusable.record.bytes),
+        sha256: reusable.record.sha256,
+        reused_local_raw: true,
+      };
+    } else
+      downloaded = await fetchFull(url, rawPath, {
+        userAgent,
+        maxRedirects,
+        downloadTimeoutMs: source.downloadTimeoutMs,
+      });
+    const snapshotDate = new Date(downloaded.response_headers['last-modified'] ?? downloaded.completed_at)
+      .toISOString()
+      .slice(0, 10);
+    writeRecord(
+      stage,
+      { ...downloaded, snapshot_date: snapshotDate, source_id: sourceId, final_url: downloaded.final_url },
+      path.relative(root, rawPath),
+      { sourceId, refreshSourceUrl: url, userAgent },
+    );
     // El guion vive junto a este módulo; el snapshot puede estar en otra raíz
     // (una sonda aislada, por ejemplo). Por eso el ejecutable se resuelve contra
     // el repositorio y sus entradas viajan como rutas absolutas.
-    const minimized = spawnSync(process.execPath, [path.join(rootFromModule, 'scripts', 'minimize.mjs')], { cwd: rootFromModule, env: { ...process.env, RAW_INPUT: rawPath, MINIMIZED_OUTPUT: path.join(stage, 'minimized'), SOURCE_ID: sourceId }, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+    const minimized = spawnSync(process.execPath, [path.join(rootFromModule, 'scripts', 'minimize.mjs')], {
+      cwd: rootFromModule,
+      env: { ...process.env, RAW_INPUT: rawPath, MINIMIZED_OUTPUT: path.join(stage, 'minimized'), SOURCE_ID: sourceId },
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024,
+    });
     if (minimized.status !== 0) throw new Error(`minimización rechazada: ${minimized.stderr || minimized.stdout}`);
     const minimizedLineage = JSON.parse(minimized.stdout);
     minimizedLineage.minimized_path = `minimized/${source.minimizedRelative}`;
-    if (minimizedLineage.raw_sha256 !== downloaded.sha256 || minimizedLineage.raw_bytes !== downloaded.bytes) throw new Error('lineage raw/minimizado inconsistente');
+    if (minimizedLineage.raw_sha256 !== downloaded.sha256 || minimizedLineage.raw_bytes !== downloaded.bytes)
+      throw new Error('lineage raw/minimizado inconsistente');
     fs.mkdirSync(path.join(stage, 'minimized', 'registry'), { recursive: true, mode: 0o700 });
     fs.mkdirSync(path.join(stage, 'minimized', 'gis'), { recursive: true, mode: 0o700 });
     for (const relative of ['registry/authorizations.csv.gz', 'gis/features.csv.gz']) {
@@ -396,21 +537,42 @@ async function runRefresh(options, source, url) {
       snapshotDate,
       acquisitionPath: path.join(final, 'provenance', snapshotDate, 'acquisitions.jsonl'),
       sourceUrl: url,
-      validators: { etag: downloaded.response_headers.etag ?? null, last_modified: downloaded.response_headers['last-modified'] ?? null },
+      validators: {
+        etag: downloaded.response_headers.etag ?? null,
+        last_modified: downloaded.response_headers['last-modified'] ?? null,
+      },
       promotedAt: new Date().toISOString(),
       temporalContext,
-      referenceInputs: { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' },
-      lineage: { ...lineage, paths: { raw_path: path.relative(root, path.join(final, path.relative(stage, rawPath))), minimized_path: path.relative(root, path.join(final, 'minimized', ...source.minimizedRelative.split('/'))) } },
+      referenceInputs: {
+        registry_gis_snapshot_date: referenceSnapshot,
+        note: 'Registro y GIS no se refrescan en este ciclo',
+      },
+      lineage: {
+        ...lineage,
+        paths: {
+          raw_path: path.relative(root, path.join(final, path.relative(stage, rawPath))),
+          minimized_path: path.relative(root, path.join(final, 'minimized', ...source.minimizedRelative.split('/'))),
+        },
+      },
     });
     // UNA pasada por el original para todos los grupos de la fuente; cada uno se
     // juzga con su línea base y sus tolerancias. Un error de contrato del ancla
     // sigue rechazando la fuente entera, como siempre; el de otro grupo solo lo
     // deja a él pendiente de revisión.
     const { resultsByGroup } = await buildSourceProducts({
-      source, sources: tablas, minimizedRoot, rawPath, cutoffAt: temporalContext.cutoff_at, snapshotId: pointer.snapshot_id, sourceMaxReportedAt: temporalContext.source_max_reported_at, sourceUrl: pointer.source_url,
+      source,
+      sources: tablas,
+      minimizedRoot,
+      rawPath,
+      cutoffAt: temporalContext.cutoff_at,
+      snapshotId: pointer.snapshot_id,
+      sourceMaxReportedAt: temporalContext.source_max_reported_at,
+      sourceUrl: pointer.source_url,
       groups: grupos.map(productGroup),
     });
-    const comerciales = grupos.some((grupo) => !grupo.private) ? loadCommercialPublicationInputs(root, { identityRoot }) : {};
+    const comerciales = grupos.some((grupo) => !grupo.private)
+      ? loadCommercialPublicationInputs(root, { identityRoot })
+      : {};
     const facilito = grupos.some((grupo) => grupo.private) ? readFacilitoState(root) : null;
     const juicios = {};
     for (const grupo of grupos) {
@@ -418,11 +580,26 @@ async function runRefresh(options, source, url) {
       let projection;
       try {
         projection = grupo.private
-          ? buildPrivateCandidate({ group: grupo, pointer, temporalContext, results: resultsByGroup[grupo.key], facilitoState: facilito })
-          : buildGroupCandidate({ group: grupo, pointer, temporalContext, results: resultsByGroup[grupo.key], ...comerciales });
+          ? buildPrivateCandidate({
+              group: grupo,
+              pointer,
+              temporalContext,
+              results: resultsByGroup[grupo.key],
+              facilitoState: facilito,
+            })
+          : buildGroupCandidate({
+              group: grupo,
+              pointer,
+              temporalContext,
+              results: resultsByGroup[grupo.key],
+              ...comerciales,
+            });
       } catch (error) {
         if (grupo.key === ANCLA) throw error;
-        juicios[grupo.key] = { projection: null, quality: { status: 'needs_review', reasons: [`${grupo.key}: ${error.message}`] } };
+        juicios[grupo.key] = {
+          projection: null,
+          quality: { status: 'needs_review', reasons: [`${grupo.key}: ${error.message}`] },
+        };
         continue;
       }
       // Un solo guardrail por grupo. El legado solo se evaluaba con evidencia
@@ -447,28 +624,69 @@ async function runRefresh(options, source, url) {
       if (!candidata) continue;
       // Un grupo privado deja solo conteos: su estado, su embudo y sus
       // exclusiones. Es la línea base de su próximo refresco.
-      const validation = candidata.private ? {
-        schema_version: 1,
-        group: key,
-        private: true,
-        snapshot_id: pointer.snapshot_id,
-        refresh_state: candidata.refreshState,
-        funnel: candidata.funnel,
-        row_exclusions: candidata.rowExclusions,
-        quality: calidad,
-      } : {
-        schema_version: 1,
-        revision_id: candidata.manifest.revision_id,
-        source_max_reported_at: candidata.refreshState.source_max_reported_at,
-        products: Object.fromEntries(Object.entries(candidata.results).map(([producto, value]) => [producto, { metrics: value.metrics, public_snapshot: candidata.manifest.products[producto] }])),
-        identity: candidata.identity,
-        commercial_identity: { ...candidata.catalog, without_current_offer_detail: candidata.catalogWithoutOffer, unknown_anchors: candidata.catalogUnknownAnchors, brand_groups: candidata.brandGroups, brand_evidence_review_queue: candidata.brandEvidenceQueue },
-        quality: calidad,
-      };
-      fs.writeFileSync(path.join(stage, `${key}-validation.json`), `${JSON.stringify(validation, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+      const validation = candidata.private
+        ? {
+            schema_version: 1,
+            group: key,
+            private: true,
+            snapshot_id: pointer.snapshot_id,
+            refresh_state: candidata.refreshState,
+            funnel: candidata.funnel,
+            row_exclusions: candidata.rowExclusions,
+            quality: calidad,
+          }
+        : {
+            schema_version: 1,
+            revision_id: candidata.manifest.revision_id,
+            source_max_reported_at: candidata.refreshState.source_max_reported_at,
+            products: Object.fromEntries(
+              Object.entries(candidata.results).map(([producto, value]) => [
+                producto,
+                { metrics: value.metrics, public_snapshot: candidata.manifest.products[producto] },
+              ]),
+            ),
+            identity: candidata.identity,
+            commercial_identity: {
+              ...candidata.catalog,
+              without_current_offer_detail: candidata.catalogWithoutOffer,
+              unknown_anchors: candidata.catalogUnknownAnchors,
+              brand_groups: candidata.brandGroups,
+              brand_evidence_review_queue: candidata.brandEvidenceQueue,
+            },
+            quality: calidad,
+          };
+      fs.writeFileSync(path.join(stage, `${key}-validation.json`), `${JSON.stringify(validation, null, 2)}\n`, {
+        mode: 0o600,
+        flag: 'wx',
+      });
     }
-    const ofertas = (candidata, producto) => (candidata.private ? candidata.results[producto].metrics.published.offers : candidata.datasets[producto].offers.length);
-    const resumenGrupos = Object.fromEntries(Object.entries(juicios).map(([key, { projection: candidata, quality: calidad }]) => [key, { status: calidad.status, reasons: calidad.reasons, first_activation: calidad.first_activation === true, revision_id: candidata?.manifest?.revision_id ?? null, ...(candidata?.private ? { private: true } : {}), products: candidata ? Object.fromEntries(Object.keys(candidata.private ? candidata.results : candidata.datasets).map((producto) => [producto, { offers: ofertas(candidata, producto), districts: candidata.results[producto].metrics.contract_ready.districts }])) : null }]));
+    const ofertas = (candidata, producto) =>
+      candidata.private
+        ? candidata.results[producto].metrics.published.offers
+        : candidata.datasets[producto].offers.length;
+    const resumenGrupos = Object.fromEntries(
+      Object.entries(juicios).map(([key, { projection: candidata, quality: calidad }]) => [
+        key,
+        {
+          status: calidad.status,
+          reasons: calidad.reasons,
+          first_activation: calidad.first_activation === true,
+          revision_id: candidata?.manifest?.revision_id ?? null,
+          ...(candidata?.private ? { private: true } : {}),
+          products: candidata
+            ? Object.fromEntries(
+                Object.keys(candidata.private ? candidata.results : candidata.datasets).map((producto) => [
+                  producto,
+                  {
+                    offers: ofertas(candidata, producto),
+                    districts: candidata.results[producto].metrics.contract_ready.districts,
+                  },
+                ]),
+              )
+            : null,
+        },
+      ]),
+    );
     // La carpeta se promueve si la aprueba al menos un grupo, y solo se mueven
     // los pointers de los que la aprobaron: Gasolina conserva el suyo si
     // rechaza un CSV que Diésel sí acepta, y al revés.
@@ -476,22 +694,93 @@ async function runRefresh(options, source, url) {
     // Con ancla, la fuente dice lo que dice Gasolina; sin ella, lo que diga
     // cualquiera de sus grupos.
     const ancla = juicios[ANCLA] ?? null;
-    const estado = ancla ? ancla.quality.status : (aprobados.length ? 'ready' : 'needs_review');
-    const referencia = { registry_gis_snapshot_date: referenceSnapshot, note: 'Registro y GIS no se refrescan en este ciclo' };
+    const estado = ancla ? ancla.quality.status : aprobados.length ? 'ready' : 'needs_review';
+    const referencia = {
+      registry_gis_snapshot_date: referenceSnapshot,
+      note: 'Registro y GIS no se refrescan en este ciclo',
+    };
     const report = ancla
-      ? { schema_version: 2, status: estado, detection, active_before: active, download: downloaded, lineage, temporal_context: temporalContext, identity: ancla.projection.identity, commercial_identity: ancla.projection.catalog, reference_inputs: referencia, quality: ancla.quality, staging_path: path.relative(root, stage), gasolina: { revision_id: ancla.projection.manifest.revision_id, products: Object.fromEntries(Object.entries(ancla.projection.datasets).map(([key, value]) => [key, { offers: value.offers.length, districts: ancla.projection.results[key].metrics.contract_ready.districts }])) }, groups: resumenGrupos }
-      : { schema_version: 2, source_id: sourceId, status: estado, detection, active_before: activeSnapshot, download: downloaded, lineage, temporal_context: temporalContext, reference_inputs: referencia, staging_path: path.relative(root, stage), groups: resumenGrupos };
-    fs.writeFileSync(path.join(stage, 'refresh-report.json'), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    const conGrupos = (resultado) => ({ ...resultado, groups: Object.fromEntries(Object.entries(resumenGrupos).map(([key, value]) => [key, { ...value, status: aprobados.includes(key) ? 'promoted' : 'needs_review' }])), promoted_groups: aprobados });
+      ? {
+          schema_version: 2,
+          status: estado,
+          detection,
+          active_before: active,
+          download: downloaded,
+          lineage,
+          temporal_context: temporalContext,
+          identity: ancla.projection.identity,
+          commercial_identity: ancla.projection.catalog,
+          reference_inputs: referencia,
+          quality: ancla.quality,
+          staging_path: path.relative(root, stage),
+          gasolina: {
+            revision_id: ancla.projection.manifest.revision_id,
+            products: Object.fromEntries(
+              Object.entries(ancla.projection.datasets).map(([key, value]) => [
+                key,
+                {
+                  offers: value.offers.length,
+                  districts: ancla.projection.results[key].metrics.contract_ready.districts,
+                },
+              ]),
+            ),
+          },
+          groups: resumenGrupos,
+        }
+      : {
+          schema_version: 2,
+          source_id: sourceId,
+          status: estado,
+          detection,
+          active_before: activeSnapshot,
+          download: downloaded,
+          lineage,
+          temporal_context: temporalContext,
+          reference_inputs: referencia,
+          staging_path: path.relative(root, stage),
+          groups: resumenGrupos,
+        };
+    fs.writeFileSync(path.join(stage, 'refresh-report.json'), `${JSON.stringify(report, null, 2)}\n`, {
+      mode: 0o600,
+      flag: 'wx',
+    });
+    const conGrupos = (resultado) => ({
+      ...resultado,
+      groups: Object.fromEntries(
+        Object.entries(resumenGrupos).map(([key, value]) => [
+          key,
+          { ...value, status: aprobados.includes(key) ? 'promoted' : 'needs_review' },
+        ]),
+      ),
+      promoted_groups: aprobados,
+    });
     if (!aprobados.length) return conGrupos({ ...report, promoted: false, staging_path: path.relative(root, stage) });
 
-    fs.writeFileSync(path.join(stage, 'snapshot-manifest.json'), `${JSON.stringify(pointer, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    const promoted = promoteSnapshot({ root, stagePath: stage, finalPath: final, pointer, groups: aprobados, beforePointerUpdate: () => rewriteFinalAcquisition(root, final, snapshotDate, path.relative(stage, rawPath), sourceId) });
+    fs.writeFileSync(path.join(stage, 'snapshot-manifest.json'), `${JSON.stringify(pointer, null, 2)}\n`, {
+      mode: 0o600,
+      flag: 'wx',
+    });
+    const promoted = promoteSnapshot({
+      root,
+      stagePath: stage,
+      finalPath: final,
+      pointer,
+      groups: aprobados,
+      beforePointerUpdate: () =>
+        rewriteFinalAcquisition(root, final, snapshotDate, path.relative(stage, rawPath), sourceId),
+    });
     if (estado === 'needs_review') {
       const { staging_path: _staging, ...sinStaging } = report;
       return conGrupos({ ...sinStaging, promoted: false, downloaded: true, snapshot_path: path.relative(root, final) });
     }
-    return conGrupos({ ...report, status: 'promoted', promoted: true, active_after: promoted, downloaded: true, public_projection_validated: aprobados.some((key) => !configuredGroup(key).private) });
+    return conGrupos({
+      ...report,
+      status: 'promoted',
+      promoted: true,
+      active_after: promoted,
+      downloaded: true,
+      public_projection_validated: aprobados.some((key) => !configuredGroup(key).private),
+    });
   } catch (error) {
     if (fs.existsSync(stage)) fs.rmSync(stage, { recursive: true, force: true });
     throw new Error(`${error.message}${error.snapshot_id ? `; snapshot_id=${error.snapshot_id}` : ''}`);
@@ -555,8 +844,11 @@ export async function refreshSnapshot({
     // Una fuente caída no detiene a las demás: su fallo queda en su resultado.
     const sources = {};
     for (const { source, url } of fuentes) {
-      try { sources[source.id] = { source_id: source.id, ...(await runRefresh(options, source, url)) }; }
-      catch (error) { sources[source.id] = { source_id: source.id, status: 'rejected', error: error.message }; }
+      try {
+        sources[source.id] = { source_id: source.id, ...(await runRefresh(options, source, url)) };
+      } catch (error) {
+        sources[source.id] = { source_id: source.id, status: 'rejected', error: error.message };
+      }
     }
     return { ...(sources['liquid-current'] ?? sources[fuentes[0].source.id]), sources };
   } finally {

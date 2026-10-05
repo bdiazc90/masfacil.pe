@@ -10,7 +10,8 @@
 // `gender` concuerda el adjetivo con el producto que se nombra: «Regular más
 // barata» habla de la gasolina, «Diésel más barato» del diésel. La unidad es la
 // del CSV y nunca se convierte: GNV se vende por metro cúbico.
-const producto = (key, canonical, label, short, chip, gender, unit = 'Galones') => Object.freeze({ key, canonical, label, short, chip, gender, unit, currency: 'PEN' });
+const producto = (key, canonical, label, short, chip, gender, unit = 'Galones') =>
+  Object.freeze({ key, canonical, label, short, chip, gender, unit, currency: 'PEN' });
 
 export const PRODUCTS = Object.freeze({
   regular: producto('regular', 'GASOHOL REGULAR', 'Gasohol Regular', 'Regular', 'REG', 'f'),
@@ -81,10 +82,38 @@ export const GROUPS = Object.freeze({ gasolina: GASOLINA, diesel: DIESEL, glp: G
 // `priceUnit` es la unidad que la tarjeta escribe junto al precio; Gasolina no la
 // escribe porque su tarjeta conjunta no cambia.
 export const VIEWS = Object.freeze({
-  gasolina: Object.freeze({ key: GASOLINA.key, label: 'Gasolina', products: GASOLINA.products, dataRoot: GASOLINA.dataRoot, history: true, priceUnit: null }),
-  diesel: Object.freeze({ key: DIESEL.key, label: 'Diésel', products: DIESEL.products, dataRoot: DIESEL.dataRoot, history: false, priceUnit: 'por galón' }),
-  glp: Object.freeze({ key: GLP.key, label: 'GLP', products: GLP.products, dataRoot: GLP.dataRoot, history: false, priceUnit: 'por galón' }),
-  gnv: Object.freeze({ key: GNV.key, label: 'GNV', products: GNV.products, dataRoot: GNV.dataRoot, history: false, priceUnit: 'por m³' }),
+  gasolina: Object.freeze({
+    key: GASOLINA.key,
+    label: 'Gasolina',
+    products: GASOLINA.products,
+    dataRoot: GASOLINA.dataRoot,
+    history: true,
+    priceUnit: null,
+  }),
+  diesel: Object.freeze({
+    key: DIESEL.key,
+    label: 'Diésel',
+    products: DIESEL.products,
+    dataRoot: DIESEL.dataRoot,
+    history: false,
+    priceUnit: 'por galón',
+  }),
+  glp: Object.freeze({
+    key: GLP.key,
+    label: 'GLP',
+    products: GLP.products,
+    dataRoot: GLP.dataRoot,
+    history: false,
+    priceUnit: 'por galón',
+  }),
+  gnv: Object.freeze({
+    key: GNV.key,
+    label: 'GNV',
+    products: GNV.products,
+    dataRoot: GNV.dataRoot,
+    history: false,
+    priceUnit: 'por m³',
+  }),
 });
 export const ACTIVE_VIEWS = Object.freeze(['gasolina', 'diesel', 'glp', 'gnv']);
 export const DEFAULT_VIEW = 'gasolina';

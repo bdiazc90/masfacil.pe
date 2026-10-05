@@ -25,9 +25,13 @@ export const FACILITO_LINK_SCHEME = 'facilito-link-v1';
  * extra («AV.» ≙ «AVENIDA», «N°» ≙ «NRO») convertiría una coincidencia exacta en
  * una interpretación, y entonces ya no sabríamos qué estamos afirmando.
  */
-export const normalizeLinkText = (value) => String(value ?? '')
-  .normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .toUpperCase().replace(/\s+/g, ' ').trim();
+export const normalizeLinkText = (value) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * La huella de una terna, o `null` si le falta alguna parte.
@@ -38,7 +42,11 @@ export const normalizeLinkText = (value) => String(value ?? '')
 export function facilitoLinkKey(legalName, address, district) {
   const partes = [legalName, address, district].map(normalizeLinkText);
   if (partes.some((parte) => parte === '')) return null;
-  return crypto.createHash('sha256').update(`${FACILITO_LINK_SCHEME}|${JSON.stringify(partes)}`).digest('hex').slice(0, 32);
+  return crypto
+    .createHash('sha256')
+    .update(`${FACILITO_LINK_SCHEME}|${JSON.stringify(partes)}`)
+    .digest('hex')
+    .slice(0, 32);
 }
 
 export const MAX_QUERY_AGE_MS = 24 * 3_600_000;
@@ -68,7 +76,10 @@ export function resolveFacilitoLayer({ state, linkKeys, product, now }) {
     // Una captura que ya venció no se publica: el cliente la rechazaría igual y
     // solo engordaría el bundle. Se conserva en el expediente con su hora
     // original, que es lo que el SPEC pide preservar.
-    if (!Number.isFinite(observado) || now - observado > MAX_QUERY_AGE_MS || now < observado) { expiradas += 1; continue; }
+    if (!Number.isFinite(observado) || now - observado > MAX_QUERY_AGE_MS || now < observado) {
+      expiradas += 1;
+      continue;
+    }
     for (const row of unidad.rows ?? []) vigentes.push({ ...row, observed_at: unidad.observed_at });
   }
 
@@ -88,9 +99,18 @@ export function resolveFacilitoLayer({ state, linkKeys, product, now }) {
   let unlinked = 0;
   for (const [key, filas] of porHuella) {
     const ofertas = ofertasPorHuella.get(key) ?? [];
-    if (filas.length > 1 || ofertas.length > 1) { ambiguous += 1; continue; }
-    if (ofertas.length === 0) { unlinked += 1; continue; }
+    if (filas.length > 1 || ofertas.length > 1) {
+      ambiguous += 1;
+      continue;
+    }
+    if (ofertas.length === 0) {
+      unlinked += 1;
+      continue;
+    }
     byOfferId.set(ofertas[0], { price: filas[0].price, observed_at: filas[0].observed_at, reported_at: null });
   }
-  return { byOfferId, counts: { rows: vigentes.length, linked: byOfferId.size, ambiguous, unlinked, expired_units: expiradas } };
+  return {
+    byOfferId,
+    counts: { rows: vigentes.length, linked: byOfferId.size, ambiguous, unlinked, expired_units: expiradas },
+  };
 }

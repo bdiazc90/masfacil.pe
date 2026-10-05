@@ -88,10 +88,24 @@ export async function observeHistory({ store, origin, summaryOnly = false, days,
       // merece mirarse, no acumularse en silencio.
       informe.ok = false;
       informe.contradictions = medidas.contradictions;
-      informe.problems.push(medidas.contradictions.length ? `el bundle publicado se contradice en ${medidas.contradictions.length} establecimiento(s)` : 'no se pudieron calcular las medias');
+      informe.problems.push(
+        medidas.contradictions.length
+          ? `el bundle publicado se contradice en ${medidas.contradictions.length} establecimiento(s)`
+          : 'no se pudieron calcular las medias',
+      );
     } else {
-      const observation = buildObservation({ observedAt, archiveHash: archivo.archive_hash, complete: archivo.complete, products: medidas.products });
-      const escrita = await putImmutable(store, observationKey(observation.local_date, observation.observation_id), `${JSON.stringify(observation)}\n`, { contentType: JSON_CONTENT_TYPE, cacheControl: IMMUTABLE_CACHE_CONTROL });
+      const observation = buildObservation({
+        observedAt,
+        archiveHash: archivo.archive_hash,
+        complete: archivo.complete,
+        products: medidas.products,
+      });
+      const escrita = await putImmutable(
+        store,
+        observationKey(observation.local_date, observation.observation_id),
+        `${JSON.stringify(observation)}\n`,
+        { contentType: JSON_CONTENT_TYPE, cacheControl: IMMUTABLE_CACHE_CONTROL },
+      );
       informe.observation = escrita.written ? 'new' : 'reused';
       informe.observation_id = observation.observation_id;
       informe.products = medidas.products;

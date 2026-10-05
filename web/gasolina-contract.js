@@ -6,7 +6,14 @@
 // service worker. Conserva su nombre porque el service worker anterior lo
 // importa así; `validBundleFor` sirve a cualquier grupo.
 
-import { GASOLINA_KEYS, GASOLINA_VERSIONS, GROUP_RULES, bundleErrors, datasetErrors, manifestErrors } from './lib/bundle-contract.js';
+import {
+  GASOLINA_KEYS,
+  GASOLINA_VERSIONS,
+  GROUP_RULES,
+  bundleErrors,
+  datasetErrors,
+  manifestErrors,
+} from './lib/bundle-contract.js';
 
 export { GASOLINA_KEYS, GASOLINA_VERSIONS };
 
@@ -24,7 +31,8 @@ export function validBundleFor(rules) {
     const bytes = new TextEncoder().encode(body);
     const descriptor = manifest?.products?.[key];
     // Si el tamaño ya no coincide, la huella no puede coincidir: no se calcula.
-    const sha256 = descriptor && bytes.length === descriptor.bytes ? hex(await crypto.subtle.digest('SHA-256', bytes)) : null;
+    const sha256 =
+      descriptor && bytes.length === descriptor.bytes ? hex(await crypto.subtle.digest('SHA-256', bytes)) : null;
     return rules.bundleErrors(manifest, key, body, { bytes: bytes.length, sha256 }).length === 0;
   };
 }

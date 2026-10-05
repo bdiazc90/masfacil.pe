@@ -46,9 +46,20 @@ const ETIQUETA = Object.freeze({
   conservada_del_catalogo_base: 'Marca conservada del catálogo publicado',
 });
 
-const leer = (nombre, fallback = null) => (fs.existsSync(path.join(identidad, nombre)) ? JSON.parse(fs.readFileSync(path.join(identidad, nombre), 'utf8')) : fallback);
-const escapar = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
-const sinTildes = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+const leer = (nombre, fallback = null) =>
+  fs.existsSync(path.join(identidad, nombre))
+    ? JSON.parse(fs.readFileSync(path.join(identidad, nombre), 'utf8'))
+    : fallback;
+const escapar = (value) =>
+  String(value ?? '').replace(
+    /[&<>"']/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
+  );
+const sinTildes = (value) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase();
 const misma = (a, b) => Boolean(a && b) && sinTildes(a) === sinTildes(b);
 
 const catalogo = leer('commercial-identity-catalog.json');
@@ -56,26 +67,52 @@ if (!catalogo) throw new Error('Falta commercial-identity-catalog.json; ejecuta 
 const archivoVeredictos = path.join(identidad, 'veredictos-marca.json');
 const veredictosGuardados = leer('veredictos-marca.json', { entradas: [] }).entradas ?? [];
 const evidencia = leer('brand-evidence.json', { entradas: {} }).entradas ?? {};
-const detalle = new Map((leer('brand-evidence-detalle.json', { aceptadas: [] }).aceptadas ?? []).map((x) => [x.establishment_id, x]));
-const nombreMaps = new Map((leer('matches.json', { resultados: [] }).resultados ?? []).map((x) => [x.establishment_id, x.nombre_maps]));
+const detalle = new Map(
+  (leer('brand-evidence-detalle.json', { aceptadas: [] }).aceptadas ?? []).map((x) => [x.establishment_id, x]),
+);
+const nombreMaps = new Map(
+  (leer('matches.json', { resultados: [] }).resultados ?? []).map((x) => [x.establishment_id, x.nombre_maps]),
+);
 
 // El CSV privado aporta dirección, razón social y el Street View: es lo que
 // convierte la revisión en observación y no en trámite.
 const sitios = new Map();
 if (fs.existsSync(path.join(identidad, 'establecimientos.csv'))) {
   const texto = fs.readFileSync(path.join(identidad, 'establecimientos.csv'), 'utf8').replace(/^﻿/, '');
-  let campo = ''; let fila = []; let comillas = false; const filas = [];
+  let campo = '';
+  let fila = [];
+  let comillas = false;
+  const filas = [];
   for (let index = 0; index < texto.length; index += 1) {
     const char = texto[index];
-    if (comillas) { if (char === '"') { if (texto[index + 1] === '"') { campo += '"'; index += 1; } else comillas = false; } else campo += char; }
-    else if (char === '"') comillas = true;
-    else if (char === ',') { fila.push(campo); campo = ''; }
-    else if (char === '\n') { fila.push(campo.replace(/\r$/, '')); filas.push(fila); fila = []; campo = ''; }
-    else campo += char;
+    if (comillas) {
+      if (char === '"') {
+        if (texto[index + 1] === '"') {
+          campo += '"';
+          index += 1;
+        } else comillas = false;
+      } else campo += char;
+    } else if (char === '"') comillas = true;
+    else if (char === ',') {
+      fila.push(campo);
+      campo = '';
+    } else if (char === '\n') {
+      fila.push(campo.replace(/\r$/, ''));
+      filas.push(fila);
+      fila = [];
+      campo = '';
+    } else campo += char;
   }
-  if (campo || fila.length) { fila.push(campo.replace(/\r$/, '')); filas.push(fila); }
+  if (campo || fila.length) {
+    fila.push(campo.replace(/\r$/, ''));
+    filas.push(fila);
+  }
   const cabecera = filas.shift();
-  for (const f of filas) if (f.length === cabecera.length) { const row = Object.fromEntries(cabecera.map((k, i) => [k, f[i]])); sitios.set(row.establishment_id, row); }
+  for (const f of filas)
+    if (f.length === cabecera.length) {
+      const row = Object.fromEntries(cabecera.map((k, i) => [k, f[i]]));
+      sitios.set(row.establishment_id, row);
+    }
 }
 
 /** Orden pseudoaleatorio pero estable: dos corridas dan la misma hoja. */
@@ -86,11 +123,24 @@ const estratoDe = (entry) => {
   if (entry.estrato) return entry.estrato;
   if (!entry.brand_evidence) return 'operador_del_registro';
   const propia = evidencia[entry.establishment_id];
-  return propia?.reference === entry.brand_evidence.reference ? (propia.estrato ?? 'distrito_declarado') : 'conservada_del_catalogo_base';
+  return propia?.reference === entry.brand_evidence.reference
+    ? (propia.estrato ?? 'distrito_declarado')
+    : 'conservada_del_catalogo_base';
 };
 // Otra marca en el nombre de Maps o en la razón social: el caso que más cuesta.
-const MARCAS = [['PRIMAX', 'Primax'], ['REPSOL', 'Repsol'], ['PECSA', 'Pecsa'], ['PETROPERU', 'Petroperú'], ['TERPEL', 'Terpel'], ['COESTI', 'Primax'], ['AVA', 'AVA']];
-const otraMarca = (texto, brand) => MARCAS.find(([palabra, marca]) => new RegExp(`\\b${palabra}\\b`).test(sinTildes(texto)) && !misma(marca, brand))?.[1] ?? null;
+const MARCAS = [
+  ['PRIMAX', 'Primax'],
+  ['REPSOL', 'Repsol'],
+  ['PECSA', 'Pecsa'],
+  ['PETROPERU', 'Petroperú'],
+  ['TERPEL', 'Terpel'],
+  ['COESTI', 'Primax'],
+  ['AVA', 'AVA'],
+];
+const otraMarca = (texto, brand) =>
+  MARCAS.find(
+    ([palabra, marca]) => new RegExp(`\\b${palabra}\\b`).test(sinTildes(texto)) && !misma(marca, brand),
+  )?.[1] ?? null;
 const choqueDe = (entry) => {
   const sitio = sitios.get(entry.establishment_id) ?? {};
   const enMaps = otraMarca(nombreMaps.get(entry.establishment_id), entry.brand);
@@ -106,10 +156,27 @@ const vigente = new Map(veredictosGuardados.map((x) => [x.id, x]));
 const nombreDeSede = new Map(catalogo.entries.map((entry) => [entry.establishment_id, entry.public_site_name]));
 // Lo mismo vale para un estrato que todavía no tiene muestra al azar.
 const choquesPendientes = (leer('brand-conflicts.json', { conflictos: [] }).conflictos ?? [])
-  .filter((conflicto) => ['choque_sin_revisar', 'estrato_sin_muestra'].includes(conflicto.motivo) && conflicto.propuesta)
-  .map((conflicto) => ({ establishment_id: conflicto.establishment_id, brand: conflicto.propuesta.brand, public_site_name: nombreDeSede.get(conflicto.establishment_id) ?? null, brand_evidence: { reference: conflicto.propuesta.reference }, estrato: conflicto.propuesta.estrato ?? 'distrito_declarado', choque: conflicto.motivo === 'choque_sin_revisar' ? conflicto.marcas.join(' ≠ ') : null }));
-const conMarca = [...catalogo.entries.filter((entry) => entry.brand && entry.publication.status === 'publishable' && entry.entity_link.status === 'verified'), ...choquesPendientes];
-const revisado = (entry) => { const v = vigente.get(entry.establishment_id); return v && (!v.marca || misma(v.marca, entry.brand)) ? v : null; };
+  .filter(
+    (conflicto) => ['choque_sin_revisar', 'estrato_sin_muestra'].includes(conflicto.motivo) && conflicto.propuesta,
+  )
+  .map((conflicto) => ({
+    establishment_id: conflicto.establishment_id,
+    brand: conflicto.propuesta.brand,
+    public_site_name: nombreDeSede.get(conflicto.establishment_id) ?? null,
+    brand_evidence: { reference: conflicto.propuesta.reference },
+    estrato: conflicto.propuesta.estrato ?? 'distrito_declarado',
+    choque: conflicto.motivo === 'choque_sin_revisar' ? conflicto.marcas.join(' ≠ ') : null,
+  }));
+const conMarca = [
+  ...catalogo.entries.filter(
+    (entry) => entry.brand && entry.publication.status === 'publishable' && entry.entity_link.status === 'verified',
+  ),
+  ...choquesPendientes,
+];
+const revisado = (entry) => {
+  const v = vigente.get(entry.establishment_id);
+  return v && (!v.marca || misma(v.marca, entry.brand)) ? v : null;
+};
 
 const muestra = [];
 const porEstrato = new Map();
@@ -118,17 +185,27 @@ for (const entry of [...conMarca].sort((a, b) => orden(a.establishment_id).local
   porEstrato.set(estrato, [...(porEstrato.get(estrato) ?? []), entry]);
 }
 const resumen = [];
-for (const [estrato, entradas] of [...porEstrato.entries()].sort(([a], [b]) => Object.keys(ETIQUETA).indexOf(a) - Object.keys(ETIQUETA).indexOf(b))) {
+for (const [estrato, entradas] of [...porEstrato.entries()].sort(
+  ([a], [b]) => Object.keys(ETIQUETA).indexOf(a) - Object.keys(ETIQUETA).indexOf(b),
+)) {
   // Lo ya revisado encabeza y no se vuelve a sortear: un error observado no se
   // borra cambiando la muestra.
   const hechas = entradas.filter(revisado);
   const riesgo = entradas.filter((entry) => !revisado(entry) && choqueDe(entry));
   const objetivo = OBJETIVO[estrato] ?? 0;
-  const azar = entradas.filter((entry) => !revisado(entry) && !choqueDe(entry)).slice(0, Math.max(0, Math.min(entradas.length, objetivo) - hechas.length));
+  const azar = entradas
+    .filter((entry) => !revisado(entry) && !choqueDe(entry))
+    .slice(0, Math.max(0, Math.min(entradas.length, objetivo) - hechas.length));
   for (const entry of hechas) muestra.push({ entry, estrato, motivo: revisado(entry).motivo ?? 'random_sample' });
   for (const entry of riesgo) muestra.push({ entry, estrato, motivo: 'risk_sample' });
   for (const entry of azar) muestra.push({ entry, estrato, motivo: 'random_sample' });
-  resumen.push({ estrato, poblacion: entradas.length, ya_revisadas: hechas.length, riesgo: riesgo.length, al_azar: azar.length });
+  resumen.push({
+    estrato,
+    poblacion: entradas.length,
+    ya_revisadas: hechas.length,
+    riesgo: riesgo.length,
+    al_azar: azar.length,
+  });
 }
 
 function tarjeta({ entry, estrato, motivo }) {
@@ -137,15 +214,19 @@ function tarjeta({ entry, estrato, motivo }) {
   const logo = brandAssetFor(entry);
   const [, , fichaNombre, fichaDireccion] = entry.brand_evidence?.reference.split(' · ') ?? [];
   const s = acreditacion?.señales;
-  const señales = s ? [
-    s.numero_de_puerta?.length ? `puerta ${s.numero_de_puerta.join(', ')}` : '',
-    s.via?.length ? `vía ${s.via.join(' ')}` : '',
-    s.manzana_lote?.length ? s.manzana_lote.join(' ') : '',
-    s.localidad?.length ? `localidad ${s.localidad.join(' ')}` : '',
-    s.nombre_en_razon_social?.length ? `nombre ≙ razón social (${s.nombre_en_razon_social.join(' ')})` : '',
-    s.operador_de_la_marca ? 'operador de la cadena' : '',
-    acreditacion.distancia_m !== null ? `${acreditacion.distancia_m} m` : 'sin coordenada útil',
-  ].filter(Boolean).join(' · ') : '';
+  const señales = s
+    ? [
+        s.numero_de_puerta?.length ? `puerta ${s.numero_de_puerta.join(', ')}` : '',
+        s.via?.length ? `vía ${s.via.join(' ')}` : '',
+        s.manzana_lote?.length ? s.manzana_lote.join(' ') : '',
+        s.localidad?.length ? `localidad ${s.localidad.join(' ')}` : '',
+        s.nombre_en_razon_social?.length ? `nombre ≙ razón social (${s.nombre_en_razon_social.join(' ')})` : '',
+        s.operador_de_la_marca ? 'operador de la cadena' : '',
+        acreditacion.distancia_m !== null ? `${acreditacion.distancia_m} m` : 'sin coordenada útil',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
   const choque = choqueDe(entry);
   const v = revisado(entry);
   return `<article class="c" data-id="${escapar(entry.establishment_id)}" data-marca="${escapar(entry.brand)}" data-estrato="${escapar(estrato)}" data-motivo="${escapar(motivo)}"${v ? ` data-v="${escapar(v.r)}"` : ''}>
@@ -195,7 +276,15 @@ header{display:flex;justify-content:space-between;margin-bottom:10px;font-size:1
 <h1>¿Esta estación lleva esa marca?</h1>
 <p class="sub">Muestra por estrato de ${muestra.length} de ${conMarca.length} estaciones con marca. La pregunta es solo por la <b>bandera del letrero</b>, no por el nombre de sede. Se guarda solo al pulsar; no hay que copiar nada.</p>
 <div class="bar"><b id="prog">0/${muestra.length}</b> <span id="res"></span><span id="estado"></span></div>
-${[...new Set(muestra.map((item) => item.estrato))].map((estrato) => `<h2>${escapar(ETIQUETA[estrato] ?? estrato)}</h2>${muestra.filter((item) => item.estrato === estrato).map(tarjeta).join('')}`).join('')}
+${[...new Set(muestra.map((item) => item.estrato))]
+  .map(
+    (estrato) =>
+      `<h2>${escapar(ETIQUETA[estrato] ?? estrato)}</h2>${muestra
+        .filter((item) => item.estrato === estrato)
+        .map(tarjeta)
+        .join('')}`,
+  )
+  .join('')}
 <script>
 const K=${JSON.stringify(clave)};
 const v={};
@@ -237,7 +326,9 @@ pintar();
 
 const destino = path.join(identidad, 'brand-sample.html');
 fs.writeFileSync(destino, html, { mode: 0o600 });
-process.stdout.write(`${JSON.stringify({ hoja: path.relative(root, destino), catalogo: catalogo.catalog_id, muestra: muestra.length, poblacion: conMarca.length, estratos: resumen }, null, 2)}\n`);
+process.stdout.write(
+  `${JSON.stringify({ hoja: path.relative(root, destino), catalogo: catalogo.catalog_id, muestra: muestra.length, poblacion: conMarca.length, estratos: resumen }, null, 2)}\n`,
+);
 
 if (process.argv.includes('--serve')) {
   const http = await import('node:http');
@@ -245,37 +336,70 @@ if (process.argv.includes('--serve')) {
   const servidor = http.createServer((peticion, respuesta) => {
     if (peticion.method === 'POST' && peticion.url === '/guardar') {
       let cuerpo = '';
-      peticion.on('data', (trozo) => { cuerpo += trozo; if (cuerpo.length > 400_000) peticion.destroy(); });
+      peticion.on('data', (trozo) => {
+        cuerpo += trozo;
+        if (cuerpo.length > 400_000) peticion.destroy();
+      });
       peticion.on('end', () => {
         try {
           const { entradas } = JSON.parse(cuerpo);
           if (!Array.isArray(entradas)) throw new Error('entradas inválidas');
           for (const item of entradas) {
-            if (!enHoja.has(item?.id) || !['verified', 'incorrect', 'pending'].includes(item?.r)) throw new Error('veredicto inválido');
+            if (!enHoja.has(item?.id) || !['verified', 'incorrect', 'pending'].includes(item?.r))
+              throw new Error('veredicto inválido');
             if (!['random_sample', 'risk_sample'].includes(item?.motivo)) throw new Error('motivo inválido');
           }
           // Se reemplaza solo lo que está en esta hoja: un veredicto anterior sobre
           // una estación que ya no aparece no se pierde por guardar otra muestra.
-          const previos = (fs.existsSync(archivoVeredictos) ? JSON.parse(fs.readFileSync(archivoVeredictos, 'utf8')).entradas ?? [] : []).filter((item) => !enHoja.has(item.id));
-          fs.writeFileSync(archivoVeredictos, `${JSON.stringify({ revisado_en: new Date().toISOString(), catalogo: catalogo.catalog_id, entradas: [...previos, ...entradas] }, null, 2)}\n`, { mode: 0o600 });
-          process.stdout.write(`  ${entradas.length} veredicto(s) de esta hoja guardados (${previos.length} anteriores conservados) en ${path.relative(root, archivoVeredictos)}\n`);
+          const previos = (
+            fs.existsSync(archivoVeredictos)
+              ? (JSON.parse(fs.readFileSync(archivoVeredictos, 'utf8')).entradas ?? [])
+              : []
+          ).filter((item) => !enHoja.has(item.id));
+          fs.writeFileSync(
+            archivoVeredictos,
+            `${JSON.stringify({ revisado_en: new Date().toISOString(), catalogo: catalogo.catalog_id, entradas: [...previos, ...entradas] }, null, 2)}\n`,
+            { mode: 0o600 },
+          );
+          process.stdout.write(
+            `  ${entradas.length} veredicto(s) de esta hoja guardados (${previos.length} anteriores conservados) en ${path.relative(root, archivoVeredictos)}\n`,
+          );
           respuesta.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}');
-        } catch (error) { respuesta.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify({ error: error.message })); }
+        } catch (error) {
+          respuesta
+            .writeHead(400, { 'content-type': 'application/json' })
+            .end(JSON.stringify({ error: error.message }));
+        }
       });
       return;
     }
-    if (peticion.method !== 'GET') { respuesta.writeHead(405).end(); return; }
+    if (peticion.method !== 'GET') {
+      respuesta.writeHead(405).end();
+      return;
+    }
     const logo = peticion.url.match(/^\/logo\/([a-z0-9][a-z0-9-]*\.svg)$/);
     if (logo) {
       const archivoLogo = path.join(root, 'web', 'icons', 'brands', logo[1]);
-      if (!fs.existsSync(archivoLogo)) { respuesta.writeHead(404).end(); return; }
+      if (!fs.existsSync(archivoLogo)) {
+        respuesta.writeHead(404).end();
+        return;
+      }
       respuesta.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'no-store' });
       respuesta.end(fs.readFileSync(archivoLogo));
       return;
     }
-    if (!['/', '/index.html'].includes(peticion.url)) { respuesta.writeHead(404).end('No encontrado'); return; }
-    respuesta.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' });
+    if (!['/', '/index.html'].includes(peticion.url)) {
+      respuesta.writeHead(404).end('No encontrado');
+      return;
+    }
+    respuesta.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-robots-tag': 'noindex, nofollow',
+    });
     respuesta.end(fs.readFileSync(destino));
   });
-  servidor.listen(PUERTO, '127.0.0.1', () => process.stdout.write(`\nRevisión de bandera en http://127.0.0.1:${PUERTO}  ·  Ctrl+C para cerrar\n`));
+  servidor.listen(PUERTO, '127.0.0.1', () =>
+    process.stdout.write(`\nRevisión de bandera en http://127.0.0.1:${PUERTO}  ·  Ctrl+C para cerrar\n`),
+  );
 }

@@ -14,20 +14,35 @@ import { nodeContract } from './gasolina-contract.mjs';
 // Actividades del CSV que cuentan como venta al público, con su código en el
 // Registro. Son las que filtra la semilla (`bootstrap/seed.manifest.json`): una
 // actividad fuera de ella no tiene con qué cruzarse.
-const ESTACIONES = Object.freeze({ 'ESTACIÓN DE SERVICIOS / GRIFOS': '01', 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GNV': '05', 'EE.SS con GLP y GNV': '06' });
+const ESTACIONES = Object.freeze({
+  'ESTACIÓN DE SERVICIOS / GRIFOS': '01',
+  'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02',
+  'EE.SS con GNV': '05',
+  'EE.SS con GLP y GNV': '06',
+});
 
 // Las que venden GLP a granel a vehículos, según el CSV de GLP: las estaciones
 // con gasocentro (Registro 02 y 06, capa GIS 35) y los gasocentros (Registro 15,
 // capa 36), con o sin GNV. Las plantas envasadoras también reportan `GLP - G` en
 // galones, pero venden a agentes, no a conductores, y quedan fuera.
-const GASOCENTROS = Object.freeze({ 'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02', 'EE.SS con GLP y GNV': '06', 'GASOCENTROS DE GLP': '15', 'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15' });
+const GASOCENTROS = Object.freeze({
+  'ESTACIÓN DE SERVICIO CON GASOCENTRO DE GLP': '02',
+  'EE.SS con GLP y GNV': '06',
+  'GASOCENTROS DE GLP': '15',
+  'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15',
+});
 
 // Las que venden GNV comprimido al público, según el CSV de líquidos: las
 // estaciones con GNV (Registro 05 y 06, capa GIS 35), los gasocentros de GLP con
 // venta de GNV (15) y los establecimientos de venta al público de GNV (59), estos
 // dos en la capa 36. La «Estación de carga de GNC» reporta en galones y queda
 // fuera, igual que el licuefactado, que se vende por kilo.
-const VENTA_GNV = Object.freeze({ 'EE.SS con GNV': '05', 'EE.SS con GLP y GNV': '06', 'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15', 'ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '59' });
+const VENTA_GNV = Object.freeze({
+  'EE.SS con GNV': '05',
+  'EE.SS con GLP y GNV': '06',
+  'GASOCENTRO DE GLP CON ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '15',
+  'ESTABLECIMIENTO DE VENTA AL PUBLICO DE GNV': '59',
+});
 
 /**
  * Lo que cada grupo necesita para proyectarse, compararse y recuperarse.
@@ -75,7 +90,12 @@ export const GROUP_CONFIG = Object.freeze({
         audited: Object.freeze({
           source_max_reported_at: '2026-09-24T04:59:31.000Z',
           products: Object.freeze({
-            diesel: Object.freeze({ fresh_0_30_days: Object.freeze({ offers: 752, districts: 43 }), contract_ready: Object.freeze({ offers: 714, districts: 43 }), coverage_percent: 94.947, published: Object.freeze({ offers: 732, districts: 43 }) }),
+            diesel: Object.freeze({
+              fresh_0_30_days: Object.freeze({ offers: 752, districts: 43 }),
+              contract_ready: Object.freeze({ offers: 714, districts: 43 }),
+              coverage_percent: 94.947,
+              published: Object.freeze({ offers: 732, districts: 43 }),
+            }),
           }),
         }),
         maxDistrictLoss: 2,
@@ -86,7 +106,7 @@ export const GROUP_CONFIG = Object.freeze({
   // salen del catálogo, como los de Diésel. Aquí queda lo de operación.
   glp: Object.freeze({
     source: 'glp-current',
-    gisLayers: Object.freeze({ '02': '35', '06': '35', '15': '36' }),
+    gisLayers: Object.freeze({ '02': '35', '06': '35', 15: '36' }),
     clientType: 'Usuario Final',
     activities: GASOCENTROS,
     idScheme: Object.freeze({ prefix: 'glp1_', namespace: 'masfacil-pe|glp-v1' }),
@@ -104,7 +124,12 @@ export const GROUP_CONFIG = Object.freeze({
         audited: Object.freeze({
           source_max_reported_at: '2026-09-24T04:59:31.000Z',
           products: Object.freeze({
-            glp: Object.freeze({ fresh_0_30_days: Object.freeze({ offers: 449, districts: 41 }), contract_ready: Object.freeze({ offers: 415, districts: 41 }), coverage_percent: 92.428, published: Object.freeze({ offers: 425, districts: 41 }) }),
+            glp: Object.freeze({
+              fresh_0_30_days: Object.freeze({ offers: 449, districts: 41 }),
+              contract_ready: Object.freeze({ offers: 415, districts: 41 }),
+              coverage_percent: 92.428,
+              published: Object.freeze({ offers: 425, districts: 41 }),
+            }),
           }),
         }),
         maxDistrictLoss: 2,
@@ -115,7 +140,7 @@ export const GROUP_CONFIG = Object.freeze({
   // activación se compone sobre el de Gasolina, como la de Diésel.
   gnv: Object.freeze({
     source: 'liquid-current',
-    gisLayers: Object.freeze({ '05': '35', '06': '35', '15': '36', '59': '36' }),
+    gisLayers: Object.freeze({ '05': '35', '06': '35', 15: '36', 59: '36' }),
     clientType: null,
     activities: VENTA_GNV,
     idScheme: Object.freeze({ prefix: 'gnv1_', namespace: 'masfacil-pe|gnv-v1' }),
@@ -133,7 +158,12 @@ export const GROUP_CONFIG = Object.freeze({
         audited: Object.freeze({
           source_max_reported_at: '2026-09-24T04:59:31.000Z',
           products: Object.freeze({
-            gnv: Object.freeze({ fresh_0_30_days: Object.freeze({ offers: 238, districts: 36 }), contract_ready: Object.freeze({ offers: 212, districts: 36 }), coverage_percent: 89.076, published: Object.freeze({ offers: 244, districts: 36 }) }),
+            gnv: Object.freeze({
+              fresh_0_30_days: Object.freeze({ offers: 238, districts: 36 }),
+              contract_ready: Object.freeze({ offers: 212, districts: 36 }),
+              coverage_percent: 89.076,
+              published: Object.freeze({ offers: 244, districts: 36 }),
+            }),
           }),
         }),
         maxDistrictLoss: 2,
@@ -148,13 +178,23 @@ export function describeGroup(key) {
   const rules = GROUP_RULES[key];
   const config = GROUP_CONFIG[key];
   if (!grupo || !rules || !config) throw new Error(`Grupo sin catálogo, contrato o configuración: ${key}`);
-  return Object.freeze({ key, dataRoot: grupo.dataRoot, products: grupo.products, scope: grupo.scope, rules, validate: nodeContract(rules), config });
+  return Object.freeze({
+    key,
+    dataRoot: grupo.dataRoot,
+    products: grupo.products,
+    scope: grupo.scope,
+    rules,
+    validate: nodeContract(rules),
+    config,
+  });
 }
 
-export const PUBLISHED_GROUPS = Object.freeze(ACTIVE_VIEWS.map((key) => {
-  if (!GROUP_RULES[key]) throw new Error(`Vista activa sin contrato de publicación: ${key}`);
-  return describeGroup(key);
-}));
+export const PUBLISHED_GROUPS = Object.freeze(
+  ACTIVE_VIEWS.map((key) => {
+    if (!GROUP_RULES[key]) throw new Error(`Vista activa sin contrato de publicación: ${key}`);
+    return describeGroup(key);
+  }),
+);
 
 export const groupByKey = (key) => PUBLISHED_GROUPS.find((grupo) => grupo.key === key) ?? null;
 
@@ -168,17 +208,36 @@ export function configuredGroup(key) {
   const config = GROUP_CONFIG[key];
   if (!config) throw new Error(`Grupo sin configuración: ${key}`);
   if (GROUPS[key] && GROUP_RULES[key]) return describeGroup(key);
-  return Object.freeze({ key, dataRoot: null, products: config.products, scope: config.scope, rules: null, validate: null, config, private: true });
+  return Object.freeze({
+    key,
+    dataRoot: null,
+    products: config.products,
+    scope: config.scope,
+    rules: null,
+    validate: null,
+    config,
+    private: true,
+  });
 }
 
 /** Todos los grupos que el refresco adquiere y juzga: los publicados y los privados. */
 export const CONFIGURED_GROUPS = Object.freeze(Object.keys(GROUP_CONFIG).map(configuredGroup));
 
 /** Los grupos que salen de una fuente, en el orden de la configuración. */
-export const groupsOfSource = (sourceId, groups = CONFIGURED_GROUPS) => groups.filter((grupo) => grupo.config.source === sourceId);
+export const groupsOfSource = (sourceId, groups = CONFIGURED_GROUPS) =>
+  groups.filter((grupo) => grupo.config.source === sourceId);
 
 /** Lo que el constructor de productos necesita de un grupo. */
-export const productGroup = (grupo) => ({ key: grupo.key, products: grupo.products, activities: grupo.config.activities, scope: grupo.scope, idScheme: grupo.config.idScheme, gisLayers: grupo.config.gisLayers, clientType: grupo.config.clientType, productDefinitions: grupo.config.productDefinitions });
+export const productGroup = (grupo) => ({
+  key: grupo.key,
+  products: grupo.products,
+  activities: grupo.config.activities,
+  scope: grupo.scope,
+  idScheme: grupo.config.idScheme,
+  gisLayers: grupo.config.gisLayers,
+  clientType: grupo.config.clientType,
+  productDefinitions: grupo.config.productDefinitions,
+});
 
 /**
  * Cómo se cachean los datos de cada grupo, en el formato de `web/_headers`. El

@@ -12,8 +12,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argumentos = process.argv.slice(2);
 const bandera = argumentos.indexOf('--group');
 const grupo = bandera >= 0 ? argumentos[bandera + 1] : 'gasolina';
-const posicionales = bandera >= 0 ? argumentos.filter((_, indice) => indice !== bandera && indice !== bandera + 1) : argumentos;
+const posicionales =
+  bandera >= 0 ? argumentos.filter((_, indice) => indice !== bandera && indice !== bandera + 1) : argumentos;
 const [snapshotId, revisionId = null] = posicionales;
-if (!snapshotId || !grupo) throw new Error('Uso: npm run rollback -- <snapshot-id> [<revision-id>] [--group gasolina|diesel|glp|gnv]');
+if (!snapshotId || !grupo)
+  throw new Error('Uso: npm run rollback -- <snapshot-id> [<revision-id>] [--group gasolina|diesel|glp|gnv]');
 
 process.stdout.write(`${JSON.stringify(await rollbackGroup({ root, group: grupo, snapshotId, revisionId }))}\n`);

@@ -52,7 +52,14 @@ export const FACILITO_PRODUCTS = Object.freeze([
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
 // La de GLP no dice la unidad en la cabecera del precio: la trae en una sexta
 // columna, que tiene que decir galones en cada fila.
-const CABECERAS_GLP = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles)', 'Unidad de Medida'];
+const CABECERAS_GLP = [
+  'Distrito',
+  'Establecimiento',
+  'Dirección',
+  'Teléfono',
+  'Precio de Venta (Soles)',
+  'Unidad de Medida',
+];
 // La de GNV dice la unidad en la cabecera del precio, como la automotora, pero en
 // metros cúbicos.
 const CABECERAS_GNV = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles/m3)'];
@@ -64,11 +71,32 @@ const CABECERAS_GNV = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono',
  * select.
  */
 export const FACILITO_PAGES = Object.freeze({
-  automotor: Object.freeze({ key: 'automotor', url: FACILITO_URL, tabla: 'tblPreciosAutomotor', cabeceras: Object.freeze(CABECERAS), unidad: null, productoFijo: false }),
-  granel_glp: Object.freeze({ key: 'granel_glp', url: FACILITO_GLP_URL, tabla: 'tblPreciosAGranelGlp', cabeceras: Object.freeze(CABECERAS_GLP), unidad: 'Galones', productoFijo: true }),
+  automotor: Object.freeze({
+    key: 'automotor',
+    url: FACILITO_URL,
+    tabla: 'tblPreciosAutomotor',
+    cabeceras: Object.freeze(CABECERAS),
+    unidad: null,
+    productoFijo: false,
+  }),
+  granel_glp: Object.freeze({
+    key: 'granel_glp',
+    url: FACILITO_GLP_URL,
+    tabla: 'tblPreciosAGranelGlp',
+    cabeceras: Object.freeze(CABECERAS_GLP),
+    unidad: 'Galones',
+    productoFijo: true,
+  }),
   // El comprimido ya viene elegido: elegirlo otra vez no recarga la tabla, así
   // que se lee como fijo y se comprueba el código y la etiqueta de la opción.
-  gnv: Object.freeze({ key: 'gnv', url: FACILITO_GNV_URL, tabla: 'tblPreciosGnv', cabeceras: Object.freeze(CABECERAS_GNV), unidad: null, productoFijo: true }),
+  gnv: Object.freeze({
+    key: 'gnv',
+    url: FACILITO_GNV_URL,
+    tabla: 'tblPreciosGnv',
+    cabeceras: Object.freeze(CABECERAS_GNV),
+    unidad: null,
+    productoFijo: true,
+  }),
 });
 
 // Presupuestos declarados. La medición del piloto es de ~11 s por distrito con
@@ -93,8 +121,19 @@ const OPEN_TIMEOUT_MS = 45_000;
 const MAX_FILAS = 400;
 const INTENTOS_POR_DISTRITO = 3;
 
-export const norm = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
-export const precio = (v) => { const m = String(v ?? '').trim().match(/^(?:S\/\s*)?(\d+(?:[.,]\d{1,4})?)$/); return m ? Number(m[1].replace(',', '.')) : NaN; };
+export const norm = (v) =>
+  String(v ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+export const precio = (v) => {
+  const m = String(v ?? '')
+    .trim()
+    .match(/^(?:S\/\s*)?(\d+(?:[.,]\d{1,4})?)$/);
+  return m ? Number(m[1].replace(',', '.')) : NaN;
+};
 
 const RECHAZO = (pagina) => `
   const txt = (e) => (e?.innerText || e?.textContent || '').replace(/\\s+/g, ' ').trim();
@@ -144,13 +183,26 @@ const TABLA = (pagina) => `(() => {${RECHAZO(pagina)}
  * código con esa etiqueta: la tabla no tiene columna de producto y su cabecera
  * es la misma para todos, así que es la única prueba de qué se está leyendo.
  */
-export function parseTabla(payload, distritoNombre, { conTexto = false, producto = null, pagina = FACILITO_PAGES.automotor } = {}) {
+export function parseTabla(
+  payload,
+  distritoNombre,
+  { conTexto = false, producto = null, pagina = FACILITO_PAGES.automotor } = {},
+) {
   if (payload?.rechazo) return { ok: false, razon: payload.rechazo };
   if (payload?.estado !== 'ok') return { ok: false, razon: payload?.estado ?? 'sin_respuesta' };
-  if (producto && (payload.seleccion?.valor !== producto.codigo || norm(payload.seleccion?.texto) !== norm(producto.etiqueta))) return { ok: false, razon: 'producto_no_coincide' };
+  if (
+    producto &&
+    (payload.seleccion?.valor !== producto.codigo || norm(payload.seleccion?.texto) !== norm(producto.etiqueta))
+  )
+    return { ok: false, razon: 'producto_no_coincide' };
   const cabeceras = pagina.cabeceras;
-  const cab = (payload.cabeceras ?? []).map((c) => String(c ?? '').replace(/\s+/g, ' ').trim());
-  if (cab.length !== cabeceras.length || cab.some((c, i) => c !== cabeceras[i])) return { ok: false, razon: 'cabeceras_desconocidas' };
+  const cab = (payload.cabeceras ?? []).map((c) =>
+    String(c ?? '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
+  if (cab.length !== cabeceras.length || cab.some((c, i) => c !== cabeceras[i]))
+    return { ok: false, razon: 'cabeceras_desconocidas' };
   const filas = [];
   for (const c of payload.filas ?? []) {
     if (!Array.isArray(c) || c.length !== cabeceras.length) return { ok: false, razon: 'fila_con_forma_inesperada' };
@@ -162,10 +214,15 @@ export function parseTabla(payload, distritoNombre, { conTexto = false, producto
     // c[3] es el teléfono: se valida por posición y no se emite nunca. El nombre
     // y la dirección se convierten en huella; solo una corrida de evidencia,
     // local y explícita, los conserva para poder revisar la muestra a ojo.
-    filas.push({ key_hash: facilitoLinkKey(c[1], c[2], c[0]), precio: p, ...(conTexto ? { establecimiento: c[1], direccion: c[2] } : {}) });
+    filas.push({
+      key_hash: facilitoLinkKey(c[1], c[2], c[0]),
+      precio: p,
+      ...(conTexto ? { establecimiento: c[1], direccion: c[2] } : {}),
+    });
   }
   if (payload.completo !== true) return { ok: false, razon: 'extraccion_incompleta' };
-  if (Number.isInteger(payload.total) && payload.total !== filas.length) return { ok: false, razon: 'total_no_coincide' };
+  if (Number.isInteger(payload.total) && payload.total !== filas.length)
+    return { ok: false, razon: 'total_no_coincide' };
   return { ok: true, filas, total: payload.total, firma: payload.firma ?? '' };
 }
 
@@ -176,31 +233,67 @@ export function resolverDistrito(distritos, consulta) {
   if (exactos.length === 1) return { ok: true, distrito: exactos[0] };
   if (exactos.length > 1) return { ok: false, razon: 'distrito_ambiguo', candidatos: exactos.map((d) => d.nombre) };
   const cerca = distritos.filter((d) => q && (norm(d.nombre).includes(q) || q.includes(norm(d.nombre))));
-  return { ok: false, razon: 'distrito_desconocido', candidatos: (cerca.length ? cerca : distritos).map((d) => d.nombre).slice(0, 12) };
+  return {
+    ok: false,
+    razon: 'distrito_desconocido',
+    candidatos: (cerca.length ? cerca : distritos).map((d) => d.nombre).slice(0, 12),
+  };
 }
 
 export class Fallo extends Error {
-  constructor(codigo, etapa, detalle = null) { super(codigo); this.codigo = codigo; this.etapa = etapa; this.detalle = detalle; }
+  constructor(codigo, etapa, detalle = null) {
+    super(codigo);
+    this.codigo = codigo;
+    this.etapa = etapa;
+    this.detalle = detalle;
+  }
   /** El sitio devuelve al buscador o corta la conexión de forma intermitente. */
-  get reintentable() { return ['timeout_de_comando', 'comando_fallido', 'eval_ilegible', 'sin_tabla', 'sin_respuesta', 'distrito_no_coincide', 'cabeceras_desconocidas'].includes(this.codigo); }
+  get reintentable() {
+    return [
+      'timeout_de_comando',
+      'comando_fallido',
+      'eval_ilegible',
+      'sin_tabla',
+      'sin_respuesta',
+      'distrito_no_coincide',
+      'cabeceras_desconocidas',
+    ].includes(this.codigo);
+  }
   /** Un rechazo explícito no se reintenta ni con otro distrito: se para todo. */
-  get bloqueo() { return ['rechazo_http', 'desafio_o_rechazo'].includes(this.codigo); }
+  get bloqueo() {
+    return ['rechazo_http', 'desafio_o_rechazo'].includes(this.codigo);
+  }
 }
 
 /** Una sesión de navegador. Se inyecta para poder recorrer el flujo sin navegador. */
 export function agentBrowserSession({ cwd, session }) {
-  return (args, { ms = TIMEOUT_MS } = {}) => execFileSync('agent-browser', ['--session', session, ...args], {
-    cwd, encoding: 'utf8', timeout: ms, maxBuffer: 8 * 1024 * 1024, shell: false, stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  return (args, { ms = TIMEOUT_MS } = {}) =>
+    execFileSync('agent-browser', ['--session', session, ...args], {
+      cwd,
+      encoding: 'utf8',
+      timeout: ms,
+      maxBuffer: 8 * 1024 * 1024,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
 }
 
 function controlador(ejecutar, restante, pagina) {
   const cmd = (args, etapa, { ms = TIMEOUT_MS, presupuesto = true } = {}) => {
     const queda = restante();
     if (presupuesto && queda <= 0) throw new Fallo('presupuesto_agotado', etapa);
-    try { return ejecutar(args, { ms: presupuesto ? Math.min(ms, queda) : ms }); } catch (error) {
-      const detalle = String(error?.stderr || error?.message || '').replace(/\s+/g, ' ').trim().slice(0, 200);
-      throw new Fallo(error?.killed || error?.code === 'ETIMEDOUT' ? 'timeout_de_comando' : 'comando_fallido', etapa, detalle || null);
+    try {
+      return ejecutar(args, { ms: presupuesto ? Math.min(ms, queda) : ms });
+    } catch (error) {
+      const detalle = String(error?.stderr || error?.message || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200);
+      throw new Fallo(
+        error?.killed || error?.code === 'ETIMEDOUT' ? 'timeout_de_comando' : 'comando_fallido',
+        etapa,
+        detalle || null,
+      );
     }
   };
   const evaluar = (script, etapa) => {
@@ -209,7 +302,9 @@ function controlador(ejecutar, restante, pagina) {
       const valor = JSON.parse(salida);
       if (valor?.data && Object.hasOwn(valor.data, 'result')) return valor.data.result;
       return valor && Object.hasOwn(valor, 'result') ? valor.result : valor;
-    } catch { throw new Fallo('eval_ilegible', etapa); }
+    } catch {
+      throw new Fallo('eval_ilegible', etapa);
+    }
   };
   const sondear = (etapa, conDistritos = false) => {
     const r = evaluar(SONDA(pagina, conDistritos), etapa);
@@ -218,7 +313,14 @@ function controlador(ejecutar, restante, pagina) {
   };
   const aplicar = ({ selector, espera, valor, siguiente, previo, etapa, conDistritos }) => {
     cmd(['select', selector, valor], etapa);
-    cmd(['wait', '--fn', `(() => { const s = document.querySelector(${JSON.stringify(espera ?? selector)}); return !!s && s.value === ${JSON.stringify(valor)} && !!document.getElementById('g-recaptcha-response')?.value && !!document.querySelector(${JSON.stringify(siguiente)}) && performance.timeOrigin !== ${Number(previo)}; })()`], etapa);
+    cmd(
+      [
+        'wait',
+        '--fn',
+        `(() => { const s = document.querySelector(${JSON.stringify(espera ?? selector)}); return !!s && s.value === ${JSON.stringify(valor)} && !!document.getElementById('g-recaptcha-response')?.value && !!document.querySelector(${JSON.stringify(siguiente)}) && performance.timeOrigin !== ${Number(previo)}; })()`,
+      ],
+      etapa,
+    );
     return sondear(etapa, conDistritos);
   };
   return { cmd, evaluar, sondear, aplicar };
@@ -241,7 +343,15 @@ function controlador(ejecutar, restante, pagina) {
  *   persiste en el expediente ni se imprime.
  * @returns {{units: object[], districts: object[], blocked: object|null, elapsed_ms: number, passes: object[]}}
  */
-export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(), budgetMs = null, soloDistritos = null, soloProductos = null, conTexto = false } = {}) {
+export function capturarLima({
+  ejecutar,
+  log = () => {},
+  now = () => new Date(),
+  budgetMs = null,
+  soloDistritos = null,
+  soloProductos = null,
+  conTexto = false,
+} = {}) {
   const inicioMs = Date.now();
   const units = [];
   const passes = [];
@@ -249,20 +359,37 @@ export function capturarLima({ ejecutar, log = () => {}, now = () => new Date(),
   let catalogo = [];
   try {
     for (const pasada of FACILITO_PASSES) {
-      const productos = FACILITO_PRODUCTS.filter((p) => pasada.products.includes(p.key) && (!soloProductos || soloProductos.includes(p.key)));
+      const productos = FACILITO_PRODUCTS.filter(
+        (p) => pasada.products.includes(p.key) && (!soloProductos || soloProductos.includes(p.key)),
+      );
       if (!productos.length) continue;
-      if (new Set(productos.map((p) => p.pagina)).size !== 1) throw new Error(`La pasada ${pasada.name} mezcla páginas del buscador`);
+      if (new Set(productos.map((p) => p.pagina)).size !== 1)
+        throw new Error(`La pasada ${pasada.name} mezcla páginas del buscador`);
       const presupuesto = budgetMs === null ? pasada.budgetMs : Math.min(budgetMs, pasada.budgetMs);
-      log(`Pasada ${pasada.name}: ${productos.map((p) => p.key).join(', ')} · presupuesto ${Math.round(presupuesto / 1000)} s`);
+      log(
+        `Pasada ${pasada.name}: ${productos.map((p) => p.key).join(', ')} · presupuesto ${Math.round(presupuesto / 1000)} s`,
+      );
       const resultado = recorrerLima({ ejecutar, log, now, productos, budgetMs: presupuesto, soloDistritos, conTexto });
       units.push(...resultado.units);
       if (resultado.districts.length) catalogo = resultado.districts;
-      passes.push({ name: pasada.name, products: productos.map((p) => p.key), elapsed_ms: resultado.elapsed_ms, blocked: resultado.blocked });
+      passes.push({
+        name: pasada.name,
+        products: productos.map((p) => p.key),
+        elapsed_ms: resultado.elapsed_ms,
+        blocked: resultado.blocked,
+      });
       // Un rechazo explícito no se esquiva cambiando de producto.
-      if (resultado.blocked) { bloqueo = resultado.blocked; break; }
+      if (resultado.blocked) {
+        bloqueo = resultado.blocked;
+        break;
+      }
     }
   } finally {
-    try { ejecutar(['close'], { ms: 5_000 }); } catch { /* la sesión se cierra sola al terminar */ }
+    try {
+      ejecutar(['close'], { ms: 5_000 });
+    } catch {
+      /* la sesión se cierra sola al terminar */
+    }
   }
   return { units, districts: catalogo, blocked: bloqueo, elapsed_ms: Date.now() - inicioMs, passes };
 }
@@ -281,10 +408,31 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
   const cascadaHastaDistritos = () => {
     const { cmd, sondear, aplicar } = control;
     cmd(['open', pagina.url], 'abrir', { ms: OPEN_TIMEOUT_MS });
-    cmd(['wait', '--fn', "!!document.querySelector('select#departmento') && !!document.getElementById('g-recaptcha-response')?.value"], 'formulario');
+    cmd(
+      [
+        'wait',
+        '--fn',
+        "!!document.querySelector('select#departmento') && !!document.getElementById('g-recaptcha-response')?.value",
+      ],
+      'formulario',
+    );
     let t = sondear('formulario').t;
-    t = aplicar({ selector: '#departmento', espera: '#departmento,select[name=departamentoAux]', valor: DEPARTAMENTO.codigo, siguiente: 'select[name=provincia]', previo: t, etapa: 'departamento' }).t;
-    const provincia = aplicar({ selector: 'select[name=provincia]', valor: PROVINCIA.codigo, siguiente: 'select[name=distrito]', previo: t, etapa: 'provincia', conDistritos: true });
+    t = aplicar({
+      selector: '#departmento',
+      espera: '#departmento,select[name=departamentoAux]',
+      valor: DEPARTAMENTO.codigo,
+      siguiente: 'select[name=provincia]',
+      previo: t,
+      etapa: 'departamento',
+    }).t;
+    const provincia = aplicar({
+      selector: 'select[name=provincia]',
+      valor: PROVINCIA.codigo,
+      siguiente: 'select[name=distrito]',
+      previo: t,
+      etapa: 'provincia',
+      conDistritos: true,
+    });
     return { t: provincia.t, catalogo: provincia.distritos ?? [] };
   };
 
@@ -294,7 +442,13 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
   // porque si el sitio devolvió al buscador ya no sabemos qué estamos leyendo.
   const recorrerDistrito = (distrito, previo) => {
     const leidas = [];
-    let t = control.aplicar({ selector: 'select[name=distrito]', valor: distrito.codigo, siguiente: 'select[name=producto]', previo, etapa: `distrito_${distrito.codigo}` }).t;
+    let t = control.aplicar({
+      selector: 'select[name=distrito]',
+      valor: distrito.codigo,
+      siguiente: 'select[name=producto]',
+      previo,
+      etapa: `distrito_${distrito.codigo}`,
+    }).t;
     let firma = '';
     for (const producto of productos) {
       const etapa = `${distrito.codigo}_${producto.codigo}`;
@@ -302,38 +456,74 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
         if (pagina.productoFijo) {
           // Un solo producto, ya elegido: la tabla del distrito es la que dejó la
           // recarga. Elegirlo otra vez podría recargar la página a media lectura.
-          control.cmd(['wait', '--fn', `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#${pagina.tabla}');
+          control.cmd(
+            [
+              'wait',
+              '--fn',
+              `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#${pagina.tabla}');
             if (!s || s.value !== ${JSON.stringify(producto.codigo)} || !tb || !document.getElementById('g-recaptcha-response')?.value) return false;
             const proc = document.querySelector('#${pagina.tabla}_processing');
-            return !proc || getComputedStyle(proc).display === 'none'; })()`], etapa);
+            return !proc || getComputedStyle(proc).display === 'none'; })()`,
+            ],
+            etapa,
+          );
         } else {
           control.cmd(['select', 'select[name=producto]', producto.codigo], etapa);
           // La sangría del guion es la de siempre: la automotora manda al
           // navegador exactamente los mismos comandos que antes de GLP.
-          control.cmd(['wait', '--fn', `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#${pagina.tabla}');
+          control.cmd(
+            [
+              'wait',
+              '--fn',
+              `(() => { const s = document.querySelector('select[name=producto]'); const tb = document.querySelector('#${pagina.tabla}');
           if (!s || s.value !== ${JSON.stringify(producto.codigo)} || !tb || !document.getElementById('g-recaptcha-response')?.value) return false;
           const proc = document.querySelector('#${pagina.tabla}_processing');
           if (proc && getComputedStyle(proc).display !== 'none') return false;
           const f = JSON.stringify(Array.from(tb.querySelectorAll('tbody tr')).slice(0, 3).map((e) => (e.innerText || '').replace(/\\s+/g, ' ').trim()));
-          return performance.timeOrigin !== ${Number(t)} || f !== ${JSON.stringify(firma)}; })()`], etapa);
+          return performance.timeOrigin !== ${Number(t)} || f !== ${JSON.stringify(firma)}; })()`,
+            ],
+            etapa,
+          );
         }
         const observadoEn = now().toISOString();
-        const leido = parseTabla(control.evaluar(TABLA(pagina), etapa), distrito.nombre, { conTexto, producto, pagina });
+        const leido = parseTabla(control.evaluar(TABLA(pagina), etapa), distrito.nombre, {
+          conTexto,
+          producto,
+          pagina,
+        });
         if (!leido.ok) throw new Fallo(leido.razon, etapa);
         firma = leido.firma;
         t = control.sondear(etapa).t;
         leidas.push({
-          district_code: distrito.codigo, district_name: distrito.nombre, product: producto.key,
+          district_code: distrito.codigo,
+          district_name: distrito.nombre,
+          product: producto.key,
           // La página va con la unidad solo cuando no es la automotora: así las
           // unidades de Gasolina y Diésel no cambian.
           ...(pagina.key === 'automotor' ? {} : { source_url: pagina.url }),
-          status: 'ok', observed_at: observadoEn, announced_total: leido.total ?? leido.filas.length,
-          rows: leido.filas.map(({ key_hash, precio, establecimiento, direccion }) => ({ key_hash, price: precio, ...(conTexto ? { establecimiento, direccion } : {}) })).filter((fila) => fila.key_hash),
+          status: 'ok',
+          observed_at: observadoEn,
+          announced_total: leido.total ?? leido.filas.length,
+          rows: leido.filas
+            .map(({ key_hash, precio, establecimiento, direccion }) => ({
+              key_hash,
+              price: precio,
+              ...(conTexto ? { establecimiento, direccion } : {}),
+            }))
+            .filter((fila) => fila.key_hash),
           dropped_rows: leido.filas.filter((fila) => !fila.key_hash).length,
         });
       } catch (error) {
-        const fallo = error instanceof Fallo ? error : new Fallo('fallo_inesperado', etapa, String(error?.message ?? '').slice(0, 200));
-        leidas.push({ district_code: distrito.codigo, district_name: distrito.nombre, product: producto.key, status: fallo.codigo });
+        const fallo =
+          error instanceof Fallo
+            ? error
+            : new Fallo('fallo_inesperado', etapa, String(error?.message ?? '').slice(0, 200));
+        leidas.push({
+          district_code: distrito.codigo,
+          district_name: distrito.nombre,
+          product: producto.key,
+          status: fallo.codigo,
+        });
         // Un bloqueo o una cascada rota no se puede aislar por producto.
         if (fallo.bloqueo || fallo.reintentable) throw fallo;
       }
@@ -348,9 +538,16 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
     let ultimo = null;
     for (let intento = 1; intento <= INTENTOS_POR_DISTRITO; intento += 1) {
       if (restante() <= 0) throw ultimo ?? new Fallo('presupuesto_agotado', etiqueta);
-      try { return paso(); } catch (error) {
-        ultimo = error instanceof Fallo ? error : new Fallo('fallo_inesperado', etiqueta, String(error?.message ?? '').slice(0, 200));
-        log(`${etiqueta}: intento ${intento}/${INTENTOS_POR_DISTRITO} falló (${ultimo.codigo}${ultimo.detalle ? `: ${ultimo.detalle}` : ''})`);
+      try {
+        return paso();
+      } catch (error) {
+        ultimo =
+          error instanceof Fallo
+            ? error
+            : new Fallo('fallo_inesperado', etiqueta, String(error?.message ?? '').slice(0, 200));
+        log(
+          `${etiqueta}: intento ${intento}/${INTENTOS_POR_DISTRITO} falló (${ultimo.codigo}${ultimo.detalle ? `: ${ultimo.detalle}` : ''})`,
+        );
         if (ultimo.bloqueo || !ultimo.reintentable) throw ultimo;
       }
     }
@@ -363,12 +560,18 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
     t = inicial.t;
     catalogo = inicial.catalogo;
     const objetivo = soloDistritos
-      ? soloDistritos.map((nombre) => resolverDistrito(catalogo, nombre)).filter((r) => r.ok).map((r) => r.distrito)
+      ? soloDistritos
+          .map((nombre) => resolverDistrito(catalogo, nombre))
+          .filter((r) => r.ok)
+          .map((r) => r.distrito)
       : catalogo;
     log(`${catalogo.length} distritos en el select; se recorrerán ${objetivo.length}`);
 
     for (const distrito of objetivo) {
-      if (restante() <= 0) { log('Presupuesto de corrida agotado; se conserva lo ya leído'); break; }
+      if (restante() <= 0) {
+        log('Presupuesto de corrida agotado; se conserva lo ya leído');
+        break;
+      }
       let hecho = false;
       for (let intento = 1; intento <= INTENTOS_POR_DISTRITO && !hecho; intento += 1) {
         try {
@@ -376,28 +579,51 @@ function recorrerLima({ ejecutar, log, now, productos, budgetMs, soloDistritos, 
           units.push(...resultado.units);
           t = resultado.t;
           hecho = true;
-          log(`${distrito.nombre}: ${resultado.units.filter((u) => u.status === 'ok').length}/${productos.length} unidades`);
+          log(
+            `${distrito.nombre}: ${resultado.units.filter((u) => u.status === 'ok').length}/${productos.length} unidades`,
+          );
         } catch (error) {
           const fallo = error instanceof Fallo ? error : new Fallo('fallo_inesperado', 'distrito');
-          if (fallo.bloqueo) { bloqueo = { codigo: fallo.codigo, etapa: fallo.etapa, distrito: distrito.nombre }; break; }
-          log(`${distrito.nombre}: intento ${intento}/${INTENTOS_POR_DISTRITO} falló (${fallo.codigo}${fallo.detalle ? `: ${fallo.detalle}` : ''})`);
+          if (fallo.bloqueo) {
+            bloqueo = { codigo: fallo.codigo, etapa: fallo.etapa, distrito: distrito.nombre };
+            break;
+          }
+          log(
+            `${distrito.nombre}: intento ${intento}/${INTENTOS_POR_DISTRITO} falló (${fallo.codigo}${fallo.detalle ? `: ${fallo.detalle}` : ''})`,
+          );
           if (intento === INTENTOS_POR_DISTRITO || !fallo.reintentable) {
-            for (const producto of productos) units.push({ district_code: distrito.codigo, district_name: distrito.nombre, product: producto.key, status: fallo.codigo });
+            for (const producto of productos)
+              units.push({
+                district_code: distrito.codigo,
+                district_name: distrito.nombre,
+                product: producto.key,
+                status: fallo.codigo,
+              });
             break;
           }
           // Reabrir la cascada: tras un fallo no sabemos en qué página estamos.
-          try { t = conReintentos(cascadaHastaDistritos, 'reapertura').t; } catch (otro) {
+          try {
+            t = conReintentos(cascadaHastaDistritos, 'reapertura').t;
+          } catch (otro) {
             const roto = otro instanceof Fallo ? otro : new Fallo('fallo_inesperado', 'reinicio');
-            if (roto.bloqueo) { bloqueo = { codigo: roto.codigo, etapa: roto.etapa, distrito: distrito.nombre }; }
+            if (roto.bloqueo) {
+              bloqueo = { codigo: roto.codigo, etapa: roto.etapa, distrito: distrito.nombre };
+            }
             break;
           }
         }
       }
       // Se detiene la adquisición entera: no se sigue golpeando el mismo muro.
-      if (bloqueo) { log(`Adquisición detenida por ${bloqueo.codigo} en ${bloqueo.distrito}`); break; }
+      if (bloqueo) {
+        log(`Adquisición detenida por ${bloqueo.codigo} en ${bloqueo.distrito}`);
+        break;
+      }
     }
   } catch (error) {
-    const fallo = error instanceof Fallo ? error : new Fallo('fallo_inesperado', 'cascada', String(error?.message ?? '').slice(0, 200));
+    const fallo =
+      error instanceof Fallo
+        ? error
+        : new Fallo('fallo_inesperado', 'cascada', String(error?.message ?? '').slice(0, 200));
     bloqueo = fallo.bloqueo ? { codigo: fallo.codigo, etapa: fallo.etapa, distrito: null } : bloqueo;
     log(`Cascada inicial fallida: ${fallo.codigo} en ${fallo.etapa}${fallo.detalle ? ` (${fallo.detalle})` : ''}`);
   }

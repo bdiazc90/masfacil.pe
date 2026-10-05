@@ -16,7 +16,13 @@ import { H, W, diaEnX, lectura, lecturas, listaDias, plano, seleccionVista } fro
 import { cargarHistorial } from './cargar-historial.js';
 
 const CARGADOS = new Set(['ready', 'stale', 'saved', 'demo']);
-const almacen = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
+const almacen = () => {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Lleva la vista y el foco al bloque: es lo que hace «Ver historial» y la ruta
@@ -25,8 +31,13 @@ const almacen = () => { try { return globalThis.localStorage ?? null; } catch { 
 export function enfocarHistorial() {
   const bloque = document.getElementById('history-chart');
   if (!bloque) return;
-  bloque.scrollIntoView?.({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  (bloque.querySelector('.history__svg') ?? document.getElementById('history-title') ?? bloque).focus?.({ preventScroll: true });
+  bloque.scrollIntoView?.({
+    block: 'start',
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+  });
+  (bloque.querySelector('.history__svg') ?? document.getElementById('history-title') ?? bloque).focus?.({
+    preventScroll: true,
+  });
 }
 
 // Lo secundario del bloque —subtítulo, fecha de cada lectura, notas— se lee en
@@ -42,9 +53,23 @@ function Lecturas({ marco }) {
         <div key={producto.key} className="grid min-w-0 gap-[2px]" data-serie={producto.key}>
           <h3 className="m-0 text-[12px] font-bold tracking-[.08em] text-serie uppercase">{producto.label}</h3>
           {producto.valor !== null ? (
-            <><p className={`${VALOR} font-extrabold text-foreground`}><small className="mr-[3px] text-[14px] font-semibold tracking-[0] text-muted-foreground">S/</small>{producto.valor}</p><p className={SECUNDARIO}><time dateTime={producto.datetime}>{producto.fecha}</time>{` · ${producto.n} grifos`}</p></>
+            <>
+              <p className={`${VALOR} font-extrabold text-foreground`}>
+                <small className="mr-[3px] text-[14px] font-semibold tracking-[0] text-muted-foreground">S/</small>
+                {producto.valor}
+              </p>
+              <p className={SECUNDARIO}>
+                <time dateTime={producto.datetime}>{producto.fecha}</time>
+                {` · ${producto.n} grifos`}
+              </p>
+            </>
           ) : (
-            <><p className={`${VALOR} font-semibold text-muted-foreground`} aria-hidden="true">—</p><p className={SECUNDARIO}>Sin días registrados en esta ventana.</p></>
+            <>
+              <p className={`${VALOR} font-semibold text-muted-foreground`} aria-hidden="true">
+                —
+              </p>
+              <p className={SECUNDARIO}>Sin días registrados en esta ventana.</p>
+            </>
           )}
         </div>
       ))}
@@ -65,35 +90,136 @@ function Plano({ marco, seleccion, uid, onElegir, onTecla }) {
   };
   return (
     <>
-      <svg className="history__svg" viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" role="group" tabIndex={0} aria-label={vista.ariaLabel} onPointerDown={alApuntar} onKeyDown={onTecla}>
+      <svg
+        className="history__svg"
+        viewBox={`0 0 ${W} ${H}`}
+        xmlns="http://www.w3.org/2000/svg"
+        role="group"
+        tabIndex={0}
+        aria-label={vista.ariaLabel}
+        onPointerDown={alApuntar}
+        onKeyDown={onTecla}
+      >
         <defs>
           {vista.gradientes.map((gradiente) => (
             // `data-serie` en el degradado: está en `<defs>`, fuera del grupo de su
             // serie, y sin él sus paradas no heredan `--serie` y salen grises.
-            <linearGradient key={gradiente.key} id={`${uid}-fill-${gradiente.key}`} data-serie={gradiente.key} x1="0" y1={gradiente.y1} x2="0" y2={gradiente.y2} gradientUnits="userSpaceOnUse"><stop className="history__fill-alto" offset="0" /><stop className="history__fill-medio" offset=".55" /><stop className="history__fill-bajo" offset="1" /></linearGradient>
+            <linearGradient
+              key={gradiente.key}
+              id={`${uid}-fill-${gradiente.key}`}
+              data-serie={gradiente.key}
+              x1="0"
+              y1={gradiente.y1}
+              x2="0"
+              y2={gradiente.y2}
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop className="history__fill-alto" offset="0" />
+              <stop className="history__fill-medio" offset=".55" />
+              <stop className="history__fill-bajo" offset="1" />
+            </linearGradient>
           ))}
         </defs>
         {vista.ticks.map((tick) => (
-          <g key={tick.key} className="history__tick"><line x1={tick.x1} y1={tick.y} x2={tick.x2} y2={tick.y} />{tick.texto ? <text x={tick.texto.x} y={tick.texto.y} textAnchor="end">{tick.texto.valor}</text> : null}</g>
+          <g key={tick.key} className="history__tick">
+            <line x1={tick.x1} y1={tick.y} x2={tick.x2} y2={tick.y} />
+            {tick.texto ? (
+              <text x={tick.texto.x} y={tick.texto.y} textAnchor="end">
+                {tick.texto.valor}
+              </text>
+            ) : null}
+          </g>
         ))}
         {vista.fechas.map((etiqueta) => (
           <Fragment key={etiqueta.key}>
-            <text className="history__eje-x" x={etiqueta.x} y={etiqueta.arriba.y} textAnchor={etiqueta.ancla} data-alterna={etiqueta.alterna ? '1' : undefined}>{etiqueta.arriba.texto}</text>
-            {etiqueta.abajo ? <text className="history__eje-x history__eje-dia" x={etiqueta.x} y={etiqueta.abajo.y} textAnchor={etiqueta.ancla} data-alterna={etiqueta.alterna ? '1' : undefined}>{etiqueta.abajo.texto}</text> : null}
+            <text
+              className="history__eje-x"
+              x={etiqueta.x}
+              y={etiqueta.arriba.y}
+              textAnchor={etiqueta.ancla}
+              data-alterna={etiqueta.alterna ? '1' : undefined}
+            >
+              {etiqueta.arriba.texto}
+            </text>
+            {etiqueta.abajo ? (
+              <text
+                className="history__eje-x history__eje-dia"
+                x={etiqueta.x}
+                y={etiqueta.abajo.y}
+                textAnchor={etiqueta.ancla}
+                data-alterna={etiqueta.alterna ? '1' : undefined}
+              >
+                {etiqueta.abajo.texto}
+              </text>
+            ) : null}
           </Fragment>
         ))}
-        <g className="history__guia-capa">{elegido.guia ? <line className="history__guia" x1={elegido.guia.x} y1={elegido.guia.y1} x2={elegido.guia.x} y2={elegido.guia.y2} /> : null}</g>
+        <g className="history__guia-capa">
+          {elegido.guia ? (
+            <line
+              className="history__guia"
+              x1={elegido.guia.x}
+              y1={elegido.guia.y1}
+              x2={elegido.guia.x}
+              y2={elegido.guia.y2}
+            />
+          ) : null}
+        </g>
         {vista.series.map((serie) => (
           <g key={serie.key} data-serie={serie.key}>
-            {serie.areas.map((d, indice) => <path key={`area-${indice}`} className="history__area" d={d} fill={`url(#${uid}-fill-${serie.key})`} />)}
-            {serie.lineas.map((linea, indice) => (linea.d ? <path key={`linea-${indice}`} className="history__linea" d={linea.d} /> : <circle key={`linea-${indice}`} className="history__solo" cx={linea.cx} cy={linea.cy} r="3.4" />))}
-            {serie.promedio ? <g className="history__promedio"><line x1={serie.promedio.x1} y1={serie.promedio.y} x2={serie.promedio.x2} y2={serie.promedio.y} /><text x={serie.promedio.texto.x} y={serie.promedio.texto.y}>{serie.promedio.texto.valor}</text></g> : null}
-            {serie.ultimo ? <><text className="history__serie-nombre" x={serie.ultimo.nombre.x} y={serie.ultimo.nombre.y} textAnchor="end">{serie.ultimo.nombre.texto}</text><circle className="history__ultimo" cx={serie.ultimo.cx} cy={serie.ultimo.cy} r="4.6" /></> : null}
+            {serie.areas.map((d, indice) => (
+              <path key={`area-${indice}`} className="history__area" d={d} fill={`url(#${uid}-fill-${serie.key})`} />
+            ))}
+            {serie.lineas.map((linea, indice) =>
+              linea.d ? (
+                <path key={`linea-${indice}`} className="history__linea" d={linea.d} />
+              ) : (
+                <circle key={`linea-${indice}`} className="history__solo" cx={linea.cx} cy={linea.cy} r="3.4" />
+              ),
+            )}
+            {serie.promedio ? (
+              <g className="history__promedio">
+                <line x1={serie.promedio.x1} y1={serie.promedio.y} x2={serie.promedio.x2} y2={serie.promedio.y} />
+                <text x={serie.promedio.texto.x} y={serie.promedio.texto.y}>
+                  {serie.promedio.texto.valor}
+                </text>
+              </g>
+            ) : null}
+            {serie.ultimo ? (
+              <>
+                <text
+                  className="history__serie-nombre"
+                  x={serie.ultimo.nombre.x}
+                  y={serie.ultimo.nombre.y}
+                  textAnchor="end"
+                >
+                  {serie.ultimo.nombre.texto}
+                </text>
+                <circle className="history__ultimo" cx={serie.ultimo.cx} cy={serie.ultimo.cy} r="4.6" />
+              </>
+            ) : null}
           </g>
         ))}
-        <g className="history__activo-capa">{elegido.activos.map((activo) => <circle key={activo.key} className="history__activo" data-serie={activo.key} cx={activo.cx} cy={activo.cy} r="5" />)}</g>
+        <g className="history__activo-capa">
+          {elegido.activos.map((activo) => (
+            <circle
+              key={activo.key}
+              className="history__activo"
+              data-serie={activo.key}
+              cx={activo.cx}
+              cy={activo.cy}
+              r="5"
+            />
+          ))}
+        </g>
       </svg>
-      <section className="sr-only" id={`${uid}-dias`} aria-label="Precio promedio día a día"><ul>{listaDias(marco.points).map((texto) => <li key={texto}>{texto}</li>)}</ul></section>
+      <section className="sr-only" id={`${uid}-dias`} aria-label="Precio promedio día a día">
+        <ul>
+          {listaDias(marco.points).map((texto) => (
+            <li key={texto}>{texto}</li>
+          ))}
+        </ul>
+      </section>
     </>
   );
 }
@@ -114,8 +240,12 @@ export function HistoryChart({ hidden, activo, demo = false }) {
   useEffect(() => {
     if (!activo) return undefined;
     let vigente = true;
-    cargarHistorial({ origin: HISTORY_ORIGIN, storage: almacen(), demo }).then((resultado) => { if (vigente) setCarga(resultado); });
-    return () => { vigente = false; };
+    cargarHistorial({ origin: HISTORY_ORIGIN, storage: almacen(), demo }).then((resultado) => {
+      if (vigente) setCarga(resultado);
+    });
+    return () => {
+      vigente = false;
+    };
   }, [activo, demo]);
 
   // Volver de segundo plano no pide nada a la red: solo vuelve a contar los días
@@ -134,9 +264,12 @@ export function HistoryChart({ hidden, activo, demo = false }) {
     return () => document.removeEventListener('visibilitychange', alVolver);
   }, [activo]);
 
-  const marco = activo && CARGADOS.has(carga.estado) ? frameWindow(carga.resumen, { today: hoy, days: DEFAULT_WINDOW }) : null;
+  const marco =
+    activo && CARGADOS.has(carga.estado) ? frameWindow(carga.resumen, { today: hoy, days: DEFAULT_WINDOW }) : null;
   // La selección es una sola y vale para las dos franjas: misma fecha, dos datos.
-  const elegir = (indice) => { if (marco) setSeleccion(Math.max(0, Math.min(marco.days - 1, indice))); };
+  const elegir = (indice) => {
+    if (marco) setSeleccion(Math.max(0, Math.min(marco.days - 1, indice)));
+  };
   const alTeclear = (event) => {
     const accion = { ArrowLeft: -1, ArrowRight: 1, Home: 'inicio', End: 'fin' }[event.key];
     if (accion === undefined || !marco) return;
@@ -147,18 +280,35 @@ export function HistoryChart({ hidden, activo, demo = false }) {
   };
 
   return (
-    <section id="history-chart" className="history plate" aria-labelledby="history-title" data-state={activo ? carga.estado : 'loading'} hidden={hidden}>
-      <h2 id="history-title" className="m-0 text-[16px]" tabIndex={-1}>Precio promedio en Lima</h2>
+    <section
+      id="history-chart"
+      className="history plate"
+      aria-labelledby="history-title"
+      data-state={activo ? carga.estado : 'loading'}
+      hidden={hidden}
+    >
+      <h2 id="history-title" className="m-0 text-[16px]" tabIndex={-1}>
+        Precio promedio en Lima
+      </h2>
       <p className={SECUNDARIO}>S/ por galón · últimos 7 días observados</p>
       <div id="history-body">
         {activo && carga.estado === 'loading' ? <p className={SECUNDARIO}>Cargando el histórico…</p> : null}
-        {marco ? <><Lecturas marco={marco} /><Plano marco={marco} seleccion={seleccion} uid={uid} onElegir={elegir} onTecla={alTeclear} /></> : null}
+        {marco ? (
+          <>
+            <Lecturas marco={marco} />
+            <Plano marco={marco} seleccion={seleccion} uid={uid} onElegir={elegir} onTecla={alTeclear} />
+          </>
+        ) : null}
       </div>
       {activo ? (
         <>
           {/* Persistentes: no se rehacen, así que el lector anuncia lo que la persona eligió. */}
-          <p className={SECUNDARIO} role="status" hidden={!carga.nota}>{carga.nota}</p>
-          <p className="history__lectura" role="status">{marco && seleccion !== null ? lectura(marco.points[seleccion]) : ''}</p>
+          <p className={SECUNDARIO} role="status" hidden={!carga.nota}>
+            {carga.nota}
+          </p>
+          <p className="history__lectura" role="status">
+            {marco && seleccion !== null ? lectura(marco.points[seleccion]) : ''}
+          </p>
         </>
       ) : null}
     </section>

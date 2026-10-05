@@ -19,23 +19,48 @@ const CASOS = [
   { guardado: 'light', sistema: 'dark', espera: 'light' },
   { guardado: 'system', sistema: 'light', espera: 'light' },
 ];
-const PAGINAS = [['portada', '/combustibles/gasolina'], ['404', '/combustibles/otra-cosa']];
+const PAGINAS = [
+  ['portada', '/combustibles/gasolina'],
+  ['404', '/combustibles/otra-cosa'],
+];
 let fallos = 0;
 try {
   for (const [nombre, ruta] of PAGINAS) {
     for (const caso of CASOS) {
       // `tema` de la librería guarda la elección y emula el sistema: aquí van por separado.
-      const p = await pagina(c, { origen: srv.origen, ancho: 390, tema: caso.sistema, gps: null, antesDeCargar: `try { localStorage.setItem('masfacil-theme', ${JSON.stringify(caso.guardado)}); } catch {}`, interceptar: [{ patron: '*/assets/index-*.js', accion: 'retener' }, { patron: '*/assets/404-*.js', accion: 'retener' }] });
+      const p = await pagina(c, {
+        origen: srv.origen,
+        ancho: 390,
+        tema: caso.sistema,
+        gps: null,
+        antesDeCargar: `try { localStorage.setItem('masfacil-theme', ${JSON.stringify(caso.guardado)}); } catch {}`,
+        interceptar: [
+          { patron: '*/assets/index-*.js', accion: 'retener' },
+          { patron: '*/assets/404-*.js', accion: 'retener' },
+        ],
+      });
       await p.ir(ruta);
-      await p.esperar(`document.readyState !== 'loading' && getComputedStyle(document.documentElement).backgroundColor !== 'rgba(0, 0, 0, 0)'`);
+      await p.esperar(
+        `document.readyState !== 'loading' && getComputedStyle(document.documentElement).backgroundColor !== 'rgba(0, 0, 0, 0)'`,
+      );
       await p.evalua('new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(() => ok(1))))');
       await dormir(150);
-      const r = await p.evalua(`({ tema: document.documentElement.dataset.theme, fondo: getComputedStyle(document.documentElement).backgroundColor, barra: document.querySelector('meta[name="theme-color"]')?.content })`);
-      const meta = await p.evalua(`(() => { const m = document.querySelector('meta[name="theme-color"]'); return m?.dataset?.[${JSON.stringify(caso.espera)}] ?? null; })()`);
-      if (SALIDA) fs.writeFileSync(path.join(SALIDA, `${nombre}-${caso.guardado}-sistema-${caso.sistema}.png`), await p.captura({ completa: false }));
+      const r = await p.evalua(
+        `({ tema: document.documentElement.dataset.theme, fondo: getComputedStyle(document.documentElement).backgroundColor, barra: document.querySelector('meta[name="theme-color"]')?.content })`,
+      );
+      const meta = await p.evalua(
+        `(() => { const m = document.querySelector('meta[name="theme-color"]'); return m?.dataset?.[${JSON.stringify(caso.espera)}] ?? null; })()`,
+      );
+      if (SALIDA)
+        fs.writeFileSync(
+          path.join(SALIDA, `${nombre}-${caso.guardado}-sistema-${caso.sistema}.png`),
+          await p.captura({ completa: false }),
+        );
       const bien = r.tema === caso.espera && meta !== null && r.barra === meta;
       fallos += !bien;
-      console.log(`${bien ? '✔' : '✖'} ${nombre} · guardado ${caso.guardado} · sistema ${caso.sistema} → data-theme ${r.tema ?? '—'} (espera ${caso.espera}) · fondo ${r.fondo} · theme-color ${r.barra}${meta ? '' : ' (sin data-*)'}`);
+      console.log(
+        `${bien ? '✔' : '✖'} ${nombre} · guardado ${caso.guardado} · sistema ${caso.sistema} → data-theme ${r.tema ?? '—'} (espera ${caso.espera}) · fondo ${r.fondo} · theme-color ${r.barra}${meta ? '' : ' (sin data-*)'}`,
+      );
       await p.cerrar();
     }
   }
@@ -43,5 +68,9 @@ try {
   await c.cerrar();
   await srv.cerrar();
 }
-console.log(fallos ? `PRIMER CUADRO: ${fallos} casos con el tema equivocado` : 'PRIMER CUADRO OK: el tema y la barra son los correctos antes de que arranque la app');
+console.log(
+  fallos
+    ? `PRIMER CUADRO: ${fallos} casos con el tema equivocado`
+    : 'PRIMER CUADRO OK: el tema y la barra son los correctos antes de que arranque la app',
+);
 process.exitCode = fallos ? 1 : 0;

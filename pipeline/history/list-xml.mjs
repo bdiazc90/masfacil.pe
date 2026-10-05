@@ -22,11 +22,13 @@ export function parseListResponse(xml) {
   for (const [, bloque] of String(xml).matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
     const key = textoEntre(bloque, 'Key');
     const size = Number(textoEntre(bloque, 'Size'));
-    if (!key) throw new Error('Listado S3 con una entrada sin clave; se prefiere fallar antes que devolver una lista parcial');
+    if (!key)
+      throw new Error('Listado S3 con una entrada sin clave; se prefiere fallar antes que devolver una lista parcial');
     keys.push({ key, bytes: Number.isFinite(size) ? size : null });
   }
   const truncado = textoEntre(xml, 'IsTruncated') === 'true';
   const cursor = textoEntre(xml, 'NextContinuationToken');
-  if (truncado && !cursor) throw new Error('Listado S3 truncado sin token de continuación; la lista estaría incompleta');
+  if (truncado && !cursor)
+    throw new Error('Listado S3 truncado sin token de continuación; la lista estaría incompleta');
   return { keys, cursor: truncado ? cursor : null };
 }

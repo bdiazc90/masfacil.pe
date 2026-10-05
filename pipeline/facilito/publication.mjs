@@ -31,7 +31,8 @@ const capaPorOferta = (datasets) => {
 export function facilitoPublicationChange({ candidate, published, now }) {
   const nuevos = capaPorOferta(candidate);
   const previos = capaPorOferta(published);
-  if (!previos.size) return { visible: true, reason: 'lo publicado no tiene capa de consulta', changed_offers: nuevos.size };
+  if (!previos.size)
+    return { visible: true, reason: 'lo publicado no tiene capa de consulta', changed_offers: nuevos.size };
 
   let cambiadas = 0;
   for (const [id, capa] of nuevos) {
@@ -41,12 +42,21 @@ export function facilitoPublicationChange({ candidate, published, now }) {
     if ((antes?.price ?? null) !== (capa?.price ?? null)) cambiadas += 1;
   }
   for (const id of previos.keys()) if (!nuevos.has(id)) cambiadas += 1;
-  if (cambiadas) return { visible: true, reason: `${cambiadas} ofertas cambian de precio efectivo o de fuente`, changed_offers: cambiadas };
+  if (cambiadas)
+    return {
+      visible: true,
+      reason: `${cambiadas} ofertas cambian de precio efectivo o de fuente`,
+      changed_offers: cambiadas,
+    };
 
   const instantes = [...previos.values()].map((capa) => Date.parse(capa?.observed_at ?? '')).filter(Number.isFinite);
   const masVieja = instantes.length ? Math.min(...instantes) : null;
   if (masVieja !== null && now - masVieja > REPUBLISH_AFTER_MS) {
     return { visible: true, reason: 'la consulta publicada se acerca a las 24 horas', changed_offers: 0 };
   }
-  return { visible: false, reason: 'ningún precio efectivo cambia y la consulta publicada sigue vigente', changed_offers: 0 };
+  return {
+    visible: false,
+    reason: 'ningún precio efectivo cambia y la consulta publicada sigue vigente',
+    changed_offers: 0,
+  };
 }

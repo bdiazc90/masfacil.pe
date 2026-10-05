@@ -1,16 +1,22 @@
 import { PRODUCTS } from './catalog.js';
 
 const EARTH_RADIUS_KM = 6371.0088;
-const toRadians = (degrees) => degrees * Math.PI / 180;
+const toRadians = (degrees) => (degrees * Math.PI) / 180;
 
 export function haversineKm(origin, destination) {
   for (const point of [origin, destination]) {
-    if (!Number.isFinite(point?.latitude) || !Number.isFinite(point?.longitude)) throw new TypeError('Haversine requiere latitud y longitud numéricas');
-    if (point.latitude < -90 || point.latitude > 90 || point.longitude < -180 || point.longitude > 180) throw new RangeError('Coordenada fuera de rango');
+    if (!Number.isFinite(point?.latitude) || !Number.isFinite(point?.longitude))
+      throw new TypeError('Haversine requiere latitud y longitud numéricas');
+    if (point.latitude < -90 || point.latitude > 90 || point.longitude < -180 || point.longitude > 180)
+      throw new RangeError('Coordenada fuera de rango');
   }
   const latitudeDelta = toRadians(destination.latitude - origin.latitude);
   const longitudeDelta = toRadians(destination.longitude - origin.longitude);
-  const a = Math.sin(latitudeDelta / 2) ** 2 + Math.cos(toRadians(origin.latitude)) * Math.cos(toRadians(destination.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
+  const a =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(toRadians(origin.latitude)) *
+      Math.cos(toRadians(destination.latitude)) *
+      Math.sin(longitudeDelta / 2) ** 2;
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(a));
 }
 
@@ -19,11 +25,22 @@ export function orderOffers(offers, criterion = 'distance') {
   // grifo cercano y todavía tiene el otro precio que ofrecer. Se ordena por el
   // precio de un producto del catálogo, nunca de una clave inventada.
   const producto = /^price:([a-z]+)$/.exec(criterion)?.[1];
-  const accessor = criterion === 'distance' ? (row) => row.distance_km
-    : producto && Object.hasOwn(PRODUCTS, producto) ? (row) => row.prices[producto]?.price ?? Infinity
-      : null;
+  const accessor =
+    criterion === 'distance'
+      ? (row) => row.distance_km
+      : producto && Object.hasOwn(PRODUCTS, producto)
+        ? (row) => row.prices[producto]?.price ?? Infinity
+        : null;
   if (!accessor) throw new Error(`Criterio de orden desconocido: ${criterion}`);
-  return offers.map((offer, index) => ({ offer, index })).sort((left, right) => accessor(left.offer) - accessor(right.offer) || left.offer.establishment_id.localeCompare(right.offer.establishment_id) || left.index - right.index).map(({ offer }) => offer);
+  return offers
+    .map((offer, index) => ({ offer, index }))
+    .sort(
+      (left, right) =>
+        accessor(left.offer) - accessor(right.offer) ||
+        left.offer.establishment_id.localeCompare(right.offer.establishment_id) ||
+        left.index - right.index,
+    )
+    .map(({ offer }) => offer);
 }
 
 export const RADIUS_MIN_KM = 1;

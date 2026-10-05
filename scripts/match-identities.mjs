@@ -24,23 +24,29 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cosechaFlag = process.argv.indexOf('--harvest');
 const cosechaDir = cosechaFlag >= 0 ? process.argv[cosechaFlag + 1] : null;
 
-const RADIO_CANDIDATO = 150;   // más allá de esto no se considera candidato
-const DISTANCIA_FIRME = 80;    // requisito de distancia para `verified`
-const MARGEN_MINIMO = 100;     // el 2º candidato debe quedar a esta distancia extra
+const RADIO_CANDIDATO = 150; // más allá de esto no se considera candidato
+const DISTANCIA_FIRME = 80; // requisito de distancia para `verified`
+const MARGEN_MINIMO = 100; // el 2º candidato debe quedar a esta distancia extra
 
 const R = 6371000;
-const rad = (g) => g * Math.PI / 180;
+const rad = (g) => (g * Math.PI) / 180;
 const distancia = (a, b) => {
-  const dLat = rad(b.lat - a.lat); const dLng = rad(b.lng - a.lng);
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
   const x = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(x));
 };
 
-const sinTildes = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+const sinTildes = (v) =>
+  String(v ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase();
 
 // Normalización de direcciones peruanas: unifica abreviaturas de vía y descarta
 // lo que no identifica (urbanización, manzana, lote, esquina).
-const RUIDO = /\b(URB|URBANIZACION|MZA?|MANZANA|LOTE|LT|ESQ|ESQUINA|CON|Y|DEL|DE|LA|EL|LOS|LAS|ETAPA|SECTOR|ASOC|AAHH|PJ|INT|PISO|SN)\b/g;
+const RUIDO =
+  /\b(URB|URBANIZACION|MZA?|MANZANA|LOTE|LT|ESQ|ESQUINA|CON|Y|DEL|DE|LA|EL|LOS|LAS|ETAPA|SECTOR|ASOC|AAHH|PJ|INT|PISO|SN)\b/g;
 const VIAS = [
   [/\b(AVENIDA|AV|AVDA)\b\.?/g, 'AV'],
   [/\b(JIRON|JR)\b\.?/g, 'JR'],
@@ -51,14 +57,22 @@ const VIAS = [
   [/\b(PANAMERICANA)\b/g, 'PANAM'],
 ];
 function normalizarDireccion(valor) {
-  let texto = sinTildes(valor).replace(/[.,;()#]/g, ' ').replace(/N[°º]|NRO|NO\b/g, ' ');
+  let texto = sinTildes(valor)
+    .replace(/[.,;()#]/g, ' ')
+    .replace(/N[°º]|NRO|NO\b/g, ' ');
   for (const [patron, reemplazo] of VIAS) texto = texto.replace(patron, reemplazo);
   return texto.replace(RUIDO, ' ').replace(/\s+/g, ' ').trim();
 }
 // Los números de puerta: el Registro a veces lista varios ("6471, 6475, 6479")
 // o usa sufijo ("6901-A"). Se comparan como conjuntos.
-const numerosDePuerta = (valor) => new Set((sinTildes(valor).match(/\b\d{2,6}\b/g) ?? []).map(Number).filter((n) => n >= 10 && n <= 99999));
-const palabras = (valor) => new Set(normalizarDireccion(valor).split(' ').filter((p) => p.length >= 4 && !/^\d+$/.test(p)));
+const numerosDePuerta = (valor) =>
+  new Set((sinTildes(valor).match(/\b\d{2,6}\b/g) ?? []).map(Number).filter((n) => n >= 10 && n <= 99999));
+const palabras = (valor) =>
+  new Set(
+    normalizarDireccion(valor)
+      .split(' ')
+      .filter((p) => p.length >= 4 && !/^\d+$/.test(p)),
+  );
 const interseccion = (a, b) => [...a].filter((x) => b.has(x));
 
 // Solo corrobora; nunca es evidencia suficiente por sí sola.
@@ -73,19 +87,33 @@ const marcaDeOperador = (razonSocial) => OPERADORES.find(([p]) => p.test(sinTild
 
 function leerCsv(file) {
   const partir = (linea) => {
-    const campos = []; let valor = ''; let comilla = false;
+    const campos = [];
+    let valor = '';
+    let comilla = false;
     for (let i = 0; i < linea.length; i += 1) {
       const c = linea[i];
-      if (comilla) { if (c === '"') { if (linea[i + 1] === '"') { valor += '"'; i += 1; } else comilla = false; } else valor += c; }
-      else if (c === '"') comilla = true;
-      else if (c === ',') { campos.push(valor); valor = ''; }
-      else valor += c;
+      if (comilla) {
+        if (c === '"') {
+          if (linea[i + 1] === '"') {
+            valor += '"';
+            i += 1;
+          } else comilla = false;
+        } else valor += c;
+      } else if (c === '"') comilla = true;
+      else if (c === ',') {
+        campos.push(valor);
+        valor = '';
+      } else valor += c;
     }
-    campos.push(valor); return campos;
+    campos.push(valor);
+    return campos;
   };
   const lineas = fs.readFileSync(file, 'utf8').replace(/^﻿/, '').trim().split('\n');
   const cabecera = partir(lineas[0]);
-  return lineas.slice(1).map(partir).map((fila) => Object.fromEntries(cabecera.map((k, i) => [k, fila[i]])));
+  return lineas
+    .slice(1)
+    .map(partir)
+    .map((fila) => Object.fromEntries(cabecera.map((k, i) => [k, fila[i]])));
 }
 
 // Señales que confirman un vínculo. La distancia NO entra aquí a propósito.
@@ -129,10 +157,13 @@ const establecimientos = leerCsv(csv).map((f) => ({
 const baseCosecha = cosechaDir ? path.resolve(cosechaDir) : path.join(root, '.local-cache', 'identity', 'harvest');
 const ndjson = fs.existsSync(path.join(baseCosecha, 'raw.ndjson'))
   ? path.join(baseCosecha, 'raw.ndjson')
-  : fs.readdirSync(baseCosecha, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
-    .map((e) => path.join(baseCosecha, e.name, 'raw.ndjson'))
-    .filter((p) => fs.existsSync(p)).sort().pop();
+  : fs
+      .readdirSync(baseCosecha, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => path.join(baseCosecha, e.name, 'raw.ndjson'))
+      .filter((p) => fs.existsSync(p))
+      .sort()
+      .pop();
 if (!ndjson) throw new Error(`No hay raw.ndjson bajo ${path.relative(root, baseCosecha)}`);
 
 // El innerText de una tarjeta de Maps mezcla nombre, calificación, número de
@@ -143,20 +174,25 @@ const ES_CALIFICACION = /^\d[.,]\d\s*$/;
 const ES_RESEÑAS = /^\(\s*[\d.,\s]+\)$/;
 const ES_HORARIO = /abierto|cierra|cerrado|abre|24\s*horas|a\.\s?m\.|p\.\s?m\./i;
 const ES_TELEFONO = /^\+?\s*\d[\d\s()-]{7,}$/;
-const PREFIJO_VIA = /\b(AV|AVDA|AVENIDA|JR|JIRON|CALLE|CA|PSJE|PASAJE|CARR|CARRETERA|PROL|PANAMERICANA|MALECON|PLAZA|OVALO)\b\.?/i;
+const PREFIJO_VIA =
+  /\b(AV|AVDA|AVENIDA|JR|JIRON|CALLE|CA|PSJE|PASAJE|CARR|CARRETERA|PROL|PANAMERICANA|MALECON|PLAZA|OVALO)\b\.?/i;
 
 function direccionDeTarjeta(info) {
   const util = info.filter((t) => {
     const texto = String(t ?? '').trim();
     if (!texto || texto.length < 4) return false;
-    return !ES_CALIFICACION.test(texto) && !ES_RESEÑAS.test(texto) && !ES_HORARIO.test(texto) && !ES_TELEFONO.test(texto);
+    return (
+      !ES_CALIFICACION.test(texto) && !ES_RESEÑAS.test(texto) && !ES_HORARIO.test(texto) && !ES_TELEFONO.test(texto)
+    );
   });
   // Preferir lo que empieza como una vía; si no, lo primero con un número de
   // puerta plausible. Nunca la calificación ni el horario.
-  return util.find((t) => PREFIJO_VIA.test(t) && /\d/.test(t))
-    ?? util.find((t) => PREFIJO_VIA.test(t))
-    ?? util.find((t) => /\b\d{2,6}\b/.test(t) && !/gasoliner|grifo|combustible/i.test(t))
-    ?? '';
+  return (
+    util.find((t) => PREFIJO_VIA.test(t) && /\d/.test(t)) ??
+    util.find((t) => PREFIJO_VIA.test(t)) ??
+    util.find((t) => /\b\d{2,6}\b/.test(t) && !/gasoliner|grifo|combustible/i.test(t)) ??
+    ''
+  );
 }
 
 // Deduplicación por identificador estable de lugar: sin esto un mismo grifo
@@ -172,15 +208,18 @@ for (const linea of fs.readFileSync(ndjson, 'utf8').split('\n')) {
     const info = Array.isArray(lugar.info) ? lugar.info : [];
     const categoria = info.find((t) => /gasoliner|estaci[oó]n de servicio|grifo|combustible/i.test(t)) ?? info[0] ?? '';
     if (!/gasoliner|grifo|combustible|estaci[oó]n de servicio/i.test(`${categoria} ${lugar.name ?? ''}`)) continue;
-    const marca = ['Primax', 'Repsol', 'Pecsa', 'Petroperú', 'Petroperu', 'Terpel', 'Gazel', 'Coesti']
-      .find((m) => sinTildes(lugar.name).includes(sinTildes(m))) ?? null;
+    const marca =
+      ['Primax', 'Repsol', 'Pecsa', 'Petroperú', 'Petroperu', 'Terpel', 'Gazel', 'Coesti'].find((m) =>
+        sinTildes(lugar.name).includes(sinTildes(m)),
+      ) ?? null;
     fichas.set(lugar.id, {
       id: lugar.id,
       nombre: lugar.name ?? '',
       marca,
       categoria,
       direccion: direccionDeTarjeta(info),
-      lat: Number(lugar.lat), lng: Number(lugar.lng),
+      lat: Number(lugar.lat),
+      lng: Number(lugar.lng),
     });
   }
 }
@@ -222,9 +261,14 @@ for (const par of pares) {
   // Un rival solo compite si él mismo podría pasar la prueba de distancia. Un
   // establecimiento a 121 m no disputa una ficha que está a 32 m de la suya: el
   // margen absoluto castigaba emparejamientos con cuatro señales coincidentes.
-  const rivalesFicha = porFicha.get(par.ficha.id).filter((p) => p.est.establishment_id !== par.est.establishment_id
-    && !estTomado.has(p.est.establishment_id)
-    && p.distancia <= DISTANCIA_FIRME);
+  const rivalesFicha = porFicha
+    .get(par.ficha.id)
+    .filter(
+      (p) =>
+        p.est.establishment_id !== par.est.establishment_id &&
+        !estTomado.has(p.est.establishment_id) &&
+        p.distancia <= DISTANCIA_FIRME,
+    );
   const segundo = rivalesFicha.sort((a, b) => a.distancia - b.distancia)[0] ?? null;
   const margen = segundo ? segundo.distancia - par.distancia : Infinity;
   const confirma = par.señales.filter((s) => s.peso >= 25);
@@ -239,9 +283,15 @@ for (const par of pares) {
   // Las demás fichas que aspiraban a este mismo establecimiento se conservan.
   // Suelen ser el caso de abanderamiento —una marca sobre la razón social de un
   // tercero— y ahí la ficha perdedora puede llevar el nombre que la gente usa.
-  const rivales = porEst.get(par.est.establishment_id)
+  const rivales = porEst
+    .get(par.est.establishment_id)
     .filter((p) => p.ficha.id !== par.ficha.id)
-    .map((p) => ({ place_id: p.ficha.id, nombre_maps: p.ficha.nombre, marca_maps: p.ficha.marca, distancia_m: Math.round(p.distancia) }));
+    .map((p) => ({
+      place_id: p.ficha.id,
+      nombre_maps: p.ficha.nombre,
+      marca_maps: p.ficha.marca,
+      distancia_m: Math.round(p.distancia),
+    }));
   resultados.push({
     estado,
     establishment_id: par.est.establishment_id,
@@ -258,7 +308,8 @@ for (const par of pares) {
     sin_rival: !Number.isFinite(margen),
     fichas_rivales: rivales,
     señales: par.señales,
-    lat: par.est.lat, lng: par.est.lng,
+    lat: par.est.lat,
+    lng: par.est.lng,
   });
 }
 
@@ -280,15 +331,27 @@ const salida = {
     fichas_sin_asignar: fichasSinUsar.length,
   },
   resultados: resultados.sort((a, b) => a.distrito.localeCompare(b.distrito) || a.distancia_m - b.distancia_m),
-  unmatched: sinFicha.map((e) => ({ establishment_id: e.establishment_id, razon_social: e.razon_social, direccion: e.direccion, distrito: e.distrito })),
-  fichas_sin_asignar: fichasSinUsar.map((f) => ({ place_id: f.id, nombre: f.nombre, marca: f.marca, direccion: f.direccion, lat: f.lat, lng: f.lng })),
+  unmatched: sinFicha.map((e) => ({
+    establishment_id: e.establishment_id,
+    razon_social: e.razon_social,
+    direccion: e.direccion,
+    distrito: e.distrito,
+  })),
+  fichas_sin_asignar: fichasSinUsar.map((f) => ({
+    place_id: f.id,
+    nombre: f.nombre,
+    marca: f.marca,
+    direccion: f.direccion,
+    lat: f.lat,
+    lng: f.lng,
+  })),
 };
 
 const destino = path.join(root, '.local-cache', 'identity', 'matches.json');
 fs.mkdirSync(path.dirname(destino), { recursive: true, mode: 0o700 });
 fs.writeFileSync(destino, `${JSON.stringify(salida, null, 2)}\n`, { mode: 0o600 });
 
-const pct = (n) => `${(n / establecimientos.length * 100).toFixed(1)} %`;
+const pct = (n) => `${((n / establecimientos.length) * 100).toFixed(1)} %`;
 process.stdout.write(`Cosecha            ${path.relative(root, ndjson)}
 Bloques leídos     ${lineas}
 Fichas únicas      ${fichas.size}   (deduplicadas por identificador de lugar)

@@ -22,7 +22,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const limaTime = (iso) => {
   if (!iso) return '';
   const date = new Date(iso);
-  const parts = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
   return parts.replace('T', ' ');
 };
 
@@ -63,7 +71,11 @@ async function main() {
   let header;
   let pending = new Set(byAnchor.keys());
   for await (const row of csvRows(rawPath)) {
-    if (!header) { header = row.map(normalizeHeader); assertHeader(header, RAW_FIELDS, rawPath); continue; }
+    if (!header) {
+      header = row.map(normalizeHeader);
+      assertHeader(header, RAW_FIELDS, rawPath);
+      continue;
+    }
     if (!pending.size) break;
     const registro = clean(row[2]);
     if (!registro) continue;
@@ -78,9 +90,28 @@ async function main() {
   }
   if (pending.size) process.stdout.write(`Aviso: ${pending.size} establecimientos sin fila en el raw\n`);
 
-  const columns = ['establishment_id', 'registro', 'ruc', 'razon_social', 'direccion', 'distrito', 'latitud', 'longitud', 'precio_regular', 'fecha_regular', 'precio_premium', 'fecha_premium', 'mapa', 'street_view'];
+  const columns = [
+    'establishment_id',
+    'registro',
+    'ruc',
+    'razon_social',
+    'direccion',
+    'distrito',
+    'latitud',
+    'longitud',
+    'precio_regular',
+    'fecha_regular',
+    'precio_premium',
+    'fecha_premium',
+    'mapa',
+    'street_view',
+  ];
   const rows = [...byAnchor.values()]
-    .sort((a, b) => (a.distrito ?? '').localeCompare(b.distrito ?? '') || (a.razon_social ?? '').localeCompare(b.razon_social ?? ''))
+    .sort(
+      (a, b) =>
+        (a.distrito ?? '').localeCompare(b.distrito ?? '') ||
+        (a.razon_social ?? '').localeCompare(b.razon_social ?? ''),
+    )
     .map((item) => ({
       ...item,
       mapa: `https://www.google.com/maps/search/?api=1&query=${item.latitud},${item.longitud}`,
@@ -88,7 +119,10 @@ async function main() {
     }));
 
   const body = `﻿${[columns.join(','), ...rows.map((row) => columns.map((key) => cell(row[key])).join(','))].join('\n')}\n`;
-  const out = path.join(path.resolve(root, process.env.IDENTITY_ROOT || path.join('.local-cache', 'identity')), 'establecimientos.csv');
+  const out = path.join(
+    path.resolve(root, process.env.IDENTITY_ROOT || path.join('.local-cache', 'identity')),
+    'establecimientos.csv',
+  );
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, body, { mode: 0o600 });
 
@@ -108,4 +142,7 @@ async function main() {
   process.stdout.write(`${'='.repeat(58)}\n`);
 }
 
-main().catch((error) => { process.stderr.write(`Falló el volcado: ${error.message}\n`); process.exitCode = 1; });
+main().catch((error) => {
+  process.stderr.write(`Falló el volcado: ${error.message}\n`);
+  process.exitCode = 1;
+});

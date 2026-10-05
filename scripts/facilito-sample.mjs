@@ -48,7 +48,11 @@ function parseArgs(argv) {
   const opciones = { group: 'gasolina', districts: DISTRITOS, size: 20, excluir: [] };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--group') opciones.group = String(argv[++i] ?? '');
-    else if (argv[i] === '--districts') opciones.districts = String(argv[++i] ?? '').split(',').map((d) => d.trim()).filter(Boolean);
+    else if (argv[i] === '--districts')
+      opciones.districts = String(argv[++i] ?? '')
+        .split(',')
+        .map((d) => d.trim())
+        .filter(Boolean);
     else if (argv[i] === '--size') opciones.size = Number(argv[++i]);
     // Para completar una muestra ya revisada sin repetir lo que ya se miró.
     else if (argv[i] === '--excluir-revisados') opciones.excluir.push(String(argv[++i] ?? ''));
@@ -62,10 +66,12 @@ const opciones = parseArgs(process.argv.slice(2));
 const grupo = describeGroup(opciones.group);
 // Los establecimientos que otra hoja ya revisó. La muestra se completa, no se
 // rehace: lo revisado sigue contando.
-const yaRevisados = new Set(opciones.excluir.flatMap((archivo) => {
-  const hoja = JSON.parse(fs.readFileSync(path.isAbsolute(archivo) ? archivo : path.join(ROOT, archivo), 'utf8'));
-  return (hoja.seleccion ?? []).map((item) => item.establishment_id);
-}));
+const yaRevisados = new Set(
+  opciones.excluir.flatMap((archivo) => {
+    const hoja = JSON.parse(fs.readFileSync(path.isAbsolute(archivo) ? archivo : path.join(ROOT, archivo), 'utf8'));
+    return (hoja.seleccion ?? []).map((item) => item.establishment_id);
+  }),
+);
 
 // 1. La composición que se publicaría: de ahí salen el vínculo, la identidad
 //    publicada y el precio del CSV con su fecha. Antes de su primera activación
@@ -74,9 +80,10 @@ const yaRevisados = new Set(opciones.excluir.flatMap((archivo) => {
 const base = readActivePointer(ROOT, { group: grupo.key }) ? null : firstActivationBase(ROOT, grupo.key);
 if (base && !base.ok) throw new Error(`${grupo.key}: sin snapshot utilizable: ${base.missing.join('; ')}`);
 const pointer = base?.pointer ?? readActivePointer(ROOT, { group: grupo.key });
-const candidate = grupo.key === 'gasolina'
-  ? await composeGasolinaProjection({ root: ROOT })
-  : (await composeGroups({ root: ROOT, plan: [{ pointer, groups: [grupo.key] }] }))[grupo.key];
+const candidate =
+  grupo.key === 'gasolina'
+    ? await composeGasolinaProjection({ root: ROOT })
+    : (await composeGroups({ root: ROOT, plan: [{ pointer, groups: [grupo.key] }] }))[grupo.key];
 // Todas las ofertas de cada huella, no la última: dos ofertas con la misma
 // huella son una ambigüedad del lado oficial y el vínculo las rechaza.
 const porHuella = new Map();
@@ -99,7 +106,9 @@ if (PARECIDAS[grupo.key]) {
   const ultimo = new Map();
   for (const row of prices) {
     // El mismo nombre en otra unidad también es otra variedad: `GLP - G` en kg.
-    const publicado = grupo.products.some((key) => PRODUCTS[key].canonical === row.PRODUCTO && PRODUCTS[key].unit === row.UNIDAD);
+    const publicado = grupo.products.some(
+      (key) => PRODUCTS[key].canonical === row.PRODUCTO && PRODUCTS[key].unit === row.UNIDAD,
+    );
     if (publicado && Object.hasOwn(grupo.config.activities, row.ACTIVIDAD)) {
       const anchor = officialAnchorFromRegistration(row.REGISTRO_DE_HIDROCARBUROS);
       actividades.set(anchor, new Set([...(actividades.get(anchor) ?? []), grupo.config.activities[row.ACTIVIDAD]]));
@@ -111,7 +120,15 @@ if (PARECIDAS[grupo.key]) {
   }
   for (const row of ultimo.values()) {
     const anchor = officialAnchorFromRegistration(row.REGISTRO_DE_HIDROCARBUROS);
-    otrasVariantes.set(anchor, [...(otrasVariantes.get(anchor) ?? []), { producto: row.PRODUCTO, unidad: row.UNIDAD, precio: Number(String(row.PRECIO_DE_VENTA_SOLES).replace(',', '.')), reportado: row.FECHA_DE_REGISTRO }]);
+    otrasVariantes.set(anchor, [
+      ...(otrasVariantes.get(anchor) ?? []),
+      {
+        producto: row.PRODUCTO,
+        unidad: row.UNIDAD,
+        precio: Number(String(row.PRECIO_DE_VENTA_SOLES).replace(',', '.')),
+        reportado: row.FECHA_DE_REGISTRO,
+      },
+    ]);
   }
 }
 
@@ -138,25 +155,50 @@ for (const unidad of lectura.units) {
     const comun = {
       distrito: unidad.district_name,
       producto: unidad.product,
-      facilito: { razon_social: fila.establecimiento, direccion: fila.direccion, precio: fila.price, observado_en: unidad.observed_at },
+      facilito: {
+        razon_social: fila.establecimiento,
+        direccion: fila.direccion,
+        precio: fila.price,
+        observado_en: unidad.observed_at,
+      },
     };
     if (repetidas.get(fila.key_hash) > 1 || pares.length > 1) {
-      ambiguas.push({ ...comun, filas_con_la_huella: repetidas.get(fila.key_hash), ofertas_con_la_huella: pares.map((offer) => ({ establishment_id: offer.establishment_id, direccion: offer.address, precio_csv: offer.price })) });
+      ambiguas.push({
+        ...comun,
+        filas_con_la_huella: repetidas.get(fila.key_hash),
+        ofertas_con_la_huella: pares.map((offer) => ({
+          establishment_id: offer.establishment_id,
+          direccion: offer.address,
+          precio_csv: offer.price,
+        })),
+      });
       continue;
     }
-    if (!pares.length) { sinPar.push(comun); continue; }
+    if (!pares.length) {
+      sinPar.push(comun);
+      continue;
+    }
     const [offer] = pares;
     vinculadas.push({
       ...comun,
       establishment_id: offer.establishment_id,
-      publicado: { nombre: offer.commercial_identity?.public_site_name ?? null, marca: offer.commercial_identity?.brand ?? null, direccion: offer.address },
+      publicado: {
+        nombre: offer.commercial_identity?.public_site_name ?? null,
+        marca: offer.commercial_identity?.brand ?? null,
+        direccion: offer.address,
+      },
       csv: { precio: offer.price, reportado_en: offer.reported_at },
       // Lo que la capa publicaría hoy para esa oferta, que puede venir de una
       // captura anterior a esta lectura: verlo separado evita confundir «el
       // precio cambió entre las dos lecturas» con «el vínculo está mal».
       capa_publicada: offer.facilito,
       diferencia: Number((fila.price - offer.price).toFixed(4)),
-      ...(PARECIDAS[grupo.key] ? { actividad: [...(actividades.get(offer.establishment_id) ?? [])].sort().join('/') || null, otras_variantes_en_csv: otrasVariantes.get(offer.establishment_id) ?? [] } : {}),
+      ...(PARECIDAS[grupo.key]
+        ? {
+            actividad: [...(actividades.get(offer.establishment_id) ?? [])].sort().join('/') || null,
+            otras_variantes_en_csv: otrasVariantes.get(offer.establishment_id) ?? [],
+          }
+        : {}),
     });
   }
 }
@@ -171,9 +213,10 @@ for (const unidad of lectura.units) {
 //    en GNV) se cruzan con capas distintas, y quien también reporta otra
 //    presentación —kg o cilindros de GLP, GNV licuefactado— podría tener en la
 //    consulta el precio de esa otra. El reparto es por esos estratos.
-const estrato = (item) => (OTRA_CAPA[grupo.key]
-  ? `${item.actividad?.split('/').some((codigo) => OTRA_CAPA[grupo.key].includes(codigo)) ? OTRA_CAPA[grupo.key].join('/') : 'estaciones'}:${item.otras_variantes_en_csv.length ? 'con_variantes' : 'sin_variantes'}`
-  : `${item.distrito}:${item.producto}`);
+const estrato = (item) =>
+  OTRA_CAPA[grupo.key]
+    ? `${item.actividad?.split('/').some((codigo) => OTRA_CAPA[grupo.key].includes(codigo)) ? OTRA_CAPA[grupo.key].join('/') : 'estaciones'}:${item.otras_variantes_en_csv.length ? 'con_variantes' : 'sin_variantes'}`
+    : `${item.distrito}:${item.producto}`;
 const grupos = new Map();
 for (const item of [...vinculadas].sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia))) {
   const clave = estrato(item);
@@ -200,24 +243,50 @@ while (seleccion.length < opciones.size && vuelta < 200) {
 // tabla consultada fuera otra variedad que el mismo grifo vende, las diferencias
 // serían sistemáticas; con el mismo producto, un reporte reciente del CSV y la
 // consulta de hoy suelen coincidir al céntimo.
-const diferencias = vinculadas.map((item) => ({ d: Math.abs(item.diferencia), horas: (Date.parse(item.facilito.observado_en) - Date.parse(item.csv.reportado_en)) / 3_600_000 }));
+const diferencias = vinculadas.map((item) => ({
+  d: Math.abs(item.diferencia),
+  horas: (Date.parse(item.facilito.observado_en) - Date.parse(item.csv.reportado_en)) / 3_600_000,
+}));
 function resumir(lista) {
   const ds = lista.map((item) => item.d).sort((a, b) => a - b);
   const cuantil = (p) => (ds.length ? ds[Math.min(ds.length - 1, Math.floor(p * ds.length))] : null);
-  return { n: ds.length, iguales: ds.filter((d) => d === 0).length, hasta_10_centimos: ds.filter((d) => d <= 0.1).length, mediana: cuantil(0.5), p90: cuantil(0.9), maxima: ds.at(-1) ?? null };
+  return {
+    n: ds.length,
+    iguales: ds.filter((d) => d === 0).length,
+    hasta_10_centimos: ds.filter((d) => d <= 0.1).length,
+    mediana: cuantil(0.5),
+    p90: cuantil(0.9),
+    maxima: ds.at(-1) ?? null,
+  };
 }
-const comparacion = { todas: resumir(diferencias), reporte_csv_hasta_72h: resumir(diferencias.filter((item) => item.horas <= 72)) };
+const comparacion = {
+  todas: resumir(diferencias),
+  reporte_csv_hasta_72h: resumir(diferencias.filter((item) => item.horas <= 72)),
+};
 
-const cuenta = (lista) => Object.fromEntries([...lista.reduce((mapa, item) => mapa.set(estrato(item), (mapa.get(estrato(item)) ?? 0) + 1), new Map())].sort());
+const cuenta = (lista) =>
+  Object.fromEntries(
+    [...lista.reduce((mapa, item) => mapa.set(estrato(item), (mapa.get(estrato(item)) ?? 0) + 1), new Map())].sort(),
+  );
 const stamp = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15);
-const destino = path.join(facilitoRoot(ROOT), `muestra-${grupo.key === 'gasolina' ? '' : `${grupo.key}-`}${stamp}.json`);
+const destino = path.join(
+  facilitoRoot(ROOT),
+  `muestra-${grupo.key === 'gasolina' ? '' : `${grupo.key}-`}${stamp}.json`,
+);
 const hoja = {
   generado_en: new Date().toISOString(),
   grupo: grupo.key,
   revision_compuesta: candidate.manifest.revision_id,
-  criterio: 'razón social + dirección + distrito exactos y únicos en ambos sentidos; normalización de mayúsculas, tildes y espacios',
+  criterio:
+    'razón social + dirección + distrito exactos y únicos en ambos sentidos; normalización de mayúsculas, tildes y espacios',
   distritos: opciones.districts,
-  poblacion: { vinculadas: vinculadas.length, establecimientos_vinculados: new Set(vinculadas.map((item) => item.establishment_id)).size, sin_par_oficial: sinPar.length, ambiguas: ambiguas.length, por_estrato: cuenta(vinculadas) },
+  poblacion: {
+    vinculadas: vinculadas.length,
+    establecimientos_vinculados: new Set(vinculadas.map((item) => item.establishment_id)).size,
+    sin_par_oficial: sinPar.length,
+    ambiguas: ambiguas.length,
+    por_estrato: cuenta(vinculadas),
+  },
   comparacion_precios: comparacion,
   ya_revisados_en_otra_hoja: [...yaRevisados],
   // Quién revisa y qué resolvió se escribe DESPUÉS, al revisar. Se deja el hueco
@@ -232,24 +301,32 @@ const hoja = {
 fs.mkdirSync(path.dirname(destino), { recursive: true, mode: 0o700 });
 fs.writeFileSync(destino, `${JSON.stringify(hoja, null, 2)}\n`, { mode: 0o600 });
 
-process.stdout.write(`${JSON.stringify({
-  hoja: path.relative(ROOT, destino),
-  grupo: grupo.key,
-  distritos: opciones.districts.length,
-  unidades_leidas: lectura.units.filter((u) => u.status === 'ok').length,
-  vinculadas: vinculadas.length,
-  ambiguas: ambiguas.length,
-  sin_par_oficial: sinPar.length,
-  muestra: seleccion.length,
-  establecimientos_distintos: new Set(seleccion.map((item) => item.establishment_id)).size,
-  excluidos_por_ya_revisados: yaRevisados.size,
-  con_diferencia_de_precio: seleccion.filter((item) => item.diferencia !== 0).length,
-  con_otras_variantes: seleccion.filter((item) => item.otras_variantes_en_csv?.length).length,
-  comparacion_precios: comparacion,
-  por_producto: Object.fromEntries(grupo.products.map((key) => [key, seleccion.filter((item) => item.producto === key).length])),
-  vinculadas_por_estrato: cuenta(vinculadas),
-  muestra_por_estrato: cuenta(seleccion),
-  distritos_en_la_muestra: new Set(seleccion.map((item) => item.distrito)).size,
-  bloqueo: lectura.blocked,
-}, null, 2)}\n`);
+process.stdout.write(
+  `${JSON.stringify(
+    {
+      hoja: path.relative(ROOT, destino),
+      grupo: grupo.key,
+      distritos: opciones.districts.length,
+      unidades_leidas: lectura.units.filter((u) => u.status === 'ok').length,
+      vinculadas: vinculadas.length,
+      ambiguas: ambiguas.length,
+      sin_par_oficial: sinPar.length,
+      muestra: seleccion.length,
+      establecimientos_distintos: new Set(seleccion.map((item) => item.establishment_id)).size,
+      excluidos_por_ya_revisados: yaRevisados.size,
+      con_diferencia_de_precio: seleccion.filter((item) => item.diferencia !== 0).length,
+      con_otras_variantes: seleccion.filter((item) => item.otras_variantes_en_csv?.length).length,
+      comparacion_precios: comparacion,
+      por_producto: Object.fromEntries(
+        grupo.products.map((key) => [key, seleccion.filter((item) => item.producto === key).length]),
+      ),
+      vinculadas_por_estrato: cuenta(vinculadas),
+      muestra_por_estrato: cuenta(seleccion),
+      distritos_en_la_muestra: new Set(seleccion.map((item) => item.distrito)).size,
+      bloqueo: lectura.blocked,
+    },
+    null,
+    2,
+  )}\n`,
+);
 process.stdout.write('PRIVADO: la hoja contiene razón social y dirección. No commitear.\n');

@@ -8,8 +8,24 @@
 // promedio del periodo. Aquí no se interpreta: fechas, producto, unidad,
 // promedio y estados de datos son etiquetas informativas.
 
-import { HISTORY_MAX_BYTES, HISTORY_MAX_DAYS, HISTORY_PRODUCTS, limaDate, validateDailySummary } from '../web/lib/history-contract.js';
-import { STALE_HOURS, areaPath, frameWindow, lastPoint, monotonePath, periodAverage, planeScale, segments, staleHours } from '../web/lib/history-series.js';
+import {
+  HISTORY_MAX_BYTES,
+  HISTORY_MAX_DAYS,
+  HISTORY_PRODUCTS,
+  limaDate,
+  validateDailySummary,
+} from '../web/lib/history-contract.js';
+import {
+  STALE_HOURS,
+  areaPath,
+  frameWindow,
+  lastPoint,
+  monotonePath,
+  periodAverage,
+  planeScale,
+  segments,
+  staleHours,
+} from '../web/lib/history-series.js';
 import { PRODUCTS } from '../web/lib/catalog.js';
 
 const DIA_CORTO = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -51,7 +67,10 @@ function marcasX(points, days) {
   const paso = days <= 7 ? 1 : 3;
   const indices = [];
   for (let i = days - 1; i >= 0; i -= paso) indices.push(i);
-  return indices.reverse().map((index) => points[index]).filter(Boolean);
+  return indices
+    .reverse()
+    .map((index) => points[index])
+    .filter(Boolean);
 }
 
 /**
@@ -63,7 +82,14 @@ function etiquetaX(punto, days, x) {
   const ancla = punto.index === 0 ? 'start' : punto.index === days - 1 ? 'end' : 'middle';
   const arriba = punto.isToday ? 'Hoy' : fecha(punto.date, days <= 7 ? DIA_SEMANA : DIA_CORTO);
   if (days > 7) return { key: punto.date, x, ancla, arriba: { y: H - 22, texto: arriba }, abajo: null, alterna: false };
-  return { key: punto.date, x, ancla, arriba: { y: H - 24, texto: arriba }, abajo: { y: H - 8, texto: fecha(punto.date, DIA_NUMERO) }, alterna: (days - 1 - punto.index) % 2 === 1 };
+  return {
+    key: punto.date,
+    x,
+    ancla,
+    arriba: { y: H - 24, texto: arriba },
+    abajo: { y: H - 8, texto: fecha(punto.date, DIA_NUMERO) },
+    alterna: (days - 1 - punto.index) % 2 === 1,
+  };
 }
 
 /**
@@ -71,8 +97,15 @@ function etiquetaX(punto, days, x) {
  * unas solas coordenadas, y lo que cada serie aporta.
  */
 export function geometria(points, days) {
-  const series = PRODUCTOS.map((producto) => ({ ...producto, ultimo: lastPoint(points, producto.key), promedio: periodAverage(points, producto.key) }));
-  const scale = planeScale(points, series.map(({ key, promedio }) => ({ key, average: promedio?.k >= 2 ? promedio.mean : null })));
+  const series = PRODUCTOS.map((producto) => ({
+    ...producto,
+    ultimo: lastPoint(points, producto.key),
+    promedio: periodAverage(points, producto.key),
+  }));
+  const scale = planeScale(
+    points,
+    series.map(({ key, promedio }) => ({ key, average: promedio?.k >= 2 ? promedio.mean : null })),
+  );
   return { series, scale, coords: coordenadas(scale, days) };
 }
 
@@ -87,46 +120,85 @@ export function plano(marco) {
   const { points, days } = marco;
   const { series, scale, coords } = geometria(points, days);
   if (scale.empty) return null;
-  const alturasPromedio = series.filter((serie) => serie.promedio?.k >= 2).map((serie) => coords.y(serie.promedio.mean));
+  const alturasPromedio = series
+    .filter((serie) => serie.promedio?.k >= 2)
+    .map((serie) => coords.y(serie.promedio.mean));
   const orden = [...series].reverse();
   const conDatos = series.filter((serie) => serie.ultimo);
   return {
     ariaLabel: `Precio promedio diario en Lima. ${conDatos.map((serie) => `${serie.label}: último S/ ${dosDecimales(serie.ultimo.mean)} del ${fecha(serie.ultimo.date, DIA_LARGO)} con ${serie.ultimo.n} estaciones${serie.promedio?.k >= 2 ? `, promedio de ${serie.promedio.k} días S/ ${dosDecimales(serie.promedio.mean)}` : ''}`).join('. ')}. Usa las flechas para recorrer los días.`,
     // El gradiente del faldón de cada serie, desde su punto más alto hasta
     // `FALDON` más abajo, con tres paradas para que no se le vea el corte.
-    gradientes: orden.map((serie) => {
-      const alturas = points.map((punto) => punto[serie.key]?.mean).filter(Number.isFinite).map(coords.y);
-      if (!alturas.length) return null;
-      const techo = Math.min(...alturas);
-      return { key: serie.key, y1: numero(techo), y2: numero(techo + FALDON) };
-    }).filter(Boolean),
+    gradientes: orden
+      .map((serie) => {
+        const alturas = points
+          .map((punto) => punto[serie.key]?.mean)
+          .filter(Number.isFinite)
+          .map(coords.y);
+        if (!alturas.length) return null;
+        const techo = Math.min(...alturas);
+        return { key: serie.key, y1: numero(techo), y2: numero(techo + FALDON) };
+      })
+      .filter(Boolean),
     // La cifra de una marca que cae encima de una referencia se calla: dos
     // números pegados a la misma altura no se leen.
     ticks: scale.ticks.map((valor) => {
       const altura = coords.y(valor);
       const choca = alturasPromedio.some((suya) => Math.abs(altura - suya) < 7);
-      return { key: valor, x1: PAD.izquierda, x2: W - PAD.derecha, y: altura, texto: choca ? null : { x: PAD.izquierda - 6, y: numero(altura + 4), valor: dosDecimales(valor) } };
+      return {
+        key: valor,
+        x1: PAD.izquierda,
+        x2: W - PAD.derecha,
+        y: altura,
+        texto: choca ? null : { x: PAD.izquierda - 6, y: numero(altura + 4), valor: dosDecimales(valor) },
+      };
     }),
     fechas: marcasX(points, days).map((punto) => etiquetaX(punto, days, coords.x(punto.index))),
     series: orden.map((serie) => {
       // Un hueco corta la línea y el área; un tramo de un solo día es un punto y
       // no arrastra relleno.
       const tramos = segments(points, serie.key);
-      const promedio = serie.promedio?.k >= 2 ? (() => {
-        const y = coords.y(serie.promedio.mean);
-        return { y, x1: PAD.izquierda, x2: W - PAD.derecha, texto: { x: PAD.izquierda + 2, y: numero(y > PAD.arriba + 22 ? y - 6 : y + 14), valor: `Prom. ${dosDecimales(serie.promedio.mean)}` } };
-      })() : null;
+      const promedio =
+        serie.promedio?.k >= 2
+          ? (() => {
+              const y = coords.y(serie.promedio.mean);
+              return {
+                y,
+                x1: PAD.izquierda,
+                x2: W - PAD.derecha,
+                texto: {
+                  x: PAD.izquierda + 2,
+                  y: numero(y > PAD.arriba + 22 ? y - 6 : y + 14),
+                  valor: `Prom. ${dosDecimales(serie.promedio.mean)}`,
+                },
+              };
+            })()
+          : null;
       // La etiqueta del último punto va sobre él, anclada a la derecha, al extremo
       // opuesto de la cifra del promedio.
-      const ultimo = serie.ultimo ? (() => {
-        const x = coords.x(serie.ultimo.index);
-        const y = coords.y(serie.ultimo.mean);
-        return { cx: x, cy: y, nombre: { x: numero(x + 2), y: numero(y > PAD.arriba + 20 ? y - 11 : y + 20), texto: serie.label.toLocaleUpperCase('es-PE') } };
-      })() : null;
+      const ultimo = serie.ultimo
+        ? (() => {
+            const x = coords.x(serie.ultimo.index);
+            const y = coords.y(serie.ultimo.mean);
+            return {
+              cx: x,
+              cy: y,
+              nombre: {
+                x: numero(x + 2),
+                y: numero(y > PAD.arriba + 20 ? y - 11 : y + 20),
+                texto: serie.label.toLocaleUpperCase('es-PE'),
+              },
+            };
+          })()
+        : null;
       return {
         key: serie.key,
         areas: tramos.filter((tramo) => tramo.length > 1).map((tramo) => areaPath(tramo, coords.x, coords.y, BASE)),
-        lineas: tramos.map((tramo) => (tramo.length > 1 ? { d: monotonePath(tramo, coords.x, coords.y) } : { cx: coords.x(tramo[0].index), cy: coords.y(tramo[0].mean) })),
+        lineas: tramos.map((tramo) =>
+          tramo.length > 1
+            ? { d: monotonePath(tramo, coords.x, coords.y) }
+            : { cx: coords.x(tramo[0].index), cy: coords.y(tramo[0].mean) },
+        ),
         promedio,
         ultimo,
       };
@@ -158,7 +230,14 @@ export function diaEnX(relativo, days) {
 export function lecturas(marco) {
   return PRODUCTOS.map((producto) => {
     const ultimo = lastPoint(marco.points, producto.key);
-    return { key: producto.key, label: producto.label, valor: ultimo ? dosDecimales(ultimo.mean) : null, fecha: ultimo ? fecha(ultimo.date) : null, datetime: ultimo ? (ultimo.observedAt ?? ultimo.date) : null, n: ultimo?.n ?? null };
+    return {
+      key: producto.key,
+      label: producto.label,
+      valor: ultimo ? dosDecimales(ultimo.mean) : null,
+      fecha: ultimo ? fecha(ultimo.date) : null,
+      datetime: ultimo ? (ultimo.observedAt ?? ultimo.date) : null,
+      n: ultimo?.n ?? null,
+    };
   });
 }
 
@@ -202,9 +281,20 @@ export function evaluarResumen(texto, { hoy, now, desdeCopia = false, savedAt = 
   const problemas = validateDailySummary(resumen, { bytes });
   if (problemas.length) throw new Error(problemas[0]);
   const completo = frameWindow(resumen, { today: hoy, days: HISTORY_MAX_DAYS });
-  if (!completo.daysWithObservation) return { resumen, estado: 'empty', nota: 'Todavía no hay días registrados en el histórico.' };
-  if (desdeCopia) return { resumen, estado: 'saved', nota: `Copia guardada${savedAt ? ` del ${fecha(limaDate(savedAt), DIA_LARGO)}` : ''}: puede no estar al día.` };
+  if (!completo.daysWithObservation)
+    return { resumen, estado: 'empty', nota: 'Todavía no hay días registrados en el histórico.' };
+  if (desdeCopia)
+    return {
+      resumen,
+      estado: 'saved',
+      nota: `Copia guardada${savedAt ? ` del ${fecha(limaDate(savedAt), DIA_LARGO)}` : ''}: puede no estar al día.`,
+    };
   const horas = staleHours(completo.lastObservedAt, now);
-  if (horas !== null && horas > STALE_HOURS) return { resumen, estado: 'stale', nota: `Última actualización: ${fecha(completo.lastObservedAt.slice(0, 10), DIA_LARGO)}.` };
+  if (horas !== null && horas > STALE_HOURS)
+    return {
+      resumen,
+      estado: 'stale',
+      nota: `Última actualización: ${fecha(completo.lastObservedAt.slice(0, 10), DIA_LARGO)}.`,
+    };
   return { resumen, estado: 'ready', nota: '' };
 }

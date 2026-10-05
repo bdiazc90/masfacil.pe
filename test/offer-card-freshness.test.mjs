@@ -38,7 +38,10 @@ const consulta = (price, observed_at) => ({ price, observed_at, reported_at: nul
 /** Una fila fusionada, por el mismo camino que recorre la app. */
 function fila({ regular, premium }, ahora) {
   const now = () => iso(ahora);
-  const porProducto = { regular: filterFreshOffers([regular], { now, cutoffAt: CORTE }), premium: filterFreshOffers([premium], { now, cutoffAt: CORTE }) };
+  const porProducto = {
+    regular: filterFreshOffers([regular], { now, cutoffAt: CORTE }),
+    premium: filterFreshOffers([premium], { now, cutoffAt: CORTE }),
+  };
   return mergeOfferRows(
     { regular: porProducto.regular.offers, premium: porProducto.premium.offers },
     { regular: porProducto.regular.expired, premium: porProducto.premium.expired },
@@ -47,20 +50,34 @@ function fila({ regular, premium }, ahora) {
 
 test('con los dos precios de la consulta, la etiqueta dice «Consultado»', () => {
   const ahora = corte + 3 * HORA;
-  const row = fila({
-    regular: oferta('a', { price: 22.99, reported_at: iso(corte - 5 * DIA), facilito: consulta(22.39, iso(ahora - 2 * HORA)) }),
-    premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA), facilito: consulta(24.49, iso(ahora - 2 * HORA)) }),
-  }, ahora);
+  const row = fila(
+    {
+      regular: oferta('a', {
+        price: 22.99,
+        reported_at: iso(corte - 5 * DIA),
+        facilito: consulta(22.39, iso(ahora - 2 * HORA)),
+      }),
+      premium: oferta('b', {
+        price: 24.99,
+        reported_at: iso(corte - 5 * DIA),
+        facilito: consulta(24.49, iso(ahora - 2 * HORA)),
+      }),
+    },
+    ahora,
+  );
   assert.equal(row.age_source, 'facilito');
   assert.equal(offerCardView(row, { includeDetail: false, withDistance: false }).freshness, 'Consultado hace 2 h');
 });
 
 test('con los dos del CSV, sigue diciendo «Reportado»', () => {
   const ahora = corte + 3 * HORA;
-  const row = fila({
-    regular: oferta('a', { price: 22.99, reported_at: iso(corte - 5 * DIA) }),
-    premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA) }),
-  }, ahora);
+  const row = fila(
+    {
+      regular: oferta('a', { price: 22.99, reported_at: iso(corte - 5 * DIA) }),
+      premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA) }),
+    },
+    ahora,
+  );
   assert.equal(row.age_source, 'csv');
   assert.equal(offerCardView(row, { includeDetail: false, withDistance: false }).freshness, 'Reportado hace 5 días');
 });
@@ -70,10 +87,17 @@ test('con fuentes mezcladas, la etiqueta nombra la del precio más reciente y el
   // etiqueta habla del más reciente con SU verbo; lo que no puede pasar es que
   // el detalle llame «reportado» a la consulta o al revés.
   const ahora = corte + 3 * HORA;
-  const row = fila({
-    regular: oferta('a', { price: 22.99, reported_at: iso(corte - 5 * DIA), facilito: consulta(22.39, iso(ahora - 2 * HORA)) }),
-    premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA) }),
-  }, ahora);
+  const row = fila(
+    {
+      regular: oferta('a', {
+        price: 22.99,
+        reported_at: iso(corte - 5 * DIA),
+        facilito: consulta(22.39, iso(ahora - 2 * HORA)),
+      }),
+      premium: oferta('b', { price: 24.99, reported_at: iso(corte - 5 * DIA) }),
+    },
+    ahora,
+  );
   assert.equal(row.age_source, 'facilito');
   assert.equal(offerCardView(row, { includeDetail: false, withDistance: false }).freshness, 'Consultado hace 2 h');
 
@@ -90,10 +114,13 @@ test('un fallo de nuestra consulta no se presenta como silencio del operador', (
   // días— y no las horas que llevamos sin poder leer la tabla.
   const ahora = corte + 40 * DIA;
   const reportado = iso(corte - 5 * DIA);
-  const row = fila({
-    regular: oferta('a', { price: 22.99, reported_at: reportado, facilito: consulta(22.39, iso(ahora - 30 * HORA)) }),
-    premium: oferta('b', { price: 24.99, reported_at: reportado }),
-  }, ahora);
+  const row = fila(
+    {
+      regular: oferta('a', { price: 22.99, reported_at: reportado, facilito: consulta(22.39, iso(ahora - 30 * HORA)) }),
+      premium: oferta('b', { price: 24.99, reported_at: reportado }),
+    },
+    ahora,
+  );
   assert.equal(row.has_price, false);
   assert.ok(row.silent_days > 44, `el silencio mide el reporte del CSV, no la consulta: ${row.silent_days}`);
   assert.equal(row.last_reported_at, reportado);

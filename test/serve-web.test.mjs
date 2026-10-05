@@ -31,5 +31,8 @@ test('en desarrollo se revalida todo; el modo prod reproduce el peor caso de la 
   assert.equal(cacheControl('prod', '.html', undefined), 'public, max-age=0, must-revalidate');
   assert.equal(cacheControl('prod', '.js', undefined), 'public, max-age=14400, must-revalidate');
   assert.equal(cacheControl('prod', '.js', 'no-cache'), 'max-age=14400');
-  assert.equal(cacheControl('prod', '.json', 'public, max-age=31536000, immutable'), 'public, max-age=31536000, immutable');
+  assert.equal(
+    cacheControl('prod', '.json', 'public, max-age=31536000, immutable'),
+    'public, max-age=31536000, immutable',
+  );
 });

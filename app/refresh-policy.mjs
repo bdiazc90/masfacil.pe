@@ -9,5 +9,9 @@ export function sourceMaxAdvances(active, candidate) {
 }
 
 export function hasNumericQuality(quality) {
-  return [quality?.candidate?.fresh_offers, quality?.candidate?.contract_ready, quality?.candidate?.coverage_percent].every(Number.isFinite);
+  return [
+    quality?.candidate?.fresh_offers,
+    quality?.candidate?.contract_ready,
+    quality?.candidate?.coverage_percent,
+  ].every(Number.isFinite);
 }

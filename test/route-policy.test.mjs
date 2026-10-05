@@ -17,7 +17,8 @@ import { resolveRoute } from '../app/route-policy.mjs';
 const ruta = (...changedPaths) => resolveRoute({ eventName: 'push', changedPaths }).route;
 
 test('un módulo de web/ que decide los bytes publicados reproyecta', () => {
-  for (const file of ['web/lib/catalog.js', 'web/lib/bundle-contract.js', 'web/lib/price-source.js']) assert.equal(ruta(file), 'project', file);
+  for (const file of ['web/lib/catalog.js', 'web/lib/bundle-contract.js', 'web/lib/price-source.js'])
+    assert.equal(ruta(file), 'project', file);
   assert.equal(ruta('ui/styles.css', 'web/lib/catalog.js'), 'project');
 });
 
@@ -37,7 +38,10 @@ test('un cambio visual habitual sigue siendo shell', () => {
   // Retirar las fuentes que pasaron a `ui/` también es un cambio de interfaz.
   assert.equal(ruta('web/app.js', 'web/styles.css', 'ui/app.js', 'ui/styles.css'), 'shell');
   // Instalar un logo: el SVG, su registro y el instalador del operador.
-  assert.equal(ruta('web/icons/brands/primax-mark.svg', 'web/brand-logos.js', 'scripts/install-brand-logo.mjs'), 'shell');
+  assert.equal(
+    ruta('web/icons/brands/primax-mark.svg', 'web/brand-logos.js', 'scripts/install-brand-logo.mjs'),
+    'shell',
+  );
   // El adaptador del navegador no cambia lo que se publica; verify:web ya
   // comprueba que el cliente acepte el bundle vigente.
   assert.equal(ruta('web/gasolina-contract.js'), 'shell');

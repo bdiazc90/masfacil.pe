@@ -17,7 +17,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const leer = (archivo) => { try { return JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { return null; } };
+const leer = (archivo) => {
+  try {
+    return JSON.parse(fs.readFileSync(archivo, 'utf8'));
+  } catch {
+    return null;
+  }
+};
 const stage = process.env.SUMMARY_STAGE || 'prepare';
 const lineas = [];
 
@@ -26,12 +32,23 @@ if (stage === 'deploy') {
   const preflightReason = process.env.PREFLIGHT_REASON || 'sin motivo';
   const upload = process.env.UPLOAD_OUTCOME || 'skipped';
   lineas.push(`## Publicación · ruta \`${process.env.ROUTE ?? 'desconocida'}\``, '');
-  if (!preflightDeploy) lineas.push(`**No publicado.** ${preflightReason}`, '', 'El deployment vigente se conserva. Si el motivo empieza por `corrida_desactualizada` o `codigo_desactualizado`, otra corrida más nueva ya publicó o va a publicar lo suyo: no hay nada que corregir.');
-  else if (upload === 'success') lineas.push('**Publicado.** El Direct Upload terminó y producción sirve esta corrida.');
-  else lineas.push(`**No publicado: la subida terminó en \`${upload}\`.** El preflight había autorizado (${preflightReason}); revisa el paso de Cloudflare arriba. Se conserva el último deployment válido.`);
+  if (!preflightDeploy)
+    lineas.push(
+      `**No publicado.** ${preflightReason}`,
+      '',
+      'El deployment vigente se conserva. Si el motivo empieza por `corrida_desactualizada` o `codigo_desactualizado`, otra corrida más nueva ya publicó o va a publicar lo suyo: no hay nada que corregir.',
+    );
+  else if (upload === 'success')
+    lineas.push('**Publicado.** El Direct Upload terminó y producción sirve esta corrida.');
+  else
+    lineas.push(
+      `**No publicado: la subida terminó en \`${upload}\`.** El preflight había autorizado (${preflightReason}); revisa el paso de Cloudflare arriba. Se conserva el último deployment válido.`,
+    );
 } else {
   const resultado = process.env.PREPARE_RESULT ? leer(path.resolve(process.env.PREPARE_RESULT)) : null;
-  const problemas = leer(path.join(root, process.env.IDENTITY_ROOT || '.local-cache/identity', 'identity-problems.json'));
+  const problemas = leer(
+    path.join(root, process.env.IDENTITY_ROOT || '.local-cache/identity', 'identity-problems.json'),
+  );
   const route = resultado?.informe?.route ?? process.env.ROUTE ?? 'desconocida';
   const routeReason = resultado?.informe?.route_reason ?? process.env.ROUTE_REASON ?? null;
   const decision = resultado?.decision ?? {};
@@ -57,21 +74,40 @@ if (stage === 'deploy') {
   // la detección de validadores y los guardrails que se dispararon.
   if (refresh.error) lineas.push(`| causa | ${refresh.error} |`);
   if (refresh.detection?.reason) lineas.push(`| detección | ${refresh.detection.reason} |`);
-  if (resultado?.execution && resultado.execution.ok === false) lineas.push(`| falló en | \`${resultado.execution.stage}\` · ${resultado.execution.error ?? 'sin mensaje'} |`);
+  if (resultado?.execution && resultado.execution.ok === false)
+    lineas.push(`| falló en | \`${resultado.execution.stage}\` · ${resultado.execution.error ?? 'sin mensaje'} |`);
   for (const motivo of refresh.quality?.reasons ?? []) lineas.push(`| guardrail | ${motivo} |`);
 
   // Cada grupo decide por su cuenta: uno puede publicar mientras otro conserva
   // su versión. La tabla lo dice sin tener que leer el JSON.
   const grupos = Object.entries(informe.groups ?? {});
   if (grupos.length > 1 || grupos.some(([, grupo]) => grupo.first_activation)) {
-    const RESULTADO = { written: 'versión nueva', reused: 'reutilizada', unchanged: 'sin cambios', failed: 'conserva la publicada', first_activation_failed: 'primera activación rechazada' };
+    const RESULTADO = {
+      written: 'versión nueva',
+      reused: 'reutilizada',
+      unchanged: 'sin cambios',
+      failed: 'conserva la publicada',
+      first_activation_failed: 'primera activación rechazada',
+    };
     lineas.push('', '| grupo | decisión | resultado | revisión | nota |', '| --- | --- | --- | --- | --- |');
     // Los motivos de cada grupo vienen de SU fuente: los de GLP no están en el
     // resultado de los líquidos.
-    const juicioDe = (clave) => Object.values(informe.sources ?? {}).map((fuente) => fuente.groups?.[clave]).find(Boolean) ?? refresh.groups?.[clave];
+    const juicioDe = (clave) =>
+      Object.values(informe.sources ?? {})
+        .map((fuente) => fuente.groups?.[clave])
+        .find(Boolean) ?? refresh.groups?.[clave];
     for (const [clave, grupo] of grupos) {
-      const nota = [grupo.first_activation ? 'primera activación' : null, grupo.facilito_change, grupo.error, ...(juicioDe(clave)?.reasons ?? []).map((motivo) => `guardrail: ${motivo}`)].filter(Boolean).join(' · ');
-      lineas.push(`| ${clave} | \`${grupo.action}\` | ${RESULTADO[grupo.outcome] ?? grupo.outcome} | ${grupo.revision_generated ? `\`${grupo.revision_generated}\`` : grupo.revision_id ? `\`${grupo.revision_id}\` (igual)` : '—'} | ${nota || '—'} |`);
+      const nota = [
+        grupo.first_activation ? 'primera activación' : null,
+        grupo.facilito_change,
+        grupo.error,
+        ...(juicioDe(clave)?.reasons ?? []).map((motivo) => `guardrail: ${motivo}`),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      lineas.push(
+        `| ${clave} | \`${grupo.action}\` | ${RESULTADO[grupo.outcome] ?? grupo.outcome} | ${grupo.revision_generated ? `\`${grupo.revision_generated}\`` : grupo.revision_id ? `\`${grupo.revision_id}\` (igual)` : '—'} | ${nota || '—'} |`,
+      );
     }
   }
 
@@ -84,15 +120,46 @@ if (stage === 'deploy') {
   const errorBreve = (error) => {
     const texto = String(error);
     const causa = texto.split('\n').find((linea) => /^\s*Error: /.test(linea));
-    return (causa ? `${texto.split(':')[0]}: ${causa.trim().replace(/^Error: /, '')}` : texto).replace(/\s+/g, ' ').trim().slice(0, 300);
+    return (causa ? `${texto.split(':')[0]}: ${causa.trim().replace(/^Error: /, '')}` : texto)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 300);
   };
   if (fuentes.length) {
-    const ESTADO = { promoted: 'promovida', unchanged: 'sin cambios', unverifiable: 'no verificable', needs_review: 'pendiente de revisión', rejected: 'rechazada' };
+    const ESTADO = {
+      promoted: 'promovida',
+      unchanged: 'sin cambios',
+      unverifiable: 'no verificable',
+      needs_review: 'pendiente de revisión',
+      rejected: 'rechazada',
+    };
     lineas.push('', '| fuente | estado | snapshot | grupos | nota |', '| --- | --- | --- | --- | --- |');
     for (const [id, fuente] of fuentes) {
-      const grupos = Object.entries(fuente.groups ?? {}).map(([clave, grupo]) => `${clave}${grupo.private ? ' (privado)' : ''}: ${grupo.status}${grupo.products ? ` · ${Object.entries(grupo.products).map(([producto, valor]) => `${producto} ${valor.offers} en ${valor.districts} distritos`).join(', ')}` : ''}`).join('<br>');
-      const nota = [fuente.error && errorBreve(fuente.error), ...Object.entries(fuente.groups ?? {}).filter(([, grupo]) => grupo.private && grupo.status !== 'promoted').flatMap(([clave, grupo]) => grupo.reasons.map((motivo) => (motivo.startsWith(`${clave}:`) ? motivo : `${clave}: ${motivo}`)))].filter(Boolean).join(' · ');
-      lineas.push(`| ${id} | ${ESTADO[fuente.status] ?? fuente.status} | ${fuente.snapshot_id ? `\`${fuente.snapshot_id}\`` : '—'} | ${grupos || '—'} | ${nota || '—'} |`);
+      const grupos = Object.entries(fuente.groups ?? {})
+        .map(
+          ([clave, grupo]) =>
+            `${clave}${grupo.private ? ' (privado)' : ''}: ${grupo.status}${
+              grupo.products
+                ? ` · ${Object.entries(grupo.products)
+                    .map(([producto, valor]) => `${producto} ${valor.offers} en ${valor.districts} distritos`)
+                    .join(', ')}`
+                : ''
+            }`,
+        )
+        .join('<br>');
+      const nota = [
+        fuente.error && errorBreve(fuente.error),
+        ...Object.entries(fuente.groups ?? {})
+          .filter(([, grupo]) => grupo.private && grupo.status !== 'promoted')
+          .flatMap(([clave, grupo]) =>
+            grupo.reasons.map((motivo) => (motivo.startsWith(`${clave}:`) ? motivo : `${clave}: ${motivo}`)),
+          ),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      lineas.push(
+        `| ${id} | ${ESTADO[fuente.status] ?? fuente.status} | ${fuente.snapshot_id ? `\`${fuente.snapshot_id}\`` : '—'} | ${grupos || '—'} | ${nota || '—'} |`,
+      );
     }
   }
 
@@ -103,11 +170,21 @@ if (stage === 'deploy') {
   if (poda) {
     const mib = (valor) => `${(valor / 1024 / 1024).toFixed(1)} MiB`;
     if (poda.status === 'pruned') {
-      const protegidos = Object.entries(poda.protected ?? {}).map(([grupo, p]) => `${grupo}: producción \`${p.production}\`, rollback ${p.rollback ? `\`${p.rollback}\`` : 'ninguno anterior'}`);
-      lineas.push('', `Poda de snapshots: ${poda.remove.length} borrados${poda.staging ? ' y staging' : ''}, ${mib(poda.freed_bytes)} liberados; se conservan ${poda.keep.length}.`);
+      const protegidos = Object.entries(poda.protected ?? {}).map(
+        ([grupo, p]) =>
+          `${grupo}: producción \`${p.production}\`, rollback ${p.rollback ? `\`${p.rollback}\`` : 'ninguno anterior'}`,
+      );
+      lineas.push(
+        '',
+        `Poda de snapshots: ${poda.remove.length} borrados${poda.staging ? ' y staging' : ''}, ${mib(poda.freed_bytes)} liberados; se conservan ${poda.keep.length}.`,
+      );
       if (protegidos.length) lineas.push(`Protegido: ${protegidos.join(' · ')}.`);
     } else {
-      lineas.push('', '> [!WARNING]', `> **Poda de snapshots omitida** (\`${poda.status}\`): ${poda.reason ?? poda.error ?? 'sin motivo'}. La caché no se achica en esta corrida.`);
+      lineas.push(
+        '',
+        '> [!WARNING]',
+        `> **Poda de snapshots omitida** (\`${poda.status}\`): ${poda.reason ?? poda.error ?? 'sin motivo'}. La caché no se achica en esta corrida.`,
+      );
     }
     for (const aviso of poda.warnings ?? []) lineas.push(`- Aviso de poda: ${aviso}.`);
   }
@@ -115,16 +192,37 @@ if (stage === 'deploy') {
   // `no_op` es el resultado correcto de un push que no cambia lo publicado.
   // `fail_closed` con una entrega pedida es lo contrario y se marca como tal.
   if (!decision.deploy) {
-    lineas.push('', decision.action === 'no_op'
-      ? '**No-op esperado.** Nada que publicar en esta corrida; el deployment vigente se conserva.'
-      : '**Entrega solicitada que no se publicó.** Se conserva el último deployment bueno; la causa está arriba.');
+    lineas.push(
+      '',
+      decision.action === 'no_op'
+        ? '**No-op esperado.** Nada que publicar en esta corrida; el deployment vigente se conserva.'
+        : '**Entrega solicitada que no se publicó.** Se conserva el último deployment bueno; la causa está arriba.',
+    );
   }
 
-  const identidad = resultado?.identity ?? resultado?.refresh?.identity ?? (problemas ? { status: problemas.status, problems: problemas.reasons ?? [], counts: problemas.counts ?? null } : null);
+  const identidad =
+    resultado?.identity ??
+    resultado?.refresh?.identity ??
+    (problemas
+      ? { status: problemas.status, problems: problemas.reasons ?? [], counts: problemas.counts ?? null }
+      : null);
   if (identidad && identidad.status && identidad.status !== 'complete') {
-    lineas.push('', '> [!WARNING]', `> **Identidad comercial ${identidad.status}.** Los precios se publican igual; las afirmaciones sin respaldo no.`);
-    for (const motivo of (identidad.problems ?? []).slice(0, 20)) lineas.push(`> - ${typeof motivo === 'string' ? motivo : `${motivo.scope ?? 'identidad'}: ${motivo.reason}${motivo.affected != null ? ` (${motivo.affected})` : ''}`}`);
-    if (identidad.counts) lineas.push('> ', `> Conteos: ${Object.entries(identidad.counts).map(([clave, valor]) => `${clave} ${valor}`).join(' · ')}`);
+    lineas.push(
+      '',
+      '> [!WARNING]',
+      `> **Identidad comercial ${identidad.status}.** Los precios se publican igual; las afirmaciones sin respaldo no.`,
+    );
+    for (const motivo of (identidad.problems ?? []).slice(0, 20))
+      lineas.push(
+        `> - ${typeof motivo === 'string' ? motivo : `${motivo.scope ?? 'identidad'}: ${motivo.reason}${motivo.affected != null ? ` (${motivo.affected})` : ''}`}`,
+      );
+    if (identidad.counts)
+      lineas.push(
+        '> ',
+        `> Conteos: ${Object.entries(identidad.counts)
+          .map(([clave, valor]) => `${clave} ${valor}`)
+          .join(' · ')}`,
+      );
   } else if (identidad?.status === 'complete') {
     lineas.push('', 'Identidad comercial completa.');
   }

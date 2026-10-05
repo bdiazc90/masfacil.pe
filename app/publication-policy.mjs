@@ -1,6 +1,7 @@
 /** Decisión pequeña y cerrada entre refresco de datos y despliegue público. */
 
-const decision = (action, { project = false, verify = false, deploy = false, reason }) => Object.freeze({ action, project, verify, deploy, reason });
+const decision = (action, { project = false, verify = false, deploy = false, reason }) =>
+  Object.freeze({ action, project, verify, deploy, reason });
 
 /**
  * ¿`candidato` se quedó atrás frente a lo que ya sirve producción?
@@ -63,8 +64,24 @@ export function groupsBehind({ local, published }) {
   for (const [group, publicado] of Object.entries(published)) {
     if (!publicado) continue;
     const propio = local[group] ?? null;
-    if (!propio) { atrasados.push({ group, local_snapshot: null, published_snapshot: publicado.snapshot_id ?? null, regressions: [], missing: true }); continue; }
-    if (dataStateIsBehind(propio, publicado)) atrasados.push({ group, local_snapshot: propio.snapshot_id ?? null, published_snapshot: publicado.snapshot_id ?? null, regressions: dataStateRegressions(propio, publicado), missing: false });
+    if (!propio) {
+      atrasados.push({
+        group,
+        local_snapshot: null,
+        published_snapshot: publicado.snapshot_id ?? null,
+        regressions: [],
+        missing: true,
+      });
+      continue;
+    }
+    if (dataStateIsBehind(propio, publicado))
+      atrasados.push({
+        group,
+        local_snapshot: propio.snapshot_id ?? null,
+        published_snapshot: publicado.snapshot_id ?? null,
+        regressions: dataStateRegressions(propio, publicado),
+        missing: false,
+      });
   }
   return atrasados;
 }
@@ -87,22 +104,37 @@ export function groupsBehind({ local, published }) {
 export function combineGroupDecisions(route, grupos) {
   const motivo = (grupo) => grupo.error ?? grupo.decision.reason;
   const primeraFallida = grupos.find((grupo) => grupo.outcome === 'first_activation_failed');
-  if (primeraFallida) return decision('fail_closed', { reason: `primera activación de ${primeraFallida.group} rechazada: ${motivo(primeraFallida)}` });
+  if (primeraFallida)
+    return decision('fail_closed', {
+      reason: `primera activación de ${primeraFallida.group} rechazada: ${motivo(primeraFallida)}`,
+    });
   const publican = grupos.filter((grupo) => grupo.decision.deploy && ['written', 'reused'].includes(grupo.outcome));
   const fallidos = grupos.filter((grupo) => grupo.outcome === 'failed');
   const principal = (lista) => lista.find((grupo) => grupo.group === 'gasolina') ?? lista[0];
   if (!publican.length) {
     if (fallidos.length) {
       const primero = principal(fallidos);
-      return decision('fail_closed', { reason: primero.decision.action === 'fail_closed' ? primero.decision.reason : `${route}: ${primero.group} falló: ${motivo(primero)}` });
+      return decision('fail_closed', {
+        reason:
+          primero.decision.action === 'fail_closed'
+            ? primero.decision.reason
+            : `${route}: ${primero.group} falló: ${motivo(primero)}`,
+      });
     }
     const { action, project, verify, deploy, reason } = principal(grupos).decision;
     return decision(action, { project, verify, deploy, reason });
   }
   const cabeza = principal(publican);
-  const otros = publican.filter((grupo) => grupo !== cabeza && grupo.decision.reason !== cabeza.decision.reason).map((grupo) => `${grupo.group}: ${grupo.decision.reason}`);
+  const otros = publican
+    .filter((grupo) => grupo !== cabeza && grupo.decision.reason !== cabeza.decision.reason)
+    .map((grupo) => `${grupo.group}: ${grupo.decision.reason}`);
   const avisos = fallidos.map((grupo) => `${grupo.group} conserva su versión publicada: ${motivo(grupo)}`);
-  return decision(cabeza.decision.action, { project: publican.some((grupo) => grupo.decision.project), verify: true, deploy: true, reason: [cabeza.decision.reason, ...otros, ...avisos].join('; ') });
+  return decision(cabeza.decision.action, {
+    project: publican.some((grupo) => grupo.decision.project),
+    verify: true,
+    deploy: true,
+    reason: [cabeza.decision.reason, ...otros, ...avisos].join('; '),
+  });
 }
 
 /**
@@ -112,16 +144,34 @@ export function combineGroupDecisions(route, grupos) {
  * cambio de CSS sin publicar, porque la única rama que reutilizaba el bundle
  * vivía dentro del estado `unchanged`.
  */
-export function publicationDecisionForRoute(route, refresh, { forceProject = false, reusedSnapshot = null, facilitoAvailable = false, officialSnapshotUsable = false } = {}) {
+export function publicationDecisionForRoute(
+  route,
+  refresh,
+  { forceProject = false, reusedSnapshot = null, facilitoAvailable = false, officialSnapshotUsable = false } = {},
+) {
   if (route === 'docs') return decision('no_op', { reason: 'solo documentación; cero bytes de datos y cero deploy' });
-  if (route === 'shell') return decision('deploy_existing_bundle', { verify: true, deploy: true, reason: 'shell nuevo sobre el último bundle público validado; sin refresco ni proyección' });
+  if (route === 'shell')
+    return decision('deploy_existing_bundle', {
+      verify: true,
+      deploy: true,
+      reason: 'shell nuevo sobre el último bundle público validado; sin refresco ni proyección',
+    });
   // Reproyectar no necesita precios nuevos: con un snapshot privado utilizable
   // la ruta de proyección tampoco consulta la fuente.
-  if (route === 'project' && reusedSnapshot) return decision('reproject_verify_deploy', { project: true, verify: true, deploy: true, reason: `reproyección desde el snapshot privado ${reusedSnapshot}; la fuente no se consultó` });
+  if (route === 'project' && reusedSnapshot)
+    return decision('reproject_verify_deploy', {
+      project: true,
+      verify: true,
+      deploy: true,
+      reason: `reproyección desde el snapshot privado ${reusedSnapshot}; la fuente no se consultó`,
+    });
   return publicationDecision(refresh, { forceProject, facilitoAvailable, officialSnapshotUsable });
 }
 
-export function publicationDecision(refresh, { forceProject = false, facilitoAvailable = false, officialSnapshotUsable = false } = {}) {
+export function publicationDecision(
+  refresh,
+  { forceProject = false, facilitoAvailable = false, officialSnapshotUsable = false } = {},
+) {
   if (!refresh || typeof refresh.status !== 'string') throw new Error('Resultado de refresco ausente o inválido');
   if (refresh.status === 'unchanged') {
     // El diseño asumía que solo un dato nuevo justifica reproyectar. Pero un
@@ -130,20 +180,41 @@ export function publicationDecision(refresh, { forceProject = false, facilitoAva
     // 2.2.0 con dirección quedó construido y sin publicar. Este forzado lo
     // cubre, y solo aplica cuando el refresco fue limpio: si falla, manda el
     // fail_closed de abajo.
-    if (forceProject) return decision('force_project_verify_deploy', { project: true, verify: true, deploy: true, reason: 'reproyección forzada sobre el snapshot activo; los datos no cambiaron' });
+    if (forceProject)
+      return decision('force_project_verify_deploy', {
+        project: true,
+        verify: true,
+        deploy: true,
+        reason: 'reproyección forzada sobre el snapshot activo; los datos no cambiaron',
+      });
     // El CSV es semanal y la consulta web es de horas: que el archivo no haya
     // cambiado ya no significa que los precios que mostramos sigan siendo los
     // mismos. Se compone para mirar, no para publicar a ciegas: si la capa no
     // mueve ningún precio efectivo, quien decide más arriba degrada a `no_op`.
-    if (facilitoAvailable) return decision('facilito_project_verify_deploy', { project: true, verify: true, deploy: true, reason: 'la fuente CSV no cambió; se compone con la consulta web y se publica solo si cambia algún precio efectivo' });
+    if (facilitoAvailable)
+      return decision('facilito_project_verify_deploy', {
+        project: true,
+        verify: true,
+        deploy: true,
+        reason:
+          'la fuente CSV no cambió; se compone con la consulta web y se publica solo si cambia algún precio efectivo',
+      });
     return decision('no_op', { reason: 'validadores sin cambio; cero bytes de datos y cero deploy' });
   }
   if (refresh.status === 'promoted') {
     // `promoted: false` con estado `promoted` no es una combinación esperada; se
     // cierra con el último deployment bueno en vez de caer por una excepción que
     // el llamador tenía que traducir a fail_closed por su cuenta.
-    if (refresh.promoted !== true) return decision('fail_closed', { reason: 'refresco promovido sin confirmar la promoción; se conserva el último deployment bueno' });
-    return decision('project_verify_deploy', { project: true, verify: true, deploy: true, reason: 'snapshot nuevo promovido y apto para proyectar' });
+    if (refresh.promoted !== true)
+      return decision('fail_closed', {
+        reason: 'refresco promovido sin confirmar la promoción; se conserva el último deployment bueno',
+      });
+    return decision('project_verify_deploy', {
+      project: true,
+      verify: true,
+      deploy: true,
+      reason: 'snapshot nuevo promovido y apto para proyectar',
+    });
   }
   if (['unverifiable', 'needs_review', 'rejected'].includes(refresh.status)) {
     // Un fallo del CSV no tiene por qué apagar la otra fuente. El pointer activo
@@ -152,7 +223,12 @@ export function publicationDecision(refresh, { forceProject = false, facilitoAva
     // que resolver el vínculo y publicar la consulta de hoy. Sin esa referencia
     // no se publica ningún vínculo nuevo: se conserva la entrega anterior.
     if (facilitoAvailable && officialSnapshotUsable) {
-      return decision('facilito_over_last_valid_snapshot', { project: true, verify: true, deploy: true, reason: `refresco ${refresh.status}; se compone la consulta web sobre el último snapshot oficial válido y se publica solo si cambia algún precio efectivo` });
+      return decision('facilito_over_last_valid_snapshot', {
+        project: true,
+        verify: true,
+        deploy: true,
+        reason: `refresco ${refresh.status}; se compone la consulta web sobre el último snapshot oficial válido y se publica solo si cambia algún precio efectivo`,
+      });
     }
     return decision('fail_closed', { reason: `refresco ${refresh.status}; se conserva el último deployment bueno` });
   }

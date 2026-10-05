@@ -22,7 +22,8 @@ const entrada = resolvePath(location.pathname, { preference: readPreference() })
 if (entrada.kind === 'redirect') location.replace(`${entrada.to}${location.search}${location.hash}`);
 else {
   const inicial = entrada.kind === 'view' ? entrada : resolvePath('/', { preference: readPreference() });
-  if (location.pathname !== inicial.canonical) history.replaceState(null, '', `${inicial.canonical}${location.search}${location.hash}`);
+  if (location.pathname !== inicial.canonical)
+    history.replaceState(null, '', `${inicial.canonical}${location.search}${location.hash}`);
   writePreference(inicial.view);
   const tema = readThemeChoice();
   applyTheme(tema);
@@ -33,7 +34,13 @@ else {
   const demo = new URLSearchParams(location.search).get('history-demo') === '1';
   createRoot(document.getElementById('main')).render(
     <StrictMode>
-      <App view={inicial.view} history={Boolean(inicial.history)} trabajador={trabajador} temaInicial={tema} demoHistorial={demo} />
+      <App
+        view={inicial.view}
+        history={Boolean(inicial.history)}
+        trabajador={trabajador}
+        temaInicial={tema}
+        demoHistorial={demo}
+      />
     </StrictMode>,
   );
 }

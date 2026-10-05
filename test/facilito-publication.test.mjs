@@ -45,15 +45,15 @@ test('si ningún precio efectivo cambia, no se publica', () => {
 test('un precio distinto, uno que entra y uno que se cae cuentan igual', () => {
   const publicado = datasets([
     oferta('g2_igual', 22.99, consulta(22.39, iso(AHORA - HORA))),
-    oferta('g2_cambia', 21.50, consulta(21.50, iso(AHORA - HORA))),
-    oferta('g2_entra', 20.10),
-    oferta('g2_cae', 19.90, consulta(19.80, iso(AHORA - HORA))),
+    oferta('g2_cambia', 21.5, consulta(21.5, iso(AHORA - HORA))),
+    oferta('g2_entra', 20.1),
+    oferta('g2_cae', 19.9, consulta(19.8, iso(AHORA - HORA))),
   ]);
   const candidato = datasets([
     oferta('g2_igual', 22.99, consulta(22.39, iso(AHORA))),
-    oferta('g2_cambia', 21.50, consulta(20.99, iso(AHORA))),
-    oferta('g2_entra', 20.10, consulta(20.05, iso(AHORA))),
-    oferta('g2_cae', 19.90),
+    oferta('g2_cambia', 21.5, consulta(20.99, iso(AHORA))),
+    oferta('g2_entra', 20.1, consulta(20.05, iso(AHORA))),
+    oferta('g2_cae', 19.9),
   ]);
   const cambio = facilitoPublicationChange({ candidate: candidato, published: publicado, now: AHORA });
   assert.equal(cambio.visible, true);
@@ -64,9 +64,17 @@ test('una consulta publicada que se acerca a las 24 h se renueva antes de vencer
   // Si no, el respaldo del CSV entraría teniendo una consulta fresca guardada.
   const mismoPrecio = (observed_at) => datasets([oferta('g2_a', 22.99, consulta(22.39, observed_at))]);
   const vieja = iso(AHORA - REPUBLISH_AFTER_MS - HORA);
-  assert.equal(facilitoPublicationChange({ candidate: mismoPrecio(iso(AHORA)), published: mismoPrecio(vieja), now: AHORA }).visible, true);
+  assert.equal(
+    facilitoPublicationChange({ candidate: mismoPrecio(iso(AHORA)), published: mismoPrecio(vieja), now: AHORA })
+      .visible,
+    true,
+  );
   const reciente = iso(AHORA - REPUBLISH_AFTER_MS + HORA);
-  assert.equal(facilitoPublicationChange({ candidate: mismoPrecio(iso(AHORA)), published: mismoPrecio(reciente), now: AHORA }).visible, false);
+  assert.equal(
+    facilitoPublicationChange({ candidate: mismoPrecio(iso(AHORA)), published: mismoPrecio(reciente), now: AHORA })
+      .visible,
+    false,
+  );
 });
 
 test('el CSV sin cambios ya no significa no publicar, pero solo si hay expediente', () => {
@@ -95,7 +103,9 @@ test('un máximo mayor no tapa un distrito que retrocede', () => {
   const publicado = entrega('S1', { 'A:regular': '2026-09-20T12:00:00.000Z', 'B:regular': '2026-09-20T12:00:00.000Z' });
   const candidato = entrega('S1', { 'A:regular': '2026-09-20T13:00:00.000Z', 'B:regular': '2026-09-20T06:00:00.000Z' });
   assert.equal(dataStateIsBehind(candidato, publicado), true);
-  assert.deepEqual(dataStateRegressions(candidato, publicado), ['B:regular: 2026-09-20T06:00:00.000Z < 2026-09-20T12:00:00.000Z']);
+  assert.deepEqual(dataStateRegressions(candidato, publicado), [
+    'B:regular: 2026-09-20T06:00:00.000Z < 2026-09-20T12:00:00.000Z',
+  ]);
 });
 
 test('perder una unidad que producción sí tiene también es retroceder', () => {
@@ -125,7 +135,9 @@ test('un CSV nuevo NO exime de comparar las unidades: una consulta antigua se re
   const candidato = entrega('S2', { 'A:regular': '2026-09-20T06:00:00.000Z' });
   const publicado = entrega('S1', { 'A:regular': '2026-09-20T12:00:00.000Z' });
   assert.equal(dataStateIsBehind(candidato, publicado), true);
-  assert.deepEqual(dataStateRegressions(candidato, publicado), ['A:regular: 2026-09-20T06:00:00.000Z < 2026-09-20T12:00:00.000Z']);
+  assert.deepEqual(dataStateRegressions(candidato, publicado), [
+    'A:regular: 2026-09-20T06:00:00.000Z < 2026-09-20T12:00:00.000Z',
+  ]);
 });
 
 test('un CSV nuevo con una unidad ausente también se rechaza', () => {
@@ -154,12 +166,23 @@ test('un bundle sin capa cuenta como el más antiguo, no como empate', () => {
 
 test('un fallo del CSV no apaga la consulta si queda un snapshot oficial válido', () => {
   for (const estado of ['unverifiable', 'needs_review', 'rejected']) {
-    const conRespaldo = publicationDecision({ status: estado }, { facilitoAvailable: true, officialSnapshotUsable: true });
+    const conRespaldo = publicationDecision(
+      { status: estado },
+      { facilitoAvailable: true, officialSnapshotUsable: true },
+    );
     assert.equal(conRespaldo.action, 'facilito_over_last_valid_snapshot', estado);
     assert.equal(conRespaldo.deploy, true, estado);
     // Sin referencia oficial utilizable no se publica ningún vínculo nuevo.
-    assert.equal(publicationDecision({ status: estado }, { facilitoAvailable: true, officialSnapshotUsable: false }).action, 'fail_closed', estado);
-    assert.equal(publicationDecision({ status: estado }, { facilitoAvailable: false, officialSnapshotUsable: true }).action, 'fail_closed', estado);
+    assert.equal(
+      publicationDecision({ status: estado }, { facilitoAvailable: true, officialSnapshotUsable: false }).action,
+      'fail_closed',
+      estado,
+    );
+    assert.equal(
+      publicationDecision({ status: estado }, { facilitoAvailable: false, officialSnapshotUsable: true }).action,
+      'fail_closed',
+      estado,
+    );
   }
 });
 
@@ -189,8 +212,12 @@ function conDeps({ precioWeb, publicadoWeb, escrituras }) {
     refreshSnapshot: async () => ({ status: 'unchanged' }),
     readFacilitoState: () => ({ units: { '150103:regular': {} } }),
     composeGroups: async () => ({ gasolina: candidato(precioWeb) }),
-    writeGroupProjection: (c) => { escrituras.push(c.manifest.revision_id); return c; },
-    publicadosDesdeDisco: () => datasets([oferta('g2_a', 22.99, publicadoWeb === null ? null : consulta(publicadoWeb, iso(AHORA - 7 * HORA)))]),
+    writeGroupProjection: (c) => {
+      escrituras.push(c.manifest.revision_id);
+      return c;
+    },
+    publicadosDesdeDisco: () =>
+      datasets([oferta('g2_a', 22.99, publicadoWeb === null ? null : consulta(publicadoWeb, iso(AHORA - 7 * HORA)))]),
     buildUi: async () => ({}),
     writeShellManifest: () => {},
     verifyWeb: async () => ({ errors: [] }),
@@ -203,7 +230,10 @@ test('con el CSV sin cambios y la consulta sin novedad, se compone, se mira y no
   // mismo que hace seis horas y la entrega anterior sigue siendo correcta.
   relojEnAhora(t);
   const escrituras = [];
-  const resultado = await prepareRelease({ route: 'data', deps: conDeps({ precioWeb: 22.39, publicadoWeb: 22.39, escrituras }) });
+  const resultado = await prepareRelease({
+    route: 'data',
+    deps: conDeps({ precioWeb: 22.39, publicadoWeb: 22.39, escrituras }),
+  });
   assert.equal(resultado.decision.action, 'no_op');
   assert.equal(resultado.decision.deploy, false);
   assert.deepEqual(escrituras, [], 'se compuso, pero no se escribió nada');
@@ -213,7 +243,10 @@ test('con el CSV sin cambios y la consulta sin novedad, se compone, se mira y no
 test('con el CSV sin cambios y un precio distinto, sí se escribe y se despliega', async (t) => {
   relojEnAhora(t);
   const escrituras = [];
-  const resultado = await prepareRelease({ route: 'data', deps: conDeps({ precioWeb: 21.99, publicadoWeb: 22.39, escrituras }) });
+  const resultado = await prepareRelease({
+    route: 'data',
+    deps: conDeps({ precioWeb: 21.99, publicadoWeb: 22.39, escrituras }),
+  });
   assert.equal(resultado.decision.action, 'facilito_project_verify_deploy');
   assert.equal(resultado.decision.deploy, true);
   assert.deepEqual(escrituras, ['gasolina-X-nueva']);

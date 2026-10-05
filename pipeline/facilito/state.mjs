@@ -21,7 +21,8 @@ const STATE_FILE = 'state.json';
 const REVISIONS_DIR = 'revisions';
 
 /** Dónde vive el expediente. `FACILITO_ROOT` permite trabajar sobre una copia, como `IDENTITY_ROOT`. */
-export const facilitoRoot = (root, override = null) => override ?? process.env.FACILITO_ROOT ?? path.join(root, FACILITO_ROOT_RELATIVE);
+export const facilitoRoot = (root, override = null) =>
+  override ?? process.env.FACILITO_ROOT ?? path.join(root, FACILITO_ROOT_RELATIVE);
 
 /** La clave de una unidad de aceptación: distrito × producto, nunca una fila suelta. */
 export const unitKey = (districtCode, product) => `${districtCode}:${product}`;
@@ -35,8 +36,12 @@ export function readFacilitoState(root, { facilitoRoot: override = null } = {}) 
   if (!fs.existsSync(file)) return null;
   try {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return parsed?.schema_version === FACILITO_STATE_VERSION && parsed.units && typeof parsed.units === 'object' ? parsed : null;
-  } catch { return null; }
+    return parsed?.schema_version === FACILITO_STATE_VERSION && parsed.units && typeof parsed.units === 'object'
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function writeJson(file, value) {
@@ -73,7 +78,11 @@ export function writeFacilitoRevision(root, revisionId, state, { facilitoRoot: o
 export function readFacilitoRevision(root, revisionId, { facilitoRoot: override = null } = {}) {
   const file = path.join(facilitoRoot(root, override), REVISIONS_DIR, `${revisionId}.json`);
   if (!fs.existsSync(file)) return null;
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -86,7 +95,9 @@ export function readFacilitoRevision(root, revisionId, { facilitoRoot: override 
  * El orden lo decide `facilitoUnitInstants`, unidad por unidad.
  */
 export function facilitoStateId(state) {
-  const instantes = Object.values(state?.units ?? {}).map((unidad) => Date.parse(unidad.observed_at)).filter(Number.isFinite);
+  const instantes = Object.values(state?.units ?? {})
+    .map((unidad) => Date.parse(unidad.observed_at))
+    .filter(Number.isFinite);
   return instantes.length ? new Date(Math.max(...instantes)).toISOString() : null;
 }
 
@@ -98,10 +109,12 @@ export function facilitoStateId(state) {
  * contra lo que sirve producción.
  */
 export function facilitoUnitInstants(state) {
-  return Object.fromEntries(Object.entries(state?.units ?? {})
-    .filter(([, unidad]) => Number.isFinite(Date.parse(unidad.observed_at)))
-    .map(([clave, unidad]) => [clave, unidad.observed_at])
-    .sort(([a], [b]) => a.localeCompare(b)));
+  return Object.fromEntries(
+    Object.entries(state?.units ?? {})
+      .filter(([, unidad]) => Number.isFinite(Date.parse(unidad.observed_at)))
+      .map(([clave, unidad]) => [clave, unidad.observed_at])
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
 }
 
 /**
@@ -113,7 +126,9 @@ export function facilitoUnitInstants(state) {
  * tenga stock; significa que hoy no lo vimos.
  */
 export function applyFacilitoRun(previous, units, { attemptedAt, contract = null, sourceUrl = null }) {
-  const state = previous ? { ...previous, units: { ...previous.units } } : emptyFacilitoState(contract ?? 'scrap-facilito/v1', sourceUrl);
+  const state = previous
+    ? { ...previous, units: { ...previous.units } }
+    : emptyFacilitoState(contract ?? 'scrap-facilito/v1', sourceUrl);
   if (contract) state.contract = contract;
   if (sourceUrl) state.source_url = sourceUrl;
   for (const unidad of units) {
@@ -152,8 +167,9 @@ export function applyFacilitoRun(previous, units, { attemptedAt, contract = null
   // propios conteos y no debe sumar las consultas de otro combustible.
   const porProducto = {};
   for (const unidad of units) {
-    const cuenta = porProducto[unidad.product] ??= { fresh: 0, failed: 0 };
-    if (unidad.status === 'ok') cuenta.fresh += 1; else cuenta.failed += 1;
+    const cuenta = (porProducto[unidad.product] ??= { fresh: 0, failed: 0 });
+    if (unidad.status === 'ok') cuenta.fresh += 1;
+    else cuenta.failed += 1;
   }
   state.last_run = {
     at: attemptedAt,
@@ -179,7 +195,11 @@ export function facilitoStateForProducts(state, products) {
   if (!state) return state;
   const propios = new Set(products);
   // La clave ya dice el producto (`distrito:producto`); el campo es la misma cosa.
-  const units = Object.fromEntries(Object.entries(state.units ?? {}).filter(([clave, unidad]) => propios.has(unidad?.product ?? clave.slice(clave.lastIndexOf(':') + 1))));
+  const units = Object.fromEntries(
+    Object.entries(state.units ?? {}).filter(([clave, unidad]) =>
+      propios.has(unidad?.product ?? clave.slice(clave.lastIndexOf(':') + 1)),
+    ),
+  );
   const corrida = state.last_run;
   if (!corrida?.by_product) return { ...state, units };
   const cuentas = Object.entries(corrida.by_product).filter(([producto]) => propios.has(producto));
@@ -200,5 +220,9 @@ export function facilitoStateForProducts(state, products) {
 /** Conteos de captura para el resumen y el refresh-state. Nunca son vínculos ni precios. */
 export function facilitoRunCounts(state) {
   const corrida = state?.last_run ?? null;
-  return { fresh: corrida?.fresh ?? 0, reused: corrida?.reused ?? Object.keys(state?.units ?? {}).length, failed: corrida?.failed ?? 0 };
+  return {
+    fresh: corrida?.fresh ?? 0,
+    reused: corrida?.reused ?? Object.keys(state?.units ?? {}).length,
+    failed: corrida?.failed ?? 0,
+  };
 }

@@ -4,7 +4,8 @@ function whenActivated(registration, timeoutMs, setTimer, clearTimer) {
   const worker = registration.active ?? registration.waiting ?? registration.installing;
   if (!worker || worker.state === 'activated') return Promise.resolve(Boolean(worker));
   return new Promise((resolve) => {
-    let done = false; let timer = null;
+    let done = false;
+    let timer = null;
     const finish = (activated) => {
       if (done) return;
       done = true;

@@ -9,7 +9,17 @@ import { DEFAULT_VIEW, GASOLINA_KEYS, VIEWS } from './catalog.js';
 import { filterFreshOffers } from './freshness.js';
 import { msUntilSourceChange } from './price-source.js';
 import { mergeOfferRows } from './merge-products.js';
-import { haversineKm, initialRadiusKm, nextVisibleCount, orderOffers, radiusIsInert, withinRadius, PAGE_SIZE, RADIUS_MIN_KM, SHOW_ALL_THRESHOLD } from './haversine.js';
+import {
+  haversineKm,
+  initialRadiusKm,
+  nextVisibleCount,
+  orderOffers,
+  radiusIsInert,
+  withinRadius,
+  PAGE_SIZE,
+  RADIUS_MIN_KM,
+  SHOW_ALL_THRESHOLD,
+} from './haversine.js';
 import { decisionTag } from './decision-view.js';
 
 /**
@@ -19,7 +29,16 @@ import { decisionTag } from './decision-view.js';
  * qué producto de la vista.
  */
 export function createSearch(view = DEFAULT_VIEW) {
-  return { view, origin: null, district: null, radiusKm: RADIUS_MIN_KM, sort: 'distance', priceProduct: VIEWS[view].products[0], visibleCount: PAGE_SIZE, preferencesTouched: false };
+  return {
+    view,
+    origin: null,
+    district: null,
+    radiusKm: RADIUS_MIN_KM,
+    sort: 'distance',
+    priceProduct: VIEWS[view].products[0],
+    visibleCount: PAGE_SIZE,
+    preferencesTouched: false,
+  };
 }
 
 /**
@@ -42,13 +61,16 @@ export function evaluateRows(dataset, instante) {
   // Los productos los declara el conjunto cargado; uno anterior a esa
   // declaración solo pudo ser de Gasolina.
   const keys = dataset.products ?? GASOLINA_KEYS;
-  const porProducto = Object.fromEntries(keys.map((key) => [key, filterFreshOffers(dataset.offers[key], { now, cutoffAt })]));
+  const porProducto = Object.fromEntries(
+    keys.map((key) => [key, filterFreshOffers(dataset.offers[key], { now, cutoffAt })]),
+  );
   const rows = mergeOfferRows(
     Object.fromEntries(keys.map((key) => [key, porProducto[key].offers])),
     Object.fromEntries(keys.map((key) => [key, porProducto[key].expired])),
     keys,
   );
-  const proximo = keys.flatMap((key) => dataset.offers[key] ?? [])
+  const proximo = keys
+    .flatMap((key) => dataset.offers[key] ?? [])
     .reduce((menor, offer) => Math.min(menor, msUntilSourceChange(offer, { now, cutoffAt })), Infinity);
   return { rows, refreshAt: Number.isFinite(proximo) ? instante.getTime() + proximo : Infinity };
 }
@@ -91,7 +113,10 @@ export function resultsView({ rows, located, search }) {
   const pool = conOrigen ? withinRadius(located, search.radiusKm) : [];
   const ordered = conOrigen
     ? orderOffers(pool, byPrice ? `price:${product}` : 'distance')
-    : orderOffers(rows.filter((row) => row.district === search.district), `price:${product}`);
+    : orderOffers(
+        rows.filter((row) => row.district === search.district),
+        `price:${product}`,
+      );
   // Si lo que falta cabe en el umbral se muestra entero: un botón para cuatro
   // tarjetas cuesta más de lo que ahorra.
   const pedidas = Math.min(search.visibleCount, ordered.length);

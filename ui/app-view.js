@@ -32,7 +32,18 @@ const ACCION_LUGAR = Object.freeze({
  * arrancar y no lleva estado ni variante.
  */
 export function pildora({ status, gps, screen }) {
-  if (status === null) return { status: null, label: 'Actualizar ubicación', compacta: 'Actualizar', nombre: null, nombreCompacta: 'Actualizar ubicación', icono: 'refresh', variante: null, etiquetaCompacta: null, disabled: false };
+  if (status === null)
+    return {
+      status: null,
+      label: 'Actualizar ubicación',
+      compacta: 'Actualizar',
+      nombre: null,
+      nombreCompacta: 'Actualizar ubicación',
+      icono: 'refresh',
+      variante: null,
+      etiquetaCompacta: null,
+      disabled: false,
+    };
   // En movimiento el dedo y la vista están en la píldora: el proceso y el fallo
   // se cuentan en el propio botón. Con GPS guardado pero fuera de resultados —en
   // la lista de distritos— no puede prometer «actualizar».
@@ -46,7 +57,7 @@ export function pildora({ status, gps, screen }) {
   return {
     status,
     label,
-    compacta: pendiente ? 'Actualizando…' : error ? 'Reintentar' : (soloEnLaBarra ? accion.label : accion.corta),
+    compacta: pendiente ? 'Actualizando…' : error ? 'Reintentar' : soloEnLaBarra ? accion.label : accion.corta,
     nombre,
     nombreCompacta: nombre,
     icono: accion.icono,
@@ -71,14 +82,28 @@ export function avisoUbicacion(locationUpdate) {
  * existe: el resumen dice lo que pasa.
  */
 export function resumenControles({ search, criterion }) {
-  const criterio = criterion === 'none' ? 'Sin precios recientes' : criterion === 'price' ? `${PRODUCTS[search.priceProduct].short} más barat${concordancia(search.priceProduct)}` : 'Más cerca';
+  const criterio =
+    criterion === 'none'
+      ? 'Sin precios recientes'
+      : criterion === 'price'
+        ? `${PRODUCTS[search.priceProduct].short} más barat${concordancia(search.priceProduct)}`
+        : 'Más cerca';
   // Con más de una vista el resumen dice de qué combustible habla, en dos
   // renglones: arriba el combustible y dónde, abajo el criterio entero.
-  if (ACTIVE_VIEWS.length > 1) return { fuel: VIEWS[search.view].label, place: `· ${search.origin ? formatRadius(search.radiusKm) : displayDistrict(search.district)}`, criteria: criterio };
+  if (ACTIVE_VIEWS.length > 1)
+    return {
+      fuel: VIEWS[search.view].label,
+      place: `· ${search.origin ? formatRadius(search.radiusKm) : displayDistrict(search.district)}`,
+      criteria: criterio,
+    };
   const partes = search.origin ? [formatRadius(search.radiusKm), criterio] : [criterio];
   // Con GPS el icono de la barra ya dice «mi ubicación»: repetirlo solo le robaba
   // ancho al criterio.
-  return { fuel: null, place: search.origin ? '' : displayDistrict(search.district), criteria: search.origin ? partes.join(' · ') : `· ${partes.join(' · ')}` };
+  return {
+    fuel: null,
+    place: search.origin ? '' : displayDistrict(search.district),
+    criteria: search.origin ? partes.join(' · ') : `· ${partes.join(' · ')}`,
+  };
 }
 
 /**
@@ -86,7 +111,12 @@ export function resumenControles({ search, criterion }) {
  * haya una sola estación: en Pucusana son tres en todo el rango.
  */
 export function lecturaRadio({ inert, total }, radiusKm) {
-  if (inert) return total === 0 ? `Ninguna estación en ${formatRadius(RADIUS_MAX_KM)}` : total === 1 ? `Única estación en ${formatRadius(RADIUS_MAX_KM)}` : `Las mismas ${total} estaciones en todo el radio`;
+  if (inert)
+    return total === 0
+      ? `Ninguna estación en ${formatRadius(RADIUS_MAX_KM)}`
+      : total === 1
+        ? `Única estación en ${formatRadius(RADIUS_MAX_KM)}`
+        : `Las mismas ${total} estaciones en todo el radio`;
   return `${formatRadius(radiusKm)} · ${total} ${total === 1 ? 'estación' : 'estaciones'}`;
 }
 
@@ -97,19 +127,32 @@ export function lecturaRadio({ inert, total }, radiusKm) {
  */
 export function estadoVista(estado, vista, { online = true } = {}) {
   if (estado === 'loading') return { texto: `Cargando precios de ${vista}…`, accion: null };
-  if (estado === 'error') return { texto: online ? `No pudimos cargar los precios de ${vista}. Revisa tu conexión y reintenta.` : `No hay precios de ${vista} guardados todavía. Conéctate una vez para descargarlos.`, accion: 'Reintentar' };
-  if (estado === 'district-empty') return { texto: `Ningún grifo de este distrito publica ${vista}.`, accion: 'Cambiar distrito' };
+  if (estado === 'error')
+    return {
+      texto: online
+        ? `No pudimos cargar los precios de ${vista}. Revisa tu conexión y reintenta.`
+        : `No hay precios de ${vista} guardados todavía. Conéctate una vez para descargarlos.`,
+      accion: 'Reintentar',
+    };
+  if (estado === 'district-empty')
+    return { texto: `Ningún grifo de este distrito publica ${vista}.`, accion: 'Cambiar distrito' };
   return null;
 }
 
 /** El renglón de Inicio: cargando, el resumen de lo cargado o la falla. */
 export function estadoInicio(fase, { rows = [], dataset = null, vista, online = true } = {}) {
   if (fase === 'error') return { texto: estadoVista('error', vista, { online }).texto, visible: true };
-  if (fase === 'ready' && dataset) return { texto: `${withPrice(rows).length} de ${rows.length} grifos con precio vigente · corte ${formatDate(dataset.cutoff_at)}.`, visible: false };
+  if (fase === 'ready' && dataset)
+    return {
+      texto: `${withPrice(rows).length} de ${rows.length} grifos con precio vigente · corte ${formatDate(dataset.cutoff_at)}.`,
+      visible: false,
+    };
   return { texto: 'Cargando precios…', visible: false };
 }
 
 /** El aviso de datos guardados, o `null` con datos de la red. */
 export function notaSinConexion(entrada) {
-  return entrada?.mode === 'saved' ? `Sin conexión · precios guardados del ${formatDate(entrada.dataset.cutoff_at)}.` : null;
+  return entrada?.mode === 'saved'
+    ? `Sin conexión · precios guardados del ${formatDate(entrada.dataset.cutoff_at)}.`
+    : null;
 }

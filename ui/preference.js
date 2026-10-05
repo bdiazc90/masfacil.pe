@@ -8,13 +8,25 @@
 const CLAVE = 'masfacil-vista';
 
 function almacen() {
-  try { return globalThis.localStorage ?? null; } catch { return null; }
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function readPreference(storage = almacen()) {
-  try { return storage?.getItem(CLAVE) ?? null; } catch { return null; }
+  try {
+    return storage?.getItem(CLAVE) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function writePreference(view, storage = almacen()) {
-  try { storage?.setItem(CLAVE, view); } catch { /* sin almacenamiento no hay preferencia, y no pasa nada */ }
+  try {
+    storage?.setItem(CLAVE, view);
+  } catch {
+    /* sin almacenamiento no hay preferencia, y no pasa nada */
+  }
 }

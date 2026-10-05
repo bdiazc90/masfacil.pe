@@ -9,9 +9,30 @@
 // grupo.
 
 import crypto from 'node:crypto';
-import { GROUP_RULES, bundleErrors, datasetErrors, manifestErrors, sameKeys, text, timestamp } from '../web/lib/bundle-contract.js';
+import {
+  GROUP_RULES,
+  bundleErrors,
+  datasetErrors,
+  manifestErrors,
+  sameKeys,
+  text,
+  timestamp,
+} from '../web/lib/bundle-contract.js';
 
-export { CONFIDENCE_LEVELS, DIESEL_MANIFEST_VERSION, FACILITO_FIELDS, GLP_MANIFEST_VERSION, GNV_MANIFEST_VERSION, GASOLINA_KEYS, GASOLINA_MANIFEST_VERSION, GASOLINA_SCOPE, GASOLINA_VERSIONS, GROUP_RULES, LEGACY_GASOLINA_MANIFEST_VERSION, PUBLIC_OFFER_FIELDS } from '../web/lib/bundle-contract.js';
+export {
+  CONFIDENCE_LEVELS,
+  DIESEL_MANIFEST_VERSION,
+  FACILITO_FIELDS,
+  GLP_MANIFEST_VERSION,
+  GNV_MANIFEST_VERSION,
+  GASOLINA_KEYS,
+  GASOLINA_MANIFEST_VERSION,
+  GASOLINA_SCOPE,
+  GASOLINA_VERSIONS,
+  GROUP_RULES,
+  LEGACY_GASOLINA_MANIFEST_VERSION,
+  PUBLIC_OFFER_FIELDS,
+} from '../web/lib/bundle-contract.js';
 
 export const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -37,44 +58,96 @@ export function refreshStateErrors(rules, state, manifest) {
   // la que vio la tabla después.
   const conFacilito = f.facilito;
   const raiz = ['schema_version', 'revision_id', 'snapshot_id', 'validators', 'source_max_reported_at', 'products'];
-  if (!sameKeys(state, conFacilito ? [...raiz, 'facilito'] : conSnapshot ? raiz : raiz.filter((field) => field !== 'snapshot_id'))) errors.push('campos refresh-state inválidos');
+  if (
+    !sameKeys(
+      state,
+      conFacilito ? [...raiz, 'facilito'] : conSnapshot ? raiz : raiz.filter((field) => field !== 'snapshot_id'),
+    )
+  )
+    errors.push('campos refresh-state inválidos');
   if (conSnapshot && !text(state?.snapshot_id)) errors.push('snapshot_id refresh-state inválido');
   if (conFacilito) {
     const capa = state?.facilito;
     const entero = (value) => Number.isInteger(value) && value >= 0;
-    if (!sameKeys(capa, ['contract', 'state_id', 'units_observed', 'units', 'districts', 'linked', 'ambiguous', 'unlinked', 'effective'])
-      || !text(capa.contract)
-      || (capa.state_id !== null && !timestamp(capa.state_id))
-      || !capa.units_observed || typeof capa.units_observed !== 'object' || Array.isArray(capa.units_observed)
-      || !Object.values(capa.units_observed).every((valor) => timestamp(valor))
-      || !sameKeys(capa.units, ['fresh', 'reused', 'failed']) || !Object.values(capa.units).every(entero)
-      || !entero(capa.districts) || !entero(capa.ambiguous) || !entero(capa.unlinked)
-      || !rules.products.every((key) => entero(capa.linked?.[key]) && sameKeys(capa.effective?.[key], ['facilito', 'csv', 'none']) && Object.values(capa.effective[key]).every(entero))) errors.push('capa facilito refresh-state inválida');
+    if (
+      !sameKeys(capa, [
+        'contract',
+        'state_id',
+        'units_observed',
+        'units',
+        'districts',
+        'linked',
+        'ambiguous',
+        'unlinked',
+        'effective',
+      ]) ||
+      !text(capa.contract) ||
+      (capa.state_id !== null && !timestamp(capa.state_id)) ||
+      !capa.units_observed ||
+      typeof capa.units_observed !== 'object' ||
+      Array.isArray(capa.units_observed) ||
+      !Object.values(capa.units_observed).every((valor) => timestamp(valor)) ||
+      !sameKeys(capa.units, ['fresh', 'reused', 'failed']) ||
+      !Object.values(capa.units).every(entero) ||
+      !entero(capa.districts) ||
+      !entero(capa.ambiguous) ||
+      !entero(capa.unlinked) ||
+      !rules.products.every(
+        (key) =>
+          entero(capa.linked?.[key]) &&
+          sameKeys(capa.effective?.[key], ['facilito', 'csv', 'none']) &&
+          Object.values(capa.effective[key]).every(entero),
+      )
+    )
+      errors.push('capa facilito refresh-state inválida');
   }
-  if (!rules.versions.includes(state?.schema_version) || (manifest?.schema_version && state?.schema_version !== manifest.schema_version) || state?.revision_id !== manifest?.revision_id) errors.push('revisión refresh-state inválida');
+  if (
+    !rules.versions.includes(state?.schema_version) ||
+    (manifest?.schema_version && state?.schema_version !== manifest.schema_version) ||
+    state?.revision_id !== manifest?.revision_id
+  )
+    errors.push('revisión refresh-state inválida');
   if (!timestamp(state?.source_max_reported_at)) errors.push('máximo temporal refresh-state inválido');
-  if (!state?.validators || !Object.hasOwn(state.validators, 'etag') || !Object.hasOwn(state.validators, 'last_modified')) errors.push('validadores refresh-state inválidos');
-  if (JSON.stringify(Object.keys(state?.products ?? {})) !== JSON.stringify(rules.products)) errors.push('productos refresh-state inválidos');
+  if (
+    !state?.validators ||
+    !Object.hasOwn(state.validators, 'etag') ||
+    !Object.hasOwn(state.validators, 'last_modified')
+  )
+    errors.push('validadores refresh-state inválidos');
+  if (JSON.stringify(Object.keys(state?.products ?? {})) !== JSON.stringify(rules.products))
+    errors.push('productos refresh-state inválidos');
   for (const key of rules.products) {
     const value = state?.products?.[key];
     const ready = value?.contract_ready;
     const fresh = value?.fresh_0_30_days;
     const conflicts = value?.conflicts;
-    if (!value
-      || !Number.isInteger(ready?.offers) || ready.offers < 1
-      || !Number.isInteger(ready?.districts) || ready.districts < 1
-      || !Number.isInteger(fresh?.offers) || fresh.offers < ready.offers
-      || !Number.isInteger(fresh?.districts) || fresh.districts < ready.districts
-      || !Number.isFinite(value.coverage_percent) || value.coverage_percent <= 0 || value.coverage_percent > 100
-      || !conflicts
-      || !Number.isInteger(conflicts.latest_price_conflicts) || conflicts.latest_price_conflicts < 0
-      || !Number.isInteger(conflicts.latest_territory_conflicts) || conflicts.latest_territory_conflicts < 0
-      || !timestamp(value.cutoff_at)) errors.push(`guardrails ${key} inválidos`);
+    if (
+      !value ||
+      !Number.isInteger(ready?.offers) ||
+      ready.offers < 1 ||
+      !Number.isInteger(ready?.districts) ||
+      ready.districts < 1 ||
+      !Number.isInteger(fresh?.offers) ||
+      fresh.offers < ready.offers ||
+      !Number.isInteger(fresh?.districts) ||
+      fresh.districts < ready.districts ||
+      !Number.isFinite(value.coverage_percent) ||
+      value.coverage_percent <= 0 ||
+      value.coverage_percent > 100 ||
+      !conflicts ||
+      !Number.isInteger(conflicts.latest_price_conflicts) ||
+      conflicts.latest_price_conflicts < 0 ||
+      !Number.isInteger(conflicts.latest_territory_conflicts) ||
+      conflicts.latest_territory_conflicts < 0 ||
+      !timestamp(value.cutoff_at)
+    )
+      errors.push(`guardrails ${key} inválidos`);
   }
   return errors;
 }
 
-export const validateGasolinaRefreshState = (state, manifest) => refreshStateErrors(GROUP_RULES.gasolina, state, manifest);
+export const validateGasolinaRefreshState = (state, manifest) =>
+  refreshStateErrors(GROUP_RULES.gasolina, state, manifest);
 
 /** Las tres validaciones de un grupo con la firma que usan la descarga, el verificador y el preflight. */
 export function nodeContract(rules) {
@@ -82,7 +155,13 @@ export function nodeContract(rules) {
     manifest: (manifest) => rules.manifestErrors(manifest),
     refreshState: (state, manifest) => refreshStateErrors(rules, state, manifest),
     // Sin descriptor no hay con qué comparar: se informa sin medir el cuerpo.
-    bundle: (manifest, key, body) => rules.bundleErrors(manifest, key, body, manifest?.products?.[key] ? { bytes: Buffer.byteLength(body), sha256: sha256(body) } : null),
+    bundle: (manifest, key, body) =>
+      rules.bundleErrors(
+        manifest,
+        key,
+        body,
+        manifest?.products?.[key] ? { bytes: Buffer.byteLength(body), sha256: sha256(body) } : null,
+      ),
   });
 }
 

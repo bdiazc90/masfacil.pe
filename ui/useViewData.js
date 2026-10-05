@@ -24,7 +24,10 @@ export function useViewData(avisos) {
   const cargadasVigentes = useRef(cargadas);
   const turno = useRef(0);
   const avisar = useRef(avisos);
-  useLayoutEffect(() => { cargadasVigentes.current = cargadas; avisar.current = avisos; });
+  useLayoutEffect(() => {
+    cargadasVigentes.current = cargadas;
+    avisar.current = avisos;
+  });
 
   /**
    * Pide la vista. Si ya está guardada la devuelve para aplicarla en el mismo
@@ -33,21 +36,34 @@ export function useViewData(avisos) {
   const cargar = useCallback((vista) => {
     const mio = ++turno.current;
     const guardada = cargadasVigentes.current.get(vista);
-    if (guardada) { setPendiente(null); return guardada; }
+    if (guardada) {
+      setPendiente(null);
+      return guardada;
+    }
     setPendiente(vista);
-    setFallidas((previas) => { if (!previas.has(vista)) return previas; const nuevas = new Set(previas); nuevas.delete(vista); return nuevas; });
-    loadView(vista).then((dataset) => ({ dataset, mode: dataset.dataMode })).then((entrada) => {
-      setCargadas((previas) => new Map(previas).set(vista, entrada));
-      if (mio !== turno.current) return;
-      setPendiente(null);
-      avisar.current.alListo(vista, entrada);
-    }, (error) => {
-      console.error(error);
-      if (mio !== turno.current) return;
-      setPendiente(null);
-      setFallidas((previas) => new Set(previas).add(vista));
-      avisar.current.alError(vista);
+    setFallidas((previas) => {
+      if (!previas.has(vista)) return previas;
+      const nuevas = new Set(previas);
+      nuevas.delete(vista);
+      return nuevas;
     });
+    loadView(vista)
+      .then((dataset) => ({ dataset, mode: dataset.dataMode }))
+      .then(
+        (entrada) => {
+          setCargadas((previas) => new Map(previas).set(vista, entrada));
+          if (mio !== turno.current) return;
+          setPendiente(null);
+          avisar.current.alListo(vista, entrada);
+        },
+        (error) => {
+          console.error(error);
+          if (mio !== turno.current) return;
+          setPendiente(null);
+          setFallidas((previas) => new Set(previas).add(vista));
+          avisar.current.alError(vista);
+        },
+      );
     return null;
   }, []);
 

@@ -18,7 +18,12 @@
 // Sin entrada aquí la tarjeta muestra la marca en texto y ya. Marca identificada
 // y activo disponible siguen siendo dos conteos distintos y no se mezclan.
 
-const normalize = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLocaleLowerCase('es-PE');
+const normalize = (value) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toLocaleLowerCase('es-PE');
 
 /** Funciones visuales admitidas. Una variante sin rol conocido no se recorre. */
 export const ASSET_ROLES = Object.freeze(['mark']);
@@ -51,7 +56,8 @@ export const BRAND_LOGOS = Object.freeze({
         width: 2476,
         height: 1796,
         source_kind: 'faithful_recreation',
-        source_url: 'recreación fiel del isotipo desde https://www.repsol.pe/content/dam/global/logotipos/repsol/logo-repsol.svg',
+        source_url:
+          'recreación fiel del isotipo desde https://www.repsol.pe/content/dam/global/logotipos/repsol/logo-repsol.svg',
         retrieved_at: '2026-09-13',
         note: 'misma geometría del símbolo, sin los filtros de desenfoque ni las máscaras del export original',
       }),
@@ -94,7 +100,8 @@ export const BRAND_LOGOS = Object.freeze({
         width: 100,
         height: 100,
         source_kind: 'faithful_recreation',
-        source_url: 'recreación fiel del símbolo desde el logotipo de pecsa.com.pe archivado por Wayback Machine (2021-09-27)',
+        source_url:
+          'recreación fiel del símbolo desde el logotipo de pecsa.com.pe archivado por Wayback Machine (2021-09-27)',
         retrieved_at: '2026-09-18',
         note: 'campo rojo con tres barras blancas; la cinta con pliegues del original se simplifica a barras rectas',
       }),
@@ -109,7 +116,8 @@ export const BRAND_LOGOS = Object.freeze({
         width: 86,
         height: 80,
         source_kind: 'faithful_recreation',
-        source_url: 'recreación fiel del isotipo desde https://www.energigas.com/wp-content/uploads/2025/07/logo-azul.svg',
+        source_url:
+          'recreación fiel del isotipo desde https://www.energigas.com/wp-content/uploads/2025/07/logo-azul.svg',
         retrieved_at: '2026-09-18',
         note: 'las dos flechas del símbolo, sin la palabra; el bisel se resuelve con una sola copia oscura desplazada',
       }),

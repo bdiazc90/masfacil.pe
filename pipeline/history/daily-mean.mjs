@@ -56,14 +56,29 @@ export function productMean(offers, { observedAt, cutoffAt }) {
   let duplicates_ignored = 0;
   for (const offer of frescas) {
     const anchor = offer?.establishment_id;
-    if (typeof anchor !== 'string' || !anchor) { problems.push('oferta sin establishment_id utilizable'); continue; }
-    if (!Number.isFinite(offer.price) || offer.price <= 0) { problems.push(`oferta con precio inválido: ${anchor}`); continue; }
+    if (typeof anchor !== 'string' || !anchor) {
+      problems.push('oferta sin establishment_id utilizable');
+      continue;
+    }
+    if (!Number.isFinite(offer.price) || offer.price <= 0) {
+      problems.push(`oferta con precio inválido: ${anchor}`);
+      continue;
+    }
     const previa = porEstablecimiento.get(anchor);
-    if (!previa) { porEstablecimiento.set(anchor, { price: offer.price, reported_at: offer.reported_at }); continue; }
+    if (!previa) {
+      porEstablecimiento.set(anchor, { price: offer.price, reported_at: offer.reported_at });
+      continue;
+    }
     // Repetir la misma fila no altera la media; que la fuente se contradiga sobre
     // el mismo establecimiento sí invalida la medición: no hay forma de elegir.
-    if (previa.price === offer.price && previa.reported_at === offer.reported_at) { duplicates_ignored += 1; continue; }
-    contradictions.push({ establishment_id: anchor, values: [previa, { price: offer.price, reported_at: offer.reported_at }] });
+    if (previa.price === offer.price && previa.reported_at === offer.reported_at) {
+      duplicates_ignored += 1;
+      continue;
+    }
+    contradictions.push({
+      establishment_id: anchor,
+      values: [previa, { price: offer.price, reported_at: offer.reported_at }],
+    });
   }
 
   const precios = [...porEstablecimiento.values()].map((item) => item.price);
@@ -90,12 +105,21 @@ export function observationMeans({ manifest, bodies, observedAt }) {
   const duplicates_ignored = {};
   for (const key of GASOLINA_KEYS) {
     const body = bodies?.[key];
-    if (typeof body !== 'string') { problems.push(`falta el cuerpo de ${key}`); continue; }
+    if (typeof body !== 'string') {
+      problems.push(`falta el cuerpo de ${key}`);
+      continue;
+    }
     const errores = validateGasolinaBundle(manifest, key, body);
-    if (errores.length) { problems.push(...errores.map((motivo) => `${key}: ${motivo}`)); continue; }
+    if (errores.length) {
+      problems.push(...errores.map((motivo) => `${key}: ${motivo}`));
+      continue;
+    }
     const dataset = JSON.parse(body);
     const medida = productMean(dataset.offers, { observedAt, cutoffAt: dataset.cutoff_at });
-    if (medida.blocked) { problems.push(...medida.problems.map((motivo) => `${key}: ${motivo}`)); continue; }
+    if (medida.blocked) {
+      problems.push(...medida.problems.map((motivo) => `${key}: ${motivo}`));
+      continue;
+    }
     products[key] = { mean: medida.mean, n: medida.n };
     duplicates_ignored[key] = medida.duplicates_ignored;
     contradictions.push(...medida.contradictions.map((item) => ({ ...item, product: key })));
@@ -105,5 +129,11 @@ export function observationMeans({ manifest, bodies, observedAt }) {
   // sí se archivan —fueron públicos y son evidencia—, pero no se publica una
   // media que dependa de cuál de las dos filas se eligió.
   const completo = GASOLINA_KEYS.every((key) => products[key]);
-  return { ok: completo && contradictions.length === 0, products, contradictions, duplicates_ignored, problems: [...new Set(problems)] };
+  return {
+    ok: completo && contradictions.length === 0,
+    products,
+    contradictions,
+    duplicates_ignored,
+    problems: [...new Set(problems)],
+  };
 }

@@ -22,7 +22,12 @@ export const MAX_OFFER_AGE_DAYS = 30;
 /** Una consulta web sirve durante un día desde que se leyó la tabla. */
 export const MAX_QUERY_AGE_HOURS = 24;
 
-export class PriceSourceError extends Error { constructor(message) { super(message); this.name = 'PriceSourceError'; } }
+export class PriceSourceError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'PriceSourceError';
+  }
+}
 
 function clock(now) {
   if (typeof now !== 'function') throw new PriceSourceError('No se puede elegir la fuente: falta un reloj inyectado');
@@ -33,7 +38,10 @@ function clock(now) {
 }
 
 /** Un instante legible, o null. Una fecha ilegible nunca hace elegible un precio. */
-const instante = (value) => { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : null; };
+const instante = (value) => {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 /**
  * El precio efectivo de una oferta y su procedencia real.
@@ -59,7 +67,8 @@ export function selectOfferPrice(offer, { now, cutoffAt }) {
   const current = clock(now);
   const cutoff = instante(cutoffAt);
   if (cutoff === null) throw new PriceSourceError('No se puede elegir la fuente: el corte del snapshot es inválido');
-  if (current < cutoff) throw new PriceSourceError('No se puede elegir la fuente: el reloj es anterior al corte del snapshot');
+  if (current < cutoff)
+    throw new PriceSourceError('No se puede elegir la fuente: el reloj es anterior al corte del snapshot');
 
   const reportado = instante(offer?.reported_at);
   const csvPrecio = Number.isFinite(offer?.price) && offer.price > 0 ? offer.price : null;
@@ -78,7 +87,14 @@ export function selectOfferPrice(offer, { now, cutoffAt }) {
   // El CSV posterior gana aunque la consulta siga dentro de su ventana: sabemos
   // de un cambio de precio más nuevo que lo que llegamos a ver en la tabla.
   if (csvElegible && consultado !== null && reportado > consultado) return conCsv('csv_posterior_a_la_consulta');
-  if (webElegible) return { price: webPrecio, source: 'facilito', at: capa.observed_at, age_days: webEdad, reason: 'consulta_vigente' };
+  if (webElegible)
+    return {
+      price: webPrecio,
+      source: 'facilito',
+      at: capa.observed_at,
+      age_days: webEdad,
+      reason: 'consulta_vigente',
+    };
   if (csvElegible) return conCsv('reporte_vigente');
   if (csvEdad !== null && csvEdad < 0) return sinPrecio('reporte_futuro');
   if (csvEdad !== null) return sinPrecio('reporte_vencido');
@@ -100,7 +116,8 @@ export function msUntilSourceChange(offer, { now, cutoffAt }) {
   const restante = [];
   const consultado = instante(offer?.facilito?.observed_at);
   const reportado = instante(offer?.reported_at);
-  if (elegido.source === 'facilito' && consultado !== null) restante.push(consultado + MAX_QUERY_AGE_HOURS * HOUR_MS - current);
+  if (elegido.source === 'facilito' && consultado !== null)
+    restante.push(consultado + MAX_QUERY_AGE_HOURS * HOUR_MS - current);
   if (reportado !== null && reportado <= current) restante.push(reportado + MAX_OFFER_AGE_DAYS * DAY_MS - current);
   const positivos = restante.filter((ms) => Number.isFinite(ms) && ms > 0);
   return positivos.length ? Math.min(...positivos) : Infinity;

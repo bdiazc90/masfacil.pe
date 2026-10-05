@@ -25,11 +25,17 @@ const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex'
 function resolveKey(root, key) {
   const clave = String(key ?? '');
   const partes = clave.split('/');
-  if (!clave || clave.startsWith('/') || clave.includes('\\') || partes.some((parte) => parte === '' || parte === '.' || parte === '..')) {
+  if (
+    !clave ||
+    clave.startsWith('/') ||
+    clave.includes('\\') ||
+    partes.some((parte) => parte === '' || parte === '.' || parte === '..')
+  ) {
     throw new Error(`Clave de almacén inválida: ${clave}`);
   }
   const destino = path.join(root, ...partes);
-  if (!destino.startsWith(`${path.resolve(root)}${path.sep}`)) throw new Error(`Clave de almacén fuera de la raíz: ${clave}`);
+  if (!destino.startsWith(`${path.resolve(root)}${path.sep}`))
+    throw new Error(`Clave de almacén fuera de la raíz: ${clave}`);
   return destino;
 }
 
@@ -47,7 +53,8 @@ function walk(directory, base, claves) {
 export function createFsStore({ root, prefix = '' }) {
   const raiz = path.resolve(root);
   const prefijo = String(prefix ?? '');
-  if (prefijo && !prefijo.endsWith('/')) throw new Error(`Prefijo de almacén inválido: ${prefijo} (debe terminar en "/")`);
+  if (prefijo && !prefijo.endsWith('/'))
+    throw new Error(`Prefijo de almacén inválido: ${prefijo} (debe terminar en "/")`);
   // El prefijo pasa por la misma validación que una clave: tampoco puede escapar.
   if (prefijo) resolveKey(raiz, `${prefijo}x`);
   const conPrefijo = (key) => `${prefijo}${key}`;

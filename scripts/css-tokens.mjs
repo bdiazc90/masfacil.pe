@@ -26,7 +26,8 @@ function bloque(css, selector) {
 /** Custom properties declaradas en un bloque, sin resolver. */
 export function declaraciones(css, selector) {
   const mapa = new Map();
-  for (const [, nombre, valor] of bloque(css, selector).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}]+)/gi)) mapa.set(nombre, valor.trim());
+  for (const [, nombre, valor] of bloque(css, selector).matchAll(/(--[a-z0-9-]+)\s*:\s*([^;}]+)/gi))
+    mapa.set(nombre, valor.trim());
   return mapa;
 }
 
@@ -55,14 +56,14 @@ function desdeOklch(L, C, H) {
   const b = C * Math.sin(h);
   const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
   const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
   const l = l_ ** 3;
   const m = m_ ** 3;
   const s = s_ ** 3;
   return [
     4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
     -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
   ].map((canal) => {
     const recortado = Math.min(1, Math.max(0, canal));
     return Math.round((recortado <= 0.0031308 ? 12.92 * recortado : 1.055 * recortado ** (1 / 2.4) - 0.055) * 255);
@@ -100,7 +101,9 @@ export function numero(valor, donde) {
 export function pesosDeMezcla(valor, donde) {
   // El `var(--x)` de dentro trae su propio paréntesis: hay que dejarlo pasar
   // antes de llegar al porcentaje de la mezcla.
-  const pesos = [...String(valor ?? '').matchAll(/color-mix\((?:[^()]|\([^()]*\))*?([\d.]+)%/g)].map((m) => Number(m[1]) / 100);
+  const pesos = [...String(valor ?? '').matchAll(/color-mix\((?:[^()]|\([^()]*\))*?([\d.]+)%/g)].map(
+    (m) => Number(m[1]) / 100,
+  );
   if (!pesos.length) throw new Error(`css-tokens: ${donde} no tiene ningún color-mix con porcentaje: «${valor}»`);
   return pesos;
 }

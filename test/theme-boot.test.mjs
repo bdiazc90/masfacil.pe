@@ -31,11 +31,24 @@ function metaTema(html) {
 function entorno({ guardado, sistemaOscuro, sinAlmacenamiento = false }) {
   const meta = { content: '#000000', dataset: { light: '#f1f3f3', dark: '#161b1d' } };
   const datos = new Map(guardado === undefined ? [] : [[THEME_KEY, guardado]]);
-  const localStorage = sinAlmacenamiento ? null : { getItem: (k) => datos.get(k) ?? null, setItem: (k, v) => datos.set(k, v) };
-  const document = { documentElement: { dataset: {} }, querySelector: (selector) => (selector === 'meta[name="theme-color"]' ? meta : null) };
-  const ventana = { document, matchMedia: (consulta) => ({ matches: consulta === '(prefers-color-scheme: dark)' && sistemaOscuro }) };
+  const localStorage = sinAlmacenamiento
+    ? null
+    : { getItem: (k) => datos.get(k) ?? null, setItem: (k, v) => datos.set(k, v) };
+  const document = {
+    documentElement: { dataset: {} },
+    querySelector: (selector) => (selector === 'meta[name="theme-color"]' ? meta : null),
+  };
+  const ventana = {
+    document,
+    matchMedia: (consulta) => ({ matches: consulta === '(prefers-color-scheme: dark)' && sistemaOscuro }),
+  };
   if (localStorage) ventana.localStorage = localStorage;
-  else Object.defineProperty(ventana, 'localStorage', { get() { throw new Error('SecurityError'); } });
+  else
+    Object.defineProperty(ventana, 'localStorage', {
+      get() {
+        throw new Error('SecurityError');
+      },
+    });
   return { ventana, document, meta };
 }
 
@@ -53,8 +66,15 @@ test('las dos páginas fijan el tema en el <head> con un script clásico, antes 
     const scripts = [...head.matchAll(/<script\b([^>]*)>/g)].map(([, atributos]) => atributos);
     const indice = scripts.findIndex((atributos) => /src="\/theme-boot\.js"/.test(atributos));
     assert.ok(indice >= 0, `${pagina} no carga /theme-boot.js en el <head>`);
-    assert.doesNotMatch(scripts[indice], /\b(type="module"|defer|async)\b/, `${pagina}: theme-boot.js tiene que bloquear, sin módulo, defer ni async`);
-    assert.ok(!scripts.slice(0, indice).some((atributos) => /type="module"/.test(atributos)), `${pagina}: ningún módulo antes de theme-boot.js`);
+    assert.doesNotMatch(
+      scripts[indice],
+      /\b(type="module"|defer|async)\b/,
+      `${pagina}: theme-boot.js tiene que bloquear, sin módulo, defer ni async`,
+    );
+    assert.ok(
+      !scripts.slice(0, indice).some((atributos) => /type="module"/.test(atributos)),
+      `${pagina}: ningún módulo antes de theme-boot.js`,
+    );
   }
 });
 
@@ -67,25 +87,37 @@ test('theme-boot.js usa la clave de theme.js y decide igual que applyTheme', () 
     script.runInNewContext(arranque.ventana);
     // `applyTheme` corre en Node: le prestamos el mismo documento por un momento.
     const app = entorno(caso);
-    const previos = { document: globalThis.document, matchMedia: globalThis.matchMedia, localStorage: Object.getOwnPropertyDescriptor(globalThis, 'localStorage') };
+    const previos = {
+      document: globalThis.document,
+      matchMedia: globalThis.matchMedia,
+      localStorage: Object.getOwnPropertyDescriptor(globalThis, 'localStorage'),
+    };
     Object.assign(globalThis, { document: app.document, matchMedia: app.ventana.matchMedia });
     Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: () => app.ventana.localStorage });
     try {
       applyTheme(caso.sinAlmacenamiento ? 'system' : (caso.guardado ?? 'system'));
     } finally {
       Object.assign(globalThis, { document: previos.document, matchMedia: previos.matchMedia });
-      if (previos.localStorage) Object.defineProperty(globalThis, 'localStorage', previos.localStorage); else delete globalThis.localStorage;
+      if (previos.localStorage) Object.defineProperty(globalThis, 'localStorage', previos.localStorage);
+      else delete globalThis.localStorage;
     }
     assert.equal(arranque.document.documentElement.dataset.theme, caso.tema, `${caso.nombre}: tema de theme-boot.js`);
     assert.equal(app.document.documentElement.dataset.theme, caso.tema, `${caso.nombre}: tema de applyTheme`);
-    assert.equal(arranque.meta.content, arranque.meta.dataset[caso.tema], `${caso.nombre}: theme-color de theme-boot.js`);
+    assert.equal(
+      arranque.meta.content,
+      arranque.meta.dataset[caso.tema],
+      `${caso.nombre}: theme-color de theme-boot.js`,
+    );
     assert.equal(app.meta.content, app.meta.dataset[caso.tema], `${caso.nombre}: theme-color de applyTheme`);
   }
 });
 
 test('theme-color es el fondo de cada tema, en hex, en las dos páginas', () => {
   const temas = tokensPorTema(leer('ui/styles.css'));
-  const fondo = { light: hex(color(temas.light.get('--background'), '--background (claro)')), dark: hex(color(temas.dark.get('--background'), '--background (oscuro)')) };
+  const fondo = {
+    light: hex(color(temas.light.get('--background'), '--background (claro)')),
+    dark: hex(color(temas.dark.get('--background'), '--background (oscuro)')),
+  };
   for (const pagina of PAGINAS) {
     const meta = metaTema(leer(pagina));
     assert.equal(meta['data-light'], fondo.light, `${pagina}: data-light`);

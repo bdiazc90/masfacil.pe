@@ -9,7 +9,12 @@
 import { CANONICAL_SOURCE_URLS } from '../app/source-catalog.mjs';
 import { GLP_MINIMIZED_FIELDS, GLP_RAW_FIELDS, MINIMIZED_FIELDS, RAW_FIELDS } from './csv.mjs';
 
-const fuente = (definicion) => Object.freeze({ ...definicion, rawFields: Object.freeze([...definicion.rawFields]), minimizedFields: Object.freeze([...definicion.minimizedFields]) });
+const fuente = (definicion) =>
+  Object.freeze({
+    ...definicion,
+    rawFields: Object.freeze([...definicion.rawFields]),
+    minimizedFields: Object.freeze([...definicion.minimizedFields]),
+  });
 
 export const SOURCES = Object.freeze({
   'liquid-current': fuente({

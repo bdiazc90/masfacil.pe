@@ -34,7 +34,10 @@ export function appPaths() {
 /** Redirecciones 301 exactas: la barra final de las rutas de la app y los enlaces antiguos. */
 export function redirects() {
   const conBarra = appPaths().map((ruta) => [`${ruta}/`, ruta]);
-  const antiguas = ANTIGUAS.flatMap(([desde, hacia]) => [[desde, hacia], [`${desde}/`, hacia]]);
+  const antiguas = ANTIGUAS.flatMap(([desde, hacia]) => [
+    [desde, hacia],
+    [`${desde}/`, hacia],
+  ]);
   return [...conBarra, ...antiguas];
 }
 
@@ -52,7 +55,8 @@ export function resolvePath(pathname, { preference = null } = {}) {
   }
   for (const view of ACTIVE_VIEWS) {
     if (pathname === viewPath(view)) return { kind: 'view', view, history: false, canonical: pathname };
-    if (VIEWS[view].history && pathname === historyPath(view)) return { kind: 'view', view, history: true, canonical: pathname };
+    if (VIEWS[view].history && pathname === historyPath(view))
+      return { kind: 'view', view, history: true, canonical: pathname };
   }
   const destino = redirects().find(([desde]) => desde === pathname)?.[1];
   return destino ? { kind: 'redirect', to: destino } : { kind: 'not-found' };

@@ -30,7 +30,9 @@ function archiveObjects({ manifestText, bodies }) {
  */
 export function archiveHash({ manifestText, bodies }) {
   const objetos = archiveObjects({ manifestText, bodies });
-  const lineas = ARCHIVE_FILES.map((nombre) => `${nombre} ${sha256(objetos[nombre])} ${Buffer.byteLength(objetos[nombre])}\n`);
+  const lineas = ARCHIVE_FILES.map(
+    (nombre) => `${nombre} ${sha256(objetos[nombre])} ${Buffer.byteLength(objetos[nombre])}\n`,
+  );
   return sha256(`${ARCHIVE_HASH_PREFIX}\n${lineas.join('')}`);
 }
 
@@ -51,7 +53,12 @@ export function archiveComplete({ manifest, manifestText, bodies, hash }) {
     manifest_schema_version: manifest.schema_version,
     cutoff_at: primerDataset.cutoff_at,
     source_max_reported_at: primerDataset.source_max_reported_at,
-    objects: Object.fromEntries(ARCHIVE_FILES.map((nombre) => [nombre, { sha256: sha256(objetos[nombre]), bytes: Buffer.byteLength(objetos[nombre]) }])),
+    objects: Object.fromEntries(
+      ARCHIVE_FILES.map((nombre) => [
+        nombre,
+        { sha256: sha256(objetos[nombre]), bytes: Buffer.byteLength(objetos[nombre]) },
+      ]),
+    ),
   };
 }
 
@@ -76,7 +83,10 @@ export async function archiveBundle(store, { manifest, manifestText, bodies }) {
   const written = [];
   const reused = [];
   for (const nombre of ARCHIVE_FILES) {
-    const salida = await putImmutable(store, archiveKey(hash, nombre), objetos[nombre], { contentType: JSON_CONTENT_TYPE, cacheControl: IMMUTABLE_CACHE_CONTROL });
+    const salida = await putImmutable(store, archiveKey(hash, nombre), objetos[nombre], {
+      contentType: JSON_CONTENT_TYPE,
+      cacheControl: IMMUTABLE_CACHE_CONTROL,
+    });
     (salida.written ? written : reused).push(nombre);
   }
 
@@ -86,12 +96,18 @@ export async function archiveBundle(store, { manifest, manifestText, bodies }) {
   for (const nombre of ARCHIVE_FILES) {
     const cabecera = await store.head(archiveKey(hash, nombre));
     const esperado = complete.objects[nombre];
-    if (!cabecera) throw new Error(`El objeto archivado desapareció antes de cerrar el archivo: ${archiveKey(hash, nombre)}`);
-    if (cabecera.sha256 && cabecera.sha256 !== esperado.sha256) throw new Error(`El objeto archivado no coincide con su huella: ${archiveKey(hash, nombre)}`);
-    if (Number.isFinite(cabecera.bytes) && cabecera.bytes !== esperado.bytes) throw new Error(`El objeto archivado no coincide en tamaño: ${archiveKey(hash, nombre)}`);
+    if (!cabecera)
+      throw new Error(`El objeto archivado desapareció antes de cerrar el archivo: ${archiveKey(hash, nombre)}`);
+    if (cabecera.sha256 && cabecera.sha256 !== esperado.sha256)
+      throw new Error(`El objeto archivado no coincide con su huella: ${archiveKey(hash, nombre)}`);
+    if (Number.isFinite(cabecera.bytes) && cabecera.bytes !== esperado.bytes)
+      throw new Error(`El objeto archivado no coincide en tamaño: ${archiveKey(hash, nombre)}`);
   }
 
-  const cierre = await putImmutable(store, archiveKey(hash, 'complete.json'), `${JSON.stringify(complete)}\n`, { contentType: JSON_CONTENT_TYPE, cacheControl: IMMUTABLE_CACHE_CONTROL });
+  const cierre = await putImmutable(store, archiveKey(hash, 'complete.json'), `${JSON.stringify(complete)}\n`, {
+    contentType: JSON_CONTENT_TYPE,
+    cacheControl: IMMUTABLE_CACHE_CONTROL,
+  });
   (cierre.written ? written : reused).push('complete.json');
   return { archive_hash: hash, complete, stored: written.length > 0, written, reused };
 }

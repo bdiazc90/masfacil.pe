@@ -20,12 +20,15 @@ import { refreshOptionsFromEnv } from '../pipeline/refresh-snapshot.mjs';
 import { pruneInCi } from '../pipeline/snapshot-prune.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const resultPath = process.env.PREPARE_RESULT ? path.resolve(process.env.PREPARE_RESULT) : path.join(root, '.local-cache', 'publish', 'prepare-result.json');
+const resultPath = process.env.PREPARE_RESULT
+  ? path.resolve(process.env.PREPARE_RESULT)
+  : path.join(root, '.local-cache', 'publish', 'prepare-result.json');
 
 function escribirResultado(payload) {
   fs.mkdirSync(path.dirname(resultPath), { recursive: true, mode: 0o700 });
   fs.writeFileSync(resultPath, `${JSON.stringify(payload)}\n`, { mode: 0o600 });
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${payload.decision?.deploy === true}\n`);
+  if (process.env.GITHUB_OUTPUT)
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `deploy=${payload.decision?.deploy === true}\n`);
 }
 
 let resultado;
@@ -47,7 +50,13 @@ try {
     route: process.env.ROUTE || 'data',
     route_reason: process.env.ROUTE_REASON || null,
     refresh: { status: 'rejected', error: error.message },
-    decision: { action: 'fail_closed', project: false, verify: false, deploy: false, reason: 'la preparación falló antes de decidir; se conserva el último deployment bueno' },
+    decision: {
+      action: 'fail_closed',
+      project: false,
+      verify: false,
+      deploy: false,
+      reason: 'la preparación falló antes de decidir; se conserva el último deployment bueno',
+    },
     execution: { stage: 'prepare', ok: false, error: error.message },
     informe: { route: process.env.ROUTE || 'data', route_reason: process.env.ROUTE_REASON || null, deploy: false },
     identity: null,
@@ -63,7 +72,9 @@ try {
 try {
   const poda = pruneInCi({ root, production: resultado.production });
   if (poda) resultado.prune = poda;
-} catch (error) { resultado.prune = { status: 'failed', error: error.message }; }
+} catch (error) {
+  resultado.prune = { status: 'failed', error: error.message };
+}
 
 escribirResultado(resultado);
 process.stdout.write(`${JSON.stringify(resultado)}\n`);

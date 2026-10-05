@@ -24,7 +24,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { adoptSnapshot } from '../app/snapshot-refresh.mjs';
 import { combineGroupDecisions, publicationDecisionForRoute } from '../app/publication-policy.mjs';
-import { composeGroups, firstActivationBase, usablePrivateSnapshot, writeGroupProjection } from './project-gasolina.mjs';
+import {
+  composeGroups,
+  firstActivationBase,
+  usablePrivateSnapshot,
+  writeGroupProjection,
+} from './project-gasolina.mjs';
 import { facilitoPublicationChange } from './facilito/publication.mjs';
 import { facilitoStateForProducts, readFacilitoState } from './facilito/state.mjs';
 import { PUBLISHED_GROUPS } from './groups.mjs';
@@ -36,7 +41,13 @@ import { verifyWeb } from '../scripts/verify-web.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const leerJson = (archivo) => { try { return JSON.parse(fs.readFileSync(archivo, 'utf8')); } catch { return null; } };
+const leerJson = (archivo) => {
+  try {
+    return JSON.parse(fs.readFileSync(archivo, 'utf8'));
+  } catch {
+    return null;
+  }
+};
 const raizDeDatos = (root, grupo) => path.join(root, 'web', ...grupo.dataRoot.split('/'));
 
 /**
@@ -69,12 +80,34 @@ const estadoPublicado = (root, grupo) => leerJson(path.join(raizDeDatos(root, gr
  * grupo nunca se publicó; un estado ilegible o sin snapshot no se adivina.
  */
 function produccionPublicada(root, grupo, estado) {
-  if (!estado) return fs.existsSync(path.join(raizDeDatos(root, grupo), 'refresh-state.json')) ? { error: 'estado publicado ilegible' } : null;
-  if (typeof estado.snapshot_id !== 'string' || !estado.snapshot_id) return { error: 'el estado publicado no declara snapshot_id' };
-  return { snapshot_id: estado.snapshot_id, revision_id: estado.revision_id ?? null, facilito: Boolean(estado.facilito?.state_id) };
+  if (!estado)
+    return fs.existsSync(path.join(raizDeDatos(root, grupo), 'refresh-state.json'))
+      ? { error: 'estado publicado ilegible' }
+      : null;
+  if (typeof estado.snapshot_id !== 'string' || !estado.snapshot_id)
+    return { error: 'el estado publicado no declara snapshot_id' };
+  return {
+    snapshot_id: estado.snapshot_id,
+    revision_id: estado.revision_id ?? null,
+    facilito: Boolean(estado.facilito?.state_id),
+  };
 }
 
-export const DEFAULT_PREPARE_DEPS = Object.freeze({ refreshSnapshot, composeGroups, writeGroupProjection, verifyWeb, buildUi, writeShellManifest, usablePrivateSnapshot, firstActivationBase, readFacilitoState, publicadosDesdeDisco, estadoPublicado, adoptSnapshot, groups: PUBLISHED_GROUPS });
+export const DEFAULT_PREPARE_DEPS = Object.freeze({
+  refreshSnapshot,
+  composeGroups,
+  writeGroupProjection,
+  verifyWeb,
+  buildUi,
+  writeShellManifest,
+  usablePrivateSnapshot,
+  firstActivationBase,
+  readFacilitoState,
+  publicadosDesdeDisco,
+  estadoPublicado,
+  adoptSnapshot,
+  groups: PUBLISHED_GROUPS,
+});
 
 const trimmed = (value) => String(value ?? '').trim();
 const fallo = (reason) => ({ action: 'fail_closed', project: false, verify: false, deploy: false, reason });
@@ -89,7 +122,10 @@ const fallo = (reason) => ({ action: 'fail_closed', project: false, verify: fals
 function planDeRefresco({ root, route, deps, publicado }) {
   if (route === 'data') return { refresh: true };
   if (route !== 'project') return { refresh: false };
-  const privado = deps.usablePrivateSnapshot(root, { publishedSnapshotId: publicado?.snapshot_id ?? null, group: 'gasolina' });
+  const privado = deps.usablePrivateSnapshot(root, {
+    publishedSnapshotId: publicado?.snapshot_id ?? null,
+    group: 'gasolina',
+  });
   return privado.ok ? { refresh: false, reused: privado.snapshot_id } : { refresh: true, missing: privado.missing };
 }
 
@@ -115,8 +151,22 @@ function refrescoDelGrupo(refresh, grupo) {
 const resumenFuente = (fuente) => ({
   status: fuente.status,
   promoted: fuente.promoted === true,
-  snapshot_id: fuente.active_after?.snapshot_id ?? (fuente.snapshot_path ? path.basename(fuente.snapshot_path) : null) ?? fuente.active_snapshot ?? null,
-  groups: Object.fromEntries(Object.entries(fuente.groups ?? {}).map(([key, value]) => [key, { status: value.status, private: value.private === true, reasons: value.reasons ?? [], products: value.products ?? null }])),
+  snapshot_id:
+    fuente.active_after?.snapshot_id ??
+    (fuente.snapshot_path ? path.basename(fuente.snapshot_path) : null) ??
+    fuente.active_snapshot ??
+    null,
+  groups: Object.fromEntries(
+    Object.entries(fuente.groups ?? {}).map(([key, value]) => [
+      key,
+      {
+        status: value.status,
+        private: value.private === true,
+        reasons: value.reasons ?? [],
+        products: value.products ?? null,
+      },
+    ]),
+  ),
   error: fuente.error ?? null,
 });
 
@@ -147,7 +197,9 @@ export async function prepareRelease({
   const grupos = usar.groups;
   const revision = (grupo) => leerJson(path.join(raizDeDatos(root, grupo), 'manifest.json'))?.revision_id ?? null;
   const publicados = Object.fromEntries(grupos.map((grupo) => [grupo.key, usar.estadoPublicado(root, grupo)]));
-  const production = Object.fromEntries(grupos.map((grupo) => [grupo.key, produccionPublicada(root, grupo, publicados[grupo.key])]));
+  const production = Object.fromEntries(
+    grupos.map((grupo) => [grupo.key, produccionPublicada(root, grupo, publicados[grupo.key])]),
+  );
 
   const plan = planDeRefresco({ root, route, deps: usar, publicado: publicados.gasolina });
   let refresh;
@@ -160,7 +212,12 @@ export async function prepareRelease({
       refresh = { status: 'rejected', error: error.message };
     }
   } else {
-    refresh = { status: 'skipped', reason: plan.reused ? `ruta project: reproyección desde el snapshot privado ${plan.reused}; la fuente no se consultó` : `ruta ${route}: no se consulta la fuente` };
+    refresh = {
+      status: 'skipped',
+      reason: plan.reused
+        ? `ruta project: reproyección desde el snapshot privado ${plan.reused}; la fuente no se consultó`
+        : `ruta ${route}: no se consulta la fuente`,
+    };
   }
   if (plan.missing) refresh.refresh_reason = `no había snapshot privado utilizable: ${plan.missing.join('; ')}`;
 
@@ -174,28 +231,67 @@ export async function prepareRelease({
     // deploy. Una captura de otro combustible no es una capa de este.
     const facilitoAvailable = Object.keys(facilitoStateForProducts(expediente, grupo.products)?.units ?? {}).length > 0;
     const refreshGrupo = plan.refresh ? refrescoDelGrupo(refresh, grupo) : null;
-    const primeraActivacion = !publicado && Boolean(grupo.config?.guardrails?.firstActivation) && !['docs', 'shell'].includes(route);
-    const propio = usar.usablePrivateSnapshot(root, { publishedSnapshotId: publicado?.snapshot_id ?? null, group: grupo.key });
-    const reusado = route === 'project' && !plan.refresh ? (grupo.key === 'gasolina' ? plan.reused ?? null : (propio.ok ? propio.snapshot_id : null)) : null;
+    const primeraActivacion =
+      !publicado && Boolean(grupo.config?.guardrails?.firstActivation) && !['docs', 'shell'].includes(route);
+    const propio = usar.usablePrivateSnapshot(root, {
+      publishedSnapshotId: publicado?.snapshot_id ?? null,
+      group: grupo.key,
+    });
+    const reusado =
+      route === 'project' && !plan.refresh
+        ? grupo.key === 'gasolina'
+          ? (plan.reused ?? null)
+          : propio.ok
+            ? propio.snapshot_id
+            : null
+        : null;
     // Con el refresco caído, el pointer del grupo sigue siendo su último
     // snapshot oficial validado. Si además es utilizable, la consulta web puede
     // publicarse sobre él en vez de perderse junto al CSV.
-    const officialSnapshotUsable = facilitoAvailable && ['unverifiable', 'needs_review', 'rejected'].includes(refreshGrupo?.status)
-      ? usar.usablePrivateSnapshot(root, { publishedSnapshotId: null, group: grupo.key }).ok
-      : false;
+    const officialSnapshotUsable =
+      facilitoAvailable && ['unverifiable', 'needs_review', 'rejected'].includes(refreshGrupo?.status)
+        ? usar.usablePrivateSnapshot(root, { publishedSnapshotId: null, group: grupo.key }).ok
+        : false;
     let decision;
     if (primeraActivacion) {
       // El refresco de esta corrida ya juzgó al grupo contra su base auditada:
       // si lo rechazó, no hay primera versión que publicar.
       const juzgado = plan.refresh ? refrescoDeLaFuente(refresh, grupo)?.groups?.[grupo.key] : null;
-      decision = juzgado?.status === 'needs_review'
-        ? fallo(`primera activación de ${grupo.key} rechazada por el refresco: ${juzgado.reasons?.join('; ') || 'sin motivo'}`)
-        : { action: 'first_activation', project: true, verify: true, deploy: true, reason: `primera activación de ${grupo.key}` };
+      decision =
+        juzgado?.status === 'needs_review'
+          ? fallo(
+              `primera activación de ${grupo.key} rechazada por el refresco: ${juzgado.reasons?.join('; ') || 'sin motivo'}`,
+            )
+          : {
+              action: 'first_activation',
+              project: true,
+              verify: true,
+              deploy: true,
+              reason: `primera activación de ${grupo.key}`,
+            };
     } else {
-      try { decision = publicationDecisionForRoute(route, refreshGrupo, { forceProject, reusedSnapshot: reusado, facilitoAvailable, officialSnapshotUsable }); }
-      catch (error) { decision = fallo(`resultado de refresco no interpretable: ${error.message}`); }
+      try {
+        decision = publicationDecisionForRoute(route, refreshGrupo, {
+          forceProject,
+          reusedSnapshot: reusado,
+          facilitoAvailable,
+          officialSnapshotUsable,
+        });
+      } catch (error) {
+        decision = fallo(`resultado de refresco no interpretable: ${error.message}`);
+      }
     }
-    porGrupo[grupo.key] = { grupo, antes, decision, primeraActivacion, propio, facilitoChange: null, outcome: null, error: null, base: null };
+    porGrupo[grupo.key] = {
+      grupo,
+      antes,
+      decision,
+      primeraActivacion,
+      propio,
+      facilitoChange: null,
+      outcome: null,
+      error: null,
+      base: null,
+    };
   }
 
   const execution = { stage: plan.refresh ? 'refresh' : 'route', ok: true, error: null };
@@ -206,25 +302,54 @@ export async function prepareRelease({
   // su fuente —en los líquidos, el de Gasolina, que es el oficial vigente—. Los
   // grupos sobre el mismo snapshot se componen juntos: UNA pasada por el
   // original por snapshot.
-  const aComponer = Object.values(porGrupo).filter((item) => item.decision.project && item.decision.action !== 'fail_closed');
+  const aComponer = Object.values(porGrupo).filter(
+    (item) => item.decision.project && item.decision.action !== 'fail_closed',
+  );
   if (aComponer.length) {
     execution.stage = 'project';
     const planComposicion = new Map();
     for (const item of aComponer) {
-      const base = item.propio.ok ? item.propio : (item.primeraActivacion ? usar.firstActivationBase(root, item.grupo.key, { usable: usar.usablePrivateSnapshot }) : item.propio);
-      if (!base.ok || !base.pointer) { item.outcome = 'failed'; item.error = `sin snapshot privado utilizable: ${(base.missing ?? []).join('; ') || 'pointer ausente'}`; continue; }
+      const base = item.propio.ok
+        ? item.propio
+        : item.primeraActivacion
+          ? usar.firstActivationBase(root, item.grupo.key, { usable: usar.usablePrivateSnapshot })
+          : item.propio;
+      if (!base.ok || !base.pointer) {
+        item.outcome = 'failed';
+        item.error = `sin snapshot privado utilizable: ${(base.missing ?? []).join('; ') || 'pointer ausente'}`;
+        continue;
+      }
       item.base = base;
       const entrada = planComposicion.get(base.snapshot_id) ?? { pointer: base.pointer, groups: [] };
       entrada.groups.push(item.grupo.key);
       planComposicion.set(base.snapshot_id, entrada);
     }
     let candidatas = {};
-    try { candidatas = planComposicion.size ? await usar.composeGroups({ root, plan: [...planComposicion.values()], identityRoot, facilitoRoot, isolate: true }) : {}; }
-    catch (error) { for (const item of aComponer) if (!item.outcome) { item.outcome = 'failed'; item.error = trimmed(error.message) || 'la proyección falló sin mensaje'; } }
+    try {
+      candidatas = planComposicion.size
+        ? await usar.composeGroups({
+            root,
+            plan: [...planComposicion.values()],
+            identityRoot,
+            facilitoRoot,
+            isolate: true,
+          })
+        : {};
+    } catch (error) {
+      for (const item of aComponer)
+        if (!item.outcome) {
+          item.outcome = 'failed';
+          item.error = trimmed(error.message) || 'la proyección falló sin mensaje';
+        }
+    }
     for (const item of aComponer) {
       if (item.outcome) continue;
       const candidata = candidatas[item.grupo.key];
-      if (!candidata || candidata.error) { item.outcome = 'failed'; item.error = trimmed(candidata?.error) || 'la proyección falló sin mensaje'; continue; }
+      if (!candidata || candidata.error) {
+        item.outcome = 'failed';
+        item.error = trimmed(candidata?.error) || 'la proyección falló sin mensaje';
+        continue;
+      }
       try {
         // La primera versión pública se juzga siempre aquí contra la base
         // auditada, también sobre un pointer propio: la cadena privada de un grupo
@@ -233,65 +358,130 @@ export async function prepareRelease({
         // aprobó activarlo. Sin pointer propio, además, el grupo adopta el
         // snapshot solo si pasa.
         if (item.primeraActivacion) {
-          const calidad = compareGroupQuality({ group: item.grupo.key, candidateProducts: candidata.refreshState.products, candidateSourceMaxReportedAt: candidata.refreshState.source_max_reported_at });
-          if (calidad.status !== 'ready') { item.outcome = 'first_activation_failed'; item.error = calidad.reasons.join('; '); continue; }
-          if (!item.propio.ok) usar.adoptSnapshot(root, item.base.snapshot_id, { group: item.grupo.key, sourceId: item.grupo.config.source });
+          const calidad = compareGroupQuality({
+            group: item.grupo.key,
+            candidateProducts: candidata.refreshState.products,
+            candidateSourceMaxReportedAt: candidata.refreshState.source_max_reported_at,
+          });
+          if (calidad.status !== 'ready') {
+            item.outcome = 'first_activation_failed';
+            item.error = calidad.reasons.join('; ');
+            continue;
+          }
+          if (!item.propio.ok)
+            usar.adoptSnapshot(root, item.base.snapshot_id, {
+              group: item.grupo.key,
+              sourceId: item.grupo.config.source,
+            });
         }
         // Con el CSV sin cambios, la entrega solo se justifica si la consulta web
         // mueve algo que alguien pueda ver. Si no, la anterior sigue siendo
         // correcta y se queda: publicar la misma lista con otra hora costaría una
         // descarga completa a cada cliente para no decirle nada nuevo.
         if (['facilito_project_verify_deploy', 'facilito_over_last_valid_snapshot'].includes(item.decision.action)) {
-          item.facilitoChange = facilitoPublicationChange({ candidate: candidata.datasets, published: usar.publicadosDesdeDisco(root, item.grupo), now: Date.now() });
+          item.facilitoChange = facilitoPublicationChange({
+            candidate: candidata.datasets,
+            published: usar.publicadosDesdeDisco(root, item.grupo),
+            now: Date.now(),
+          });
         }
         if (item.facilitoChange && !item.facilitoChange.visible) {
-          item.decision = { ...item.decision, project: false, verify: false, deploy: false, action: 'no_op', reason: `consulta web sin efecto publicable: ${item.facilitoChange.reason}` };
+          item.decision = {
+            ...item.decision,
+            project: false,
+            verify: false,
+            deploy: false,
+            action: 'no_op',
+            reason: `consulta web sin efecto publicable: ${item.facilitoChange.reason}`,
+          };
           item.outcome = 'unchanged';
         } else {
-          identity = usar.writeGroupProjection(candidata, { root, group: item.grupo, identityRoot, facilitoRoot }).identity ?? identity;
+          identity =
+            usar.writeGroupProjection(candidata, { root, group: item.grupo, identityRoot, facilitoRoot }).identity ??
+            identity;
           item.outcome = 'written';
         }
-      } catch (error) { item.outcome = 'failed'; item.error = trimmed(error.message) || 'la proyección falló sin mensaje'; }
+      } catch (error) {
+        item.outcome = 'failed';
+        item.error = trimmed(error.message) || 'la proyección falló sin mensaje';
+      }
     }
     // Una primera activación que no llega a escribirse, por la causa que sea,
     // también detiene la entrega.
-    for (const item of aComponer) if (item.primeraActivacion && item.outcome === 'failed') item.outcome = 'first_activation_failed';
+    for (const item of aComponer)
+      if (item.primeraActivacion && item.outcome === 'failed') item.outcome = 'first_activation_failed';
   }
   for (const item of Object.values(porGrupo)) {
     if (item.outcome) continue;
-    if (item.decision.action === 'fail_closed') item.outcome = item.primeraActivacion ? 'first_activation_failed' : 'failed';
+    if (item.decision.action === 'fail_closed')
+      item.outcome = item.primeraActivacion ? 'first_activation_failed' : 'failed';
     else item.outcome = item.decision.deploy ? 'reused' : 'unchanged';
   }
 
-  let decision = combineGroupDecisions(route, Object.values(porGrupo).map((item) => ({ group: item.grupo.key, decision: item.decision, outcome: item.outcome, error: item.error })));
-  if (decision.action === 'fail_closed') { execution.ok = false; execution.error = decision.reason; }
+  let decision = combineGroupDecisions(
+    route,
+    Object.values(porGrupo).map((item) => ({
+      group: item.grupo.key,
+      decision: item.decision,
+      outcome: item.outcome,
+      error: item.error,
+    })),
+  );
+  if (decision.action === 'fail_closed') {
+    execution.ok = false;
+    execution.error = decision.reason;
+  }
   // En TODA ruta que publica y en este orden: datos disponibles → interfaz
   // compilada → precache derivada → verificación. El shell que se sube, su lista
   // y su comprobación salen de la misma corrida, y después de verificar no se
   // vuelve a compilar. Compilar no toca `web/data/`; un fallo no publica nada.
   if (execution.ok && decision.verify) {
     execution.stage = 'build';
-    try { await usar.buildUi({ root }); }
-    catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'el build de la interfaz falló sin mensaje'; }
+    try {
+      await usar.buildUi({ root });
+    } catch (error) {
+      execution.ok = false;
+      execution.error = trimmed(error.message) || 'el build de la interfaz falló sin mensaje';
+    }
   }
   let shell = null;
   if (execution.ok && decision.verify) {
     execution.stage = 'shell';
-    try { shell = usar.writeShellManifest({ root }) ?? null; }
-    catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'la precache derivada falló sin mensaje'; }
+    try {
+      shell = usar.writeShellManifest({ root }) ?? null;
+    } catch (error) {
+      execution.ok = false;
+      execution.error = trimmed(error.message) || 'la precache derivada falló sin mensaje';
+    }
   }
   if (execution.ok && decision.verify) {
     execution.stage = 'verify';
     try {
       const verificacion = await usar.verifyWeb({ root });
-      if (verificacion.errors.length) { execution.ok = false; execution.error = verificacion.errors.join('; '); }
-    } catch (error) { execution.ok = false; execution.error = trimmed(error.message) || 'la verificación falló sin mensaje'; }
+      if (verificacion.errors.length) {
+        execution.ok = false;
+        execution.error = verificacion.errors.join('; ');
+      }
+    } catch (error) {
+      execution.ok = false;
+      execution.error = trimmed(error.message) || 'la verificación falló sin mensaje';
+    }
   }
 
   // El log tiene que decir lo mismo que el archivo: informar la decisión
   // original mientras se escribe la degradada hacía creer que se iba a desplegar
   // algo que ya estaba descartado.
-  const applied = execution.ok ? decision : { ...decision, deploy: false, action: 'fail_closed', reason: decision.action === 'fail_closed' ? decision.reason : `${execution.stage} falló tras un refresco ${refresh.status}` };
+  const applied = execution.ok
+    ? decision
+    : {
+        ...decision,
+        deploy: false,
+        action: 'fail_closed',
+        reason:
+          decision.action === 'fail_closed'
+            ? decision.reason
+            : `${execution.stage} falló tras un refresco ${refresh.status}`,
+      };
   const informeGrupo = (item) => {
     const despues = revision(item.grupo);
     return {
@@ -323,11 +513,23 @@ export async function prepareRelease({
     deploy: applied.deploy,
     // La versión del shell que se sube: dos corridas del mismo código tienen que
     // dar la misma, aunque cambien los datos.
-    shell: execution.ok ? shell?.cache ?? null : null,
+    shell: execution.ok ? (shell?.cache ?? null) : null,
     groups: grupoInforme,
     // Cada fuente que se consultó, con los grupos que juzgó: también los que
     // todavía no publican. Nunca cambia la decisión de publicar.
-    sources: Object.fromEntries(Object.entries(refresh.sources ?? {}).map(([id, fuente]) => [id, resumenFuente(fuente)])),
+    sources: Object.fromEntries(
+      Object.entries(refresh.sources ?? {}).map(([id, fuente]) => [id, resumenFuente(fuente)]),
+    ),
   };
-  return { ok: execution.ok, route, route_reason: routeReason, refresh, decision: applied, execution, informe, identity, production };
+  return {
+    ok: execution.ok,
+    route,
+    route_reason: routeReason,
+    refresh,
+    decision: applied,
+    execution,
+    informe,
+    identity,
+    production,
+  };
 }

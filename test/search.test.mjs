@@ -12,7 +12,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test, { mock } from 'node:test';
 
-import { createSearch, districtsFrom, evaluateRows, resultsView, startResults, withDistances } from '../web/lib/search.js';
+import {
+  createSearch,
+  districtsFrom,
+  evaluateRows,
+  resultsView,
+  startResults,
+  withDistances,
+} from '../web/lib/search.js';
 
 const CORTE = '2026-09-20T12:00:00.000Z';
 const HORA = 3_600_000;
@@ -27,7 +34,18 @@ const id = (letra) => letra.repeat(24);
 let serie = 0;
 function oferta(letra, { km, distrito = 'SURQUILLO', precio, reportado = corte - 2 * DIA, consulta = null }) {
   serie += 1;
-  return { id: `g2_${String(serie).padStart(24, '0')}`, establishment_id: `est_${id(letra)}`, commercial_identity: null, address: null, price: precio, reported_at: iso(reportado), facilito: consulta, district: distrito, longitude: ORIGEN.longitude, latitude: ORIGEN.latitude - km * GRADOS_POR_KM };
+  return {
+    id: `g2_${String(serie).padStart(24, '0')}`,
+    establishment_id: `est_${id(letra)}`,
+    commercial_identity: null,
+    address: null,
+    price: precio,
+    reported_at: iso(reportado),
+    facilito: consulta,
+    district: distrito,
+    longitude: ORIGEN.longitude,
+    latitude: ORIGEN.latitude - km * GRADOS_POR_KM,
+  };
 }
 
 // Siete grifos dentro de 3,5 km y seis más lejos. B solo vende Regular y C solo
@@ -40,7 +58,12 @@ const DATASET = Object.freeze({
     regular: [
       oferta('a', { km: 0.3, distrito: 'MIRAFLORES', precio: 20.5 }),
       oferta('b', { km: 0.8, distrito: 'MIRAFLORES', precio: 20.1 }),
-      oferta('d', { km: 2.2, distrito: 'SAN ISIDRO', precio: 20.9, consulta: { price: 20.7, observed_at: iso(corte - HORA), reported_at: null } }),
+      oferta('d', {
+        km: 2.2,
+        distrito: 'SAN ISIDRO',
+        precio: 20.9,
+        consulta: { price: 20.7, observed_at: iso(corte - HORA), reported_at: null },
+      }),
       oferta('e', { km: 3.0, distrito: 'SAN BORJA', precio: 20.4, reportado: callado }),
       oferta('f', { km: 2.6, precio: 20.3 }),
       oferta('g', { km: 3.1, precio: 20.6 }),
@@ -78,7 +101,9 @@ test('las reglas no leen el reloj del sistema ni la página', () => {
   try {
     const { view } = conUbicacion();
     assert.equal(view.items.length, 7);
-  } finally { mock.timers.reset(); }
+  } finally {
+    mock.timers.reset();
+  }
   const fuente = fs.readFileSync(new URL('../web/lib/search.js', import.meta.url), 'utf8');
   assert.doesNotMatch(fuente, /\b(?:document|window|navigator|localStorage|sessionStorage)\b/);
   assert.doesNotMatch(fuente, /\bDate\.now\b|new Date\(\s*\)/);
@@ -153,7 +178,14 @@ test('lejos de todo: radio inerte y vacío del radio', () => {
 
 test('una preferencia tocada sobrevive a volver a abrir resultados', () => {
   const { located } = conUbicacion();
-  const tocada = { ...createSearch(), origin: ORIGEN, radiusKm: 2, sort: 'price', preferencesTouched: true, visibleCount: 12 };
+  const tocada = {
+    ...createSearch(),
+    origin: ORIGEN,
+    radiusKm: 2,
+    sort: 'price',
+    preferencesTouched: true,
+    visibleCount: 12,
+  };
   assert.deepEqual(startResults(tocada, located), { ...tocada, visibleCount: 6 });
 });
 
@@ -192,8 +224,28 @@ test('sin un solo precio vigente no se ordena por precio', () => {
 test('el tag cuenta los precios de lo que se muestra, no del radio entero', () => {
   // Cinco grifos mudos delante, uno con precio y cinco más con precio detrás:
   // la primera página solo trae un precio y no hay nada que comparar.
-  const fila = (letra, km, precio) => ({ establishment_id: `est_${id(letra)}`, district: 'SURQUILLO', latitude: 0, longitude: 0, distance_km: km, prices: { regular: precio ? { price: precio } : null, premium: null }, has_price: Boolean(precio) });
-  const located = [fila('a', 0.1), fila('b', 0.2), fila('c', 0.3), fila('d', 0.4), fila('e', 0.5), fila('f', 0.6, 20.5), fila('g', 0.7, 20.1), fila('h', 0.8, 20.2), fila('i', 0.9, 20.3), fila('j', 1.0, 20.4), fila('k', 1.1, 20.6)];
+  const fila = (letra, km, precio) => ({
+    establishment_id: `est_${id(letra)}`,
+    district: 'SURQUILLO',
+    latitude: 0,
+    longitude: 0,
+    distance_km: km,
+    prices: { regular: precio ? { price: precio } : null, premium: null },
+    has_price: Boolean(precio),
+  });
+  const located = [
+    fila('a', 0.1),
+    fila('b', 0.2),
+    fila('c', 0.3),
+    fila('d', 0.4),
+    fila('e', 0.5),
+    fila('f', 0.6, 20.5),
+    fila('g', 0.7, 20.1),
+    fila('h', 0.8, 20.2),
+    fila('i', 0.9, 20.3),
+    fila('j', 1.0, 20.4),
+    fila('k', 1.1, 20.6),
+  ];
   const search = { ...createSearch(), origin: ORIGEN, radiusKm: 5 };
   const primera = resultsView({ rows: located, located, search });
   assert.equal(primera.items.length, 6);

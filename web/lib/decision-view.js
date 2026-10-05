@@ -7,7 +7,12 @@ import { PRODUCTS } from './catalog.js';
 export function cheapestOffer(pool, product = 'regular') {
   const conPrecio = pool.filter((row) => row.prices?.[product]);
   if (!conPrecio.length) return null;
-  return conPrecio.sort((left, right) => left.prices[product].price - right.prices[product].price || left.distance_km - right.distance_km || left.establishment_id.localeCompare(right.establishment_id))[0];
+  return conPrecio.sort(
+    (left, right) =>
+      left.prices[product].price - right.prices[product].price ||
+      left.distance_km - right.distance_km ||
+      left.establishment_id.localeCompare(right.establishment_id),
+  )[0];
 }
 
 // El tag se calcula sobre el conjunto que el radio define, así que "tu zona" ya
@@ -19,7 +24,9 @@ export function decisionTag(offer, pool, radiusKm = null, product = 'regular') {
   const alcance = radiusKm ? `en ${formatRadius(radiusKm)}` : 'de tu zona';
   const { short: etiqueta } = PRODUCTS[product] ?? PRODUCTS.regular;
   const a = concordancia(product);
-  return nearest && nearest.establishment_id === cheapest.establishment_id ? `${etiqueta} más barat${a} y más cercan${a} ${alcance}` : `${etiqueta} más barat${a} ${alcance}`;
+  return nearest && nearest.establishment_id === cheapest.establishment_id
+    ? `${etiqueta} más barat${a} y más cercan${a} ${alcance}`
+    : `${etiqueta} más barat${a} ${alcance}`;
 }
 
 /** La vocal que concuerda con el producto: «Regular más barata», «Diésel más barato». */

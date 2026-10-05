@@ -60,7 +60,11 @@ const ordenar = (valores) => [...new Set(valores)].sort((a, b) => (a < b ? -1 : 
 function compilados(root, problems) {
   const build = readUiBuild({ root });
   if (build?.status !== 'complete') {
-    problems.push(build ? `el build de la interfaz no terminó (${build.status}); ejecuta npm run build` : 'falta el build de la interfaz; ejecuta npm run build');
+    problems.push(
+      build
+        ? `el build de la interfaz no terminó (${build.status}); ejecuta npm run build`
+        : 'falta el build de la interfaz; ejecuta npm run build',
+    );
     return [];
   }
   return Object.keys(build.outputs ?? {}).map((relativo) => `/${relativo}`);
@@ -71,8 +75,12 @@ function cargadosPorLasPaginas(webRoot, problems) {
   const rutas = [];
   for (const pagina of UI_PAGES) {
     const archivo = path.join(webRoot, pagina);
-    if (!fs.existsSync(archivo)) { problems.push(`falta web/${pagina}; ejecuta npm run build`); continue; }
-    for (const { url } of htmlResources(fs.readFileSync(archivo, 'utf8'))) if (url.startsWith('/') && !url.startsWith('//')) rutas.push(url.replace(/[?#].*$/, ''));
+    if (!fs.existsSync(archivo)) {
+      problems.push(`falta web/${pagina}; ejecuta npm run build`);
+      continue;
+    }
+    for (const { url } of htmlResources(fs.readFileSync(archivo, 'utf8')))
+      if (url.startsWith('/') && !url.startsWith('//')) rutas.push(url.replace(/[?#].*$/, ''));
   }
   return rutas;
 }
@@ -96,8 +104,12 @@ export function deriveShell({ root = rootFromModule } = {}) {
   const marcas = [];
   for (const { key, role, path: ruta } of brandAssets(BRAND_LOGOS)) {
     const archivo = path.join(root, shellEntryFile(ruta));
-    if (!fs.existsSync(archivo)) { problems.push(`${key}.${role}: ${ruta} está registrado y no existe en el árbol`); continue; }
-    for (const motivo of svgProblems(fs.readFileSync(archivo, 'utf8'))) problems.push(`${key}.${role}: ${ruta} ${motivo}`);
+    if (!fs.existsSync(archivo)) {
+      problems.push(`${key}.${role}: ${ruta} está registrado y no existe en el árbol`);
+      continue;
+    }
+    for (const motivo of svgProblems(fs.readFileSync(archivo, 'utf8')))
+      problems.push(`${key}.${role}: ${ruta} ${motivo}`);
     marcas.push(ruta);
   }
   // Las dos páginas primero: la portada es cada vista, y la 404 propia viaja en
@@ -105,14 +117,21 @@ export function deriveShell({ root = rootFromModule } = {}) {
   // cualquier dirección que no sea una vista. Después, ordenado, todo lo que
   // emitió el build, lo que cargan las páginas, los iconos y las marcas.
   const paginas = new Set(['/', ...UI_PAGES.map((pagina) => `/${pagina}`)]);
-  const resto = [...compilados(root, problems), ...cargadosPorLasPaginas(webRoot, problems), ...iconosDelManifiesto(webRoot), ...marcas]
-    .filter((entry) => !paginas.has(entry) && !FUERA_DE_LA_PRECACHE.has(entry.replace(/^\//, '')));
+  const resto = [
+    ...compilados(root, problems),
+    ...cargadosPorLasPaginas(webRoot, problems),
+    ...iconosDelManifiesto(webRoot),
+    ...marcas,
+  ].filter((entry) => !paginas.has(entry) && !FUERA_DE_LA_PRECACHE.has(entry.replace(/^\//, '')));
   const entries = ['/', '/404.html', ...ordenar(resto)];
 
   const hash = crypto.createHash('sha256').update(`${JSON.stringify(entries)}\n`);
   for (const entry of entries) {
     const archivo = path.join(root, shellEntryFile(entry));
-    if (!fs.existsSync(archivo)) { problems.push(`${entry} está en la precache derivada y no existe en el árbol`); continue; }
+    if (!fs.existsSync(archivo)) {
+      problems.push(`${entry} está en la precache derivada y no existe en el árbol`);
+      continue;
+    }
     hash.update(fs.readFileSync(archivo));
   }
   // Las cabeceras también son versión del shell: el service worker guarda cada
@@ -191,10 +210,14 @@ export function shellManifestProblems({ root = rootFromModule } = {}) {
   const derived = deriveShell({ root });
   if (derived.problems.length) return { derived, problems: derived.problems };
   const problems = [];
-  for (const [relativo, esperado] of [[SHELL_MANIFEST_RELATIVE, renderShellManifest(derived)], [SERVICE_WORKER_RELATIVE, renderServiceWorker(derived)]]) {
+  for (const [relativo, esperado] of [
+    [SHELL_MANIFEST_RELATIVE, renderShellManifest(derived)],
+    [SERVICE_WORKER_RELATIVE, renderServiceWorker(derived)],
+  ]) {
     const destino = path.join(root, relativo);
     if (!fs.existsSync(destino)) problems.push(`falta ${relativo}; ejecuta npm run build para generarlo`);
-    else if (fs.readFileSync(destino, 'utf8') !== esperado) problems.push(`${relativo} no coincide con el árbol; la precache derivada es ${derived.cache}`);
+    else if (fs.readFileSync(destino, 'utf8') !== esperado)
+      problems.push(`${relativo} no coincide con el árbol; la precache derivada es ${derived.cache}`);
   }
   return { derived, problems };
 }

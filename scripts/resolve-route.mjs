@@ -25,8 +25,10 @@ const after = (process.env.RANGE_AFTER ?? 'HEAD').trim();
 function rangoDelPush() {
   if (eventName !== 'push') return { changedPaths: [], previousCommitValid: true };
   if (!before || /^0+$/.test(before)) return { changedPaths: [], previousCommitValid: false };
-  if (git('rev-parse', '--verify', '--quiet', `${before}^{commit}`).status !== 0) return { changedPaths: [], previousCommitValid: false };
-  if (git('merge-base', '--is-ancestor', before, after).status !== 0) return { changedPaths: [], previousCommitValid: false };
+  if (git('rev-parse', '--verify', '--quiet', `${before}^{commit}`).status !== 0)
+    return { changedPaths: [], previousCommitValid: false };
+  if (git('merge-base', '--is-ancestor', before, after).status !== 0)
+    return { changedPaths: [], previousCommitValid: false };
   const diff = git('diff', '--name-only', '-z', `${before}..${after}`);
   if (diff.status !== 0) return { changedPaths: [], previousCommitValid: false };
   return { changedPaths: diff.stdout.split('\0').filter(Boolean), previousCommitValid: true };
@@ -55,6 +57,11 @@ const salida = {
 };
 
 if (process.env.GITHUB_OUTPUT) {
-  fs.appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(salida).map(([clave, valor]) => `${clave}=${valor}`).join('\n') + '\n');
+  fs.appendFileSync(
+    process.env.GITHUB_OUTPUT,
+    Object.entries(salida)
+      .map(([clave, valor]) => `${clave}=${valor}`)
+      .join('\n') + '\n',
+  );
 }
 process.stdout.write(`${JSON.stringify(salida)}\n`);

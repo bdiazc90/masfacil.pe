@@ -15,8 +15,22 @@ import { capturarLima, parseTabla } from '../pipeline/facilito/capture.mjs';
 import { applyFacilitoRun, facilitoStateId } from '../pipeline/facilito/state.mjs';
 
 const CABECERAS = ['Distrito', 'Establecimiento', 'Dirección', 'Teléfono', 'Precio de Venta (Soles por galón)'];
-const fila = (nombre, precio = 'S/ 19,49', distrito = 'ATE') => [distrito, nombre, `AV. ${nombre} 1`, '999999999', precio];
-const tabla = (filas, extra = {}) => ({ estado: 'ok', completo: true, total: filas.length, firma: 'x', cabeceras: CABECERAS, filas, ...extra });
+const fila = (nombre, precio = 'S/ 19,49', distrito = 'ATE') => [
+  distrito,
+  nombre,
+  `AV. ${nombre} 1`,
+  '999999999',
+  precio,
+];
+const tabla = (filas, extra = {}) => ({
+  estado: 'ok',
+  completo: true,
+  total: filas.length,
+  firma: 'x',
+  cabeceras: CABECERAS,
+  filas,
+  ...extra,
+});
 
 test('una tabla completa de más de 50 filas se lee entera', () => {
   const filas = Array.from({ length: 63 }, (_, i) => fila(`GRIFO ${i}`));
@@ -42,7 +56,10 @@ test('una tabla truncada no publica las filas que sí llegaron', () => {
 
 test('una tabla de otro distrito o con otras cabeceras no se interpreta', () => {
   assert.equal(parseTabla(tabla([fila('GRIFO X')]), 'SAN LUIS').razon, 'distrito_no_coincide');
-  assert.equal(parseTabla(tabla([fila('GRIFO X')], { cabeceras: [...CABECERAS.slice(0, 4), 'Precio'] }), 'ATE').razon, 'cabeceras_desconocidas');
+  assert.equal(
+    parseTabla(tabla([fila('GRIFO X')], { cabeceras: [...CABECERAS.slice(0, 4), 'Precio'] }), 'ATE').razon,
+    'cabeceras_desconocidas',
+  );
   assert.equal(parseTabla(tabla([fila('GRIFO X').slice(0, 4)]), 'ATE').razon, 'fila_con_forma_inesperada');
   assert.equal(parseTabla(tabla([fila('GRIFO X', '0')]), 'ATE').razon, 'precio_ilegible');
   assert.equal(parseTabla(tabla([fila('GRIFO X', 'consultar')]), 'ATE').razon, 'precio_ilegible');
@@ -73,7 +90,10 @@ function navegadorFalso({ distritos, tablaDe }) {
     if (args[0] === '--json' && args[1] === 'eval') {
       const script = Buffer.from(args[3], 'base64').toString('utf8');
       const respuesta = script.includes('page.info')
-        ? { seleccion: { valor: productoActual, texto: ETIQUETAS_DEL_SITIO[productoActual] ?? '' }, ...tablaDe(distritoActual, productoActual) }
+        ? {
+            seleccion: { valor: productoActual, texto: ETIQUETAS_DEL_SITIO[productoActual] ?? '' },
+            ...tablaDe(distritoActual, productoActual),
+          }
         : { t: (reloj += 1), distritos };
       return JSON.stringify({ result: respuesta });
     }
@@ -81,7 +101,10 @@ function navegadorFalso({ distritos, tablaDe }) {
   };
 }
 
-const DISTRITOS = [{ nombre: 'ATE', codigo: '150103' }, { nombre: 'SAN LUIS', codigo: '150134' }];
+const DISTRITOS = [
+  { nombre: 'ATE', codigo: '150103' },
+  { nombre: 'SAN LUIS', codigo: '150134' },
+];
 // Lo que muestra el select del sitio para cada código (HAR del 10/09/2026).
 const ETIQUETAS_DEL_SITIO = { 126: 'Gasohol Regular', 127: 'Gasohol Premium', 40: 'DB5 S-50 UV' };
 
@@ -91,9 +114,10 @@ test('un producto roto no se lleva por delante al distrito ni a los demás', () 
     ejecutar: navegadorFalso({
       distritos: DISTRITOS,
       // Solo Premium de Ate llega truncado; los otros tres pares están enteros.
-      tablaDe: (distrito, producto) => (distrito?.codigo === '150103' && producto === '127'
-        ? tabla([fila('GRIFO A', 'S/ 21,40')], { completo: false, total: 9 })
-        : tabla([fila(`GRIFO ${distrito?.nombre}`, 'S/ 19,49', distrito?.nombre)])),
+      tablaDe: (distrito, producto) =>
+        distrito?.codigo === '150103' && producto === '127'
+          ? tabla([fila('GRIFO A', 'S/ 21,40')], { completo: false, total: 9 })
+          : tabla([fila(`GRIFO ${distrito?.nombre}`, 'S/ 19,49', distrito?.nombre)]),
     }),
   });
   assert.equal(resultado.blocked, null);
@@ -111,21 +135,42 @@ test('un bloqueo explícito detiene la adquisición entera', () => {
     soloProductos: ['regular', 'premium'],
     ejecutar: navegadorFalso({
       distritos: DISTRITOS,
-      tablaDe: (distrito) => (distrito?.codigo === '150103' ? { rechazo: 'desafio_o_rechazo' } : tabla([fila('GRIFO B', 'S/ 19,49', 'SAN LUIS')])),
+      tablaDe: (distrito) =>
+        distrito?.codigo === '150103'
+          ? { rechazo: 'desafio_o_rechazo' }
+          : tabla([fila('GRIFO B', 'S/ 19,49', 'SAN LUIS')]),
     }),
   });
   assert.equal(resultado.blocked?.codigo, 'desafio_o_rechazo');
   // San Luis nunca se intenta: seguir sería golpear el mismo muro con otra puerta.
-  assert.equal(resultado.units.some((u) => u.district_name === 'SAN LUIS'), false);
+  assert.equal(
+    resultado.units.some((u) => u.district_name === 'SAN LUIS'),
+    false,
+  );
 });
 
 test('una corrida fallida conserva la captura anterior con su hora original', () => {
-  const anterior = applyFacilitoRun(null, [{
-    district_code: '150103', district_name: 'ATE', product: 'regular', status: 'ok',
-    observed_at: '2026-09-20T10:00:00.000Z', announced_total: 1, rows: [{ key_hash: 'abc', price: 19.49 }],
-  }], { attemptedAt: '2026-09-20T10:00:00.000Z' });
+  const anterior = applyFacilitoRun(
+    null,
+    [
+      {
+        district_code: '150103',
+        district_name: 'ATE',
+        product: 'regular',
+        status: 'ok',
+        observed_at: '2026-09-20T10:00:00.000Z',
+        announced_total: 1,
+        rows: [{ key_hash: 'abc', price: 19.49 }],
+      },
+    ],
+    { attemptedAt: '2026-09-20T10:00:00.000Z' },
+  );
 
-  const despues = applyFacilitoRun(anterior, [{ district_code: '150103', district_name: 'ATE', product: 'regular', status: 'timeout_de_comando' }], { attemptedAt: '2026-09-20T16:00:00.000Z' });
+  const despues = applyFacilitoRun(
+    anterior,
+    [{ district_code: '150103', district_name: 'ATE', product: 'regular', status: 'timeout_de_comando' }],
+    { attemptedAt: '2026-09-20T16:00:00.000Z' },
+  );
   const unidad = despues.units['150103:regular'];
   assert.equal(unidad.observed_at, '2026-09-20T10:00:00.000Z', 'no se rejuvenece porque el proceso se ejecutó');
   assert.deepEqual(unidad.rows, [{ key_hash: 'abc', price: 19.49 }]);
@@ -134,14 +179,40 @@ test('una corrida fallida conserva la captura anterior con su hora original', ()
 });
 
 test('ver otra vez el mismo precio acredita una observación nueva, no un reporte nuevo', () => {
-  const primera = applyFacilitoRun(null, [{
-    district_code: '150103', district_name: 'ATE', product: 'regular', status: 'ok',
-    observed_at: '2026-09-20T10:00:00.000Z', announced_total: 1, rows: [{ key_hash: 'abc', price: 19.49 }],
-  }], { attemptedAt: '2026-09-20T10:00:00.000Z' });
-  const segunda = applyFacilitoRun(primera, [{
-    district_code: '150103', district_name: 'ATE', product: 'regular', status: 'ok',
-    observed_at: '2026-09-20T16:00:00.000Z', announced_total: 1, rows: [{ key_hash: 'abc', price: 19.49 }],
-  }], { attemptedAt: '2026-09-20T16:00:00.000Z' });
+  const primera = applyFacilitoRun(
+    null,
+    [
+      {
+        district_code: '150103',
+        district_name: 'ATE',
+        product: 'regular',
+        status: 'ok',
+        observed_at: '2026-09-20T10:00:00.000Z',
+        announced_total: 1,
+        rows: [{ key_hash: 'abc', price: 19.49 }],
+      },
+    ],
+    { attemptedAt: '2026-09-20T10:00:00.000Z' },
+  );
+  const segunda = applyFacilitoRun(
+    primera,
+    [
+      {
+        district_code: '150103',
+        district_name: 'ATE',
+        product: 'regular',
+        status: 'ok',
+        observed_at: '2026-09-20T16:00:00.000Z',
+        announced_total: 1,
+        rows: [{ key_hash: 'abc', price: 19.49 }],
+      },
+    ],
+    { attemptedAt: '2026-09-20T16:00:00.000Z' },
+  );
   assert.equal(segunda.units['150103:regular'].observed_at, '2026-09-20T16:00:00.000Z');
-  assert.equal(facilitoStateId(segunda), '2026-09-20T16:00:00.000Z', 'y el estado avanza, que es lo que ordena dos corridas del mismo CSV');
+  assert.equal(
+    facilitoStateId(segunda),
+    '2026-09-20T16:00:00.000Z',
+    'y el estado avanza, que es lo que ordena dos corridas del mismo CSV',
+  );
 });

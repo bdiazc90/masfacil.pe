@@ -26,13 +26,29 @@ import { fileURLToPath } from 'node:url';
 import { PUBLISHED_GROUPS, dataCacheRules } from '../pipeline/groups.mjs';
 import { GROUP_CONTRACTS } from '../web/group-contracts.js';
 import { BRAND_LOGOS, brandAssets } from '../web/brand-logos.js';
-import { SERVICE_WORKER_MAIN, renderServiceWorker, renderShellManifest, shellManifestProblems } from '../pipeline/shell-manifest.mjs';
+import {
+  SERVICE_WORKER_MAIN,
+  renderServiceWorker,
+  renderShellManifest,
+  shellManifestProblems,
+} from '../pipeline/shell-manifest.mjs';
 import { UI_PAGES, uiBuildProblems } from '../pipeline/ui-build.mjs';
 import { fetchLiveGroups } from '../pipeline/live-bundle.mjs';
 import { HISTORY_ORIGIN } from '../web/lib/history-contract.js';
 import { appPaths, historyPath, redirectRules, redirects, viewPath } from '../web/lib/routes.js';
 import { ACTIVE_VIEWS, VIEWS } from '../web/lib/catalog.js';
-import { ANALYTICS_BEACON, ANALYTICS_ENDPOINT, NOT_FOUND_MARKER, brandAssetProblems, htmlResourceProblems, inlineProblems, notFoundPageProblems, serviceWorkerUpdateProblems, shellEntryFile, withoutPagesAnalytics } from '../app/shell-assets.mjs';
+import {
+  ANALYTICS_BEACON,
+  ANALYTICS_ENDPOINT,
+  NOT_FOUND_MARKER,
+  brandAssetProblems,
+  htmlResourceProblems,
+  inlineProblems,
+  notFoundPageProblems,
+  serviceWorkerUpdateProblems,
+  shellEntryFile,
+  withoutPagesAnalytics,
+} from '../app/shell-assets.mjs';
 
 const rootFromModule = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -49,7 +65,10 @@ async function bundleProblems(grupo, { manifest, state, bodies }) {
   if (state === undefined) errors.push(`falta refresh-state ${grupo.key}`);
   else errors.push(...grupo.validate.refreshState(state, manifest));
   for (const key of grupo.products) {
-    if (bodies[key] === undefined) { errors.push(`falta snapshot ${key}`); continue; }
+    if (bodies[key] === undefined) {
+      errors.push(`falta snapshot ${key}`);
+      continue;
+    }
     errors.push(...grupo.validate.bundle(manifest, key, bodies[key]));
   }
   // Si el cliente que se publica no acepta el bundle que se publica con él, no
@@ -58,7 +77,8 @@ async function bundleProblems(grupo, { manifest, state, bodies }) {
   if (!cliente.validManifest(manifest)) errors.push('el cliente nuevo rechaza el manifest del bundle');
   for (const key of grupo.products) {
     if (bodies[key] === undefined) continue;
-    if (!(await cliente.validBundle(manifest, key, bodies[key]))) errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
+    if (!(await cliente.validBundle(manifest, key, bodies[key])))
+      errors.push(`el cliente nuevo rechaza el snapshot ${key}`);
   }
   return errors;
 }
@@ -69,7 +89,8 @@ async function bundleProblems(grupo, { manifest, state, bodies }) {
 // catálogo: activar una vista la saca de aquí sin tocar esta lista.
 const PREVISTAS = Object.freeze(['gasolina', 'diesel', 'glp', 'gnv']);
 const NO_EXISTEN = Object.freeze([
-  '/combustibles', '/combustibles/',
+  '/combustibles',
+  '/combustibles/',
   ...PREVISTAS.filter((view) => !ACTIVE_VIEWS.includes(view)).map(viewPath),
   ...ACTIVE_VIEWS.filter((view) => !VIEWS[view].history).map(historyPath),
   ...ACTIVE_VIEWS.map((view) => `${viewPath(view)}/otra`),
@@ -81,10 +102,16 @@ export function dataHeaderProblems(cabeceras, reglas = dataCacheRules()) {
   const bloques = new Map();
   let actual = null;
   for (const linea of cabeceras.split('\n')) {
-    if (/^\S/.test(linea)) { actual = linea.trim(); bloques.set(actual, []); continue; }
+    if (/^\S/.test(linea)) {
+      actual = linea.trim();
+      bloques.set(actual, []);
+      continue;
+    }
     if (actual && linea.trim()) bloques.get(actual).push(linea.trim());
   }
-  return reglas.filter((regla) => !(bloques.get(regla.path) ?? []).includes(`Cache-Control: ${regla.cacheControl}`)).map((regla) => `web/_headers no declara Cache-Control: ${regla.cacheControl} para ${regla.path}`);
+  return reglas
+    .filter((regla) => !(bloques.get(regla.path) ?? []).includes(`Cache-Control: ${regla.cacheControl}`))
+    .map((regla) => `web/_headers no declara Cache-Control: ${regla.cacheControl} para ${regla.path}`);
 }
 
 /**
@@ -102,23 +129,34 @@ export async function routeProblems(origin, { root = rootFromModule } = {}) {
     try {
       const response = await pedir(ruta);
       const cuerpo = await response.text();
-      if (response.status !== 200 || withoutPagesAnalytics(cuerpo) !== portada) problemas.push(`ruta ${ruta} respondió ${response.status} sin la portada de este árbol`);
-    } catch (error) { problemas.push(`ruta ${ruta}: ${error.message}`); }
+      if (response.status !== 200 || withoutPagesAnalytics(cuerpo) !== portada)
+        problemas.push(`ruta ${ruta} respondió ${response.status} sin la portada de este árbol`);
+    } catch (error) {
+      problemas.push(`ruta ${ruta}: ${error.message}`);
+    }
   }
   for (const [desde, hacia] of redirects()) {
     try {
       const response = await pedir(desde);
       await response.arrayBuffer();
       const destino = response.headers.get('location');
-      if (response.status !== 301 || !destino || new URL(destino, origin).pathname !== hacia) problemas.push(`ruta ${desde} respondió ${response.status} → ${destino ?? 'sin destino'} en vez de 301 → ${hacia}`);
-    } catch (error) { problemas.push(`ruta ${desde}: ${error.message}`); }
+      if (response.status !== 301 || !destino || new URL(destino, origin).pathname !== hacia)
+        problemas.push(
+          `ruta ${desde} respondió ${response.status} → ${destino ?? 'sin destino'} en vez de 301 → ${hacia}`,
+        );
+    } catch (error) {
+      problemas.push(`ruta ${desde}: ${error.message}`);
+    }
   }
   for (const ruta of NO_EXISTEN) {
     try {
       const response = await pedir(ruta);
       const cuerpo = await response.text();
-      if (response.status !== 404 || !cuerpo.includes(NOT_FOUND_MARKER)) problemas.push(`ruta ${ruta} respondió ${response.status} en vez de la 404 propia`);
-    } catch (error) { problemas.push(`ruta ${ruta}: ${error.message}`); }
+      if (response.status !== 404 || !cuerpo.includes(NOT_FOUND_MARKER))
+        problemas.push(`ruta ${ruta} respondió ${response.status} en vez de la 404 propia`);
+    } catch (error) {
+      problemas.push(`ruta ${ruta}: ${error.message}`);
+    }
   }
   return problemas;
 }
@@ -137,7 +175,10 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   for (const grupo of PUBLISHED_GROUPS) {
     const dataRoot = path.join(root, 'web', ...grupo.dataRoot.split('/'));
     const manifestPath = path.join(dataRoot, 'manifest.json');
-    if (!fs.existsSync(manifestPath)) throw new Error(`Falta web/${grupo.dataRoot}/manifest.json; ejecuta npm run project o npm run fetch:live -- <url de Pages>`);
+    if (!fs.existsSync(manifestPath))
+      throw new Error(
+        `Falta web/${grupo.dataRoot}/manifest.json; ejecuta npm run project o npm run fetch:live -- <url de Pages>`,
+      );
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     manifiestos[grupo.key] = manifest;
     const refreshPath = path.join(dataRoot, 'refresh-state.json');
@@ -147,11 +188,13 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
       const snapshot = descriptor && path.join(root, 'web', descriptor.dataset_url);
       if (snapshot && fs.existsSync(snapshot)) cuerpos[key] = fs.readFileSync(snapshot, 'utf8');
     }
-    errors.push(...await bundleProblems(grupo, {
-      manifest,
-      state: fs.existsSync(refreshPath) ? JSON.parse(fs.readFileSync(refreshPath, 'utf8')) : undefined,
-      bodies: cuerpos,
-    }));
+    errors.push(
+      ...(await bundleProblems(grupo, {
+        manifest,
+        state: fs.existsSync(refreshPath) ? JSON.parse(fs.readFileSync(refreshPath, 'utf8')) : undefined,
+        bodies: cuerpos,
+      })),
+    );
   }
 
   // 3. La interfaz compilada: sus bytes en `web/` son los del último build y ese
@@ -174,22 +217,28 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // puede importar `node:`: la página fallaría y el service worker ni siquiera se
   // instalaría. La lógica del worker no está en la precache, así que se revisa
   // su grafo además de la lista.
-  const delNavegador = new Set([...shell.derived.entries.filter((entry) => entry.endsWith('.js')).map((entry) => entry.slice(1)), ...(shell.derived.worker ?? [])]);
+  const delNavegador = new Set([
+    ...shell.derived.entries.filter((entry) => entry.endsWith('.js')).map((entry) => entry.slice(1)),
+    ...(shell.derived.worker ?? []),
+  ]);
   for (const relativo of delNavegador) {
     const archivo = path.join(root, 'web', relativo);
-    if (fs.existsSync(archivo) && /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]node:/.test(fs.readFileSync(archivo, 'utf8'))) errors.push(`web/${relativo} importa un módulo node:, que el navegador no puede cargar`);
+    if (fs.existsSync(archivo) && /(?:\bfrom\s*|\bimport\s*\(?\s*)['"]node:/.test(fs.readFileSync(archivo, 'utf8')))
+      errors.push(`web/${relativo} importa un módulo node:, que el navegador no puede cargar`);
   }
 
   // 4. Activos de marca registrados: registro → archivo → SVG válido → precache.
-  errors.push(...brandAssetProblems({
-    brandLogos: BRAND_LOGOS,
-    shellList: shell.derived.entries,
-    read: (ruta) => {
-      const archivo = path.join(root, 'web', ruta.replace(/^\//, ''));
-      if (!fs.existsSync(archivo)) return { ok: false };
-      return { ok: true, body: fs.readFileSync(archivo, 'utf8') };
-    },
-  }));
+  errors.push(
+    ...brandAssetProblems({
+      brandLogos: BRAND_LOGOS,
+      shellList: shell.derived.entries,
+      read: (ruta) => {
+        const archivo = path.join(root, 'web', ruta.replace(/^\//, ''));
+        if (!fs.existsSync(archivo)) return { ok: false };
+        return { ok: true, body: fs.readFileSync(archivo, 'utf8') };
+      },
+    }),
+  );
 
   // 5. El origen del histórico vive en DOS sitios —la constante que usa el
   // cliente y la CSP que lo autoriza— y si divergen el gráfico funciona en local
@@ -197,17 +246,25 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // que el paso 2 cruza cliente y datos.
   const cabeceras = fs.readFileSync(path.join(root, 'web', '_headers'), 'utf8');
   const connectSrc = /connect-src ([^;]+);/.exec(cabeceras)?.[1] ?? '';
-  if (!connectSrc.split(/\s+/).includes(HISTORY_ORIGIN)) errors.push(`web/_headers no autoriza ${HISTORY_ORIGIN} en connect-src; el navegador bloquearía el histórico`);
+  if (!connectSrc.split(/\s+/).includes(HISTORY_ORIGIN))
+    errors.push(`web/_headers no autoriza ${HISTORY_ORIGIN} en connect-src; el navegador bloquearía el histórico`);
   // Además del histórico, solo el endpoint exacto al que envía el beacon.
-  else if (connectSrc.trim() !== `'self' ${HISTORY_ORIGIN} ${ANALYTICS_ENDPOINT}`) errors.push(`web/_headers: connect-src tiene que ser exactamente 'self' ${HISTORY_ORIGIN} ${ANALYTICS_ENDPOINT}; es «${connectSrc.trim()}»`);
+  else if (connectSrc.trim() !== `'self' ${HISTORY_ORIGIN} ${ANALYTICS_ENDPOINT}`)
+    errors.push(
+      `web/_headers: connect-src tiene que ser exactamente 'self' ${HISTORY_ORIGIN} ${ANALYTICS_ENDPOINT}; es «${connectSrc.trim()}»`,
+    );
   // Los scripts: lo propio y el beacon de Web Analytics que inyecta Pages, nada
   // más. Sin comodines ni `unsafe-inline`: por aquí no puede colarse otro script.
   const scriptSrc = /script-src ([^;]+);/.exec(cabeceras)?.[1]?.trim() ?? '';
-  if (scriptSrc !== `'self' ${ANALYTICS_BEACON}`) errors.push(`web/_headers: script-src tiene que ser exactamente 'self' ${ANALYTICS_BEACON}; es «${scriptSrc}»`);
+  if (scriptSrc !== `'self' ${ANALYTICS_BEACON}`)
+    errors.push(`web/_headers: script-src tiene que ser exactamente 'self' ${ANALYTICS_BEACON}; es «${scriptSrc}»`);
   // Y tiene que ser CROSS-ORIGIN: es lo que hace que el service worker lo ignore
   // (web/sw-main.js descarta lo que no es del propio origen) y que un JSON que cambia
   // cada pocas horas no acabe cacheado como si fuera parte del shell.
-  if (origin && new URL(HISTORY_ORIGIN).origin === new URL(origin).origin) errors.push('el histórico no puede servirse desde el mismo origen que la app: el service worker lo cachearía como shell');
+  if (origin && new URL(HISTORY_ORIGIN).origin === new URL(origin).origin)
+    errors.push(
+      'el histórico no puede servirse desde el mismo origen que la app: el service worker lo cachearía como shell',
+    );
   // Los datos de cada grupo con su caché: un manifest guardado mezclaría
   // revisiones y un snapshot sin `immutable` se volvería a bajar entero.
   errors.push(...dataHeaderProblems(cabeceras));
@@ -216,13 +273,18 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
   // ruta desconocida. Tiene que existir, respetar la CSP y cargar su hoja y su
   // módulo de tema. Se verifica por lo que usa, no por nombres de archivo.
   const notFoundPath = path.join(root, 'web', '404.html');
-  if (!fs.existsSync(notFoundPath)) errors.push('falta web/404.html: Pages serviría la portada con 200 para cualquier ruta desconocida');
+  if (!fs.existsSync(notFoundPath))
+    errors.push('falta web/404.html: Pages serviría la portada con 200 para cualquier ruta desconocida');
   else errors.push(...notFoundPageProblems(fs.readFileSync(notFoundPath, 'utf8')));
-  if (!shell.derived.entries.includes('/404.html')) errors.push('/404.html no está en la precache derivada: sin red no habría 404 propia');
+  if (!shell.derived.entries.includes('/404.html'))
+    errors.push('/404.html no está en la precache derivada: sin red no habría 404 propia');
   // Lo que carga cada página existe, es propio, va por ruta absoluta —una vista
   // anidada no lo pediría bajo `/combustibles/…`— y viaja en la precache.
   const precache = new Set(shell.derived.entries);
-  const existe = (ruta) => { const archivo = path.join(root, 'web', ruta); return !ruta.split('/').includes('..') && fs.existsSync(archivo) && fs.statSync(archivo).isFile(); };
+  const existe = (ruta) => {
+    const archivo = path.join(root, 'web', ruta);
+    return !ruta.split('/').includes('..') && fs.existsSync(archivo) && fs.statSync(archivo).isFile();
+  };
   for (const pagina of UI_PAGES) {
     const archivo = path.join(root, 'web', pagina);
     if (!fs.existsSync(archivo)) continue;
@@ -232,9 +294,13 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
 
   // 6b. Las reglas del hosting son las de la tabla de rutas, una a una y en el
   // mismo orden: el cliente, el service worker y el servidor local usan la tabla.
-  const reglas = fs.readFileSync(path.join(root, 'web', '_redirects'), 'utf8').split('\n')
-    .map((linea) => linea.trim().replace(/\s+/g, ' ')).filter((linea) => linea && !linea.startsWith('#'));
-  if (JSON.stringify(reglas) !== JSON.stringify(redirectRules())) errors.push('web/_redirects no coincide con la tabla de web/lib/routes.js');
+  const reglas = fs
+    .readFileSync(path.join(root, 'web', '_redirects'), 'utf8')
+    .split('\n')
+    .map((linea) => linea.trim().replace(/\s+/g, ' '))
+    .filter((linea) => linea && !linea.startsWith('#'));
+  if (JSON.stringify(reglas) !== JSON.stringify(redirectRules()))
+    errors.push('web/_redirects no coincide con la tabla de web/lib/routes.js');
 
   // 7. Contra el origen público. Se mira el tipo y el contenido de cada
   // respuesta, no solo que llegue: un 200 con HTML donde iba un SVG es un fallo.
@@ -247,10 +313,15 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
       const response = await fetch(new URL(inexistente, origin), { redirect: 'error', cache: 'no-store' });
       const tipo = response.headers.get('content-type') ?? '';
       const cuerpo = await response.text();
-      if (response.status !== 404) errors.push(`origen público · ${inexistente} respondió ${response.status} en vez de 404`);
-      if (!tipo.startsWith('text/html')) errors.push(`origen público · la página 404 respondió ${tipo || 'sin tipo'} en vez de text/html`);
-      if (!cuerpo.includes(NOT_FOUND_MARKER)) errors.push('origen público · la respuesta 404 no es la página 404 propia');
-    } catch (error) { errors.push(`origen público · no se pudo comprobar la página 404: ${error.message}`); }
+      if (response.status !== 404)
+        errors.push(`origen público · ${inexistente} respondió ${response.status} en vez de 404`);
+      if (!tipo.startsWith('text/html'))
+        errors.push(`origen público · la página 404 respondió ${tipo || 'sin tipo'} en vez de text/html`);
+      if (!cuerpo.includes(NOT_FOUND_MARKER))
+        errors.push('origen público · la respuesta 404 no es la página 404 propia');
+    } catch (error) {
+      errors.push(`origen público · no se pudo comprobar la página 404: ${error.message}`);
+    }
 
     const respuestas = new Map();
     // Mismo recorrido que la precache y que la tarjeta: si una variante se
@@ -258,10 +329,23 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     for (const { path: ruta } of brandAssets(BRAND_LOGOS)) {
       try {
         const response = await fetch(new URL(ruta, origin), { redirect: 'error', cache: 'no-store' });
-        respuestas.set(ruta, response.ok ? { ok: true, body: await response.text(), contentType: response.headers.get('content-type') ?? '' } : { ok: false });
-      } catch (error) { respuestas.set(ruta, { ok: false, error: error.message }); }
+        respuestas.set(
+          ruta,
+          response.ok
+            ? { ok: true, body: await response.text(), contentType: response.headers.get('content-type') ?? '' }
+            : { ok: false },
+        );
+      } catch (error) {
+        respuestas.set(ruta, { ok: false, error: error.message });
+      }
     }
-    errors.push(...brandAssetProblems({ brandLogos: BRAND_LOGOS, shellList: shell.derived.entries, read: (ruta) => respuestas.get(ruta) }).map((motivo) => `origen público · ${motivo}`));
+    errors.push(
+      ...brandAssetProblems({
+        brandLogos: BRAND_LOGOS,
+        shellList: shell.derived.entries,
+        read: (ruta) => respuestas.get(ruta),
+      }).map((motivo) => `origen público · ${motivo}`),
+    );
 
     // 8. El bundle que de verdad se sirve, no la copia local: se lee con la misma
     // lectura coherente que usa CI —manifest releído al final— y se valida en
@@ -271,12 +355,21 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
       servido = vivos.map((vivo) => vivo.revision_id ?? `${vivo.group} sin publicar`).join(', ');
       for (const vivo of vivos) {
         // Después del deploy todos los grupos activos tienen que estar servidos.
-        if (vivo.unpublished) { errors.push(`origen público · el grupo ${vivo.group} no está publicado`); continue; }
+        if (vivo.unpublished) {
+          errors.push(`origen público · el grupo ${vivo.group} no está publicado`);
+          continue;
+        }
         const grupo = PUBLISHED_GROUPS.find((item) => item.key === vivo.group);
-        const problemas = await bundleProblems(grupo, { manifest: vivo.manifest, state: JSON.parse(vivo.stateText), bodies: vivo.bodies });
+        const problemas = await bundleProblems(grupo, {
+          manifest: vivo.manifest,
+          state: JSON.parse(vivo.stateText),
+          bodies: vivo.bodies,
+        });
         errors.push(...problemas.map((motivo) => `origen público · bundle servido · ${vivo.group} · ${motivo}`));
       }
-    } catch (error) { errors.push(`origen público · no se pudo leer un bundle servido coherente: ${error.message}`); }
+    } catch (error) {
+      errors.push(`origen público · no se pudo leer un bundle servido coherente: ${error.message}`);
+    }
 
     // 9. El shell publicado. La precache que sirve el origen tiene que ser la
     // derivada de este árbol y cada archivo, byte a byte, el de este árbol: así se
@@ -286,19 +379,36 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
     // descuenta es el bloque que Pages Analytics inyecta en el HTML servido,
     // delimitado por su propio comentario; cualquier otra diferencia cuenta.
     const sinAnalytics = (bytes) => Buffer.from(withoutPagesAnalytics(bytes.toString('utf8')));
-    const publicados = [...new Set([...shell.derived.entries, '/sw.js', ...(shell.derived.worker ?? []).map((relativo) => `/${relativo}`)])];
+    const publicados = [
+      ...new Set([
+        ...shell.derived.entries,
+        '/sw.js',
+        ...(shell.derived.worker ?? []).map((relativo) => `/${relativo}`),
+      ]),
+    ];
     const generados = { '/shell-manifest.js': renderShellManifest, '/sw.js': renderServiceWorker };
-    const comparados = await Promise.all(publicados.map(async (entry) => {
-      try {
-        // `/404.html` es la única entrada que Pages redirige (308 a `/404`).
-        const response = await fetch(new URL(entry, origin), { redirect: entry === '/404.html' ? 'follow' : 'error', cache: 'no-store' });
-        if (!response.ok) return `origen público · shell · ${entry} respondió ${response.status}`;
-        const recibido = Buffer.from(await response.arrayBuffer());
-        const bytes = (response.headers.get('content-type') ?? '').startsWith('text/html') ? sinAnalytics(recibido) : recibido;
-        const local = generados[entry] ? Buffer.from(generados[entry](shell.derived)) : fs.readFileSync(path.join(root, shellEntryFile(entry)));
-        return bytes.equals(local) ? null : `origen público · shell · ${entry} no coincide con este árbol`;
-      } catch (error) { return `origen público · shell · ${entry}: ${error.message}`; }
-    }));
+    const comparados = await Promise.all(
+      publicados.map(async (entry) => {
+        try {
+          // `/404.html` es la única entrada que Pages redirige (308 a `/404`).
+          const response = await fetch(new URL(entry, origin), {
+            redirect: entry === '/404.html' ? 'follow' : 'error',
+            cache: 'no-store',
+          });
+          if (!response.ok) return `origen público · shell · ${entry} respondió ${response.status}`;
+          const recibido = Buffer.from(await response.arrayBuffer());
+          const bytes = (response.headers.get('content-type') ?? '').startsWith('text/html')
+            ? sinAnalytics(recibido)
+            : recibido;
+          const local = generados[entry]
+            ? Buffer.from(generados[entry](shell.derived))
+            : fs.readFileSync(path.join(root, shellEntryFile(entry)));
+          return bytes.equals(local) ? null : `origen público · shell · ${entry} no coincide con este árbol`;
+        } catch (error) {
+          return `origen público · shell · ${entry}: ${error.message}`;
+        }
+      }),
+    );
     errors.push(...comparados.filter(Boolean));
 
     // 10. Las rutas, tal como responde el origen.
@@ -307,7 +417,10 @@ export async function verifyWeb({ root = rootFromModule, origin = null } = {}) {
 
   const variantes = [...brandAssets(BRAND_LOGOS)].length;
   const publico = origin ? ` · origen: bundle ${servido ?? 'sin leer'} y shell ${shell.derived.cache}` : '';
-  const grupos = PUBLISHED_GROUPS.map((grupo) => `${grupo.key} ${manifiestos[grupo.key].revision_id} (${grupo.products.map((key) => `${key} ${manifiestos[grupo.key].products?.[key]?.bytes} bytes`).join(' · ')})`).join('; ');
+  const grupos = PUBLISHED_GROUPS.map(
+    (grupo) =>
+      `${grupo.key} ${manifiestos[grupo.key].revision_id} (${grupo.products.map((key) => `${key} ${manifiestos[grupo.key].products?.[key]?.bytes} bytes`).join(' · ')})`,
+  ).join('; ');
   const summary = `Bundles válidos: ${grupos} · cliente compatible · ${Object.keys(BRAND_LOGOS).length} marcas y ${variantes} activos registrados en ${shell.derived.cache} (${shell.derived.entries.length} entradas)${publico}`;
   return { errors: [...new Set(errors)], notas, summary };
 }

@@ -19,7 +19,8 @@ const visible = (el) => el && el.offsetParent !== null;
  * que se vuelve arriba y el card regresa al flujo solo.
  */
 export function scrollToTop() {
-  if (scrollY > cssPx('--expand-at')) scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  if (scrollY > cssPx('--expand-at'))
+    scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 export function useControlsCard({ activo }) {
@@ -49,13 +50,17 @@ export function useControlsCard({ activo }) {
     // de la barra. Cerrar a mano devuelve el foco a «Ajustar» aunque estuviera
     // fuera del card: tocar el fondo no puede dejarlo en <body>.
     if (estado === 'compact' && el && (devolverFoco.current || el.contains(document.activeElement))) {
-      const destino = visible(summary.current) ? summary.current : [...el.querySelectorAll('.controls__bar button')].find(visible);
+      const destino = visible(summary.current)
+        ? summary.current
+        : [...el.querySelectorAll('.controls__bar button')].find(visible);
       destino?.focus({ preventScroll: true });
     }
     // Abrir «Ajustar» lleva el foco al primer control de búsqueda: la cabecera de
     // marca y tema queda fuera, porque abrir es para ajustar, no para ir al inicio.
     if (estado === 'overlay' && el && primerControl.current) {
-      [...el.querySelectorAll('.controls__panel :is(button, a[href], input):not([disabled])')].find((nodo) => visible(nodo) && !nodo.closest('.appbar'))?.focus({ preventScroll: true });
+      [...el.querySelectorAll('.controls__panel :is(button, a[href], input):not([disabled])')]
+        .find((nodo) => visible(nodo) && !nodo.closest('.appbar'))
+        ?.focus({ preventScroll: true });
     }
     devolverFoco.current = false;
     primerControl.current = false;
@@ -65,18 +70,23 @@ export function useControlsCard({ activo }) {
   useEffect(() => {
     if (estado !== 'overlay') return undefined;
     const desde = scrollY;
-    const alBajar = () => { if (scrollY - desde > 32) cambiar('compact'); };
+    const alBajar = () => {
+      if (scrollY - desde > 32) cambiar('compact');
+    };
     addEventListener('scroll', alBajar, { passive: true });
     return () => removeEventListener('scroll', alBajar);
   }, [estado, cambiar]);
 
   useEffect(() => {
-    const alTeclear = (event) => { if (event.key === 'Escape' && actual.current.estado === 'overlay') cambiar('compact', { foco: true }); };
+    const alTeclear = (event) => {
+      if (event.key === 'Escape' && actual.current.estado === 'overlay') cambiar('compact', { foco: true });
+    };
     addEventListener('keydown', alTeclear);
     const centinelas = new IntersectionObserver((entries) => {
       if (!actual.current.activo) return;
       for (const entry of entries) {
-        if (entry.target === colapso.current && !entry.isIntersecting && actual.current.estado === 'full') cambiar('compact');
+        if (entry.target === colapso.current && !entry.isIntersecting && actual.current.estado === 'full')
+          cambiar('compact');
         if (entry.target === expansion.current && entry.isIntersecting) cambiar('full');
       }
     });
@@ -84,9 +94,16 @@ export function useControlsCard({ activo }) {
     centinelas.observe(expansion.current);
     // El hueco conserva el alto del card en full: fijarlo no mueve la lista y
     // volver al flujo tampoco.
-    const alto = new ResizeObserver(() => { if (actual.current.estado === 'full') slot.current?.style.setProperty('--controls-slot-h', `${card.current.offsetHeight}px`); });
+    const alto = new ResizeObserver(() => {
+      if (actual.current.estado === 'full')
+        slot.current?.style.setProperty('--controls-slot-h', `${card.current.offsetHeight}px`);
+    });
     alto.observe(card.current);
-    return () => { removeEventListener('keydown', alTeclear); centinelas.disconnect(); alto.disconnect(); };
+    return () => {
+      removeEventListener('keydown', alTeclear);
+      centinelas.disconnect();
+      alto.disconnect();
+    };
   }, [cambiar]);
 
   return {

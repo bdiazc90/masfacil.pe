@@ -45,17 +45,27 @@ const CONTENT_RULES = Object.freeze([
   ['private_key', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
   ['cloud_key', /\bAKIA[0-9A-Z]{16}\b/],
   ['bearer_token', /authorization\s*[:=]\s*bearer\s+[A-Za-z0-9._-]+/i],
-  ['assigned_secret', /(?:api[_-]?key|secret(?:[_-]?key)?|password)\s*[:=]\s*(?:['"][^'"\s]{8,}['"]|[A-Za-z0-9._-]{12,})/i],
+  [
+    'assigned_secret',
+    /(?:api[_-]?key|secret(?:[_-]?key)?|password)\s*[:=]\s*(?:['"][^'"\s]{8,}['"]|[A-Za-z0-9._-]{12,})/i,
+  ],
   ['email', /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i],
   ['peruvian_ruc', /\b(?:10|20)\d{9}\b/],
 ]);
 
 function git(root, args, encoding = 'utf8') {
   try {
-    return execFileSync('git', args, { cwd: root, encoding, stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 });
+    return execFileSync('git', args, {
+      cwd: root,
+      encoding,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 64 * 1024 * 1024,
+    });
   } catch (error) {
     const stderr = String(error.stderr ?? '').trim();
-    throw new Error(`La auditoría no pudo ejecutar git ${args.join(' ')}: ${stderr || error.message}`, { cause: error });
+    throw new Error(`La auditoría no pudo ejecutar git ${args.join(' ')}: ${stderr || error.message}`, {
+      cause: error,
+    });
   }
 }
 
@@ -93,7 +103,9 @@ function publicationRefs(root) {
 function publicationRevisions(root) {
   const refs = publicationRefs(root);
   if (!refs.length) throw new Error('La auditoría no encontró ramas, tags ni remotos publicables');
-  return String(git(root, ['rev-list', ...refs])).split('\n').filter(Boolean);
+  return String(git(root, ['rev-list', ...refs]))
+    .split('\n')
+    .filter(Boolean);
 }
 
 /** Lista blobs exactamente como los ve el índice (:) o un treeish confirmado. */
@@ -118,7 +130,13 @@ export function listTreeEntries(root, treeish = ':') {
     .map((record) => {
       const match = /^(\d+) (\w+) ([0-9a-f]+)\s+(\d+|-)\t(.+)$/.exec(record);
       if (!match) throw new Error(`Entrada de árbol inválida: ${record}`);
-      return { mode: match[1], type: match[2], oid: match[3], bytes: match[4] === '-' ? null : Number(match[4]), file: match[5] };
+      return {
+        mode: match[1],
+        type: match[2],
+        oid: match[3],
+        bytes: match[4] === '-' ? null : Number(match[4]),
+        file: match[5],
+      };
     })
     .filter((entry) => entry.type === 'blob')
     .sort((a, b) => a.file.localeCompare(b.file));
@@ -130,7 +148,8 @@ export function auditTreeEntries(root, entries, scope = 'candidate', revision) {
   for (const entry of entries) {
     const base = { scope, file: entry.file, ...(revision ? { revision: revision.slice(0, 12) } : {}) };
     if (pathFinding(entry.file)) findings.push({ ...base, kind: 'forbidden_path' });
-    if (scope === 'candidate' && CANDIDATE_FORBIDDEN_PATHS.some((pattern) => pattern.test(entry.file))) findings.push({ ...base, kind: 'generated_output' });
+    if (scope === 'candidate' && CANDIDATE_FORBIDDEN_PATHS.some((pattern) => pattern.test(entry.file)))
+      findings.push({ ...base, kind: 'generated_output' });
     const bytes = readBlob(root, entry.oid);
     if (bytes.length > MAX_TRACKED_BYTES && !LARGE_FILE_ALLOWLIST.has(entry.file)) {
       findings.push({ ...base, kind: 'oversized_file', bytes: bytes.length });
@@ -144,10 +163,19 @@ export function auditTreeEntries(root, entries, scope = 'candidate', revision) {
 
 function verifyIgnores(root, entries) {
   const ignore = entries.find((entry) => entry.file === '.gitignore');
-  const rules = ignore ? new Set(readBlob(root, ignore.oid).toString('utf8').split(/\r?\n/).map((line) => line.trim())) : new Set();
-  return REQUIRED_IGNORES
-    .filter(([, rule]) => !rules.has(rule))
-    .map(([file]) => ({ scope: 'candidate', kind: 'missing_ignore', file }));
+  const rules = ignore
+    ? new Set(
+        readBlob(root, ignore.oid)
+          .toString('utf8')
+          .split(/\r?\n/)
+          .map((line) => line.trim()),
+      )
+    : new Set();
+  return REQUIRED_IGNORES.filter(([, rule]) => !rules.has(rule)).map(([file]) => ({
+    scope: 'candidate',
+    kind: 'missing_ignore',
+    file,
+  }));
 }
 
 export function auditHistoryPaths(root) {
@@ -161,8 +189,12 @@ export function auditHistoryPaths(root) {
     scope: 'history_path',
     kind: 'forbidden_path',
     file,
-    introduced_by: String(git(root, ['log', ...refs, '--diff-filter=A', '--format=%H', '--', file]))
-      .split('\n').filter(Boolean).at(-1)?.slice(0, 12) ?? 'desconocido',
+    introduced_by:
+      String(git(root, ['log', ...refs, '--diff-filter=A', '--format=%H', '--', file]))
+        .split('\n')
+        .filter(Boolean)
+        .at(-1)
+        ?.slice(0, 12) ?? 'desconocido',
   }));
 }
 
@@ -175,8 +207,11 @@ export function auditHistoryContent(root) {
     for (const entry of listTreeEntries(root, revision)) {
       if (seenBlobs.has(entry.oid)) continue;
       seenBlobs.add(entry.oid);
-      findings.push(...auditTreeEntries(root, [entry], 'history_content', revision)
-        .filter((item) => item.kind !== 'forbidden_path' && item.kind !== 'oversized_file'));
+      findings.push(
+        ...auditTreeEntries(root, [entry], 'history_content', revision).filter(
+          (item) => item.kind !== 'forbidden_path' && item.kind !== 'oversized_file',
+        ),
+      );
     }
   }
   return { revisions: revisions.length, blobs: seenBlobs.size, findings };

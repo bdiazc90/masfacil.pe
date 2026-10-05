@@ -22,10 +22,16 @@ import { BRAND_LOGOS } from '../web/brand-logos.js';
 const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const HOJA = path.join(raiz, 'ui', 'styles.css');
 
-const lum = (c) => c.map((v) => { const canal = v / 255; return canal <= 0.03928 ? canal / 12.92 : ((canal + 0.055) / 1.055) ** 2.4; })
-  .reduce((total, v, i) => total + v * [0.2126, 0.7152, 0.0722][i], 0);
+const lum = (c) =>
+  c
+    .map((v) => {
+      const canal = v / 255;
+      return canal <= 0.03928 ? canal / 12.92 : ((canal + 0.055) / 1.055) ** 2.4;
+    })
+    .reduce((total, v, i) => total + v * [0.2126, 0.7152, 0.0722][i], 0);
 const over = (frente, alpha, fondo) => frente.map((v, i) => alpha * v + (1 - alpha) * fondo[i]);
-export const contrastRatio = (izquierda, derecha) => (Math.max(lum(izquierda), lum(derecha)) + 0.05) / (Math.min(lum(izquierda), lum(derecha)) + 0.05);
+export const contrastRatio = (izquierda, derecha) =>
+  (Math.max(lum(izquierda), lum(derecha)) + 0.05) / (Math.min(lum(izquierda), lum(derecha)) + 0.05);
 
 /** Los roles de color que se miden, con el nombre que usan en el CSS. */
 const ROLES = Object.freeze({
@@ -65,8 +71,12 @@ const HALOS = Object.freeze(Object.keys(BRAND_LOGOS).map((clave) => `--halo-${cl
 export function leerPaleta(css) {
   const temas = tokensPorTema(css);
   const vidrio = pesosDeMezcla(temas.light.get('--surface'), '--surface');
-  if (vidrio.length !== 3) throw new Error(`contrast: --surface debía mezclar tres superficies y mezcla ${vidrio.length}`);
-  const fijo = pesosDeMezcla(declaracion(css, '.controls[data-state="compact"]', 'background'), 'el card de controles fijo');
+  if (vidrio.length !== 3)
+    throw new Error(`contrast: --surface debía mezclar tres superficies y mezcla ${vidrio.length}`);
+  const fijo = pesosDeMezcla(
+    declaracion(css, '.controls[data-state="compact"]', 'background'),
+    'el card de controles fijo',
+  );
   const chip = pesosDeMezcla(declaracion(css, '.chip{', 'background'), 'el relleno del chip');
   const glow3 = numero(declaracion(css, '.glow i:nth-child(3)', 'opacity'), 'la tercera mancha del glow');
   const referencia = pesosDeMezcla(declaracion(css, '.history__promedio{', '--serie-ref'), 'la recta del promedio');
@@ -79,7 +89,9 @@ export function leerPaleta(css) {
       return valor;
     };
     porTema[tema] = {
-      ...Object.fromEntries(Object.entries(ROLES).map(([rol, nombre]) => [rol, color(leer(nombre), `${nombre} (${tema})`)])),
+      ...Object.fromEntries(
+        Object.entries(ROLES).map(([rol, nombre]) => [rol, color(leer(nombre), `${nombre} (${tema})`)]),
+      ),
       glow: GLOWS.map((nombre) => color(leer(nombre), `${nombre} (${tema})`)),
       glowAlpha: numero(leer('--glow-alpha'), `--glow-alpha (${tema})`),
       halos: HALOS.map((nombre) => color(leer(nombre), `${nombre} (${tema})`)),
@@ -115,7 +127,10 @@ export function verifyContrast(tema, paleta) {
     over(t.card, paleta.fijo, trasera),
   ]);
   const surfaces = vidrio.flatMap((s) => [s, ...t.halos.map((halo) => over(halo, t.haloAlpha, s))]);
-  const trazado = vidrio.flatMap((s) => [s, ...[t.regularStrong, t.premiumStrong].map((serie) => over(serie, t.fillAlpha, s))]);
+  const trazado = vidrio.flatMap((s) => [
+    s,
+    ...[t.regularStrong, t.premiumStrong].map((serie) => over(serie, t.fillAlpha, s)),
+  ]);
 
   const minimo = (c) => Math.min(...surfaces.map((s) => contrastRatio(c, s)));
   const enTrazado = (c) => Math.min(...trazado.map((s) => contrastRatio(c, s)));
@@ -172,9 +187,29 @@ export function verifyContrast(tema, paleta) {
 // Quedan informativos los dos cantos del vidrio —nunca se pintan sólidos— y el
 // degradado de área, que es decoración.
 export const MINIMUM = Object.freeze({
-  foreground: 4.5, muted: 4.5, accent: 4.5, button: 4.5,
-  chipRegular: 4.5, chipPremium: 4.5, chipMutedRegular: 4.5, chipMutedPremium: 4.5, chipDiesel: 4.5, chipMutedDiesel: 4.5, chipGlp: 4.5, chipMutedGlp: 4.5, chipGnv: 4.5, chipMutedGnv: 4.5,
-  primary: 3, ring: 3, regularStrong: 3, premiumStrong: 3, dieselStrong: 3, glpStrong: 3, gnvStrong: 3, promedioRegular: 3, promedioPremium: 3,
+  foreground: 4.5,
+  muted: 4.5,
+  accent: 4.5,
+  button: 4.5,
+  chipRegular: 4.5,
+  chipPremium: 4.5,
+  chipMutedRegular: 4.5,
+  chipMutedPremium: 4.5,
+  chipDiesel: 4.5,
+  chipMutedDiesel: 4.5,
+  chipGlp: 4.5,
+  chipMutedGlp: 4.5,
+  chipGnv: 4.5,
+  chipMutedGnv: 4.5,
+  primary: 3,
+  ring: 3,
+  regularStrong: 3,
+  premiumStrong: 3,
+  dieselStrong: 3,
+  glpStrong: 3,
+  gnvStrong: 3,
+  promedioRegular: 3,
+  promedioPremium: 3,
 });
 
 const pct = (fraccion) => `${Number((fraccion * 100).toFixed(2))}%`;
@@ -187,9 +222,13 @@ if (typeof process !== 'undefined' && /contrast\.mjs$/.test(process.argv?.[1] ??
       const piso = MINIMUM[nombre];
       const ok = piso === undefined || valor >= piso;
       if (!ok) fallo = true;
-      process.stdout.write(`${tema.padEnd(5)} ${nombre.padEnd(17)} ${valor.toFixed(2).padStart(6)} ${piso === undefined ? '(informativo)' : ok ? 'ok' : `< ${piso}`}\n`);
+      process.stdout.write(
+        `${tema.padEnd(5)} ${nombre.padEnd(17)} ${valor.toFixed(2).padStart(6)} ${piso === undefined ? '(informativo)' : ok ? 'ok' : `< ${piso}`}\n`,
+      );
     }
   }
-  process.stdout.write(`\nPaleta leída de ${path.relative(raiz, HOJA)} · vidrio ${paleta.vidrio.map(pct).join('/')} · card fijo ${pct(paleta.fijo)} · chip ${pct(paleta.chip)} · referencia ${pct(paleta.referencia)}\n`);
+  process.stdout.write(
+    `\nPaleta leída de ${path.relative(raiz, HOJA)} · vidrio ${paleta.vidrio.map(pct).join('/')} · card fijo ${pct(paleta.fijo)} · chip ${pct(paleta.chip)} · referencia ${pct(paleta.referencia)}\n`,
+  );
   process.exitCode = fallo ? 1 : 0;
 }

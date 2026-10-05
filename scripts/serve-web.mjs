@@ -20,7 +20,15 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const TIPOS = new Map([['.html', 'text/html; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'], ['.css', 'text/css; charset=utf-8'], ['.json', 'application/json'], ['.webmanifest', 'application/manifest+json'], ['.svg', 'image/svg+xml'], ['.png', 'image/png']]);
+const TIPOS = new Map([
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.json', 'application/json'],
+  ['.webmanifest', 'application/manifest+json'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+]);
 // Lo que Pages inyecta en cada HTML cuando Web Analytics está activo.
 const BEACON = `<!-- Cloudflare Pages Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "prueba-local"}'></script><!-- Cloudflare Pages Analytics -->`;
 
@@ -30,7 +38,15 @@ export function readHeaders(texto) {
   for (const linea of texto.split('\n')) {
     if (!linea.trim()) continue;
     if (!/^\s/.test(linea)) {
-      reglas.push({ patron: new RegExp(`^${linea.trim().replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`), cabeceras: {} });
+      reglas.push({
+        patron: new RegExp(
+          `^${linea
+            .trim()
+            .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+            .replace(/\*/g, '.*')}$`,
+        ),
+        cabeceras: {},
+      });
       continue;
     }
     const [, nombre, valor] = /^\s+([^:]+):\s*(.+)$/.exec(linea) ?? [];
@@ -40,7 +56,8 @@ export function readHeaders(texto) {
 }
 
 /** Las cabeceras de una ruta: todas las reglas que casan, la última manda. */
-export const headersFor = (reglas, ruta) => Object.assign({}, ...reglas.filter((r) => r.patron.test(ruta)).map((r) => r.cabeceras));
+export const headersFor = (reglas, ruta) =>
+  Object.assign({}, ...reglas.filter((r) => r.patron.test(ruta)).map((r) => r.cabeceras));
 
 /**
  * `dev`: la cabecera declarada o `no-cache`, que revalida con ETag en cada carga.
@@ -60,7 +77,15 @@ export function cacheControl(modo, ext, declarada) {
  * Sirve `<root>/web` como Pages. `port: 0` elige uno libre. `tls`: `{cert, key}`.
  * @returns {Promise<{origin: string, shell: string, close: () => Promise<void>}>}
  */
-export async function serveWeb({ root = REPO, port = 4173, host = '127.0.0.1', build = true, cache = 'dev', analytics = false, tls = null } = {}) {
+export async function serveWeb({
+  root = REPO,
+  port = 4173,
+  host = '127.0.0.1',
+  build = true,
+  cache = 'dev',
+  analytics = false,
+  tls = null,
+} = {}) {
   const raiz = path.resolve(root);
   const webRoot = path.join(raiz, 'web');
   if (build) await (await import(pathToFileURL(path.join(raiz, 'pipeline', 'ui-build.mjs')))).buildUi({ root: raiz });
@@ -72,39 +97,82 @@ export async function serveWeb({ root = REPO, port = 4173, host = '127.0.0.1', b
   const responder = (request, response, estado, ruta, archivo) => {
     const ext = path.extname(archivo);
     let cuerpo = fs.readFileSync(archivo);
-    if (ext === '.html' && analytics) cuerpo = Buffer.from(cuerpo.toString('utf8').replace('</body>', `${BEACON}</body>`));
+    if (ext === '.html' && analytics)
+      cuerpo = Buffer.from(cuerpo.toString('utf8').replace('</body>', `${BEACON}</body>`));
     const { 'Cache-Control': declarada, ...resto } = headersFor(reglas, ruta);
     const etag = `W/"${crypto.createHash('sha1').update(cuerpo).digest('hex')}"`;
-    const cabeceras = { ...resto, 'Content-Type': TIPOS.get(ext) ?? 'application/octet-stream', 'Cache-Control': cacheControl(cache, ext, declarada), ETag: etag };
-    if (estado === 200 && request.headers['if-none-match'] === etag) { response.writeHead(304, cabeceras); response.end(); return; }
+    const cabeceras = {
+      ...resto,
+      'Content-Type': TIPOS.get(ext) ?? 'application/octet-stream',
+      'Cache-Control': cacheControl(cache, ext, declarada),
+      ETag: etag,
+    };
+    if (estado === 200 && request.headers['if-none-match'] === etag) {
+      response.writeHead(304, cabeceras);
+      response.end();
+      return;
+    }
     response.writeHead(estado, cabeceras);
     response.end(request.method === 'GET' ? cuerpo : undefined);
   };
   const manejar = (request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') { response.writeHead(405); response.end(); return; }
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      response.writeHead(405);
+      response.end();
+      return;
+    }
     const url = new URL(request.url, 'http://local');
     // La misma tabla que `_redirects` y el service worker: las vistas son la
     // portada sin cambiar la URL, la barra final y los enlaces antiguos responden
     // 301, y lo demás es un archivo o la 404 propia con su código.
     const ruta = resolvePath(url.pathname);
-    if (ruta.kind === 'redirect') { response.writeHead(301, { ...headersFor(reglas, url.pathname), Location: `${ruta.to}${url.search}` }); response.end(); return; }
-    if (ruta.kind === 'view') { responder(request, response, 200, url.pathname, path.join(webRoot, 'index.html')); return; }
+    if (ruta.kind === 'redirect') {
+      response.writeHead(301, { ...headersFor(reglas, url.pathname), Location: `${ruta.to}${url.search}` });
+      response.end();
+      return;
+    }
+    if (ruta.kind === 'view') {
+      responder(request, response, 200, url.pathname, path.join(webRoot, 'index.html'));
+      return;
+    }
     const relativo = path.posix.normalize(url.pathname).replace(/^\/+/, '');
     const archivo = path.join(webRoot, relativo);
-    if (archivo.startsWith(`${webRoot}${path.sep}`) && !relativo.startsWith('_') && fs.existsSync(archivo) && fs.statSync(archivo).isFile()) { responder(request, response, 200, url.pathname, archivo); return; }
+    if (
+      archivo.startsWith(`${webRoot}${path.sep}`) &&
+      !relativo.startsWith('_') &&
+      fs.existsSync(archivo) &&
+      fs.statSync(archivo).isFile()
+    ) {
+      responder(request, response, 200, url.pathname, archivo);
+      return;
+    }
     responder(request, response, 404, url.pathname, path.join(webRoot, '404.html'));
   };
 
   const server = tls ? https.createServer(tls, manejar) : http.createServer(manejar);
-  await new Promise((ok, ko) => { server.once('error', ko); server.listen(port, host, ok); });
+  await new Promise((ok, ko) => {
+    server.once('error', ko);
+    server.listen(port, host, ok);
+  });
   const origin = `${tls ? 'https' : 'http'}://${host.includes(':') ? `[${host}]` : host}:${server.address().port}`;
-  return { origin, shell: shell.cache, entries: shell.entries.length, close: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(() => ok()); }) };
+  return {
+    origin,
+    shell: shell.cache,
+    entries: shell.entries.length,
+    close: () =>
+      new Promise((ok) => {
+        server.closeAllConnections?.();
+        server.close(() => ok());
+      }),
+  };
 }
 
 /** La IP privada de la Mac en la red local, o `null`. */
 export function lanAddress() {
   for (const lista of Object.values(os.networkInterfaces())) {
-    for (const i of lista ?? []) if (i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(i.address)) return i.address;
+    for (const i of lista ?? [])
+      if (i.family === 'IPv4' && !i.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(i.address))
+        return i.address;
   }
   return null;
 }
@@ -119,24 +187,112 @@ export function localTls(ip, dir = path.join(REPO, '.local-cache', 'tls')) {
   fs.mkdirSync(dir, { recursive: true });
   const ruta = (nombre) => path.join(dir, nombre);
   const ssl = (...args) => execFileSync('openssl', args, { stdio: ['ignore', 'pipe', 'pipe'] }).toString();
-  const vigente = (crt) => { try { ssl('x509', '-in', crt, '-noout', '-checkend', '86400'); return true; } catch { return false; } };
+  const vigente = (crt) => {
+    try {
+      ssl('x509', '-in', crt, '-noout', '-checkend', '86400');
+      return true;
+    } catch {
+      return false;
+    }
+  };
   if (!fs.existsSync(ruta('ca.crt')) || !vigente(ruta('ca.crt'))) {
-    fs.writeFileSync(ruta('ca.cnf'), ['[req]', 'distinguished_name = dn', '[dn]', '[v3_ca_local]', 'basicConstraints = critical,CA:TRUE,pathlen:0', 'keyUsage = critical,keyCertSign,cRLSign', 'subjectKeyIdentifier = hash', 'nameConstraints = critical,permitted;IP:10.0.0.0/255.0.0.0,permitted;IP:172.16.0.0/255.240.0.0,permitted;IP:192.168.0.0/255.255.0.0,permitted;IP:127.0.0.1/255.255.255.255,permitted;DNS:localhost', ''].join('\n'));
+    fs.writeFileSync(
+      ruta('ca.cnf'),
+      [
+        '[req]',
+        'distinguished_name = dn',
+        '[dn]',
+        '[v3_ca_local]',
+        'basicConstraints = critical,CA:TRUE,pathlen:0',
+        'keyUsage = critical,keyCertSign,cRLSign',
+        'subjectKeyIdentifier = hash',
+        'nameConstraints = critical,permitted;IP:10.0.0.0/255.0.0.0,permitted;IP:172.16.0.0/255.240.0.0,permitted;IP:192.168.0.0/255.255.0.0,permitted;IP:127.0.0.1/255.255.255.255,permitted;DNS:localhost',
+        '',
+      ].join('\n'),
+    );
     ssl('ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', ruta('ca.key'));
-    ssl('req', '-x509', '-new', '-key', ruta('ca.key'), '-sha256', '-days', '30', '-subj', '/CN=masfacil prueba local', '-config', ruta('ca.cnf'), '-extensions', 'v3_ca_local', '-out', ruta('ca.crt'));
+    ssl(
+      'req',
+      '-x509',
+      '-new',
+      '-key',
+      ruta('ca.key'),
+      '-sha256',
+      '-days',
+      '30',
+      '-subj',
+      '/CN=masfacil prueba local',
+      '-config',
+      ruta('ca.cnf'),
+      '-extensions',
+      'v3_ca_local',
+      '-out',
+      ruta('ca.crt'),
+    );
     ssl('x509', '-in', ruta('ca.crt'), '-outform', 'der', '-out', ruta('masfacil-prueba-local.cer'));
     fs.rmSync(ruta('servidor.crt'), { force: true });
     fs.chmodSync(ruta('ca.key'), 0o600);
   }
-  const cubre = () => { try { return ssl('x509', '-in', ruta('servidor.crt'), '-noout', '-checkip', ip).includes('does match'); } catch { return false; } };
+  const cubre = () => {
+    try {
+      return ssl('x509', '-in', ruta('servidor.crt'), '-noout', '-checkip', ip).includes('does match');
+    } catch {
+      return false;
+    }
+  };
   if (!fs.existsSync(ruta('servidor.crt')) || !vigente(ruta('servidor.crt')) || !cubre()) {
-    fs.writeFileSync(ruta('servidor.cnf'), ['[servidor]', `subjectAltName = IP:${ip},IP:127.0.0.1,DNS:localhost`, 'extendedKeyUsage = serverAuth', 'keyUsage = critical,digitalSignature', 'basicConstraints = critical,CA:FALSE', ''].join('\n'));
+    fs.writeFileSync(
+      ruta('servidor.cnf'),
+      [
+        '[servidor]',
+        `subjectAltName = IP:${ip},IP:127.0.0.1,DNS:localhost`,
+        'extendedKeyUsage = serverAuth',
+        'keyUsage = critical,digitalSignature',
+        'basicConstraints = critical,CA:FALSE',
+        '',
+      ].join('\n'),
+    );
     ssl('ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', ruta('servidor.key'));
-    ssl('req', '-new', '-key', ruta('servidor.key'), '-subj', `/CN=${ip}`, '-config', ruta('ca.cnf'), '-out', ruta('servidor.csr'));
-    ssl('x509', '-req', '-in', ruta('servidor.csr'), '-CA', ruta('ca.crt'), '-CAkey', ruta('ca.key'), '-set_serial', `0x${crypto.randomBytes(16).toString('hex')}`, '-days', '30', '-sha256', '-extfile', ruta('servidor.cnf'), '-extensions', 'servidor', '-out', ruta('servidor.crt'));
+    ssl(
+      'req',
+      '-new',
+      '-key',
+      ruta('servidor.key'),
+      '-subj',
+      `/CN=${ip}`,
+      '-config',
+      ruta('ca.cnf'),
+      '-out',
+      ruta('servidor.csr'),
+    );
+    ssl(
+      'x509',
+      '-req',
+      '-in',
+      ruta('servidor.csr'),
+      '-CA',
+      ruta('ca.crt'),
+      '-CAkey',
+      ruta('ca.key'),
+      '-set_serial',
+      `0x${crypto.randomBytes(16).toString('hex')}`,
+      '-days',
+      '30',
+      '-sha256',
+      '-extfile',
+      ruta('servidor.cnf'),
+      '-extensions',
+      'servidor',
+      '-out',
+      ruta('servidor.crt'),
+    );
     fs.chmodSync(ruta('servidor.key'), 0o600);
   }
-  return { cert: fs.readFileSync(ruta('servidor.crt')), key: fs.readFileSync(ruta('servidor.key')), cer: ruta('masfacil-prueba-local.cer') };
+  return {
+    cert: fs.readFileSync(ruta('servidor.crt')),
+    key: fs.readFileSync(ruta('servidor.key')),
+    cer: ruta('masfacil-prueba-local.cer'),
+  };
 }
 
 function parseArgs(args) {
@@ -166,8 +322,21 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const ip = lanAddress();
     if (!ip) throw new Error('No hay una IP privada de red local: conecta la Mac a la Wi-Fi.');
     const tls = localTls(ip);
-    const red = await serveWeb({ ...opciones, build: false, host: ip, port: lanPort, tls: { cert: tls.cert, key: tls.key } });
-    lineas.push(`  teléfono (misma Wi-Fi): ${red.origin}`, '', 'La primera vez, en el iPhone:', `  1. Pasa ${path.relative(process.cwd(), tls.cer)} por AirDrop e instálalo en Ajustes → Perfil descargado.`, '  2. Actívalo en Ajustes → General → Información → Ajustes de confianza de certificados.', '  Al terminar, bórralo en Ajustes → General → VPN y gestión de dispositivos.');
+    const red = await serveWeb({
+      ...opciones,
+      build: false,
+      host: ip,
+      port: lanPort,
+      tls: { cert: tls.cert, key: tls.key },
+    });
+    lineas.push(
+      `  teléfono (misma Wi-Fi): ${red.origin}`,
+      '',
+      'La primera vez, en el iPhone:',
+      `  1. Pasa ${path.relative(process.cwd(), tls.cer)} por AirDrop e instálalo en Ajustes → Perfil descargado.`,
+      '  2. Actívalo en Ajustes → General → Información → Ajustes de confianza de certificados.',
+      '  Al terminar, bórralo en Ajustes → General → VPN y gestión de dispositivos.',
+    );
   }
   lineas.push('', `Precache derivada: ${local.shell} · ${local.entries} entradas`);
   process.stdout.write(`${lineas.join('\n')}\n`);

@@ -18,32 +18,77 @@ import { offerCardView, offerDetailView } from '../ui/offer-view.js';
 
 const AHORA = new Date('2026-09-24T12:00:00.000Z');
 const ORIGEN = { latitude: -12.12, longitude: -77.03 };
-const oferta = (prefijo, letra, precio, distrito, dLat = 0) => ({ id: `${prefijo}${letra.repeat(24)}`, establishment_id: `est_${letra.repeat(24)}`, commercial_identity: null, address: 'Av. Larco 123', price: precio, reported_at: '2026-09-23T12:00:00.000Z', facilito: null, district: distrito, longitude: -77.03, latitude: -12.12 + dLat });
+const oferta = (prefijo, letra, precio, distrito, dLat = 0) => ({
+  id: `${prefijo}${letra.repeat(24)}`,
+  establishment_id: `est_${letra.repeat(24)}`,
+  commercial_identity: null,
+  address: 'Av. Larco 123',
+  price: precio,
+  reported_at: '2026-09-23T12:00:00.000Z',
+  facilito: null,
+  district: distrito,
+  longitude: -77.03,
+  latitude: -12.12 + dLat,
+});
 const glp = (letra, precio, distrito, dLat) => oferta('glp1_', letra, precio, distrito, dLat);
-const conjunto = (key, ofertas) => mergeProducts({ key, manifest: { revision_id: `${key}-x` }, dataset: { scope: {}, snapshot_date: '2026-09-24', cutoff_at: '2026-09-24T06:00:00.000Z', provenance: {}, offers: ofertas }, dataMode: 'network' });
+const conjunto = (key, ofertas) =>
+  mergeProducts({
+    key,
+    manifest: { revision_id: `${key}-x` },
+    dataset: {
+      scope: {},
+      snapshot_date: '2026-09-24',
+      cutoff_at: '2026-09-24T06:00:00.000Z',
+      provenance: {},
+      offers: ofertas,
+    },
+    dataMode: 'network',
+  });
 const filas = (key, ofertas) => evaluateRows(conjunto(key, ofertas), AHORA).rows;
 
 test('GLP es la tercera vista, sin histórico y con la unidad en la tarjeta', () => {
   assert.deepEqual(ACTIVE_VIEWS.slice(0, 3), ['gasolina', 'diesel', 'glp']);
-  assert.deepEqual([VIEWS.glp.label, VIEWS.glp.history, VIEWS.glp.priceUnit, VIEWS.glp.dataRoot], ['GLP', false, 'por galón', 'data/glp']);
+  assert.deepEqual(
+    [VIEWS.glp.label, VIEWS.glp.history, VIEWS.glp.priceUnit, VIEWS.glp.dataRoot],
+    ['GLP', false, 'por galón', 'data/glp'],
+  );
 });
 
 test('GLP ordena por su precio, sin selector de producto y con su etiqueta', () => {
-  const rows = filas('glp', [glp('a', 7.49, 'MIRAFLORES'), glp('b', 7.29, 'MIRAFLORES', 0.01), glp('c', 7.59, 'SURQUILLO', 0.02)]);
+  const rows = filas('glp', [
+    glp('a', 7.49, 'MIRAFLORES'),
+    glp('b', 7.29, 'MIRAFLORES', 0.01),
+    glp('c', 7.59, 'SURQUILLO', 0.02),
+  ]);
   const search = { ...createSearch('glp'), origin: ORIGEN, radiusKm: 5, sort: 'price' };
   assert.equal(search.priceProduct, 'glp');
   const vista = resultsView({ rows, located: withDistances(rows, search.origin), search });
-  assert.deepEqual(vista.items.map((item) => item.prices.glp.price), [7.29, 7.49, 7.59]);
+  assert.deepEqual(
+    vista.items.map((item) => item.prices.glp.price),
+    [7.29, 7.49, 7.59],
+  );
   assert.equal(vista.productToggle, false, 'un solo producto: nada que elegir');
   assert.equal(decisionTag(vista.items[0], vista.pool, 5, 'glp'), 'GLP más barato en 5 km');
 });
 
 test('la tarjeta de GLP dice su nombre preciso para lectores, su chip y la unidad', () => {
   const [fila] = filas('glp', [glp('a', 7.49, 'MIRAFLORES')]);
-  const tarjeta = offerCardView(fila, { includeDetail: false, withDistance: false, directionsUrl: 'https://example.test/ruta', products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit });
-  assert.deepEqual(tarjeta.prices, [{ key: 'glp', state: null, chip: 'GLP', label: 'GLP automotor', amount: '7.49', unit: 'por galón' }]);
+  const tarjeta = offerCardView(fila, {
+    includeDetail: false,
+    withDistance: false,
+    directionsUrl: 'https://example.test/ruta',
+    products: VIEWS.glp.products,
+    priceUnit: VIEWS.glp.priceUnit,
+  });
+  assert.deepEqual(tarjeta.prices, [
+    { key: 'glp', state: null, chip: 'GLP', label: 'GLP automotor', amount: '7.49', unit: 'por galón' },
+  ]);
   assert.match(tarjeta.directions.label, /^Cómo llegar a .*, GLP automotor S\/\s?7\.49$/);
-  assert.equal(offerDetailView(fila, { prices: fila.prices, products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit }).rows[0].unit, 'por galón');
+  assert.equal(
+    offerDetailView(fila, { prices: fila.prices, products: VIEWS.glp.products, priceUnit: VIEWS.glp.priceUnit }).rows[0]
+      .unit,
+    'por galón',
+  );
 });
 
 test('un gasocentro que solo vende GLP aparece en GLP aunque no esté en Gasolina, y un distrito sin GLP es un vacío propio', () => {
@@ -51,15 +96,30 @@ test('un gasocentro que solo vende GLP aparece en GLP aunque no esté en Gasolin
   const soloGlp = filas('glp', [glp('z', 7.19, 'MIRAFLORES')]);
   assert.equal(gasolina.includes(soloGlp[0].establishment_id), false);
   // El distrito que se trae desde Gasolina se conserva; si no tiene GLP, se dice.
-  const enMiraflores = resultsView({ rows: soloGlp, located: [], search: { ...createSearch('glp'), district: 'MIRAFLORES', sort: 'price' } });
-  assert.deepEqual(enMiraflores.items.map((item) => item.establishment_id), [`est_${'z'.repeat(24)}`]);
-  const enPucusana = resultsView({ rows: soloGlp, located: [], search: { ...createSearch('glp'), district: 'PUCUSANA', sort: 'price' } });
+  const enMiraflores = resultsView({
+    rows: soloGlp,
+    located: [],
+    search: { ...createSearch('glp'), district: 'MIRAFLORES', sort: 'price' },
+  });
+  assert.deepEqual(
+    enMiraflores.items.map((item) => item.establishment_id),
+    [`est_${'z'.repeat(24)}`],
+  );
+  const enPucusana = resultsView({
+    rows: soloGlp,
+    located: [],
+    search: { ...createSearch('glp'), district: 'PUCUSANA', sort: 'price' },
+  });
   assert.deepEqual([enPucusana.districtEmpty, enPucusana.items.length, enPucusana.radiusEmpty], [true, 0, false]);
 });
 
 // Seis gasolineras en 1 km; los gasocentros, entre 2 y 3 km.
-const cercaGasolina = Array.from({ length: 6 }, (_, i) => oferta('g2_', String.fromCharCode(97 + i), 15 + i / 10, 'MIRAFLORES', 0.001 * (i + 1)));
-const lejosGlp = Array.from({ length: 6 }, (_, i) => glp(String.fromCharCode(107 + i), 7 + i / 10, 'SURQUILLO', 0.02 + 0.001 * i));
+const cercaGasolina = Array.from({ length: 6 }, (_, i) =>
+  oferta('g2_', String.fromCharCode(97 + i), 15 + i / 10, 'MIRAFLORES', 0.001 * (i + 1)),
+);
+const lejosGlp = Array.from({ length: 6 }, (_, i) =>
+  glp(String.fromCharCode(107 + i), 7 + i / 10, 'SURQUILLO', 0.02 + 0.001 * i),
+);
 
 test('al cambiar a GLP, un radio que nadie eligió se recalcula con sus precios', () => {
   const rowsGasolina = filas('gasolina', cercaGasolina);
@@ -85,6 +145,10 @@ test('al cambiar a GLP, un radio elegido se conserva y el vacío se dice', () =>
 test('sin ninguna estación de GLP en todo el rango, el control es inerte con cero', () => {
   const rowsGlp = filas('glp', [glp('a', 7.49, 'LURIN', 0.3)]);
   const located = withDistances(rowsGlp, ORIGEN);
-  const vista = resultsView({ rows: rowsGlp, located, search: startResults({ ...createSearch('glp'), origin: ORIGEN }, located) });
+  const vista = resultsView({
+    rows: rowsGlp,
+    located,
+    search: startResults({ ...createSearch('glp'), origin: ORIGEN }, located),
+  });
   assert.deepEqual([vista.radiusEmpty, vista.radius], [true, { inert: true, total: 0 }]);
 });

@@ -22,7 +22,11 @@ const ui = await buildUi({ root });
 const shell = writeShellManifest({ root });
 for (const relativo of Object.keys(ui.outputs)) {
   const bytes = fs.readFileSync(path.join(root, 'web', relativo));
-  process.stdout.write(`web/${relativo}  ${kib(bytes.length)} · gzip ${kib(zlib.gzipSync(bytes, { level: 9 }).length)}\n`);
+  process.stdout.write(
+    `web/${relativo}  ${kib(bytes.length)} · gzip ${kib(zlib.gzipSync(bytes, { level: 9 }).length)}\n`,
+  );
 }
 const tailwind = ui.versions.tailwindcss ? ` · tailwindcss ${ui.versions.tailwindcss}` : '';
-process.stdout.write(`Interfaz: vite ${ui.versions.vite} · rolldown ${ui.versions.rolldown}${tailwind} · ${Object.keys(ui.inputs).length} entradas\nPrecache derivada: ${shell.cache} · ${shell.entries.length} entradas\n`);
+process.stdout.write(
+  `Interfaz: vite ${ui.versions.vite} · rolldown ${ui.versions.rolldown}${tailwind} · ${Object.keys(ui.inputs).length} entradas\nPrecache derivada: ${shell.cache} · ${shell.entries.length} entradas\n`,
+);

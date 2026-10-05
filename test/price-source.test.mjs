@@ -51,7 +51,10 @@ test('un reporte del CSV posterior a la consulta gana, aunque la consulta siga v
   // El archivo llegó con un precio registrado DESPUÉS de que leyéramos la
   // tabla: sabemos de un cambio más nuevo que lo que alcanzamos a ver.
   const ahora = corte + 3 * HORA;
-  const elegido = elegir(oferta({ price: 22.99, reported_at: iso(ahora - HORA), facilito: consulta(22.39, iso(ahora - 5 * HORA)) }), ahora);
+  const elegido = elegir(
+    oferta({ price: 22.99, reported_at: iso(ahora - HORA), facilito: consulta(22.39, iso(ahora - 5 * HORA)) }),
+    ahora,
+  );
   assert.equal(elegido.price, 22.99);
   assert.equal(elegido.source, 'csv');
   assert.equal(elegido.reason, 'csv_posterior_a_la_consulta');
@@ -102,15 +105,18 @@ test('filterFreshOffers entrega el precio ya elegido, y lo vencido conserva el d
   // Es el único paso antes de filtrar, ordenar y contar: si aquí saliera el
   // precio del CSV, la lista ordenaría por uno y la tarjeta pintaría otro.
   const ahora = corte + 3 * HORA;
-  const barato = { ...oferta({ price: 22.99, facilito: consulta(19.49, iso(ahora - HORA)) }), id: 'g2_aaaaaaaaaaaaaaaaaaaaaaaa' };
-  const callado = { ...oferta({ price: 21.10, reported_at: iso(corte - 45 * DIA) }), id: 'g2_bbbbbbbbbbbbbbbbbbbbbbbb' };
+  const barato = {
+    ...oferta({ price: 22.99, facilito: consulta(19.49, iso(ahora - HORA)) }),
+    id: 'g2_aaaaaaaaaaaaaaaaaaaaaaaa',
+  };
+  const callado = { ...oferta({ price: 21.1, reported_at: iso(corte - 45 * DIA) }), id: 'g2_bbbbbbbbbbbbbbbbbbbbbbbb' };
   const { offers, expired } = filterFreshOffers([barato, callado], { now: () => iso(ahora), cutoffAt: CORTE });
   assert.equal(offers.length, 1);
   assert.equal(offers[0].price, 19.49);
   assert.equal(offers[0].price_source, 'facilito');
   assert.ok(offers[0].age_days < 1);
   assert.equal(expired.length, 1);
-  assert.equal(expired[0].price, 21.10, 'el precio vencido sigue siendo el del CSV');
+  assert.equal(expired[0].price, 21.1, 'el precio vencido sigue siendo el del CSV');
   assert.ok(expired[0].age_days > 44, 'y su edad mide el silencio del operador, no nuestra consulta');
 });
 
@@ -122,6 +128,9 @@ test('el próximo vencimiento es el de la consulta, para que el respaldo entre s
   const faltan = msUntilSourceChange(item, { now: () => iso(ahora), cutoffAt: CORTE });
   assert.equal(faltan, MAX_QUERY_AGE_HOURS * HORA - 2 * HORA);
   // Sin capa web, el que manda es el vencimiento de los 30 días.
-  const soloCsv = msUntilSourceChange(oferta({ reported_at: iso(corte - 2 * DIA) }), { now: () => iso(ahora), cutoffAt: CORTE });
+  const soloCsv = msUntilSourceChange(oferta({ reported_at: iso(corte - 2 * DIA) }), {
+    now: () => iso(ahora),
+    cutoffAt: CORTE,
+  });
   assert.equal(soloCsv, Date.parse(iso(corte - 2 * DIA)) + 30 * DIA - ahora);
 });

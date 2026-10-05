@@ -49,35 +49,49 @@ const yaRevisados = (() => {
   if (!fs.existsSync(archivo)) return new Set();
   return new Set(JSON.parse(fs.readFileSync(archivo, 'utf8')).entradas.map((x) => x.id));
 })();
-const candidatosPublicables = porEstado('candidate')
-  .filter((r) => (!enCatalogo || enCatalogo.has(r.establishment_id)) && !yaRevisados.has(r.establishment_id));
+const candidatosPublicables = porEstado('candidate').filter(
+  (r) => (!enCatalogo || enCatalogo.has(r.establishment_id)) && !yaRevisados.has(r.establishment_id),
+);
 
 const muestra = CANDIDATOS
   ? repartir(candidatosPublicables, TAMANO).map((r) => ({ ...r, motivo: 'risk_sample' }))
-  : TODOS ? matches.resultados.filter((r) => r.estado !== 'unmatched') : [
-    ...repartir(verified, Math.round(TAMANO * 0.62)).map((r) => ({ ...r, motivo: 'random_sample' })),
-    ...repartir(conflict, Math.round(TAMANO * 0.25)).map((r) => ({ ...r, motivo: 'risk_sample' })),
-    ...repartir(ajustados, Math.round(TAMANO * 0.13)).map((r) => ({ ...r, motivo: 'risk_sample' })),
-  ];
+  : TODOS
+    ? matches.resultados.filter((r) => r.estado !== 'unmatched')
+    : [
+        ...repartir(verified, Math.round(TAMANO * 0.62)).map((r) => ({ ...r, motivo: 'random_sample' })),
+        ...repartir(conflict, Math.round(TAMANO * 0.25)).map((r) => ({ ...r, motivo: 'risk_sample' })),
+        ...repartir(ajustados, Math.round(TAMANO * 0.13)).map((r) => ({ ...r, motivo: 'risk_sample' })),
+      ];
 const unicos = [...new Map(muestra.map((r) => [r.establishment_id, r])).values()];
 
 // Para juzgar una ficha dudosa hace falta ver lo que Google dice de ella tal
 // cual: la categoría revela si es la tienda, el lavado o el grifo.
 const infoPorLugar = new Map();
 if (CANDIDATOS) {
-  const ndjson = fs.readdirSync(path.join(root, '.local-cache', 'identity', 'harvest'), { withFileTypes: true })
-    .filter((e) => e.isDirectory()).map((e) => path.join(root, '.local-cache', 'identity', 'harvest', e.name, 'raw.ndjson'))
-    .filter((p) => fs.existsSync(p)).sort().pop();
-  if (ndjson) for (const linea of fs.readFileSync(ndjson, 'utf8').split('\n')) {
-    if (!linea.trim()) continue;
-    for (const lugar of JSON.parse(linea).places ?? []) if (lugar.id && !infoPorLugar.has(lugar.id)) infoPorLugar.set(lugar.id, lugar.info ?? []);
-  }
+  const ndjson = fs
+    .readdirSync(path.join(root, '.local-cache', 'identity', 'harvest'), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => path.join(root, '.local-cache', 'identity', 'harvest', e.name, 'raw.ndjson'))
+    .filter((p) => fs.existsSync(p))
+    .sort()
+    .pop();
+  if (ndjson)
+    for (const linea of fs.readFileSync(ndjson, 'utf8').split('\n')) {
+      if (!linea.trim()) continue;
+      for (const lugar of JSON.parse(linea).places ?? [])
+        if (lugar.id && !infoPorLugar.has(lugar.id)) infoPorLugar.set(lugar.id, lugar.info ?? []);
+    }
 }
 
-const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-const lugarUrl = (r) => (/^ChIJ/.test(r.place_id)
-  ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}&query_place_id=${encodeURIComponent(r.place_id)}`
-  : `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`);
+const esc = (v) =>
+  String(v ?? '').replace(
+    /[&<>'"]/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c],
+  );
+const lugarUrl = (r) =>
+  /^ChIJ/.test(r.place_id)
+    ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}&query_place_id=${encodeURIComponent(r.place_id)}`
+    : `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
 
 const tarjeta = (r, i) => `
 <article class="c" data-id="${esc(r.establishment_id)}" data-motivo="${esc(r.motivo ?? 'publishable_candidate')}" data-estado="${esc(r.estado)}">
@@ -88,7 +102,15 @@ const tarjeta = (r, i) => `
   </div>
   <p class="ev"><b>${r.distancia_m} m</b> · margen ${r.margen_m === null ? 'sin rival' : `${r.margen_m} m`} · ${r.señales.map((s) => `${esc(s.tipo)} <i>${esc(s.valor)}</i>`).join(' + ') || 'sin señales'}</p>
   ${r.fichas_rivales.length ? `<p class="riv">Otras fichas aquí: ${r.fichas_rivales.map((x) => `${esc(x.nombre_maps)} (${x.distancia_m} m)`).join(' · ')}</p>` : ''}
-  ${CANDIDATOS && infoPorLugar.has(r.place_id) ? `<p class="raw">Google dice: ${infoPorLugar.get(r.place_id).filter(Boolean).map((t) => esc(t)).join(' · ')}</p>` : ''}
+  ${
+    CANDIDATOS && infoPorLugar.has(r.place_id)
+      ? `<p class="raw">Google dice: ${infoPorLugar
+          .get(r.place_id)
+          .filter(Boolean)
+          .map((t) => esc(t))
+          .join(' · ')}</p>`
+      : ''
+  }
   <div class="acc">
     <a class="b b--g" href="${esc(lugarUrl(r))}" target="_blank" rel="noopener noreferrer">Ver en Maps</a>
     <button class="b b--duda" data-v="pending" type="button">? No sé</button>
@@ -166,7 +188,12 @@ document.getElementById('exp').addEventListener('click',async()=>{
 pintar();
 </script></body></html>`;
 
-const destino = path.join(root, '.local-cache', 'identity', CANDIDATOS ? 'audit-sheet-candidatos.html' : 'audit-sheet.html');
+const destino = path.join(
+  root,
+  '.local-cache',
+  'identity',
+  CANDIDATOS ? 'audit-sheet-candidatos.html' : 'audit-sheet.html',
+);
 fs.writeFileSync(destino, html, { mode: 0o600 });
 
 const cuenta = (estado) => unicos.filter((r) => r.estado === estado).length;
@@ -185,9 +212,20 @@ if (process.argv.includes('--serve')) {
   const http = await import('node:http');
   const cuerpo = fs.readFileSync(destino);
   const servidor = http.createServer((peticion, respuesta) => {
-    if (peticion.method !== 'GET' || !['/', '/index.html'].includes(peticion.url)) { respuesta.writeHead(404).end('No encontrado'); return; }
-    respuesta.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' });
+    if (peticion.method !== 'GET' || !['/', '/index.html'].includes(peticion.url)) {
+      respuesta.writeHead(404).end('No encontrado');
+      return;
+    }
+    respuesta.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-robots-tag': 'noindex, nofollow',
+    });
     respuesta.end(cuerpo);
   });
-  servidor.listen(CANDIDATOS ? 4175 : 4174, '127.0.0.1', () => process.stdout.write(`\nHoja de auditoría en http://127.0.0.1:${CANDIDATOS ? 4175 : 4174}  ·  Ctrl+C para cerrar\n`));
+  servidor.listen(CANDIDATOS ? 4175 : 4174, '127.0.0.1', () =>
+    process.stdout.write(
+      `\nHoja de auditoría en http://127.0.0.1:${CANDIDATOS ? 4175 : 4174}  ·  Ctrl+C para cerrar\n`,
+    ),
+  );
 }
