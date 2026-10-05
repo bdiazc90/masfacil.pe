@@ -193,10 +193,3 @@ export function dataCacheRules(groups = PUBLISHED_GROUPS) {
     { path: `/${grupo.dataRoot}/snapshots/*`, cacheControl: 'public, max-age=31536000, immutable' },
   ]);
 }
-
-/** La cabecera de caché de un archivo de datos, o `null` si no es de ningún grupo. */
-export function dataCacheControl(relative, groups = PUBLISHED_GROUPS) {
-  const ruta = `/${relative.replace(/^\/+/, '')}`;
-  const regla = dataCacheRules(groups).find((item) => (item.path.endsWith('/*') ? ruta.startsWith(item.path.slice(0, -1)) : ruta === item.path));
-  return regla?.cacheControl ?? null;
-}

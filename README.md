@@ -33,7 +33,18 @@ node scripts/contrast.mjs   # mide el contraste de los tokens de ui/styles.css
 
 `npm run dev` es para editar —también para afinar un token o una clase y verlo
 al instante—: no registra el service worker ni aplica la CSP, la 404 real o el
-modo sin red. Eso se comprueba con `npm run serve`.
+modo sin red. Eso se comprueba con `npm run serve`, que responde como Pages: la
+misma tabla de rutas, `web/_headers` completo (CSP incluida), ETag y la 404 propia.
+
+**En el teléfono.** `npm run serve -- --lan` sirve además el teléfono, en la misma
+Wi-Fi, por HTTPS en la IP de la Mac (puerto 4443): fuera de localhost, por HTTP no
+cargan los precios, porque su verificación usa `crypto.subtle`, que solo existe en
+un origen seguro. La primera vez crea en `.local-cache/tls/` una CA de prueba que
+dura 30 días y solo vale para redes privadas y localhost: el certificado
+`masfacil-prueba-local.cer` se pasa al iPhone por AirDrop, se instala en Ajustes →
+Perfil descargado y se activa en Ajustes → General → Información → Ajustes de
+confianza de certificados. Al terminar, se borra en Ajustes → General → VPN y
+gestión de dispositivos.
 
 Para ver datos reales hace falta el bundle. Dos formas:
 
