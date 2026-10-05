@@ -3,8 +3,8 @@
 Contrato de diseño de `masfacil.pe`. Fuente canónica de los principios de interfaz y del
 sistema visual de **todas** las rutas.
 
-Agnóstico al stack: hoy se implementa en HTML, CSS y JavaScript sin dependencias; debe
-seguir siendo válido cuando la interfaz se construya con un framework.
+Agnóstico al stack en sus principios (hoy: React, Vite y Tailwind). Los valores viven
+solo en el código; aquí están el papel de cada token y sus reglas.
 
 Cada principio declara **cómo se detecta que se violó**: uno que no se puede falsificar
 es decoración. `mockup.html`, en la raíz, es la maqueta histórica de la pantalla de
@@ -62,22 +62,16 @@ La rapidez nunca justifica una decisión peor informada.
 | 7 | Lo tocable, abajo | la acción primaria vive en la mitad superior de la pantalla |
 | 8 | Nada invita a mirar el teléfono: sin auto-refresh, sin alertas, sin animación que llame | el layout cambia sin que la persona haya hecho nada |
 | 9 | Accesibilidad de origen, no de fase | un target bajo 44 px, un contraste bajo el mínimo, un cambio de estado sin anuncio |
-| 10 | Cero red de terceros, con dos excepciones declaradas: el origen público del histórico en `connect-src` y Cloudflare Web Analytics, que Pages inyecta y cuenta visitas sin cookies —su beacon (`https://static.cloudflareinsights.com/beacon.min.js`) en `script-src` y su envío (`https://cloudflareinsights.com/cdn-cgi/rum`) en `connect-src`— | aparece en el CSP un host que no sea `'self'` ni esas dos excepciones |
+| 10 | Cero red de terceros, con dos excepciones declaradas: el origen público del histórico y Cloudflare Web Analytics, que Pages inyecta y cuenta visitas sin cookies (su beacon y su envío, por ruta exacta) | aparece en el CSP un host que no sea `'self'` ni esas dos excepciones |
 | 11 | El origen del dato y la no afiliación se leen sin buscarlos | se llega a resultados sin haber podido saber de dónde salen y quién hizo esto |
 
-Sobre el principio 8: el card de controles se contrae al hacer scroll y se expande al
-volver arriba. Es una respuesta a un gesto de la persona, no una animación que llama, y su
-hueco conserva el alto para que la lista no salte. Por lo mismo, el bloque del histórico
-reserva su alto desde el primer pintado.
+Sobre el principio 8: el card de controles que se contrae al hacer scroll responde a un
+gesto de la persona, no llama; por lo mismo, el bloque del histórico reserva su alto desde
+el primer pintado.
 
-Sobre el principio 10: el resumen del histórico se sirve desde su propio bucket, y eso es
-deliberado —así el service worker, que ignora lo cross-origin, no puede cachear como shell
-un JSON que cambia cada pocas horas—. Está escrita en `_headers` y
-`scripts/verify-web.mjs` cruza esa cabecera con la constante del cliente en cada
-verificación. La otra excepción es Web Analytics: Pages inyecta su beacon, que
-cuenta visitas sin cookies, y la CSP admite ese script y su envío por ruta exacta;
-`scripts/verify-web.mjs` exige que `script-src` y `connect-src` no admitan nada más.
-No hay otra analítica, ni fuentes, ni imágenes, ni scripts de terceros.
+Sobre el principio 10: el resumen del histórico se sirve desde su propio bucket a
+propósito, para que el service worker, que ignora lo cross-origin, no lo cachee como shell.
+`scripts/verify-web.mjs` exige que la CSP de `_headers` no admita nada más.
 
 ## 4 · Honestidad del dato
 
@@ -124,140 +118,86 @@ que el producto no miente: se diseñan con el mismo cuidado que el camino feliz.
 
 ## 6 · Sistema visual
 
-**Tokens.** La fuente de verdad son las custom properties de `ui/styles.css`: el tema
-claro en `:root`, el oscuro en `:root[data-theme="dark"]`. `ui/theme.js` fija siempre
-`light` o `dark` (la opción «sistema» se resuelve ahí), así que el CSS nunca depende de
-`prefers-color-scheme`. Antes del primer pintado lo fija `web/theme-boot.js`, un script
-clásico en el `<head>` de la portada y de la 404 que repite la misma regla: el tema oscuro
-nunca arranca en claro. La barra del navegador (`theme-color`) sigue al tema; su color
-es `--background` en hex, escrito en el propio `<meta>` (`data-light`, `data-dark`)
-porque se pinta antes de que llegue la hoja, y un test exige que coincidan.
+**Tokens.** La fuente de verdad son las custom properties de `ui/styles.css`, con sus
+valores escritos ahí y solo ahí: claro en `:root`, oscuro en `:root[data-theme="dark"]`.
+`ui/theme.js` fija siempre `light` o `dark` («sistema» se resuelve ahí), así que el CSS no
+depende de `prefers-color-scheme`; antes del primer pintado repite la regla
+`web/theme-boot.js`, y el tema oscuro nunca arranca en claro. `theme-color` sigue al tema
+con el hex de `--background` escrito en el `<meta>`, y un test exige que coincidan.
 
-**Qué conserva un nombre y qué se escribe directo.** Un nombre no es gratis: cada uno es
-una cadena más que hay que seguir para saber de qué color es algo. Se conserva cuando
-gana algo real:
+**Qué conserva un nombre.** Un token existe solo si gana algo real: cambia con el tema; es
+contrato con JavaScript (`--expand-at`, en px porque `useControlsCard.js` lo lee con
+`parseFloat`; `--controls-slot-h`, que ese módulo escribe; la duración, el paso y la curva
+que lee `ui/results/entrada.js`); lo mide `scripts/contrast.mjs`; o se reutiliza entre
+reglas. Cualquier otra medida va junto a su propiedad, con su variación agrupada debajo.
+**Un número repetido por casualidad no obliga a crear un token.**
 
-- **cambia de verdad con el tema** — todos los colores de la tabla de abajo;
-- **es contrato con JavaScript** — `--expand-at`, que `useControlsCard.js` lee de la raíz
-  con `parseFloat` y por eso conserva su unidad px, y `--controls-slot-h`, que ese mismo
-  módulo escribe; y la duración, el paso y la curva de la entrada de tarjetas, que lee
-  `ui/results/entrada.js`;
-- **lo mide `scripts/contrast.mjs`** — si el CSS y su comprobación comparten un valor,
-  ese valor tiene nombre;
-- **se reutiliza entre reglas** — la escala de espaciado, `--product`, `--serie`,
-  `--brand-halo`, en el ámbito donde se reutilizan.
+| Token | Rol |
+|---|---|
+| `--background` / `--foreground` | papel / tinta: el dato que decide |
+| `--muted-foreground` | dato secundario |
+| `--card` → `--card-2` | superficies de vidrio; en claro, más blancas que el papel para separarse de él |
+| `--border` → `--border-2` | canto del vidrio |
+| `--primary` / `--primary-foreground` | la acción, una vez por pantalla |
+| `--accent` | enlaces, etiquetas, tag de tarjeta |
+| `--ring` | anillo de foco |
+| `--brand` | la palabra «masfacil» del logotipo, igual en ambos temas |
+| `--product-<combustible>` / `-strong` | relleno del chip / tinta del chip y de la cifra activa |
+| `--halo-<marca>` / `--brand-halo-alpha` | halo de la marca del grifo, uno por marca registrada, y cuánto pesa |
+| `--chart-fill-alpha` | tope del degradado de área del histórico |
+| `--glow-1…3` / `--glow-alpha` / `--glow-blur` | las tres manchas del fondo, su intensidad y su difusión |
+| `--glass-*` | vidrio: desenfoque de lo grande y de lo chico, saturación y sombra de lo grande |
+| `--motion-*` / `--ease-out` / `--motion-ease` | movimiento (ver «Movimiento») |
+| `--logo-halo` | contorno del logo para que el aro no se funda con el fondo |
+| `--surface`, `--rim`, `--pill-fill`, `--pill-rim` | recetas de superficie del vidrio y de las píldoras de la barra |
+| `--s1`…`--s5`, `--radius-small`, `--font` | escala de espaciado, radio y fuente (Roboto → stack del sistema) |
+| `--collapse-at`, `--expand-at`, `--controls-compact-h` | umbrales del card de controles y alto de su fila compacta |
 
-Cualquier otra medida se escribe junto a su propiedad, y su variación en móvil o en un
-estado se agrupa debajo de la regla que modifica. **Un número repetido por casualidad no
-obliga a crear un token**, y una opacidad fija no necesita un parámetro global más una
-multiplicación para llegar a otra constante.
+**Tokens y Tailwind.** Sin paleta ni escala propias: `ui/tailwind.css` declara alias
+`inline` de estos tokens y borra el resto (`p-5` o `text-red-500` no existen). `estrecho:`
+es 340 px o menos; `dark:` sigue a `data-theme`, nunca a la media query.
 
-**Papel y tinta.** Los neutros son `oklch()` con sus tres valores escritos. Antes salían
-de tres knobs compartidos (`--paper-hue`, `--paper-chroma`, `--ink-chroma`); se retiraron
-porque para saber de qué color era una superficie había que resolver la cadena entera, y
-porque el verificador terminó copiándolos. Cada neutro fija su luminosidad y comparte
-matiz y croma por escrito.
-
-| Token | Rol | Claro | Oscuro |
-|---|---|---|---|
-| `--background` | papel | `oklch(96.3% 0.002 197.1)` | `oklch(21.8% 0.008 223.9)` |
-| `--foreground` | tinta: el dato que decide | `oklch(30% .01 130)` | `oklch(78% .01 130)` |
-| `--muted-foreground` | dato secundario | `oklch(46% .01 130)` | `oklch(76% .01 130)` |
-| `--card` → `--card-2` | superficies de vidrio; en claro, más blancas que el papel para separarse de él | L 99 % → 92 % | L 30 % → 23 % |
-| `--border` → `--border-2` | canto del vidrio | L 40 % → 30 % | L 62 % → 85 % |
-| `--primary` / `--primary-foreground` | la acción, una vez por pantalla | `#074b3f` / `#ffffff` | `#32b988` / `#052611` |
-| `--accent` | enlaces, etiquetas, tag de tarjeta | `#17615d` | `#63d0c9` |
-| `--ring` | anillo de foco | `#2e7d32` | `#4caf50` |
-| `--brand` | la palabra «masfacil» del logotipo, en ambos temas | `#e0581e` | `#e0581e` |
-| `--product-regular` / `-strong` | Regular: el tono base tiñe el relleno del chip; `-strong` es la tinta del chip y la cifra activa | `#708d3a` / `#207461` | `#7fc9a0` / `#8fe3b3` |
-| `--product-premium` / `-strong` | Premium, igual | `#4a78a8` / `#1d4e8e` | `#8fb4e0` / `#a4c6f2` |
-| `--product-diesel` / `-strong` | Diésel, igual; no tiene serie en el histórico | `#9a7a2c` / `#7a5712` | `#d9b56a` / `#ecc97e` |
-| `--product-glp` / `-strong` | GLP, igual; no tiene serie en el histórico | `#8a63b8` / `#5e3d8f` | `#c3a6ec` / `#d6c1f7` |
-| `--product-gnv` / `-strong` | GNV, igual; no tiene serie en el histórico | `#b85a7a` / `#8a2f55` | `#eca3bd` / `#f5bfd1` |
-| `--halo-<marca>` | halo de la marca del grifo, un token por marca registrada (Primax, Repsol, AVA, Petroperú, Pecsa, Energigas, Terpel) | tintes claros: `#f2c2a6` `#899ccd` `#e3c2eb` `#ffbbbb` `#f5b8bf` `#c9e6b0` `#ffd1a8` | tintes oscuros: `#171a52` `#5a2a0c` `#3a1244` `#0d3b29` `#4a0b14` `#173d11` `#4f1a05` |
-| `--brand-halo-alpha` | cuánto pesa el halo de marca | .38 | .38 |
-| `--chart-fill-alpha` | tope del degradado de área del histórico | .28 | .18 |
-| `--glow-1` `--glow-2` `--glow-3` | las tres manchas del fondo; en claro, con más croma y la misma luz | `oklch(95.3% 0.064 180.801)` `oklch(95.1% 0.034 236.824)` `oklch(95.6% 0.056 203.388)` | `#815a48` `#585b48` `#8d6c5e` |
-| `--glow-alpha` / `--glow-blur` | intensidad y difusión del glow | .6 / 80 px | .6 / 80 px |
-| `--glass-blur` / `--glass-blur-small` / `--glass-saturate` | vidrio: desenfoque de lo grande y de lo chico, y cuánto glow deja pasar | 30 px / 16 px / 35 % | igual |
-| `--glass-shadow` | la sombra de lo grande (tarjetas, plates): un contacto nítido y una caída larga | tinta al 6 % y 24 % | negro al 28 % y 60 % |
-| `--motion-*` / `--ease-out` / `--motion-ease` | movimiento (ver «Movimiento»): pulsar, entrar el menú o el detalle, el panel, las tarjetas y su paso, el giro y el latido de la carga; la curva de entradas y presión, y la de los cambios de color | 160 ms · 200 ms · 200 ms · 300 ms · 50 ms · 800 ms · 1.2 s / `cubic-bezier(.23, 1, .32, 1)` / `ease` | igual |
-| `--logo-halo` | contorno del logo para que el aro no se funda con el fondo | transparente | blanco al 45 % |
-
-Compartidos: `--font` (Roboto → stack del sistema), la escala de espaciado
-`--s1`…`--s5` (4 · 8 · 12 · 16 · 24 px), `--radius-small` 12 px, los dos umbrales del
-card de controles (`--collapse-at` 96 px, `--expand-at` 8 px), el alto de su fila
-compacta (`--controls-compact-h` 64 px, que también usa el `scroll-margin` de la
-tarjeta) y las recetas de superficie: `--surface` y `--rim` para el vidrio, `--pill-fill`
-y `--pill-rim` para las píldoras de la barra. El resto de medidas —tamaños de cifra,
-alto del trazado, desvanecidos— vive escrito en su regla, con su variación agrupada
-debajo.
-
-**Tokens y Tailwind.** Las utilidades no tienen paleta ni escala propias: `ui/tailwind.css`
-declara alias `inline` de estos tokens (`text-muted-foreground` es `var(--muted-foreground)`,
-`p-s3` es `var(--s3)`) y borra todo lo demás, así que `p-5` o `text-red-500` no existen.
-Una medida de un solo uso va como valor arbitrario junto a su propiedad (`text-[13px]`).
-`estrecho:` es el ancho de 340 px o menos; `dark:` sigue a `data-theme`, nunca a la media
-query. Afinar un color se hace en el token, con `npm run dev` abierto: cambia en vivo y en
-todos los sitios que lo usan.
-
-**Cuatro roles de color, separados.** Identidad de masfacil (`--brand`), acción
+**Cuatro roles de color, separados:** identidad de masfacil (`--brand`), acción
 (`--primary`, `--accent`, `--ring`), combustible (`--product-*`) y marca del grifo
 (`--halo-*` y el isotipo). **El color de una marca comercial no tiñe botones, precios,
-estados de selección ni series del histórico**: vive en la capa decorativa de su tarjeta
-y en ningún sitio más. Regular y Premium conservan su correspondencia entre la tarjeta y
-el gráfico, que es lo que permite leer los dos sin descifrar una leyenda.
+estados de selección ni series del histórico**: vive solo en la capa decorativa de su
+tarjeta. Regular y Premium conservan el mismo color en la tarjeta y en el gráfico, para
+leerlos sin leyenda. El halo va en la dirección que aleja la superficie de la tinta —tinte
+claro sobre papel, oscuro sobre carbón— porque el color pleno le quitaba contraste al
+texto; el color real de la marca lo lleva el isotipo.
 
-**El halo va en la dirección que aleja la superficie de la tinta**: tinte claro sobre
-papel, tinte oscuro sobre carbón. Con el color pleno de la marca, el texto que cae en esa
-esquina perdía hasta punto y medio de contraste. El color real de la marca no se pierde:
-lo lleva el isotipo, que es el activo.
+**Vidrio.** El canto se lee por diferencia con lo que hay detrás: sobre fondo oscuro es
+luz; sobre fondo claro, sombra. El relleno no separa la tarjeta del fondo; la separa el
+canto. Por eso **ningún estado depende solo de una diferencia de fondo o de una sombra**:
+el activo de un selector usa relleno, color de texto y peso. El card de controles, fijo,
+se rellena al 90 % y lleva sombra para separarse de la lista que pasa debajo. Lo grande
+—tarjetas y plates— es más grueso (desenfoque pleno y `--glass-shadow`); lo chico —chips,
+selectores sueltos— usa `--glass-blur-small`. **Nunca vidrio sobre vidrio**: dentro de un
+plate, selectores y tema no llevan desenfoque propio. Con «Aumentar contraste»
+(`prefers-contrast: more`) el vidrio es opaco, sin desenfoque y con borde real.
 
-**Vidrio.** El canto se lee por diferencia con lo que hay detrás, y solo en la dirección
-que la superficie deja libre: tarjeta oscura sobre fondo oscuro → **el canto es luz**;
-tarjeta clara sobre fondo claro → **el canto es sombra**. El relleno nunca separa la
-tarjeta del fondo; lo que la hace visible es el canto. Por eso **ningún estado depende
-solo de una diferencia de fondo o de una sombra**: el elemento activo de un switch usa
-relleno, color de texto y peso, y dos de esas tres son independientes del fondo. El card
-de controles, cuando va fijo, se rellena al 90 % y lleva sombra: ahí sí hay que separarlo
-de la lista que pasa por debajo.
+**Movimiento** (skills de Emil Kowalski). Se anima solo
+lo que tiene motivo —respuesta, de dónde viene algo, evitar un salto— y solo `opacity` y
+`transform` (el alto del panel de controles es la excepción heredada). Entradas y presión
+usan `--ease-out`; los cambios de color, `ease`; nunca `ease-in`, `transition: all` ni
+`scale(0)`, y nada dura más de 300 ms salvo el giro de la carga, lo único en bucle. Al
+pulsar, lo que tiene forma de botón se hunde al 97 % y el texto o la fila se atenúa. El
+menú entra desde su botón y el detalle con un fundido; los dos se cierran al instante. Las
+tarjetas nuevas de una lista suben 8 px y aparecen con 50 ms entre una y otra hasta la
+sexta; reordenar no anima, y el cambio de tema tampoco. Con `prefers-reduced-motion:
+reduce` hay menos movimiento, no cero: sin desplazamientos, escalas ni scroll suave;
+quedan fundidos de opacidad y color.
 
-**Jerarquía del vidrio** (G5, con la skill `apple-design`). Lo grande —tarjetas y plates—
-es más grueso: desenfoque pleno y `--glass-shadow`; lo chico —chips, selectores sueltos—
-usa `--glass-blur-small`. **Nunca vidrio sobre vidrio**: dentro de un plate, los
-selectores y el tema no llevan desenfoque propio. Con «Aumentar contraste»
-(`prefers-contrast: more`) el vidrio se vuelve opaco, sin desenfoque y con borde real.
+**Fondo.** Papel liso pintado por `html` y tres manchas difusas (`.glow`) en `z-index:-1`;
+`body` no pinta fondo porque las taparía. La violación se ve: el glow desaparece.
 
-**Movimiento** (G5, con las skills `animate` y `review-animations` de Emil Kowalski). Se
-anima solo lo que tiene un motivo —respuesta, de dónde viene algo, evitar un salto— y solo
-`opacity` y `transform` (el alto del panel de controles es la excepción heredada). Las
-entradas y la presión usan `--ease-out`; los cambios de color, `ease`; nunca `ease-in`,
-`transition: all` ni `scale(0)`, y nada de más de 300 ms salvo el giro de la carga, que es
-lo único en bucle. Al pulsar, lo que tiene forma de botón se hunde al 97 % y lo que es
-texto o fila se atenúa. El menú entra desde su botón y el detalle con un fundido; los dos
-se cierran al instante. Las tarjetas nuevas de una lista suben 8 px y aparecen, con 50 ms
-entre una y otra hasta la sexta; reordenar no anima. Con `prefers-reduced-motion: reduce`
-el movimiento es menos y más suave, no cero: ni desplazamientos, ni escalas, ni scroll
-suave; quedan fundidos de opacidad y color. El cambio de tema no se anima.
-
-**Fondo.** Papel liso pintado por `html` y tres manchas difusas (`.glow`) en `z-index:-1`:
-verdeagua y celeste sobre papel en claro, terracota sobre carbón en oscuro. Sin velo encima y sin
-imágenes: `body` no pinta fondo, porque lo taparía. Detectar la violación: el glow no se
-ve.
-
-**Tipografía.** Roboto primero porque en Android ya es la fuente del sistema y no descarga
-nada; fuera de Android cae al stack nativo. Ninguna fuente se hospeda ni se descarga.
-`tabular-nums` en cifras. El dato que decide, a 24 px y peso 800 (21 px hasta 340 px de
-ancho), con el «S/» reducido a 13 px porque la moneda acompaña, no decide. En el histórico
-el dato que decide es el último promedio de cada franja: 26 px y peso 800. Texto de
-lectura nunca bajo 12 px, **sin excepciones**: las etiquetas en mayúsculas (LUGAR, RADIO)
-y los chips de producto van a 12 px, los chips además monoespaciados y pegados a la cifra
-que acompañan. Su nombre completo en `aria-label` es refuerzo, no sustituto: un
-`aria-label` no vuelve legible un chip que no se lee.
-
-**Las etiquetas de un SVG también son texto.** Dentro de un `viewBox` el tamaño se escala
-con el ancho: `--chart-label-size` sube de 12.5 a 16 unidades hasta 340 px justo para que
-siga midiendo 12 px reales. Una etiqueta ilegible no se compensa con un `aria-label`.
+**Tipografía.** Roboto donde el sistema ya la tiene (Android); si no, el stack nativo.
+Ninguna fuente se descarga. `tabular-nums` en cifras. El dato que decide va a 24 px y peso
+800 (21 px hasta 340 px), con «S/» a 13 px porque la moneda acompaña; en el histórico, el
+último promedio de cada franja a 26 px. **Ningún texto de lectura baja de 12 px**: tampoco
+las etiquetas en mayúsculas ni los chips —monoespaciados y pegados a la cifra que
+acompañan—, ni las etiquetas de un SVG, cuyo tamaño (`--chart-label-size`) se compensa con
+el ancho para medir 12 px reales. Un `aria-label` no vuelve legible lo que no se lee.
 
 **Rendimiento como decisión de diseño.** Sesiones de diez segundos: el shell arranca en
 pocos KB y funciona offline con el último bundle validado. Un efecto que cueste en un
@@ -265,105 +205,72 @@ Android de gama baja se paga solo si mejora la decisión.
 
 ## 7 · Componentes
 
-Principios, no catálogo. Un inventario cerrado de componentes con sus reglas
-exige mantener a mano una copia del código y envejece en cada cambio de UI; lo
-que sigue vigente es cómo debe comportarse cualquier control de esta interfaz.
-La interfaz es React y cada componente vive en `ui/`: la cabecera en `ui/controls/`, las pantallas en `ui/screens/`, la lista de resultados en `ui/results/` y el histórico en `ui/history/`. Lo que dicen —textos, estados, marca, enlaces, geometría del gráfico— se decide sin JSX en `ui/offer-view.js`, `ui/app-view.js` y `ui/history-view.js`, y las transiciones de la búsqueda en `ui/app-state.js`. La maquetación de cada componente va en su JSX con utilidades de Tailwind; los tokens y el CSS que se lee mejor como CSS —vidrio, halos, chips, estados de la cifra, card de controles, range, selectores, SVG del histórico— en `ui/styles.css`, y la configuración de Tailwind en `ui/tailwind.css`.
+Principios, no catálogo. Dónde vive cada pieza lo dice `README.md` («Dónde se cambia la
+interfaz»).
 
-- **Un control, una cosa.** Ordenar no filtra; filtrar no ordena. Un control cuyo
-  efecto no se puede nombrar en una línea está haciendo dos cosas.
-- **Estado visible sin depender del color.** Un elemento activo se distingue por
-  relleno, peso o forma además del color, y lo declara en el marcado
+- **Un control, una cosa.** Ordenar no filtra; filtrar no ordena. Si su efecto no se
+  nombra en una línea, hace dos cosas.
+- **Estado visible sin depender del color:** relleno, peso o forma, declarado en el marcado
   (`aria-pressed`, `aria-current`), no solo en el estilo.
-- **Elección binaria con botones, no con `<select>`.** Dos opciones se tocan; no
-  se despliegan.
-- **Si un control no cambia nada, se deshabilita y lo dice.** No se deja activo
-  fingiendo que hay algo que ajustar.
-- **Objetivos táctiles:** llamada principal de pantalla ≥ 52 px, acción dentro de
-  una tarjeta ≥ 48 px, botón de texto ≥ 44 px.
-- **Nada se repite.** Lo que la tarjeta ya dice no se anuncia encima de la lista.
-- **La tarjeta de resultado ordena de arriba abajo por lo que decide:** primero lo
-  que distingue una opción de otra, después lo que la identifica, y al final las
-  acciones. La ausencia de un dato se dice —«—», «por confirmar», marcador
-  neutral—, nunca se oculta la fila.
-- **La decoración vive en su propia capa, detrás del contenido.** La marca del
-  grifo es una capa aparte: `aria-hidden`, sin eventos y sin parada de teclado.
-  Recorta solo la decoración —nunca el anillo de foco, las acciones ni el detalle
-  desplegado—, así que el `overflow` va en la capa y no en la tarjeta. Una marca
-  sin activo registrado no tiene capa: superficie neutral, misma calidad visual.
-  La marca se dice siempre en texto, de modo que reconocerla no depende de ver el
-  isotipo.
-- **Una decoración que gana presencia no puede costar altura.** La firma visual se
-  mide con la misma estación, estado, ancho y texto antes y después: si la tarjeta
-  crece para exhibir marca, la marca sobra.
-- **Un gráfico se lee en reposo.** El valor principal, su fecha y su población
-  están visibles sin tocar. La interacción añade el detalle de un día; no es el
-  camino para enterarse de lo que el bloque dice.
-- **Una escala por serie cuando las series no comparten rango.** Compartirla
-  aplasta las dos curvas contra sus bordes. Cada escala declara sus referencias
-  numéricas en la unidad real; no se normaliza a porcentajes.
-- **Un patrón de trazo significa una cosa sola.** El discontinuo está reservado al
-  promedio de referencia, así que ninguna serie observada es discontinua.
+- **Elección binaria con botones, no con `<select>`.**
+- **Si un control no cambia nada, se deshabilita y lo dice.**
+- **Objetivos táctiles:** llamada principal de pantalla ≥ 52 px, acción dentro de una
+  tarjeta ≥ 48 px, botón de texto ≥ 44 px.
+- **El card de controles tiene tres estados** —completo, compacto y superpuesto—: se
+  contrae al hacer scroll, se expande al volver arriba y su hueco conserva el alto para que
+  la lista no salte.
+- **Nada se repite:** lo que la tarjeta ya dice no se anuncia encima de la lista.
+- **La tarjeta ordena por lo que decide:** primero lo que distingue una opción, después lo
+  que la identifica, al final las acciones. Un dato ausente se dice («—», «por confirmar»,
+  marcador neutral); la fila no se oculta.
+- **La decoración vive en su propia capa, detrás del contenido:** la marca del grifo es
+  `aria-hidden`, sin eventos ni parada de teclado, y recorta solo la decoración —nunca el
+  foco, las acciones ni el detalle—, así que el `overflow` va en la capa. Sin activo
+  registrado no hay capa: superficie neutral. La marca se dice siempre en texto.
+- **Una decoración que gana presencia no puede costar altura:** si la tarjeta crece para
+  exhibir marca, la marca sobra.
+- **Un gráfico se lee en reposo:** valor principal, fecha y población visibles sin tocar;
+  la interacción solo añade el detalle de un día.
+- **Una escala por serie cuando las series no comparten rango**, con referencias en la
+  unidad real, nunca en porcentajes.
+- **Un patrón de trazo significa una cosa:** el discontinuo es solo el promedio de
+  referencia.
 
 ## 8 · Accesibilidad
 
 Piso no negociable, verificado y no asumido.
 
 - HTML semántico: `<main>`, `<section>`, encabezados en orden, listas para las opciones.
-- Todo tocable ≥ 44 px; acción primaria de pantalla ≥ 52 px.
-- Contraste **medido en el peor caso real**, y el peor caso incluye lo que se pinta
-  detrás. Dos juegos de fondos, porque el texto y el gráfico no viven en el mismo sitio:
-  **tarjeta**, el vidrio en sus tres mezclas y el card fijo sobre el papel liso y sobre
-  cada mancha del glow, y sobre cualquiera de esos el halo de cualquiera de las marcas
-  registradas; **trazado**, ese mismo vidrio y además el relleno de área de cada serie al
-  tope de su degradado, que es lo más denso que llega a haber bajo una línea.
-  Texto ≥ 4.5:1; texto grande (la cifra a peso 800, lo único que lleva el color «strong»)
-  ≥ 3:1; anillo de foco, botón como forma y **gráfico necesario para entender el dato**
-  —la curva y la recta del promedio— ≥ 3:1. La prueba es `node scripts/contrast.mjs`:
-  imprime cada razón y falla bajo el mínimo. Se corre a mano al tocar un token, no en CI.
-  Añadir un fondo nuevo sin añadirlo ahí deja el script en verde sin acreditar nada.
-  **La sonda no guarda paleta: lee los valores vigentes de `ui/styles.css`** —los colores
-  de tema, las opacidades y los pesos de cada mezcla, sacados de la receta que de verdad
-  los pinta—. Lo que sí declara son los nombres de los roles y los mínimos: ese es su
-  contrato, no una segunda configuración visual. Un rol ausente o un valor que no sepa
-  leer produce error explícito, nunca una medición con un hueco. Mientras la paleta estuvo
-  duplicada se desincronizó dos veces sin que nadie lo notara: `--border-2` no llegó a
-  copiarse nunca y el peso del vidrio era `.144` frente al 14 % del CSS. Fuera
-  del piso, a propósito: la palabra «masfacil» en `--brand` (marca, exenta), el canto del
-  vidrio (nunca se pinta sólido), el degradado de área (decoración declarada) y el isotipo
-  de marca (imagen recortada y desvanecida, no un color plano).
-- **El chip se mide como texto, en sus dos tintas.** Tinta y relleno nunca salen del mismo
-  token —dos valores del mismo color no se separan— y un estado apagado no se dice con
-  `opacity`, que hunde tinta y relleno a la vez: se dice con la tinta neutral, el peso y
-  el borde. Como el relleno se mezcla con `--card`, que es opaco, la pareja es directa y
-  no depende del vidrio ni del halo.
+- Todo tocable ≥ 44 px; acción primaria de pantalla ≥ 52 px. Sin scroll horizontal a
+  320 px. Tema claro, oscuro y del sistema.
+- Contraste **medido en el peor caso real**, con lo que se pinta detrás: **tarjeta** —el
+  vidrio en sus tres mezclas y el card fijo, sobre el papel y cada mancha del glow, con el
+  halo de cualquier marca— y **trazado** —además, el relleno de área de cada serie en su
+  tope—. Texto ≥ 4.5:1; la cifra a peso 800 ≥ 3:1; foco, botón como forma y **gráfico
+  necesario para entender el dato** ≥ 3:1. Lo prueba `node scripts/contrast.mjs`, que **no
+  guarda paleta**: lee `ui/styles.css` y la receta que de verdad pinta, y falla bajo el
+  mínimo o ante un rol que no sepa leer. Se corre a mano al tocar un token; un fondo nuevo
+  que no se añade ahí queda sin acreditar. Exentos a propósito: «masfacil» en `--brand`, el
+  canto del vidrio, el degradado de área y el isotipo de marca.
+- **El chip se mide como texto, en sus dos tintas:** tinta y relleno nunca salen del mismo
+  token, y un estado apagado se dice con tinta neutral, peso y borde, no con `opacity`, que
+  hunde las dos a la vez.
 - `:focus-visible` siempre visible; foco al encabezado al cambiar de paso (en resultados,
-  el nombre del lugar); orden de tabulación que no obliga a atravesar controles
-  secundarios para llegar a la decisión. Al contraerse el card, nadie queda enfocado
-  dentro de un panel oculto.
-- Nombres accesibles en cada acción; regiones vivas para los cambios de estado; los chips
-  declaran su nombre completo. **Una región viva no se repinta**: si el nodo se recrea en
-  cada render, unos lectores no anuncian nada y otros anuncian la pantalla entera. Se crea
-  una vez y solo se le escribe lo que la persona acaba de elegir.
-- **Una selección repinta lo que cambia, no el nodo que tiene el foco.** Reconstruir el
-  elemento enfocado obliga al lector a releer su nombre —y su descripción, si la tiene—
-  en cada pulsación, y devuelve el foco a un nodo recién nacido. Lo que se mueve vive en
-  capas propias que se reescriben solas. Por lo mismo, una descripción larga no se cuelga
-  del foco con `aria-describedby`: una lista de catorce días es una región hermana con
-  nombre propio, que se alcanza navegando y no se recita al entrar.
-- **Un control que repinta su propio bloque devuelve el foco.** Si el botón que se pulsó
-  se destruye en el repintado, el foco cae al cuerpo del documento y hay que volver a
-  tabular hasta ahí.
-- **Retirar una vista no puede quitar el acceso al dato.** Donde se quita una tabla queda
-  una lectura equivalente para tecnologías de asistencia: día, media y población de cada
-  fecha, sin una parada de teclado por punto. Un nombre accesible o una instrucción para
-  lector no son frases interpretativas visibles.
-- El movimiento que desplaza o escala solo existe con `prefers-reduced-motion:
-  no-preference`; con `reduce` quedan fundidos de opacidad y color (§6, «Movimiento»).
-  `forced-colors` con bordes visibles; `prefers-contrast: more` con vidrio opaco.
-- En el teléfono, un control responde con su `:active` y no con el destello gris de iOS,
-  y mantenerlo pulsado no selecciona su texto (el contenido sí se selecciona).
-- Sin scroll horizontal a 320 px. Tema claro, oscuro y del sistema.
+  el nombre del lugar); la tabulación no obliga a atravesar controles secundarios; al
+  contraerse el card, nadie queda enfocado en un panel oculto.
+- Nombres accesibles en cada acción y regiones vivas para los cambios de estado. **Una
+  región viva no se repinta**: se crea una vez y solo se le escribe lo que la persona acaba
+  de elegir; recrearla hace que unos lectores callen y otros lean la pantalla entera.
+- **Una selección repinta lo que cambia, no el nodo que tiene el foco**, y un control que
+  repinta su propio bloque devuelve el foco. Una descripción larga no se cuelga del foco
+  con `aria-describedby`: va en una región hermana con nombre propio.
+- **Retirar una vista no puede quitar el acceso al dato:** donde se quita una tabla queda
+  una lectura equivalente (día, media y población), sin una parada de teclado por punto.
+  Un nombre accesible o una instrucción para lector no son frases interpretativas visibles.
+- Movimiento según `prefers-reduced-motion` (§6, «Movimiento»); `forced-colors` con bordes
+  visibles; `prefers-contrast: more` con vidrio opaco.
+- En el teléfono, un control responde con su `:active` y no con el destello gris de iOS, y
+  mantenerlo pulsado no selecciona su texto (el contenido sí).
 
 ## 9 · Microcopy
 
@@ -391,67 +298,23 @@ Piso no negociable, verificado y no asumido.
 
 ## 11 · Cuando cambie el stack
 
-**Se conserva:** los colores de tema como custom properties de CSS; los nombres, la
-anatomía y los estados de los componentes; el HTML semántico y los atributos de
-accesibilidad; los estados obligatorios; el microcopy; el presupuesto de rendimiento y el
-funcionamiento offline.
+**Se conserva:** los colores de tema como custom properties de CSS, sin duplicar sus
+valores en JavaScript ni en la sonda de contraste; los nombres, la anatomía y los estados
+de los componentes; el HTML semántico y los atributos de accesibilidad; los estados
+obligatorios; el microcopy; el presupuesto de rendimiento y el funcionamiento offline.
+Nada de CSS-in-JS en tiempo de ejecución.
 
 **Se puede reorganizar:** la estructura de archivos, el mecanismo de render y el
-empaquetado.
+empaquetado. Una medida de un solo uso se escribe junto a su propiedad, en cualquier stack.
 
-**Reglas del puente:** los colores de tema siguen siendo CSS custom properties, sin
-duplicar sus valores en JavaScript ni en la sonda de contraste; nada de CSS-in-JS en
-tiempo de ejecución; el HTML que hoy genera cada renderer es el contrato de aceptación de
-su componente equivalente. **No hay obligación de tokenizar toda medida**: una medida de
-un solo uso se escribe junto a su propiedad, aquí y en cualquier stack futuro. Lo que sí
-se exige de una utilidad de clases es que los colores y el espaciado sigan saliendo de
-esta paleta y de esta escala, no de una tabla paralela.
-
-Tailwind v4 se adoptó con la migración a React (`docs/SPEC-ui-react.md`, gate 4), con estas
-reglas: sin Preflight —el reset es el propio—, sin tema por defecto, alias `inline` de los
-tokens y nada más; `ui/styles.css` no lleva directivas, así que llega tal cual y lo que mide
-la sonda de contraste es lo que se sirve; clases completas siempre, y una variante sale de
-un mapa con los nombres enteros, nunca de interpolar `bg-${algo}`; las utilidades solo se
-leen de `ui/`. Navegadores objetivo: Chrome/Edge 111, Safari/iOS 16.4 y Firefox 128; de
-Firefox 121 a 127 la interfaz se usa, pero sin garantía visual.
+**Tailwind** (desde `docs/SPEC-ui-react.md`, gate 4): sin Preflight ni tema por defecto,
+solo alias de los tokens; `ui/styles.css` llega tal cual, así que la sonda de contraste mide
+lo que se sirve. Navegadores objetivo: Chrome/Edge 111, Safari/iOS 16.4 y Firefox 128.
 
 ## 12 · Decisiones cerradas de gasolina
 
-Primera ruta. Reabrir cualquiera exige un hallazgo material medido, no una
-opinión. Las cifras que las justificaron se midieron sobre bundles concretos y no
-se copian aquí: envejecen y el motivo no.
-
-| Decisión | Por qué |
-|---|---|
-| Cada vista vive en `/combustibles/<vista>` —hoy Gasolina, Diésel, GLP y GNV— y `/` abre la última vista recordada, sin pantalla de elegir producto. `/combustibles/gasolina/historial` reescribe a la misma portada con el gráfico del histórico enfocado; los enlaces viejos (`/gasolina`, `/gasolina/regular`, `/gasolina/premium`, `/gasolina/historial`) y la barra final responden 301 a su ruta canónica; una vista no activada o cualquier otra ruta responde 404 con una página mínima, también sin conexión. Navegador, service worker, servidor local y `_redirects` usan una sola tabla (`web/lib/routes.js`) | los dos bundles son idénticos salvo precio y fecha: elegir producto antes de ver nada era un tap sin información; el historial es contexto de la portada, no otra pantalla, y su URL existe solo para poder enlazarlo; una dirección que no existe no debe fingir ser la app: un enlace roto se ve, no se disimula; y si cada capa resolviera las rutas por su cuenta, un enlace funcionaría en un sitio y no en otro |
-| Una tarjeta por grifo con Regular y Premium; «—» cuando falta uno | la gran mayoría de los grifos reporta los dos productos a la vez, y se decide comparándolos frente al surtidor |
-| Radio de búsqueda de 1 a 5 km en pasos de 0.5; arranca en el menor que llena seis tarjetas | en Lima urbana cae en 1–1.5 km y en zonas dispersas sube solo. Un pool fijo mandaba a kilómetros de distancia por céntimos |
-| «Más cerca» y «Más barata» solo ordenan; el sub-selector fija el producto de «Más barata» y recuerda la elección | cada control hace una cosa; en «Más cerca» el producto no ordena nada y el sub-selector se oculta |
-| Etiqueta «Regular más barata en 1.5 km» sobre la más barata del radio; doble cuando también es la más cercana | sin decirlo, la interfaz inventaría un contraste que no existe |
-| Paginación que duplica: 6 → 12 → 24 → todo; si quedan ≤ 4, se muestran sin botón | un distrito grande a 5 km son más de cien estaciones: pocos toques en vez de decenas |
-| Card de controles fijo con tres estados en vez de un header pegajoso alto | el header fijo ocupaba un cuarto de la pantalla; la fila compacta conserva lugar, radio y criterio |
-| Con más de un combustible, la fila compacta va en dos renglones: arriba el combustible y el lugar —radio o distrito, lo único que puede truncarse—, abajo el criterio entero. A 360 px o menos la píldora de la barra queda en icono | en un solo renglón, combustible, radio y criterio no cabían junto a «Ajustar» ni a 390 px; un criterio montado sobre el botón no se lee |
-| Selector de combustible —Gasolina, Diésel, GLP, GNV— en Inicio y en «Ajustar», en una sola fila que cabe a 320 px, el mismo control segmentado que el orden; solo aparece con dos o más vistas activas y viene oculto en el HTML | elegir combustible no pide ubicación ni abre otra pantalla; un selector de una sola opción sería un control que no hace nada, y el `app.js` anterior al selector no sabe pintarlo |
-| Cambiar de combustible conserva origen o distrito, el radio y el orden que la persona eligió; vuelve a la primera página. Un radio que nadie tocó se recalcula con los precios de la vista nueva. Mientras la vista nueva carga no se muestra ningún precio; un distrito sin grifos de ese combustible lo dice y ofrece cambiarlo; sin ninguna estación a 5 km, el vacío no pide ampliar el radio | el contexto es de la persona, no del combustible; un radio automático de Gasolina dejaría vacía la de GLP, que tiene muchas menos estaciones; un precio de la vista anterior bajo la etiqueta nueva sería falso, y cambiar el distrito o el radio elegido por su cuenta también |
-| La tarjeta de Diésel lleva un solo precio con su nombre preciso (`B5 S-50 UV`, «Diésel B5 S-50 UV» para lectores) y «por galón» junto a la cifra; la de GLP, igual (`GLP`, «GLP automotor» para lectores); la de GNV dice «por m³» (`GNV`, «GNV comprimido» para lectores); la de Gasolina no cambia | fuera de Gasolina la unidad no se da por supuesta, y GNV se vende por metro cúbico: su precio nunca se compara con uno por galón; el nombre del CSV distingue esta variedad de las otras que el mismo grifo reporta, en GLP del mismo gas en kilogramos o en cilindros y en GNV del licuefactado |
-| Ventana de frescura: 30 días | fuera de ella el precio ya no sirve para decidir; el grifo se queda sin precio, porque desaparecer diría que cerró |
-| Ubicación de alta precisión | un error de 300 m reordena las tarjetas y el producto mentiría sin saberlo |
-| Sin ubicación: elegir distrito, sin distancia ni radio, ordenado por precio | no se confunde límite distrital con cercanía |
-| Nombre de estación solo desde el catálogo con respaldo; «por confirmar» con cercanía comprobada; la dirección oficial siempre | la precisión medida se declara en «Sobre los datos», con la cifra de la corrida vigente |
-| Handoff a Google Maps con solo el destino, tras un tap | es navegación, no carga de recurso; la ubicación no sale del dispositivo |
-| La app nunca se localiza sola, ni con el permiso ya concedido | un permiso concedido una vez no es una orden permanente. Arrancando solo, la portada dejaba de ser alcanzable: no se podía mirar el histórico ni elegir distrito sin que la localización secuestrara la pantalla. Localizar es siempre un gesto, y cada gesto lee el GPS sin posición cacheada |
-| La marca del grifo es un isotipo amplio y traslúcido recortado en la esquina superior derecha, con halo tenue; el logo pequeño junto al nombre se retiró | se reconocía la bandera solo después de leer la tarjeta. Dos acreditaciones visuales de la misma marca no añadían nada, y la placa blanca del logo pequeño era el único fondo sólido de la tarjeta |
-| Precio Regular, precio Premium y distancia se alinean a la izquierda en la misma fila | los tres datos que se comparan se leen de un barrido, y la esquina superior derecha queda libre para la marca sin pisar ningún dato |
-| El histórico es un solo plano con las dos series y **una escala en soles reales**, con piso de amplitud de S/ 0.50 por galón | los dos precios son reales y separarlos en dos ejes obligaba a mirar dos veces; con uno se ve la brecha entre productos de un vistazo. El coste está aceptado y declarado: con los dos dentro, cada curva recorre unos 19 px en vez de 37. Sin piso, una diferencia de milésimas ocuparía toda la altura |
-| Cuatro líneas, dos señales: el **color** dice el producto y el **trazo** dice la función —continuo lo observado, discontinuo el promedio—; cada curva lleva su nombre junto al último punto | con las dos series en el mismo plano, distinguirlas no puede depender del color solo, y una leyenda obliga a ir y volver |
-| El relleno se apaga a poca distancia de su propia curva en vez de cerrar contra el suelo | cerrando abajo, el área de Premium taparía la curva de Regular y las dos tintas se apilarían: un área por producto no puede leerse como una suma |
-| Curva monótona acotada (Hermite con pendientes limitadas), nunca un spline libre | un spline inventa un mínimo por debajo del día más barato, y eso sería un precio que nadie observó |
-| Ventana fija de 7 días, sin selector; el contrato, el resumen y el almacén siguen en 30 | siete fechas caben etiquetadas una por una y se leen sin tocar nada; una ventana que no se elige no necesita un control. Bajar el máximo del almacén para esconder una opción de interfaz sería tirar dato |
-| El subtítulo dice «últimos 7 días observados» y la meta de cada combustible solo lleva fecha y población | el título no puede prometer una cobertura que el dato no sostiene: con tres días registrados, afirmar «promedio de 7 días» sería falso. Describir la ventana en vez de afirmarla deja el `k/W` de sobra |
-| El método de cálculo no se explica en la interfaz | el bloque dice qué es cada cifra con sus etiquetas; una ayuda desplegable era un segundo texto que nadie abría |
-| Firma de autoría en el pie de todas las vistas, con enlace externo | un proyecto independiente se lee mejor firmado: refuerza la no afiliación en vez de dejarla enterrada en «Sobre los datos» |
-| El promedio del periodo es la media de las medias diarias con dato: cada día pesa una vez | ponderar por la población de cada día describiría otra cosa, y un hueco convertido en cero mentiría |
-| Sin tabla desplegable, sin cifra permanente en cada punto y sin frase que califique el precio | el bloque responde con datos y etiquetas mínimas; juzgar el precio es una recomendación de compra, y eso no se hace |
+Viven en `docs/SPEC-combustibles.md` §10. Reabrir cualquiera exige un hallazgo material
+medido, no una opinión.
 
 ## 13 · Cómo se cambia este documento
 
