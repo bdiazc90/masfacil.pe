@@ -2,49 +2,29 @@
 
 Conocimiento vigente medido principalmente el **14 de agosto de 2026**. Caracteriza fuentes oficiales y relaciones exactas; no demuestra el linaje técnico inmediato hacia cada pantalla de Facilito.
 
-## Evidencia conservada y reproducción
-
-El repositorio mantuvo durante un tiempo un directorio de evidencia con resultados agregados o sanitizados que sostenían las decisiones de cada corte. **Ese directorio ya no se conserva en el repositorio**; su contenido queda en el historial de Git. Ninguno de esos archivos contenía raw, RUC, razón social, dirección, overlay comercial privado, cachés, JSON público generado ni credenciales, y cada uno registraba, cuando aplicaba, fuente/fecha, observación, inferencia, confianza y el script que permitía reproducirla con inputs locales autorizados.
-
-Lo que aportaban está recogido como hecho medido en este documento:
-
-- perfiles y métricas agregadas de factibilidad del **14/08/2026**, incluido el corte de Lima provincia y el sondeo de J7; no probaban disponibilidad actual ni identidad comercial;
-- cobertura y políticas agregadas del piloto de identidad comercial y del subconjunto público; no contenían el golden set privado ni autorizaban reutilizar contenido de terceros;
-- resultado de detección y de refresco del **18/08/2026**, con hashes y decisiones operativas; no sustituían los raws locales;
-- una observación acotada del producto público de Facilito del **14/08/2026**; no probaba arquitectura, afiliación ni equivalencia.
-
-Ese conjunto agregado **ya no se produce**: el constructor privado que lo emitía se retiró junto con el dataset experimental y su schema, porque nada de lo que construía llegaba al público salvo dos campos temporales, que hoy viajan en el pointer del snapshot. Un snapshot nuevo no contiene dataset ni evidencia. Los scripts operativos siguen reproduciendo las transformaciones que sí se publican cuando existen los inputs autorizados en `.local-cache/`; un clon limpio no puede reconstruir un snapshot real.
+Las mediciones fechadas, embudos auditados, pilotos y contratos históricos que sostienen este documento viven en [docs/evidencia-datos.md](evidencia-datos.md); un clon limpio no puede reconstruir un snapshot real sin los inputs autorizados de `.local-cache/` ([detalle](evidencia-datos.md#evidencia-conservada-y-reproducción)).
 
 ## Fuentes de precio reproducidas
 
 Las fichas de los cuatro datasets declaran ODC-By. Los archivos y sus catálogos son recursos distintos.
 
-| Fuente | Filas | Alcance / corte material | Límite principal |
-| --- | ---: | --- | --- |
-| DMIN | 858 | 9 productos; fecha máx. 2026-08-13 | universo pequeño |
-| Serie diaria anonimizada | 497,156 | corte 2026-03-01 | sin identidad ni territorio |
-| GLP vigente | 522,380 | 6 productos; fecha máx. 2026-08-13 | mezcla unidades y actividades |
-| Líquidos vigentes | 1,319,922 | 29 productos; fecha máx. 2026-08-13 | contiene historia y extremos |
-
-Total perfilado: **2,340,316 filas**. Los extremos se conservan como anomalías; no se corrigen sin semántica. En GLP, `MARCA` aparece en 345,018/522,380 filas (66.047 %), pero su diccionario la define como producto o envasadora, no nombre comercial del establecimiento.
-
-Los CSV vigentes de GLP y líquidos estuvieron disponibles por HTTP 206. Los fallos 403 previos fueron del cliente, no un límite de la fuente. Una adquisición completa observada transfirió 1.56 GB. La fuente expone `ETag`, `Last-Modified` y `Accept-Ranges`; todavía no se demostró respuesta 304, API incremental ni SLA.
+- **Datasets:** DMIN, serie diaria anonimizada, GLP vigente y líquidos vigentes; el producto usa los dos últimos ([perfil del 14/08/2026](evidencia-datos.md#fuentes-de-precio-reproducidas--perfil-del-14082026)).
+- **Cadencia:** el CSV de líquidos ya es diario, y `FECHA_DE_REGISTRO` es por norma el inicio de vigencia del precio: la app puede decir «precio desde» esa fecha ([medición](evidencia-datos.md#cadencia-de-la-fuente-y-frescura--medido-el-2526082026)).
+- **Ventana de 30 días:** la regulación PRICE publica en Facilito hasta por 30 días y, por política conservadora, una fila raw más antigua no se muestra automáticamente ([EVPC](evidencia-datos.md#evidencia-externa-verificada-por-el-owner-evpc)).
+- **Consulta web de Facilito:** lee el mismo registro PRICE con horas de retraso y es una capa sobre el CSV, nunca un reemplazo: vale 24 horas, la tarjeta dice «Consultado hace X» y un reporte del CSV posterior a la consulta gana siempre. El teléfono no se emite, y la razón social y la dirección solo quedan como huella SHA-256 ([reglas y medición](evidencia-datos.md#consulta-web-de-facilito--medido-el-20092026)).
+- **PRICE y J7:** el enlace PRICE de Facilito no ofrece una interfaz estructurada y J7 sigue fuera del producto ([evidencia](evidencia-datos.md#price-y-j7)).
 
 ### Detección barata de cambios
 
 La URL canónica de `liquid-current` se comparte entre la adquisición y el probe (`app/source-catalog.mjs`). El detector (`app/validator-comparison.mjs` + `app/http-validator-probe.mjs`) compara ETag como valor opaco y Last-Modified sin descargar el cuerpo. Primero hace `HEAD` condicional; solo si el método no está soportado o una respuesta exitosa carece de validadores intenta `GET` con `Range: bytes=0-0` y cancela el cuerpo al recibir los headers. Un error HTTP definitivo no provoca una segunda petición. Ausencia, error, timeout o respuesta ambigua producen `unverifiable`, nunca `unchanged`.
 
-Ejecución real única del **18/08/2026** sobre el snapshot local del **14/08/2026**: `HEAD` HTTP 200, 0 bytes consumidos, ETag remoto `"{FE76AA7F-4385-420E-8CBD-64AD7572DE90},238` frente a local `...,234`, y Last-Modified remoto **18 ago. 12:28:58 GMT** frente a local **14 ago. 12:28:52 GMT**. Resultado `changed`. La evidencia sanitizada de esa corrida ya no se conserva en el repositorio y queda en el historial de Git; no se descargó ni promovió un snapshot.
-
-Conclusión aceptada: **B — viable con fallback seguro**. La detección de cambio es barata y reproducible; los tests probaron `unchanged` tanto por 304 como por HEAD 200 con validadores idénticos. Falta observar un ciclo real sin cambios para caracterizar cuál de esas respuestas usa la fuente.
+La primera ejecución real, el 18/08/2026, consumió 0 bytes, y la detección quedó aceptada como viable con fallback seguro ([evidencia](evidencia-datos.md#detección-barata-de-cambios--ejecución-real-del-18082026)).
 
 ### Refresco seguro y promoción atómica
 
 El refresco manual reproducible es `npm run refresh -- liquid-current`. Resuelve la fuente desde `app/source-catalog.mjs`, compara validadores, descarga solo si el estado es `changed`, escribe en un staging único, sella bytes y SHA-256, ejecuta el builder y sus contratos/joins, compara cobertura y excepciones contra el snapshot activo y solo entonces mueve el staging a `.local-cache/snapshots/<snapshot-id>/`. El pointer pequeño `.local-cache/snapshots/active.json` se actualiza con escritura + rename atómico; `npm run rollback -- <snapshot-id>` cambia únicamente ese pointer.
 
-El refresco correctivo real restauró primero `2026-08-14`, tomó ETag/Last-Modified del probe, encontró una adquisición local con esos validators exactos y verificó sus bytes y SHA-256 antes de reutilizarla. El raw tiene **1,078,782,427 bytes**, SHA-256 `9404f2910141efb2a4199ac446f547f43c5dad912958b33fdcc711ee5df18a55`; el CSV minimizado quedó con SHA-256 `231f3969613af4f357df0fc44c8e404089c9c5bf7d76792e8b0f114d25c3f89e`, **1,351,248 filas** y `source_max_reported_at=2026-08-18T04:59:36Z`. El snapshot promovido es `2026-08-18-20260819T003213952Z-7928-71e6ba`; su `source_last_modified_at` es `2026-08-18T12:28:58Z` y su `acquired_at` `2026-08-18T20:48:25.837Z`. La detección consumió 0 bytes y no hubo redescarga.
-
-El candidato produjo **740** ofertas frescas, **714** listas para contrato y **96.486 %** de cobertura, frente a **741**, **714** y **96.356 %**. Registro y GIS siguieron fijados al **14/08/2026**. En aquella corrida los 11 anchors del piloto Repsol se revalidaron y reanclaron al `dataset_id` nuevo. **Ese reanclaje ya no existe:** se retiró del código junto con el overlay privado, así que el refresco de hoy no arrastra ni reancla identidad alguna. Los dos candidatos supersedidos permanecen inactivos y no son elegibles para rollback. Una segunda ejecución fue `unchanged`, sin descarga ni promoción. La reutilización es genérica: si cambian los validators, el raw anterior no coincide y no se reutiliza.
+En el refresco correctivo del 18/08/2026 se fijó que un raw local solo se reutiliza si coinciden validators, bytes y SHA-256; el refresco de hoy no arrastra ni reancla identidad alguna ([evidencia](evidencia-datos.md#refresco-correctivo-del-18082026)).
 
 Más tarde la promoción se amplió al contrato público v2: el staging construye y valida **Regular y Premium** contra una misma revisión antes de mover el pointer privado. Los guardrails comprueban por producto ofertas frescas/publicables, distritos, cobertura y conflictos; también exigen que avance `source_max_reported_at`. El manifest público común se escribe después de sus dos snapshots inmutables. `npm run rollback -- <snapshot-id>` reconstruye y valida el mismo par antes de cambiar el pointer. La simulación de runner limpio verificó `changed` con 714 Regular y 700 Premium, y luego `unchanged` con un HEAD y 0 bytes de raw.
 
@@ -54,8 +34,6 @@ Más tarde la promoción se amplió al contrato público v2: el staging construy
 - **Diésel** tiene `active-diesel.json`.
 
 El refresco construye los dos grupos con **una sola** pasada por el raw y juzga cada uno con su línea base y sus tolerancias. La carpeta se promueve si la aprueba al menos un grupo, y solo se mueven los pointers de los que la aprobaron: un CSV que Gasolina rechaza puede publicarse en Diésel, y al revés. Un grupo que se queda atrás espera al próximo CSV, sin ponerse al día solo, para no deshacer un rollback. `npm run rollback -- <snapshot-id> [<revisión>] --group diesel` mueve solo el pointer de Diésel y escribe solo `web/data/diesel`; sin `--group` es el rollback de Gasolina de siempre.
-
-Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026**; no fueron refrescados ni se afirma lo contrario. Los originales y derivados grandes viven solo en `.local-cache/`; la evidencia agregada de ese refresco ya no se conserva en el repositorio y queda en el historial de Git.
 
 **Una fuente, un refresco (Fase 3A).** Desde GLP hay dos fuentes de precio (`pipeline/sources.mjs`), y cada una se refresca por su cuenta:
 
@@ -72,71 +50,17 @@ Registro y GIS se reutilizaron como inputs de referencia fijados al **14/08/2026
 - **Referencia de Registro y GIS:** antes de descargar, el refresco exige que traiga los códigos y las capas de todos los grupos de la fuente. Con la semilla v1, GLP se rechaza sin bajar nada.
 - **Recuperación:** el rollback, la adopción y la composición rechazan un snapshot de otra fuente antes de tocar un pointer.
 
-**Grupos que se preparan en privado.** Un grupo configurado en `pipeline/groups.mjs` sin vista en el catálogo público se adquiere y se juzga sin publicarse. Así se preparó GLP en la Fase 3A; desde la 3B no queda ninguno.
-- **Adquisición y juicio:** si pasa, el refresco mueve solo su pointer y el de su fuente.
-- **Qué escribe:** su juicio queda en `<grupo>-validation.json`, dentro del snapshot. Son solo conteos (estado, embudo, exclusiones y vínculos con la consulta web), y esa validación es su línea base en la corrida siguiente.
-- **Sin línea base:** se juzga contra su base auditada; sin ninguna de las dos no se promueve.
-- **Qué no toca:** nada suyo llega a `web/` ni cambia la decisión de publicar.
+**Grupos que se preparan en privado.** Un grupo sin vista en el catálogo público se adquiere y se juzga sin publicarse; hoy no queda ninguno ([detalle](evidencia-datos.md#grupos-que-se-preparan-en-privado-fase-3a)).
 
-**Semilla de Registro y GIS v2.** La semilla que viaja como secret (`BOOTSTRAP_SEED_B64`, entorno `pages-production`) suma los gasocentros a lo de siempre:
-- **Contenido:** Registro 01/02/05/06/15 y capas GIS 35/36, Lima/Lima. Son 774 filas de Registro (30 del código 15) y 831 de GIS (81 de la capa 36); el base64 ocupa 28,5 KB.
-- **Formato de las filas GIS:** cada una lleva su capa, `[layer, n, dep, prov, dist, lon, lat]`, y la clave es `(capa, N)`.
-- **Qué no cambia:** amplía y no refresca. Las tablas siguen siendo las del **14/08/2026**, y `node scripts/build-seed.mjs` exige que la v2, recortada a los filtros de la v1, sea la v1 byte a byte. Por eso Gasolina y Diésel no cambian al instalarla, y además cada grupo solo mira el Registro de sus propios códigos.
-- **Caché de Actions:** su clave lleva el hash del manifest. La segunda clave de respaldo (`snapshots-`) recupera la caché de la semilla anterior, que sigue valiendo porque la nueva solo amplía.
+**Grupos publicados.** Diésel, GLP y GNV tienen estado, guardrails y rollback (`--group`) propios; sin versión publicada, cada uno se juzga contra su embudo auditado del 24/09/2026 ([Diésel](evidencia-datos.md#grupo-diésel--embudo-auditado-el-24092026), [GLP](evidencia-datos.md#grupo-glp--embudo-auditado-el-24092026-publicado-desde-la-fase-3b), [GNV](evidencia-datos.md#grupo-gnv--embudo-auditado-el-24092026-publicado-desde-la-fase-4)).
 
-**Semilla v3 (Fase 4).** Suma la venta al público de GNV, **Registro 59**, que vive en la capa 36 (45 de 45 en Lima), con el mismo formato que la v2.
-- **Contenido:** 819 filas de Registro (45 del código 59) y las mismas 831 de GIS; el base64 ocupa 28,6 KB.
-- **Garantía:** recortada a los filtros de la v2, es la v2 byte a byte.
-- **Por qué es obligatoria:** desde GNV, el refresco de los líquidos exige el código 59 antes de descargar (`assertReferenceCovers`). Con el secret v2 se rechazaría la fuente entera.
-- **Cómo se cambia:** el secret se valida contra el manifest de su commit, así que el cambio de secret y el push van seguidos. Un cron del código anterior que corra en medio falla en `seed:install` sin desplegar nada.
-- **Si hay que volver atrás:** se revierte también el secret a la v2, que queda respaldada en `.local-cache/publish/*.v2`.
+**Semilla de Registro y GIS.** Viaja como secret (`BOOTSTRAP_SEED_B64`) con las tablas del 14/08/2026, ampliadas sin refrescar; la vigente, v3, suma el Registro 59 que el refresco de los líquidos exige antes de descargar, y el cambio de secret y el push van seguidos ([v2](evidencia-datos.md#semilla-de-registro-y-gis-v2-fase-3a), [v3](evidencia-datos.md#semilla-v3-fase-4)).
 
-**Poda de snapshots en CI.** Sin poda, cada CSV nuevo quedaba para siempre en la caché de Actions, que llegó a 10,95 GB en 28 entradas.
-- **Cuándo:** `scripts/publish.mjs` poda `.local-cache/snapshots/` después de preparar la entrega, solo en CI (`pipeline/snapshot-prune.mjs`).
-- **Por qué no bastan los pointers:** la poda corre en `prepare`, antes del deploy. Tras promover, los pointers ya apuntan al snapshot nuevo, y el que sirve producción sigue haciendo falta si el deploy falla. La fuente solo sirve el CSV vigente: lo borrado no vuelve sin descargar, y lo viejo no vuelve nunca.
-- **Qué protege, por cada grupo publicado:**
-  - su **producción**: el snapshot del estado que sirve, leído antes de escribir nada;
-  - un **destino de rollback**: el snapshot utilizable más nuevo anterior a su producción, de la misma fuente y con otro CSV. Una revisión nueva de Facilito o una reproyección del mismo CSV no cuentan como otro destino.
-  - "Utilizable" es lo mismo que exige el rollback: manifest válido, `minimized/` y original que resuelve.
-- **Qué más conserva:**
-  - por fuente, todo lo que va desde el destino de rollback hasta lo más nuevo, incluido lo que otra corrida esté desplegando;
-  - el destino de cada pointer (`active*.json`, `source-*.json`);
-  - el dueño real de cada original y el destino de cada symlink.
-- **Qué borra:** los snapshots que quedan debajo y `staging/`. De un grupo que todavía no se publicó solo se conserva el destino de sus pointers.
-- **Cuándo no borra nada:**
-  - hay un refresco en curso;
-  - no hay pointers, o uno es ilegible o apunta a una carpeta que falta o no sirve;
-  - la producción es desconocida, ilegible o incompleta;
-  - hay snapshots anteriores a producción, pero ninguno sirve de destino de rollback. Pasa, por ejemplo, si todos los anteriores de GLP traen el mismo CSV que su producción; la poda vuelve cuando producción avanza a otro CSV;
-  - hay un symlink colgante o que sale de la caché, o un original que no resuelve.
-- **Informe y local:**
-  - el resumen de CI dice qué protegió de cada grupo, qué borró y cuánto liberó. Una poda omitida sale como aviso con su motivo;
-  - en local no se poda nada, porque ahí los snapshots viejos son los que permiten revertir.
-
-## Evidencia externa verificada por el owner: EVPC
-
-`OWNER-VERIFIED / TRUSTED INPUT`, snapshot aproximado **12 de agosto de 2026**. Sus artefactos no viven en este repo y sus números no son permanentes.
-
-`Ultimos-Precios-Registrados-EVPC.xlsx` contenía **17,472 filas** y **5,685 `CODIGO_OSINERG` únicos**, aproximadamente establecimiento × producto × último precio. Frescura:
-
-- 330 dentro de una hora;
-- 9,540 (≈55 %) dentro de 24 horas;
-- 15,924 (≈91 %) dentro de 7 días;
-- 16,966 (≈97 %) dentro de 30 días;
-- 506 por encima de 30 días.
-
-La regulación PRICE aportada por el owner indica actualización cuando cambia el precio y publicación en Facilito hasta por 30 días. Por política conservadora, una fila raw más antigua no se muestra automáticamente.
+**Poda de snapshots en CI.** Conserva por grupo publicado su producción y un destino de rollback con otro CSV, no borra nada si hay un refresco en curso o algo no se puede comprobar, y en local no se poda ([detalle](evidencia-datos.md#poda-de-snapshots-en-ci-fase-3a)).
 
 ## Registro, GIS y geografía
 
 El snapshot minimizado del Registro contiene 17,742 autorizaciones de diez actividades. `REGISTRO` no siempre es fila-única; RUC identifica al titular, no a una sede, y no se conserva en derivados.
-
-Las capas GIS perfiladas suman 11,215 features:
-
-- capa 28: 117;
-- capa 34: 5,663;
-- capa 35: 5,284;
-- capa 36: 151.
 
 `N` es completo y único en las capas 34/35/36. La capa 31 no existe en el servicio observado. Las geometrías son válidas y están dentro de una caja conservadora de Perú. El servicio atribuye copyright a Osinergmin, pero no expone licencia explícita. Ese es un hecho de procedencia; el owner aprobó expresamente publicar las coordenadas GIS en el contrato público downstream. La atribución pública resultante es “Datos de precios y coordenadas: Osinergmin.”
 
@@ -150,14 +74,6 @@ Solapamientos exactos del snapshot, sin fuzzy matching:
 | GIS 28 `COD_OSINERGMIN` ↔ Registro actividad 20 | 109/117 (93.162 %) | uno-a-uno en matches |
 
 Son relaciones candidatas del snapshot: los no-matches y la multiplicidad impiden declararlas universales.
-
-La evidencia EVPC del owner verificó además:
-
-- `CODIGO_OSINERG` ↔ Registro: 5,659/5,685 (**99.54 %**);
-- `NRO_REGISTRO` ↔ GIS `N`: 5,279/5,685 (**92.86 %**);
-- geografía segura con bridges estrictos: 5,345/5,685 (**94.02 %**);
-- excluyendo 144 grifos flotantes y 101 rurales: 5,345/5,440 (**98.25 %**);
-- control Santiago de Surco: 28/28 con coordenada segura.
 
 El catálogo UBIGEO INEI contiene 1,891 distritos e IDs únicos, bajo ODbL. Las fuentes observadas usan territorio textual y no ofrecen un campo UBIGEO compatible para join directo.
 
@@ -185,31 +101,7 @@ coordenada oficial **selecciona candidatos**; lo que **confirma** el vínculo es
 número de puerta, el nombre de la vía, la razón social o una observación visual,
 más unicidad por margen frente al segundo candidato.
 
-Primera medición, 23/08/2026, sobre un barrido de 68 fichas en un radio de 3 km
-desde `-12.1326704,-77.0123699`. Se cruzaron las 5 fichas más cercanas al centro
-contra los 717 establecimientos del contrato vigente:
-
-| Ficha de Maps | Registro emparejado | Distancia | Corroboración independiente |
-| --- | --- | ---: | --- |
-| EDS Servicentro Germanico SAC | SERVICENTRO GERMANICO F.H. S.A.C. | 30 m | el nombre es la razón social |
-| Primax Alegría · Benavides 2116 | COESTI S.A. · AV. BENAVIDES N° 2116 | 15 m | número de puerta exacto |
-| Primax Granada · M. Castilla 905 | COESTI GRANADA · AV. MARISCAL CASTILLA N° 905 | 26 m | vía, número y la palabra «Granada» |
-| Gasolinera Repsol | REPSOL COMERCIAL S.A.C. | 22 m | la marca aparece en la razón social |
-| Primax El Cortijo gnv · Panamá 6901 | SERVICENTRO GERMANICO · PANAMA N° 6901-A | 18 m | número de puerta exacto |
-
-Las cinco resultaron únicas por margen: el segundo candidato quedó entre 370 m y
-753 m. **Ninguna se apoyó solo en la distancia.**
-
-La primera y la quinta apuntan al **mismo** Registro: Google mantiene dos fichas
-para una sola esquina (Panamá 6901 con Mariscal Castilla). Es un caso de
-**abanderamiento** observado con nombre propio —marca Primax sobre la razón
-social de un tercero— y confirma que la asignación debe ser bipartita: dos fichas
-no pueden reclamar un mismo `establishment_id`. También resuelve qué publicar: el
-conductor reconoce «Primax El Cortijo», no la razón social.
-
-Cinco casos en un distrito denso no son una tasa de precisión. Antes de publicar
-cualquier tier hace falta una muestra auditada por el owner, con cota inferior
-medida. Esa medición todavía no existe.
+La primera medición, del 23/08/2026, confirmó que la asignación debe ser bipartita; como cinco casos no son una tasa de precisión, publicar un tier exige una muestra auditada por el owner con cota inferior medida ([medición](evidencia-datos.md#google-maps-como-fuente-de-descubrimiento--primera-medición-del-23082026)).
 
 Procedencia: lo cosechado de Google vive solo en `.local-cache/` y no se
 commitea. Raspar Google Maps contraviene sus términos de servicio y Bruno asume
@@ -228,34 +120,9 @@ Según los dos ejes del método:
 
 Publicar un nombre convierte una tarjeta anónima —«SURQUILLO · S/ 16.89»— en una afirmación sobre un negocio identificable. El mismo error que antes solo confundía a quien conduce, después atribuye un precio al establecimiento equivocado. Por eso la identidad **sube** el estándar de exactitud de los campos que la acompañan.
 
-### Hard negatives medidos, que siguen vigentes
+Los hard negatives que midió el piloto del 17/08/2026 siguen vigentes —coordenada compartida, abanderamiento y dirección ambigua o compartida—, y la separación del piloto entre vínculo, permiso y frescura la sostiene hoy el catálogo sucesor ([hard negatives](evidencia-datos.md#hard-negatives-medidos-que-siguen-vigentes), [piloto](evidencia-datos.md#piloto-de-identidad-comercial--contrato-histórico)).
 
-El piloto midió modos de fallo reales; no son cautela abstracta:
-
-- **coordenada compartida:** dos establecimientos con razón social distinta —COESTI y Repsol— sobre la misma coordenada exacta. Una coordenada no puede ser anchor de identidad por sí sola;
-- **abanderamiento:** una marca operando sobre la razón social de un tercero. Se excluyó correctamente como conflicto, no como verificado;
-- **dirección normalizada ambigua o compartida** entre candidatos.
-
-### Piloto de identidad comercial — contrato histórico
-
-Trabajo realizado y verificado el **17 de agosto de 2026**. Estos hechos no se reescriben.
-
-Un golden set privado, construido por un research scout independiente, vinculó identidad comercial fuera de las fuentes bulk oficiales:
-
-- universo predefinido de 64 ofertas (Surco + 3 distritos aledaños) del dataset privado de Lima provincia;
-- 14 candidatos con razón social corporativa Repsol exacta; 11 vinculados por dirección normalizada exacta a una fuente first-party (PDF "Relación de Estaciones – Repsol You"), 3 sin contraparte (unmatched, no forzado);
-- 0 vínculos Primax: no se encontró directorio first-party con nombre de sede accesible sin evadir controles ni renderizar JS;
-- método en dos pasos deterministas, sin fuzzy matching: igualdad exacta de razón social corporativa, luego dirección normalizada exacta con candidato único;
-- fuente con antigüedad declarada (~4 años, Last-Modified 2022-11-02): las 11 entradas quedaron `identity_freshness=stale`, sin inferir vigencia desde esa fecha;
-- permiso de publicación de las 11 identidades: `unknown`. No hay licencia ni prohibición explícita en la fuente; un robots.txt permisivo autoriza rastreo, no reutilización de contenido.
-
-Aquel overlay separaba siempre exactitud del vínculo (`verification_status`) de permiso de publicación (`publication_status`) y de frescura (`identity_freshness`), y nunca derivaba frescura desde la fecha de acceso o de modificación de la fuente. **Esa separación se conserva** y hoy la sostiene el catálogo sucesor. El overlay vivió únicamente en una carpeta privada de `.local-cache/`, con permisos `0600` e ignorada por Git; esa carpeta ya no existe y el repositorio tampoco conserva el schema ni la evidencia agregada de ese piloto, que quedan en el historial de Git.
-
-**Límite del contrato histórico.** El schema del overlay describía ese piloto y se conservó sin modificar mientras existió. Su forma solo admitía el método que el piloto usó: `discovery_method` estaba congelado en `normalized_address_exact`, `integration_method` en `official_anchor_exact`, y `source.url` exigía patrón `^https://` incluso cuando `source.kind` era `owner_verified`. Una verificación presencial del owner no tiene URL y, por lo tanto, **no era representable** en ese contrato. El bloqueo de identidad no fue solo una decisión de criterio: quedó codificado en el artefacto. Ese schema nunca se mutó para simular lo contrario; en su lugar se escribió un contrato sucesor capaz de representar evidencia observada sin URL obligatoria, y el histórico ya no se conserva en el repositorio.
-
-**Límite de la política de publicación.** Existió un módulo de matriz de publicación campo por campo, que trataba `unknown` como campo suprimible. Bajo el método vigente `unknown` es una cola accionable y no un veredicto terminal, así que esa matriz requería migración. Hoy ese módulo ya no se conserva en el repositorio y su función quedó repartida en dos artefactos vivos: la **allowlist cerrada** del contrato público (`PUBLIC_OFFER_FIELDS` en `pipeline/gasolina-contract.mjs`), que rechaza cualquier campo fuera del conjunto exacto, y el **contrato de catálogo** (`app/commercial-catalog.mjs`), donde `publication.status` distingue `publishable`, `pending` y `not_publishable`. El registro del permiso campo por campo no está codificado en ningún artefacto ejecutable: es esta tabla.
-
-#### Permiso de publicación campo por campo
+### Permiso de publicación campo por campo
 
 El permiso no es uniforme: se evalúa campo por campo, contra la licencia real de su fuente.
 
@@ -267,6 +134,8 @@ El permiso no es uniforme: se evalúa campo por campo, contra la licencia real d
 | Dirección de la vía | publicable | admitida por el contrato público vigente, acotada a texto corto para la tarjeta |
 | Razón social, RUC, representante | no se publica | la declaración ODC-By observada describe los datasets de precio, no columnas de identidad legal; además una razón social no es una marca |
 | Identidad comercial (`brand`, `public_site_name`) | gobernada por el catálogo | entrada por entrada, con evidencia privada, vínculo exacto y fecha de verificación |
+
+Esta tabla es el registro del permiso campo por campo; en código lo hacen cumplir la allowlist cerrada `PUBLIC_OFFER_FIELDS` (`pipeline/gasolina-contract.mjs`) y `publication.status` (`app/commercial-catalog.mjs`), y `unknown` es una cola accionable ([antecedente](evidencia-datos.md#piloto-de-identidad-comercial--contrato-histórico)).
 
 **`no se publica` no es un veredicto terminal para todo:** es la decisión vigente mientras el catálogo cubra mejor la necesidad. El precedente es la coordenada, que estuvo sin decisión y salió por una decisión explícita del owner con procedencia y atribución conservadas. Ese es el circuito previsto, no una excepción.
 
@@ -306,23 +175,7 @@ El contrato sucesor puede registrar evidencia `owner_verified`, `first_party`, `
 
 La clave del catálogo es la **entidad oficial**, no la oferta. El anchor ya existe en el pipeline: `establishment_id` se deriva exclusivamente del código de Registro (`app/official-anchor.mjs`, `officialAnchorFromRegistration`, usado por `pipeline/gasolina-products.mjs`), de modo que un establecimiento con varios productos es una sola entrada.
 
-Medición sobre los snapshots privados autorizados, contando entidades y no ofertas:
-
-| Medida | Valor |
-| --- | ---: |
-| Establecimientos distintos en el contrato Regular (14/08/2026) | 714 |
-| Establecimientos distintos en el contrato Regular (18/08/2026) | 714 |
-| Altas de código entre ambos cortes | 0 |
-| Bajas de código entre ambos cortes | 0 |
-| Precios que cambiaron entre ambos cortes | 239/714 (33.5 %) |
-
-En Gasohol Regular la relación oferta↔establecimiento fue 1:1 en ambos cortes. **714 no es el tamaño del universo del catálogo:** es el conteo de un producto en un ámbito. El universo real es la unión de códigos con oferta contractual en todos los productos publicados; con Regular en 714 y Premium en 700 entradas, esa unión está acotada entre 714 y 1,414. Esa medición sí se completó después y se reporta más abajo: unión de **717** y solapamiento de **697**.
-
-### La estabilidad observada es un límite inferior
-
-Las cifras anteriores tienen un límite material que debe declararse: entre esos dos cortes, razón social, dirección y coordenada fueron **idénticas por construcción**, no por estabilidad observada. El refresco actualiza el CSV de precios y reutiliza Registro y GIS fijados al 14/08/2026. Además, un establecimiento nuevo en el CSV de precios sin autorización en ese Registro congelado se **excluye** (17 exclusiones) en lugar de contarse como alta.
-
-Consecuencia directa: hoy **no existe señal alguna de cambio a nivel de entidad**. La rotación medida de 0 altas y 0 bajas es un piso, no una medición del mundo.
+El universo es la unión de códigos con oferta contractual en todos los productos publicados y se cuenta en cada corrida; con Registro y GIS fijados al 14/08/2026 no hay señal de cambio a nivel de entidad, así que 0 altas y 0 bajas son un piso ([medición](evidencia-datos.md#catálogo-canónico-de-entidades--cortes-del-1408-y-el-18082026)).
 
 ### Invalidación barata
 
@@ -344,256 +197,7 @@ Una revisión manual ocasional es una red de seguridad, no garantía de vigencia
 
 Cada fila de auditoría conserva el SHA-256 de la representación canónica de la entrada completa. Si cambia identidad, fuente, vínculo, frescura o publicación, la auditoría pasa a `pending`; si no hay entradas publicables, informa `not_required`. El seam privado de candidatos existió como módulo aparte y separaba `commercial_identity_claim` de `legal_entity_claim`; ese módulo ya no se conserva en el repositorio, pero la regla que imponía sigue vigente dentro del catálogo, cuyo `entity_link.status` distingue `verified`, `pending` y `conflict`: una razón social y un Registro exacto pueden seguir como candidato o conflicto, pero **no se convierten en marca**. Solo identidad comercial explícita, anchor derivado exactamente del Registro, evidencia comercial específica y revisión permiten `verified`, y solo una entrada `verified` puede llegar a `publishable`. Ningún candidato se proyecta por esa vía.
 
-La medición se hizo con el raw privado del runner limpio y el seed autorizado de Registro/GIS. El resultado sanitizado midió 714 establecimientos Regular, 700 Premium, una unión de **717** y solapamiento de **697**; ese archivo agregado ya no se conserva en el repositorio y queda en el historial de Git. La unión de **717** y el solapamiento de **697** describen ese corte, no el universo de hoy: el conteo vigente sale del propio cruce en cada corrida. Las tres waves públicas no encontraron un puente comercial válido; la cobertura actual se construyó después, con la fuente de identidad autorizada el 23/08/2026.
-
-Los 11 vínculos Repsol del piloto siguen siendo antecedentes privados con fuente stale y permiso de publicación `unknown`; no se trasladan silenciosamente al sucesor. Además **ya no son recuperables desde el repositorio**: el overlay se eliminó y el `establishment_id` cambió de derivación, de modo que sus anchors antiguos no corresponden a los actuales. Para incorporarlos o añadir cualquier identidad hace falta revalidación autorizada que complete el expediente nuevo y un `publication_status=publishable`. La cobertura por distrito puede usarse como diagnóstico si aparece un sesgo material, pero no es una puerta para publicar la primera cobertura parcial con fallback.
-
-## PRICE y J7
-
-El enlace PRICE visible en Facilito redirige a una biblioteca documental. En la página observada había 1,337 enlaces a PDF/XLS/XLSX/ZIP, pero cero CSV y cero rutas `Reporte-Diario`. Esto no contradice que el archivo EVPC sea material para precios retail; indica que ese enlace concreto no ofrece una interfaz estructurada visible.
-
-J7 permanece fuera del producto: no se reprodujo una fuente nominal que explique distribuidor, marca, fecha y rangos de sus 444 filas públicas. La capa GIS 31 que se suponía asociada tampoco existe.
-
-## Cadencia de la fuente y frescura — medido el 25–26/08/2026
-
-**Actualización del 25/09/2026: el CSV de líquidos ya es diario.** Del 21 al 25/09/2026 el primer cron de cada día posterior a las ~12:30 GMT promovió un CSV nuevo, y los demás salieron `unchanged` (`Last-Modified` del 24/09: 12:31:26 GMT; del 25/09: 12:31:37 GMT). Antes de eso ya se habían visto archivos fuera del martes: domingo 06/09 y jueves 24/09. El de GLP del 24/09 lleva 12:28:56 GMT. Lo que sigue es la medición de agosto, cuando la fuente era semanal.
-
-**En agosto la fuente era semanal.** `CL-Registro-precios-DMA-V-CCA-CCE.csv` cambió de `Last-Modified` **mar. 18 ago 12:28:58 GMT** a **mar. 25 ago 12:29:26 GMT** (ETag `,238` → `,245`), y las cuatro sondas HEAD del lunes 24 devolvieron `unchanged`. El archivo del martes contiene registros hasta el lunes 23:59 Lima (`source_max_reported_at` 2026-08-25T04:54:33Z). Un precio cambiado un miércoles aparece el martes siguiente: hasta 6 días de retraso, que ningún cron nuestro puede acortar. La carpeta se llama `Reporte-Diario`, pero se publica semanalmente. Distribución en el bundle del 25/08: 522 de 715 grifos registraron el lunes 24 (ajuste semanal de las cadenas), 43 el 25, 128 entre 3 y 6 días, 14 con más de una semana.
-
-**Qué es `FECHA_DE_REGISTRO`.** Por RCD 050-2017-OS/CD (leída del PDF firmado, art. 1 que modifica el art. 2 del Anexo A del procedimiento PRICE de 2005) el registro «debe ser actualizado inmediatamente después de los cambios efectuados en la lista de precios» del establecimiento, y «los precios registrados en el PRICE deben ser iguales a los que son publicados en su establecimiento». El procedimiento vigente, RCD 256-2021-OS/CD (deroga la 394-2005; modificada por RCD 051-2023-OS/CD, que añade alertas de cumplimiento), conserva la regla en su art. 3: el registro se actualiza inmediatamente cuando el precio se modifica. Conclusión: la fecha de registro es, por norma, el **inicio de vigencia** del precio en el surtidor. La app puede decir «precio desde el <fecha>»; lo que no puede afirmar es cuánto tardó el archivo semanal en recogerlo.
-
-**Fuentes evaluadas para una frescura ≤ 24 h** (cuatro agentes de lectura pública, 26/08; ninguna sonda escribió ni saltó controles):
-
-| Canal | Frescura | Automatizable | Motivo |
-|---|---|---|---|
-| CSV semanal de `Reporte-Diario` (actual) | martes; hasta 6 días | sí | única fuente oficial nominal por establecimiento |
-| `CL-Registro-precios-DMIN.csv` (misma carpeta) | mismo sello semanal | sí | distribuidores minoristas, no grifos |
-| Otras rutas de `SCOP-DOCS` | — | — | variantes probadas 404; el listado SharePoint exige autenticación |
-| Facilito web | horas (lee PRICE) | sí, medido el 10 y el 20/09/2026 | formulario Struts con reCAPTCHA v3; un navegador normal lo atraviesa sin resolver ningún desafío |
-| Facilito app | horas | no | sin API pública; no se decompila |
-| PRICE/SCOP (`pvo.osinergmin.gob.pe`) | inmediato | no | credenciales de operador |
-| datosabiertos.gob.pe «Lista de precios diaria» | mensual | sí | anonimizado: sin establecimiento |
-| Precios de referencia PR1/PR2 | semanal | condicional | promedios nacionales, no por grifo |
-| ArcGIS de Osinergmin | — | — | `gis.osinergmin.gob.pe` no resuelve; `gisem` 404 |
-
-**Decisión de agosto, ya superada en parte.** Se mantuvo el CSV semanal como única fuente y la app declaraba su cadencia. La fila de Facilito decía «no automatizable»; el piloto del 10/09/2026 y el barrido del 20/09/2026 lo desmintieron, y desde entonces la consulta web es una **capa sobre** el CSV, nunca un reemplazo. Siguen abiertos los dos caminos no técnicos: pedir a Osinergmin la publicación diaria del reporte o un acceso al módulo PRICE, y los aportes de quien usa la app junto al precio oficial, nunca en su lugar (backlog en [roadmap.md](roadmap.md)).
-
-## Consulta web de Facilito — medido el 20/09/2026
-
-**Qué es.** El buscador público de Facilito lee el mismo registro PRICE que alimenta el CSV, pero con horas de retraso en vez de días. Se conduce con un navegador normal sobre sus selectores públicos —departamento, provincia, distrito, producto— y se lee la tabla que DataTables ya cargó en el cliente, contrastando las filas contra el total que la propia tabla anuncia. No se llaman endpoints, no se reutiliza el token de reCAPTCHA, no se resuelve ningún desafío y no se usan proxies.
-
-**Barrido completo medido.** 43 distritos de Lima provincia × 2 productos = **86 unidades, 86 comprobadas, 1452 filas, en 109 segundos**. La unidad de aceptación es distrito × producto: una tabla parcial o de forma desconocida tumba esa unidad y no las demás. Un rechazo explícito —401/403/429 o un desafío— detiene la adquisición entera en vez de seguir probando distritos.
-
-**Diésel: capturado desde el 24/09/2026, publicado desde la Fase 2B.** El select de producto ofrece `126` Gasohol Regular, `127` Gasohol Premium y `40` «DB5 S-50 UV»; nada de GLP ni GNV en este formulario. Los códigos se fijan y en cada lectura se comprueba que la opción elegida muestre su etiqueta: la tabla no tiene columna de producto y su cabecera es la misma para todos, así que es la única prueba de qué se leyó. Diésel se recorre en una **pasada propia**, después de la de Gasolina —que no cambia— y con su propio presupuesto (10 min): un problema de su tabla no le cuesta a Gasolina ningún distrito, y un bloqueo detiene las dos. Primera lectura local: San Luis y Ate, 2 de 2 unidades, 66 filas, unos 5 s por distrito. «DB5 S-50 UV» no es el nombre del CSV (`Diesel B5 S-50 UV`): que sean el mismo producto lo acreditó la muestra de vínculos antes de publicar Diésel, no el parecido.
-
-La muestra del 24/09/2026 se tomó en seis distritos con el CSV que publicaba Gasolina:
-- **184 filas vinculadas** de 192, **cero ambigüedades** y 8 sin par oficial.
-- En **172 de las 184** el precio de la consulta y el del CSV coinciden al céntimo; la mediana y el percentil 90 de la diferencia son 0. Con reporte del CSV de 72 horas o menos coinciden 158 de 167.
-- Una sonda independiente revisó 20 establecimientos: 18 correctos, 2 dudosos y ninguno incorrecto. Los dudosos tienen el vínculo exacto; lo raro es una subida de precio grande en unas 24 horas.
-- Dos de las filas sin par usan comillas tipográficas en la dirección, que la normalización no iguala. Eso resta cobertura, pero no produce vínculos falsos. El expediente es uno, pero cada grupo cuenta solo sus unidades: el `refresh-state` de Gasolina no lleva consultas de Diésel y el preflight no las compara como suyas. El resumen de cada corrida sale por producto y por pasada; `--products` limita una corrida de comprobación.
-
-**Qué NO entrega.** La tabla no publica el número de Registro ni la fecha en que el operador registró el precio. Por eso el vínculo con el establecimiento oficial es textual —razón social + dirección + distrito exactos y únicos en ambos sentidos, normalizando solo mayúsculas, tildes y espacios— y por eso la capa lleva `reported_at: null` y la tarjeta dice **«Consultado hace X»**, nunca «Reportado». Medido sobre el snapshot del 06/09: **684 de 726 ofertas Regular y 673 de 711 Premium** quedaron vinculadas, con **cero ambigüedades** y 95 filas sin par oficial.
-
-**Cuánto vale una consulta.** 24 horas desde que se leyó la tabla. Después manda el respaldo del CSV mientras su reporte tenga 30 días o menos, y si tampoco, la tarjeta se queda sin precio. Un reporte del CSV posterior a la consulta gana siempre: una consulta anterior no desplaza un cambio de precio más nuevo que sí conocemos. Un fallo de consulta no rejuvenece nada —la captura anterior conserva su hora— y no se presenta nunca como silencio del operador.
-
-**Privacidad.** La tabla trae razón social, dirección y teléfono. El teléfono se valida por posición y no se emite nunca; la razón social y la dirección se convierten en huella SHA-256 para comparar y no se persisten. El expediente privado (`.local-cache/facilito/`) guarda huella, precio y hora, nada más. Solo `node scripts/facilito-sample.mjs`, local y explícito, conserva el texto para revisar una muestra a ojo.
-
-## Grupo Diésel — embudo auditado el 24/09/2026
-
-Diésel es un grupo propio de un producto:
-- producto `Diesel B5 S-50 UV` en `Galones`, con el nombre exacto del CSV;
-- datos en `/data/diesel/`, contrato 1.0.0, revisiones `diesel-` e IDs `d1_`;
-- su estado, sus guardrails y su rollback no dependen de Gasolina.
-
-Las otras variedades con nombre parecido se cuentan y no se unen. En filas de Lima, con la unidad de cada una:
-
-| Variedad | Filas |
-| --- | ---: |
-| `Diesel B5 S-50` | 294 |
-| `Diesel 2 S-50 UV` | 241 |
-| `DIESEL B5` | 17 |
-| `DIESEL B5 UV` | 15 |
-| `Diesel 2 S-50` | 1 |
-
-**Actividades, con evidencia del CSV.** Establecimientos de Lima que reportan el producto:
-
-| Actividad | Establecimientos | Se usa |
-| --- | ---: | --- |
-| Estación de servicios / grifos | 341 | sí |
-| Con gasocentro de GLP | 264 | sí |
-| Con GLP y GNV | 218 | sí |
-| Con GNV | 30 | sí |
-| Distribuidor mayorista de combustibles líquidos | 8 | no: vende al por mayor |
-
-Las cuatro actividades usadas coinciden con las de la semilla de Registro y GIS, así que Diésel no la tocó. La semilla v2 de la Fase 3A las conserva byte a byte.
-
-**Embudo sobre el CSV del 24/09/2026.** Validadores `…,275` y `Thu, 24 Sep 2026 12:31:26 GMT`, el mismo CSV que publicaba Gasolina:
-
-| Paso | Ofertas | Distritos |
-| --- | ---: | ---: |
-| Último reporte por clave en Lima | 853 | 43 |
-| Reportadas en ≤30 días | 752 | 43 |
-| Con Registro único | 723 | 43 |
-| Con GIS seguro | 714 | 43 |
-| Listas para contrato | 714 | 43 |
-| Publicadas (con precio + 18 sin precio vigente) | 732 | 43 |
-
-- **Cobertura:** 94.947 %.
-- **Conflictos:** ninguno, ni de precio ni de territorio.
-- **Ambigüedades y repetidos:** ninguno, ni en Registro, ni en GIS, ni en el raw.
-- **Motivos de pérdida** sobre los 853 últimos reportes: 714 publicadas, 18 publicadas sin precio vigente, 112 no cruzan el Registro (29 frescas y 83 vencidas) y 9 sin GIS único.
-- **Por distrito:** cinco distritos tienen un solo grifo con precio; el que más tiene, 60. El detalle por distrito queda en `.local-cache/publish/diesel/funnel.json` en cada composición.
-
-**Guardrails.**
-- **Tolerancias:** las mismas que Gasolina. Las ofertas frescas no pueden caer más de 20 % y la cobertura no puede caer más de 5 puntos frente a la versión publicada.
-- **Primera activación:** sin versión publicada, Diésel se juzga contra la base auditada de arriba (`pipeline/groups.mjs`) con esas mismas tolerancias. Además no puede perder más de 2 de sus 43 distritos publicados, porque cinco tienen un solo grifo, y su fuente no puede ser anterior a la auditada; igual no hace falta que avance.
-
-**Primera activación y recuperación.**
-- **Cuándo cuenta como no publicado:** solo cuando producción responde 404 a la vez en su manifest y en `/combustibles/diesel`. Cualquier otra ausencia es un despliegue roto y detiene la corrida; lo mismo aplican `fetch:live` y el preflight.
-- **Cómo se activa:** sin pointer propio, Diésel se compone sobre el snapshot de Gasolina y solo lo adopta si pasa.
-- **Si la primera versión no pasa:** la entrega entera termina en `fail_closed`. El código ya activó la vista y publicarla sin datos sería peor.
-- **Después:** un fallo de Diésel conserva su versión publicada y deja publicar Gasolina, y al revés.
-- **Recuperar la entrega de código:** `git revert` y redeploy por el workflow.
-
-## Grupo GLP — embudo auditado el 24/09/2026 (publicado desde la Fase 3B)
-
-GLP automotor es un grupo propio de un producto, con su propia fuente:
-- producto `GLP - G` en `Galones` para «Usuario Final», del CSV `glp-current`;
-- IDs `glp1_`, revisiones `glp-` y contrato 1.0.0 con la forma de oferta de Gasolina 2.7.0;
-- vista `/combustibles/glp` y datos en `/data/glp` desde la Fase 3B. Se preparó en privado en la 3A.
-
-**Actividades, con evidencia del CSV.** Son las que venden GLP a granel a vehículos. En Lima, esas cuatro actividades reportan `GLP - G` solo en galones y solo para «Usuario Final»:
-
-| Actividad | Establecimientos en Lima | Registro | Capa GIS |
-| --- | ---: | --- | --- |
-| Estación de servicio con gasocentro de GLP | 257 | 02 | 35 |
-| EE.SS con GLP y GNV | 216 | 06 | 35 |
-| Gasocentros de GLP | 23 | 15 | 36 |
-| Gasocentro de GLP con venta al público de GNV | 14 | 15 | 36 |
-
-- **Qué queda fuera:** las plantas envasadoras también reportan `GLP - G` en galones, pero a «Agentes con RHO», y además en kilogramos. Los cilindros son otros productos (`Cilindros de 10 Kg de GLP`…). Nada de eso entra.
-- **Gasocentros:** las dos etiquetas del código 15 son el mismo establecimiento para el Registro, así que la clave del último reporte usa el código y no la etiqueta. Un gasocentro se ubica en la capa 36; su N en la capa 35 no cuenta.
-- **`MARCA`:** es la envasadora, no el grifo, y aparece solo en filas de cilindros. El minimizado la quita junto con RUC, razón social y dirección.
-
-**Embudo sobre el CSV del 24/09/2026.** Validadores `…,278` y `Thu, 24 Sep 2026 12:28:56 GMT`, contra la semilla v2:
-
-| Paso | Ofertas | Distritos |
-| --- | ---: | ---: |
-| Último reporte por clave en Lima | 510 | 41 |
-| Reportadas en ≤30 días | 449 | 41 |
-| Con Registro único | 421 | 41 |
-| Con GIS seguro | 415 | 41 |
-| Listas para contrato | 415 | 41 |
-| Publicables (con precio + 10 sin precio vigente) | 425 | 41 |
-
-- **Cobertura:** 92.428 %.
-- **Conflictos:** ninguno, ni de precio ni de territorio. Tampoco hay ambigüedades ni repetidos.
-- **Motivos de pérdida** sobre los 510 últimos reportes:
-  - 415 publicables y 10 publicables sin precio vigente;
-  - 79 no están en el Registro del 14/08 (36 del código 02, 36 del 06 y 7 del 15): es la pérdida declarada de no refrescar el Registro;
-  - 6 sin punto GIS.
-- **Por distrito:** los 41 distritos tienen al menos un gasocentro ubicado, y cinco tienen uno solo.
-
-**Guardrails.** Las mismas tolerancias que Gasolina y Diésel, frente a su versión publicada (`web/data/glp/refresh-state.json`). Sin versión publicada, GLP se juzga contra esta base auditada y no puede perder más de 2 de sus 41 distritos.
-
-**Primera activación y recuperación.**
-- **Cuándo cuenta como no publicado:** solo cuando producción responde 404 a la vez en su manifest y en `/combustibles/glp`, como Diésel.
-- **Sobre qué se activa:**
-  - sobre `active-glp.json`, el pointer que dejó su preparación en privado;
-  - sin él, sobre `source-glp-current.json`, que además adopta si pasa;
-  - nunca sobre un snapshot de los líquidos. Sin ninguno de los dos utilizable, la entrega termina en `fail_closed` sin publicar ni adoptar nada.
-- **Juicio:** la primera versión pública se juzga siempre contra esta base auditada, también sobre `active-glp.json`. Su cadena privada solo se comparó con su versión anterior.
-- **Hasta la primera publicación:** la sonda compara con los validadores de `source-glp-current.json`. Si el CSV no cambió, sale `unchanged` sin descargar; un CSV nuevo se juzga contra esta base, no contra la cadena privada.
-- **Si la primera versión no pasa:** la entrega entera termina en `fail_closed`, como en Diésel. Mientras tanto Gasolina y Diésel tampoco se actualizan, así que un fallo de activación se revierte el mismo día.
-- **Después:** un fallo de GLP conserva su versión publicada y deja publicar Gasolina y Diésel, y al revés.
-- **Recuperar un grupo:** `npm run rollback -- <snapshot> [<revisión>] --group glp` no toca los demás.
-- **Recuperar la entrega de código:**
-  1. primero el push del `git revert`: las corridas de 3B que sigan en vuelo abortan en el preflight por código desactualizado;
-  2. cancelar las corridas en curso;
-  3. el rollback de Pages queda solo como parche. Si fuera primero, una corrida de 3B vería GLP en 404, lo tomaría por no publicado y lo volvería a activar.
-
-**Consulta web de GLP.** GLP no está en la página automotora de Facilito, sino en la suya, «Gas Licuado de Petróleo Automotor» (`buscadorAGranelGLP.jsp`). La sonda acotada del 25/09/2026 midió:
-- **Cascada:** Lima / Lima / distrito, con los mismos códigos que la página automotora.
-- **Producto:** un único producto ya elegido, `49` «GLP - Granel».
-- **Tabla:** `#tblPreciosAGranelGlp`, con seis columnas. La sexta, «Unidad de Medida», dice «Galones».
-- **Muestra:** San Miguel 9 filas y Surquillo 6, cada una con su total anunciado cuadrado, y precios de S/ 7,29 a 7,89.
-- **Costo:** 10 navegaciones y ningún bloqueo; un solo corte intermitente, que se reintentó.
-
-GLP se lee en una tercera pasada, la última, con 10 min de presupuesto. No se toca el select de producto y se exige «Galones» en cada fila. Sus unidades guardan su página y entran solo en el estado que publica GLP, no en el de Gasolina ni en el de Diésel.
-
-**Vínculo de GLP acreditado el 26/09/2026, antes de publicar la capa.** El método es el de Diésel: razón social + dirección + distrito exactos y únicos. Se probó contra el CSV de GLP del 25/09 y una pasada local completa.
-- **Población (43 distritos):** 390 filas vinculadas, 0 ambiguas y 36 sin par.
-- **Muestra (`scripts/facilito-sample.mjs --group glp`):** ocho distritos elegidos para cubrir estaciones con gasocentro (02/06), gasocentros puros (15) y establecimientos que también reportan GLP en kg o cilindros: La Victoria, Villa El Salvador, Comas, Ate, San Martín de Porres, Lurigancho, Puente Piedra y La Molina.
-  - 159 filas vinculadas, 0 ambiguas y 16 sin par. De las vinculadas, 14 son del código 15 y 41 tienen variantes.
-  - Las 16 sin par: 12 son gasocentros vigentes que no se publican (fuera del Registro del 14/08 o sin punto GIS); 4 tienen la misma razón social en el distrito con otra dirección, y el vínculo exacto no los empareja.
-- **Precios:** 141 de 159 coinciden al céntimo y 153 difieren 10 céntimos o menos. Mediana 0, percentil 90 de 0,05 y máximo de 0,50 (un reporte del CSV del 19/08, ya vencido).
-- **Revisión a ojo:** 24 establecimientos, 10 del código 15 y 11 con variantes.
-  - Todos son el mismo establecimiento que la dirección oficial.
-  - El precio está en soles por galón.
-  - Las diferencias se explican por la fecha del reporte.
-  - Los cilindros de 10 kg (S/ 37 a 62,5) no se confunden con el precio por galón.
-
-## Grupo GNV — embudo auditado el 24/09/2026 (publicado desde la Fase 4)
-
-GNV es un grupo propio de un producto que sale de los líquidos, con sus propias actividades:
-- producto `GAS NATURAL VEHICULAR COMPRIMIDO` en `Metros Cúbicos`;
-- IDs `gnv1_`, revisiones `gnv-` y contrato 1.0.0;
-- vista `/combustibles/gnv` con «por m³». Su precio nunca se compara con uno por galón.
-
-**Actividades, con evidencia del CSV:**
-
-| Actividad | Establecimientos vigentes en Lima | Registro | Capa GIS |
-| --- | ---: | --- | --- |
-| EE.SS con GLP y GNV | 189 | 06 | 35 |
-| EE.SS con GNV | 27 | 05 | 35 |
-| Gasocentro de GLP con venta al público de GNV | 13 | 15 | 36 |
-| Establecimiento de venta al público de GNV | 9 | 59 | 36 |
-
-- **Qué queda fuera:**
-  - el licuefactado, que se vende por kilo y es otro registro;
-  - el comprimido reportado en galones, que se cuenta como otra unidad;
-  - la «Estación de carga de GNC», que no vende al público.
-- **Precios vigentes:** de S/ 1,50 a 2,29 por m³, mediana 1,77.
-
-**Embudo sobre el CSV del 24/09/2026.** Validadores `…,275` y `Thu, 24 Sep 2026 12:31:26 GMT`, contra la semilla v3:
-
-| Paso | Ofertas | Distritos |
-| --- | ---: | ---: |
-| Último reporte por clave en Lima | 296 | 36 |
-| Reportadas en ≤30 días | 238 | 36 |
-| Con Registro único | 216 | 36 |
-| Con GIS seguro | 212 | 36 |
-| Publicables (con precio + 32 sin precio vigente) | 244 | 36 |
-
-- **Cobertura:** 89,076 %, sin conflictos.
-- **Pérdidas:** 48 no están en el Registro del 14/08 y 4 no tienen punto GIS.
-- **Por distrito:** son 36 distritos, y en siete hay una sola estación.
-- **Identidad:** 178 de 244 tienen nombre. Los códigos 15 y 59 salen neutrales.
-
-**Guardrails.** Las mismas tolerancias que los demás. Sin versión publicada, GNV se juzga contra esta base auditada y no puede perder más de 2 de sus 36 distritos.
-
-**Primera activación y recuperación:**
-- **Base:** se compone con los líquidos, sobre el snapshot de Gasolina, como Diésel, y adopta ese snapshot solo si pasa.
-- **Si no pasa:** la entrega entera termina en `fail_closed`.
-- **Después:** un fallo de GNV conserva su versión publicada y deja publicar a los demás, y al revés.
-- **Recuperar el grupo:** `npm run rollback -- <snapshot> [<revisión>] --group gnv`.
-- **Recuperar el código:** el mismo orden que en GLP: primero el secret v2 y enseguida el push del revert, después cancelar las corridas en vuelo, y el rollback de Pages solo como parche.
-
-**Consulta web de GNV** (`buscadorGNV.jsp`, sonda del 26/09/2026):
-- **Tabla:** `#tblPreciosGnv`, con la misma cascada y los mismos códigos de distrito que la automotora. La cabecera del precio dice «Soles/m3».
-- **Producto:** el select trae ya elegido `131` «Gas Natural Vehicular Comprimido» y ofrece `129`, el licuefactado. Se lee como producto fijo y se comprueba el código y la etiqueta.
-- **Pasada:** es la cuarta, después de GLP, con 10 min.
-- **Pasada local completa:** 43 de 43 distritos, 270 filas en 36 distritos, y un corte intermitente que se reintentó.
-
-**Vínculo de GNV acreditado el 26/09/2026:**
-- **Población:** 229 filas vinculadas, 0 ambiguas y 41 sin par.
-- **Muestra de siete distritos:** La Victoria, San Juan de Lurigancho, Los Olivos, San Martín de Porres, Ate, Independencia y Puente Piedra.
-  - 89 vinculadas, 0 ambiguas y 19 sin par. De las vinculadas, 22 son locales 15/59 y 2 son establecimientos que también venden licuefactado.
-  - 87 de 89 precios coinciden al céntimo, con un máximo de 0,10.
-  - Las 19 sin par: 9 son vigentes fuera del Registro o sin GIS; 6 tienen la misma razón social con otra dirección; 3 no tienen fila en el CSV; 1 solo reporta otro producto.
-- **Revisión a ojo:** 24 establecimientos, 11 de ellos 15/59.
-  - En todos la dirección coincide con la oficial.
-  - Donde también se vende licuefactado, la consulta coincide con el comprimido y no con el kilo.
+La cobertura inicial salió de la fuente de identidad autorizada el 23/08/2026; los 11 vínculos Repsol del piloto no pasan al sucesor sin revalidación autorizada ([antecedentes](evidencia-datos.md#catálogo-sucesor-y-cobertura-inicial)).
 
 ## Modelo útil
 
