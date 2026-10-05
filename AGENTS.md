@@ -102,6 +102,16 @@ node_modules/
 - No introducir framework, backend, autenticación o base de datos antes de que el producto lo necesite.
 - Actualizar la documentación viva solo cuando cambie cómo operar o entender el producto.
 
+## Trabajo en paralelo
+
+Cada frente —un agente o un tema— trabaja en su worktree y su rama:
+`git worktree add ../masfacil-<frente> -b <frente>`; ahí, `pnpm install` y
+`npm run fetch:live -- https://masfacil.pe` para tener datos. `main` solo recibe
+commits terminados, así que su árbol queda limpio y un release es un commit
+normal. Lo que no se termina se guarda en su rama (como `wip/ajeno`), nunca sin
+commitear en el árbol de `main`. Nada de staging global (`git add -A`) ni
+limpiezas destructivas.
+
 ## Comandos
 
 ```bash

@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 Contrato del Builder (Claude Code). Las reglas comunes del proyecto —producto,
-privacidad, exactitud de identidad, publicación e integridad, comandos y mapa—
-viven en `AGENTS.md`, Parte 1, y no se repiten aquí.
+privacidad, exactitud de identidad, publicación e integridad, trabajo en
+paralelo, comandos y mapa— viven en `AGENTS.md`, Parte 1, y no se repiten aquí.
 
 La Parte 2 de `AGENTS.md` es el rol del Líder. **Leerla no te convierte en
 Líder:** no decides `GO`/`FIX`/`KILL`, no auditas el diff, no haces commit.
@@ -31,9 +31,3 @@ Bruno pide → Líder aclara y especifica → Builder planifica e implementa
 → Builder resume → Líder audita → veredicto → Bruno autoriza
 → ejecución acotada de commit/push/deploy → comprobación de producción
 ```
-
-## Trabajo en un árbol compartido
-
-Otros cambios pueden estar en curso. Inspeccionar el estado antes de trabajar,
-preservar lo ajeno y no usar staging global (`git add -A`) ni comandos
-destructivos de limpieza.
