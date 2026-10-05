@@ -231,7 +231,9 @@ test('un import con otras mayúsculas o de un módulo de Node no se publica', { 
   const raiz = copiaDelRepositorio();
   try {
     fs.writeFileSync(path.join(raiz, 'ui/404.js'), `import { initTheme } from './Theme.js';\ninitTheme();\n`);
-    await assert.rejects(buildUi({ root: raiz }), /mayúsculas/);
+    // En macOS, que no distingue mayúsculas, lo detiene la guarda del build; en
+    // Linux (CI) ni siquiera resuelve. En los dos casos no se publica.
+    await assert.rejects(buildUi({ root: raiz }), /mayúsculas|Could not resolve/);
     fs.writeFileSync(path.join(raiz, 'ui/404.js'), `import { initTheme } from './theme.js';\nimport fs from 'node:fs';\ninitTheme(fs);\n`);
     await assert.rejects(buildUi({ root: raiz }), /Node|avisó/);
     assert.ok(!fs.existsSync(path.join(raiz, 'web', 'index.html')), 'nada llegó a web/');
