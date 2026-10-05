@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ecf0e9">
+  <meta name="theme-color" content="#f1f3f3" data-light="#f1f3f3" data-dark="#161b1d">
   <meta name="color-scheme" content="light dark">
   <meta name="robots" content="noindex">
   <title>Página no encontrada · masfacil.pe</title>
@@ -11,12 +11,14 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="./tailwind.css">
   <link rel="stylesheet" href="./styles.css">
+  <script src="/theme-boot.js"></script>
 </head>
 <body>
   <!-- Página de error de Cloudflare Pages: al existir, ninguna ruta desconocida
-       vuelve a servir la portada con 200. Solo clases de styles.css y un módulo
-       con src: la CSP del sitio no admite estilos ni scripts en línea. Enlaza
-       también tailwind.css para compartir con la portada una sola hoja compilada. -->
+       vuelve a servir la portada con 200. Solo clases de styles.css y scripts
+       con src —el del tema antes de pintar y un módulo—: la CSP del sitio no
+       admite estilos ni scripts en línea. Enlaza también tailwind.css para
+       compartir con la portada una sola hoja compilada. -->
   <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>
   <a class="skip-link" href="#main">Ir al contenido</a>
   <main id="main" tabindex="-1" class="app-shell">

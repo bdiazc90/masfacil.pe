@@ -5,6 +5,7 @@
 import { MAX_OFFER_AGE_DAYS } from '../../web/lib/freshness.js';
 import { RADIUS_MAX_KM, RADIUS_MIN_KM } from '../../web/lib/haversine.js';
 import { Results } from '../results/Results.jsx';
+import { EstadoIcono } from './EstadoIcono.jsx';
 
 /**
  * Lo que el producto tiene que declarar, sin justificarse: atribución, no
@@ -34,7 +35,7 @@ export function CompareScreen({ hidden, nota, aviso, estadoVista, resultados, pr
         <p id="location-update-text" className="m-0 text-[13px] leading-[1.4] text-muted-foreground group-data-[status=error]:font-semibold group-data-[status=error]:text-foreground" role="status" aria-live="polite">{aviso?.texto ?? ''}</p>
       </div>
       {/* Cargando, error o distrito sin grifos del combustible elegido. */}
-      <section id="view-state" className="plate mt-s4 grid justify-items-start gap-s3" hidden={!estadoVista.contenido} data-state={estadoVista.estado}><p id="view-state-text" className="lede" role="status" aria-live="polite">{estadoVista.contenido?.texto ?? ''}</p><button id="view-state-action" className="button button--ghost" type="button" hidden={!estadoVista.contenido?.accion} onClick={onViewStateAction}>{estadoVista.contenido?.accion ?? ''}</button></section>
+      <section id="view-state" className="plate mt-s4 grid justify-items-start gap-s3" hidden={!estadoVista.contenido} data-state={estadoVista.estado}>{estadoVista.contenido ? <EstadoIcono estado={estadoVista.estado} /> : null}<p id="view-state-text" className="lede" role="status" aria-live="polite">{estadoVista.contenido?.texto ?? ''}</p><button id="view-state-action" className="button button--ghost" type="button" hidden={!estadoVista.contenido?.accion} onClick={onViewStateAction}>{estadoVista.contenido?.accion ?? ''}</button></section>
       <Results {...resultados} />
       <details className="about plate"><summary>Sobre los datos</summary><SobreLosDatos provenance={provenance} /></details>
     </section>

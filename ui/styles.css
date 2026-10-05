@@ -33,11 +33,15 @@
   color-scheme:light;
 
   /* Papel y tinta */
+  /* En hex, `--background` de cada tema va también en el `theme-color` de
+     `ui/index.html` y `ui/404.html` (`data-light`, `data-dark`): la barra del
+     navegador se pinta antes de que llegue esta hoja. Un test exige que
+     coincidan. */
   --background:oklch(96.3% 0.002 197.1);
   --foreground:oklch(30% 0.01 130);
   --muted-foreground:oklch(46% 0.01 130); /* 46 % y no 48: es lo que llega a 4.5:1 sobre el card fijo */
-  --card:oklch(98% 0.01 130);
-  --card-2:oklch(90% 0.01 130);
+  --card:oklch(99% 0.006 130); /* G5: más blanco que el papel, para separarse de él */
+  --card-2:oklch(92% 0.01 130); /* G5: 92 y no 90, el vidrio claro sin franja gris */
   --border:oklch(40% 0.01 130);
   --border-2:oklch(30% 0.01 130);
 
@@ -64,9 +68,11 @@
   --product-gnv-strong:#8a2f55;
 
   /* Fondo: tres manchas difusas bajo el vidrio */
-  --glow-1:oklch(95.3% 0.051 180.801);
-  --glow-2:oklch(95.1% 0.026 236.824);
-  --glow-3:oklch(95.6% 0.045 203.388);
+  /* G5: más croma con la misma luz, para que se note sin oscurecer lo que
+     queda detrás del texto. */
+  --glow-1:oklch(95.3% 0.064 180.801);
+  --glow-2:oklch(95.1% 0.034 236.824);
+  --glow-3:oklch(95.6% 0.056 203.388);
   --glow-alpha:.6;
 
   /* Marca del grifo. Tinte, no color pleno: va en la dirección que ALEJA la
@@ -85,15 +91,32 @@
   /* Gráfico: tope del degradado de área */
   --chart-fill-alpha:.28;
 
-  /* Vidrio: desenfoque y cuánto glow deja pasar; el desenfoque de las manchas */
+  /* Vidrio: desenfoque y cuánto glow deja pasar; el desenfoque de las manchas.
+     Lo grande (tarjetas, plates) es más grueso que lo chico (chips, selectores
+     sueltos): más desenfoque y sombra (SPEC-UI-REACT §8 bis, `apple-design`). */
   --glass-blur:30px;
+  --glass-blur-small:16px;
   --glass-saturate:35%;
   --glow-blur:80px;
+  /* La sombra de lo grande: un contacto nítido y una caída larga y suave. */
+  --glass-shadow:0 1px 2px oklch(25% 0.02 230 / .06),0 12px 28px -14px oklch(25% 0.02 230 / .24);
 
-  /* Movimiento: solo existe con `prefers-reduced-motion: no-preference` */
-  --motion-feedback:.15s; /* un control responde a su cambio de estado */
+  /* Movimiento (SPEC-UI-REACT §8 bis, valores de la skill `animate` de Emil
+     Kowalski). Con `prefers-reduced-motion: reduce` no hay desplazamientos,
+     escalas ni giros: quedan los fundidos de color y de opacidad.
+     `--ease-out`, `--motion-ease`, `--motion-cards`, `--motion-stagger` y
+     `--motion-enter` las lee también `ui/results/entrada.js`: son contrato con
+     JavaScript. */
+  --motion-feedback:.15s; /* un control funde su color al cambiar de estado */
+  --motion-press:160ms; /* la respuesta al pulsar */
+  --motion-enter:200ms; /* entran el menú y el detalle; con `reduce`, cualquier fundido */
   --motion-panel:200ms; /* el colapso del card de controles: sus cuatro transiciones duran esto o se ve roto */
-  --motion-ease:ease;
+  --motion-cards:300ms; /* una tarjeta nueva sube y aparece */
+  --motion-stagger:50ms; /* de una tarjeta nueva a la siguiente, hasta la sexta */
+  --motion-spin:800ms; /* una vuelta del indicador de carga: rápido se siente más corto */
+  --motion-pulse:1.2s; /* el mismo indicador con `reduce`: late en vez de girar */
+  --motion-ease:ease; /* solo para cambios de color */
+  --ease-out:cubic-bezier(.23,1,.32,1); /* entradas, presión y panel: arranca rápido */
 
   /* Compartidos de forma y ritmo */
   --radius-small:12px;
@@ -149,6 +172,7 @@
   --halo-energigas:#173d11;
   --halo-terpel:#4f1a05;
   --chart-fill-alpha:.18; /* el relleno claro sobre carbón tapaba la referencia del promedio */
+  --glass-shadow:0 1px 2px rgb(0 0 0 / .28),0 14px 32px -14px rgb(0 0 0 / .6);
 }
 
 /* ── Superficies compartidas ───────────────────────────────────────────
@@ -156,7 +180,7 @@
    la sonda de contraste saca de `--surface` los tres pesos que compone. */
 :root{
   --surface:linear-gradient(115deg,color-mix(in srgb,var(--card) 20%,transparent),color-mix(in srgb,var(--card-2) 14%,transparent) 52%,color-mix(in srgb,var(--card) 8%,transparent));
-  --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 30%,transparent),color-mix(in srgb,var(--border) 15%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 22%,transparent) 100%);
+  --rim:linear-gradient(165deg,color-mix(in srgb,var(--border) 38%,transparent),color-mix(in srgb,var(--border) 18%,transparent) 20%,transparent 55%,color-mix(in srgb,var(--border-2) 28%,transparent) 100%);
   /* Las píldoras de la barra (tema, acceso rápido, «Más opciones»): relleno y borde. */
   --pill-fill:color-mix(in srgb,var(--card) 42%,transparent);
   --pill-rim:color-mix(in srgb,var(--border) 32%,transparent);
@@ -167,6 +191,12 @@
    sonda de contraste mide el valor con vidrio. */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   :root{--brand-halo-alpha:.13}
+}
+/* «Aumentar contraste» (iOS, macOS, Windows): superficies opacas, sin
+   desenfoque y con borde marcado; el resto, en «Vidrio». Sin capa e indentado
+   por lo mismo que el bloque de arriba. */
+@media(prefers-contrast:more){
+  :root{--surface:var(--card);--pill-fill:var(--card);--pill-rim:var(--border)}
 }
 
 /* ── Capas ─────────────────────────────────────────────────────────────
@@ -184,10 +214,17 @@ html{
   color:var(--foreground);
   font-family:var(--font);
   font-variant-numeric:tabular-nums;
+  /* Sin el velo gris que iOS pinta al tocar: cada control responde con su
+     propio `:active` (ver «Al pulsar»). */
+  -webkit-tap-highlight-color:transparent;
 }
-body{margin:0;min-width:280px;min-height:100vh}
+/* `dvh` y no `vh`: en el teléfono `100vh` cuenta también la barra del
+   navegador, y una pantalla corta se desplazaba de más. */
+body{margin:0;min-width:280px;min-height:100dvh}
 button,a{font:inherit;min-height:44px}
-button{touch-action:manipulation;cursor:pointer}
+/* Mantener pulsado un control no selecciona su texto; el contenido sí se
+   selecciona y se copia. */
+button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-select:none}
 h1,h2,h3,p{margin-top:0}
 /* Los títulos por defecto; cada pantalla los ajusta donde hace falta. */
 h2{font-size:25px;letter-spacing:-.03em;line-height:1.1}
@@ -201,11 +238,14 @@ h3{font-size:16px;margin-bottom:6px}
   top:10px;
   z-index:10;
   padding:10px;
+  /* Transparente además de desplazado: Safari en el iPhone pinta detrás de la
+     barra de estado lo que queda encima del viewport, y ahí asomaba. */
+  opacity:0;
   transform:translateY(-160%);
   background:var(--primary);
   color:var(--primary-foreground);
 }
-.skip-link:focus{transform:none}
+.skip-link:focus{opacity:1;transform:none}
 }
 
 @layer components{
@@ -232,39 +272,48 @@ h3{font-size:16px;margin-bottom:6px}
   content:"";
   position:absolute;
   inset:0;
-  padding:.9px;
+  /* 1 px y no .9: a densidad 2 cae en píxel entero y el canto sale nítido. */
+  padding:1px;
   border-radius:inherit;
   background:var(--rim);
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   mask-composite:exclude;
   pointer-events:none;
 }
-.glass{border-radius:36px;padding:var(--s5);box-shadow:0 2px 6px #0000000d}
-.plate{padding:var(--s4) var(--s5)}
+.glass{border-radius:36px;padding:var(--s5);box-shadow:var(--glass-shadow)}
+.plate{padding:var(--s4) var(--s5);box-shadow:var(--glass-shadow)}
 @media(max-width:340px){.glass{padding:var(--s4)}}
 /* En colores forzados el pseudo-canto se descarta: vuelve un borde real. */
 @media(forced-colors:active){.glass,.plate,.toggle{border:2px solid ButtonText}}
+/* «Aumentar contraste»: el vidrio se vuelve opaco (los tokens, arriba) y el
+   canto, un borde real. Los selectores y los chips, debajo de sus reglas. */
+@media(prefers-contrast:more){
+  .glass,.plate{-webkit-backdrop-filter:none;backdrop-filter:none;border:1.5px solid var(--border)}
+  .glass:after,.plate:after,.toggle:after{display:none}
+}
 
 /* ── Appbar ────────────────────────────────────────────────────────────── */
-.appbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s3)}
+/* El hueco lo pone `space-between`; `gap` es solo el mínimo, y a 320 px el
+   selector de tema de 44 px por botón cabe con 4. */
+.appbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s1)}
 .brand{color:var(--brand);font-weight:700;text-decoration:none;letter-spacing:-.01em;display:flex;align-items:center}
 .brand em{font-style:normal;color:var(--foreground)}
 .brand__logo{display:block;width:28px;height:auto;flex-shrink:0;filter:drop-shadow(0 0 1.5px var(--logo-halo))}
 .brand .brand__logo{margin-right:var(--s2)}
+/* Vive siempre dentro del card de controles, que ya es vidrio: sin desenfoque
+   propio (nunca vidrio sobre vidrio). Cada botón mide 44 × 44 para el dedo; el
+   borde transparente deja el relleno del elegido en el círculo de antes, a 3 px
+   del canto, y su sombra sigue al círculo y no a la caja. */
 .theme-toggle{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:3px;
+  grid-template-columns:repeat(3,44px);
   min-height:44px;
-  padding:3px;
   border:1px solid var(--pill-rim);
   border-radius:999px;
   background:var(--pill-fill);
-  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-saturate));
 }
-.theme-toggle button{display:grid;place-items:center;width:36px;min-height:38px;padding:0;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground)}
-.theme-toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);box-shadow:0 1px 4px #0002}
+.theme-toggle button{display:grid;place-items:center;width:44px;min-height:44px;padding:0;border:3px solid transparent;border-radius:999px;background:transparent;background-clip:padding-box;color:var(--muted-foreground)}
+.theme-toggle button[aria-pressed="true"]{background-color:var(--foreground);color:var(--card);filter:drop-shadow(0 1px 2px #0002)}
 .theme-toggle svg,.place__icon,.controls__chevron{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── Card de controles ─────────────────────────────────────────────────
@@ -304,6 +353,7 @@ h3{font-size:16px;margin-bottom:6px}
   background:color-mix(in srgb,var(--card) 90%,transparent);
   box-shadow:var(--controls-shadow);
 }
+@media(prefers-contrast:more){.controls[data-state="compact"],.controls[data-state="overlay"]{background:var(--card)}}
 .controls-scrim{position:fixed;inset:0;z-index:4}
 .controls__bar{display:flex;align-items:center;gap:var(--s1)}
 .controls__summary{
@@ -365,7 +415,8 @@ h3{font-size:16px;margin-bottom:6px}
 .controls__chevron{width:16px;height:16px}
 .controls__panel{display:grid;grid-template-rows:1fr}
 .controls__inner{min-height:0;overflow:hidden;display:grid;gap:var(--s3);padding:var(--s2) 3px var(--s3);margin:0 -3px}
-.controls__done{justify-self:end;display:inline-flex;align-items:center;gap:2px;min-height:36px;margin-top:calc(-1 * var(--s2))}
+/* Mide 44 px de alto por `.button--text`. */
+.controls__done{justify-self:end;display:inline-flex;align-items:center;gap:2px;margin-top:calc(-1 * var(--s2))}
 .controls:not([data-state="compact"]) .controls__bar{display:none}
 .controls[data-state="full"] .controls__done{display:none}
 .controls[data-state="compact"] .controls__panel{grid-template-rows:0fr;visibility:hidden}
@@ -382,10 +433,11 @@ h3{font-size:16px;margin-bottom:6px}
 /* Un solo menú para las dos pantallas: cada ítem declara dónde vive. */
 .controls[data-screen="district"] [data-menu-screen="compare"],
 .controls:not([data-screen="district"]) [data-menu-screen="district"]{display:none}
+/* El colapso mueve el alto: con `reduce` es instantáneo. */
 @media(prefers-reduced-motion:no-preference){
-  .controls__panel{transition:grid-template-rows var(--motion-panel) var(--motion-ease)}
-  .controls__inner{transition:padding var(--motion-panel) var(--motion-ease)}
-  .controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--motion-panel) var(--motion-ease),visibility 0s var(--motion-panel)}
+  .controls__panel{transition:grid-template-rows var(--motion-panel) var(--ease-out)}
+  .controls__inner{transition:padding var(--motion-panel) var(--ease-out)}
+  .controls[data-state="compact"] .controls__panel{transition:grid-template-rows var(--motion-panel) var(--ease-out),visibility 0s var(--motion-panel)}
 }
 
 /* ── Lugar y sus acciones ──────────────────────────────────────────────
@@ -436,6 +488,8 @@ h3{font-size:16px;margin-bottom:6px}
   border-radius:16px;
   background:var(--card);
   box-shadow:var(--controls-shadow);
+  /* Cuelga de «Más opciones», arriba a la derecha: crece desde ahí. */
+  transform-origin:top right;
 }
 .place__menu-item{display:flex;align-items:center;gap:var(--s2);min-height:44px;padding:0 var(--s2);border:0;border-radius:12px;background:transparent;color:var(--foreground);font-size:15px;font-weight:600;text-align:left}
 .place__menu-item svg{color:var(--accent)}
@@ -443,22 +497,34 @@ h3{font-size:16px;margin-bottom:6px}
 .place__menu-item:disabled svg{color:var(--muted-foreground)}
 .place__menu-item--home{margin-top:var(--s1);padding-top:var(--s1);border-top:1px solid color-mix(in srgb,var(--border) 18%,transparent);border-radius:0 0 12px 12px}
 .place__menu-item--home .brand__logo{flex-shrink:0}
+/* Entra desde su botón; se cierra al instante, porque cerrar suele ser elegir
+   y lo que sigue ya es otra pantalla. Con `reduce`, solo el fundido. */
+@media(prefers-reduced-motion:no-preference){
+  .place__menu:not([hidden]){animation:menu-entra var(--motion-enter) var(--ease-out)}
+  @keyframes menu-entra{from{opacity:0;transform:scale(.95)}}
+}
+@media(prefers-reduced-motion:reduce){
+  .place__menu:not([hidden]){animation:fundido var(--motion-enter) var(--motion-ease)}
+}
 
 /* ── Radio y selectores ────────────────────────────────────────────────── */
 .radius{display:grid;gap:2px}
 .radius__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding:0 2px}
 .radius__label{margin:0;color:var(--muted-foreground);font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .radius__readout{margin:0;font-size:14px;font-weight:700}
-.radius__input{width:100%;height:40px;margin:0;accent-color:var(--primary);cursor:pointer}
+/* 44 px para el dedo; el margen negativo conserva el alto que ocupaba (40). */
+.radius__input{width:100%;height:44px;margin:-2px 0;accent-color:var(--primary);cursor:pointer}
 .radius__input:disabled{cursor:not-allowed;opacity:.45}
-.toggle{display:flex;gap:var(--s1);padding:3px;border-radius:999px;margin:0}
+/* Suelto (la portada) es vidrio chico; dentro de un plate, que ya es vidrio, no
+   lleva desenfoque propio: nunca vidrio sobre vidrio. */
+.toggle{display:flex;gap:var(--s1);padding:3px;border-radius:999px;margin:0;-webkit-backdrop-filter:blur(var(--glass-blur-small)) saturate(var(--glass-saturate));backdrop-filter:blur(var(--glass-blur-small)) saturate(var(--glass-saturate))}
+.plate .toggle{-webkit-backdrop-filter:none;backdrop-filter:none}
+@media(prefers-contrast:more){.toggle{-webkit-backdrop-filter:none;backdrop-filter:none;border:1.5px solid var(--border)}}
 .toggle button{flex:1;min-height:44px;border:0;border-radius:999px;background:transparent;color:var(--muted-foreground);font-size:15px;font-weight:500}
 /* El activo se dice con relleno, color y peso: dos de las tres no dependen del fondo. */
 .toggle button[aria-pressed="true"]{background:var(--foreground);color:var(--card);font-weight:700}
 .toggle--sub button{font-size:14px}
-@media(prefers-reduced-motion:no-preference){
-  .toggle button{transition:color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
-}
+/* Sus transiciones viven en «Al pulsar», con la del hundimiento. */
 
 /* ── Botones ───────────────────────────────────────────────────────────── */
 .button{
@@ -475,12 +541,40 @@ h3{font-size:16px;margin-bottom:6px}
   letter-spacing:.04em;
   text-align:center;
   text-decoration:none;
+  /* También cuando es un enlace: un botón no abre la vista previa del enlace
+     ni selecciona su texto al mantenerlo pulsado. */
+  -webkit-touch-callout:none;
+  -webkit-user-select:none;
+  user-select:none;
 }
 .button--ghost{border:1.5px solid color-mix(in srgb,var(--border) 35%,transparent);background:transparent;color:var(--foreground)}
 .button--primary{background:var(--primary);color:var(--primary-foreground)}
 .button--text{background:transparent;border:0;color:var(--accent);text-decoration:underline;text-underline-offset:4px;font-weight:700;letter-spacing:0;min-height:44px;padding:var(--s2) 2px}
 .button:disabled{cursor:wait;opacity:.65}
 @media(forced-colors:active){.button{border:2px solid ButtonText}}
+
+/* ── Al pulsar ─────────────────────────────────────────────────────────
+   `:active` responde al apoyar el dedo, no al soltarlo. Lo que tiene forma de
+   botón se hunde un 3 %; lo que es texto o fila se atenúa. Con `reduce` no hay
+   escalas: todo se atenúa. Los selectores y el tema, además, funden su color al
+   cambiar de estado, en los dos modos. Lo deshabilitado no responde.
+   Un solo bloque para todos: cada `transition` lleva su lista entera, y dos
+   reglas por separado se pisarían. */
+@keyframes fundido{from{opacity:0}}
+.toggle button,.theme-toggle button{transition:color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
+.button--text,.controls__summary,.about summary{transition:opacity var(--motion-press) var(--ease-out)}
+.button--text:active,.controls__summary:active,.about summary:active{opacity:.6}
+.place__menu-item{transition:background-color var(--motion-press) var(--ease-out)}
+.place__menu-item:active:not(:disabled){background:color-mix(in srgb,var(--foreground) 8%,transparent)}
+@media(prefers-reduced-motion:no-preference){
+  .button,.place__action,.place__more,.controls__quick,.chips button{transition:transform var(--motion-press) var(--ease-out)}
+  .toggle button,.theme-toggle button{transition:transform var(--motion-press) var(--ease-out),color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
+  :is(.button,.place__action,.place__more,.controls__quick,.chips button,.toggle button,.theme-toggle button):active:not(:disabled){transform:scale(.97)}
+}
+@media(prefers-reduced-motion:reduce){
+  .button,.place__action,.place__more,.controls__quick,.chips button{transition:opacity var(--motion-press) var(--ease-out)}
+  :is(.button,.place__action,.place__more,.controls__quick,.chips button,.toggle button,.theme-toggle button):active:not(:disabled){opacity:.7}
+}
 
 /* ── Pantallas fuera de resultados ─────────────────────────────────────── */
 .screen-flow{display:grid;gap:var(--s4);margin-top:var(--s4)}
@@ -490,11 +584,27 @@ h3{font-size:16px;margin-bottom:6px}
 .hint,.lede{font-size:14px;line-height:1.45;margin-bottom:0}
 .start-step{padding-top:var(--s2);text-align:center}
 .start-step h1{margin:0 0 var(--s2);font-size:25px;font-weight:700;letter-spacing:-.03em;line-height:1.14;text-wrap:balance}
-.dot{display:block;width:14px;height:14px;margin:0 auto var(--s4);border-radius:50%;background:var(--primary)}
+/* ── Indicador de carga e icono de estado ──────────────────────────────
+   La carga, el error y el vacío dicen su estado con algo más que una línea de
+   texto. Los dos son decoración (`aria-hidden`): se anuncia el texto de al lado.
+   El indicador es un aro que gira rápido —una espera que se mueve rápido se
+   siente más corta— y es lo único que se mueve en bucle; con `reduce` no gira,
+   late. */
+.loader{display:block;width:32px;height:32px;border:3px solid color-mix(in srgb,var(--primary) 28%,transparent);border-top-color:var(--primary);border-radius:50%}
 @media(prefers-reduced-motion:no-preference){
-  .dot{animation:breathe 2.6s ease-in-out infinite}
-  @keyframes breathe{0%,100%{opacity:.28}50%{opacity:1}}
+  .loader{animation:girar var(--motion-spin) linear infinite}
+  @keyframes girar{to{transform:rotate(1turn)}}
 }
+@media(prefers-reduced-motion:reduce){
+  .loader{animation:latir var(--motion-pulse) ease-in-out infinite}
+  @keyframes latir{50%{opacity:.4}}
+}
+/* Con colores forzados el aro entero sería de un color y no se vería girar. */
+@media(forced-colors:active){.loader{forced-color-adjust:none;border-color:GrayText;border-top-color:CanvasText}}
+.estado-icono{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+/* El error se dice con tinta, como el aviso de ubicación: sin rojo ni alarma. */
+.estado-icono--error{background:color-mix(in srgb,var(--foreground) 10%,transparent);color:var(--foreground)}
+.estado-icono svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .district-filter{display:grid;gap:6px}
 .district-filter label{color:var(--muted-foreground);font-size:14px;font-weight:600}
 .district-filter input{
@@ -509,10 +619,16 @@ h3{font-size:16px;margin-bottom:6px}
 }
 .district-filter input::placeholder{color:var(--muted-foreground);opacity:1}
 .chips{display:flex;flex-wrap:wrap;gap:var(--s3)}
-.chips button{border:0;border-radius:999px;background:var(--surface);color:var(--foreground);padding:0 var(--s4);font-weight:600;backdrop-filter:blur(var(--glass-blur))}
+/* Vidrio chico. Con prefijo: Safari anterior a 18 solo conoce
+   `-webkit-backdrop-filter`, y sin él los chips salían planos. */
+.chips button{border:0;border-radius:999px;background:var(--surface);color:var(--foreground);padding:0 var(--s4);font-weight:600;-webkit-backdrop-filter:blur(var(--glass-blur-small));backdrop-filter:blur(var(--glass-blur-small))}
+@media(prefers-contrast:more){.chips button{-webkit-backdrop-filter:none;backdrop-filter:none;border:1.5px solid var(--border)}}
 .about{margin-top:var(--s4)}
-.about summary{min-height:44px;display:flex;align-items:center;color:var(--muted-foreground);font-weight:400;cursor:pointer}
+.about summary{min-height:44px;display:flex;align-items:center;color:var(--muted-foreground);font-weight:400;cursor:pointer;-webkit-user-select:none;user-select:none}
 .about p:last-child{margin-bottom:0}
+/* «Ver fuente de Osinergmin» va sola en su párrafo: 44 px de área para el dedo,
+   con el relleno, y el margen negativo deja la línea donde estaba. */
+.about a{display:inline-block;padding-block:13px;margin-block:-13px}
 
 /* ── Resultados ────────────────────────────────────────────────────────── */
 .screen-flow--results{display:block}
@@ -554,9 +670,8 @@ h3{font-size:16px;margin-bottom:6px}
 }
 .chip--distance{--product-strong:var(--muted-foreground);background:transparent;border-color:transparent;padding-inline:0}
 @media(forced-colors:active){.chip{border:2px solid ButtonText}}
-@media(prefers-reduced-motion:no-preference){
-  .chip,.offer__price b{transition:color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
-}
+/* Un fundido de color, también con `reduce`: no mueve nada. */
+.chip,.offer__price b{transition:color var(--motion-feedback) var(--motion-ease),background-color var(--motion-feedback) var(--motion-ease),opacity var(--motion-feedback) var(--motion-ease)}
 /* Énfasis: en «Más barata» el producto elegido pinta la cifra con «strong» y su
    chip sube de peso y de borde; el otro (--muted) baja a gris. Sin precio
    (--absent) siempre apagado. En «Más cerca» no hay énfasis: los dos en tinta.
@@ -623,7 +738,19 @@ h3{font-size:16px;margin-bottom:6px}
 /* ── Panel de detalle ──────────────────────────────────────────────────── */
 /* Las filas y los textos viven en `ui/results/OfferDetail.jsx`. */
 .offer__detail{margin-top:var(--s4);padding-top:var(--s4);border-top:1.5px solid color-mix(in srgb,var(--border) 28%,transparent);display:grid;gap:var(--s2)}
-.offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:40px}
+/* 44 px para el dedo; el margen negativo conserva el alto que ocupaba (40). */
+.offer__detail .button--text{width:auto;justify-self:start;padding:0;min-height:44px;margin-block:-2px}
+/* Se monta al abrir: su contenido baja 4 px desde «Ver detalle» y aparece. La
+   tarjeta crece al instante —animar el alto costaría layout en cada cuadro y
+   recortaría el anillo de foco— y se cierra al instante. Con `reduce`, solo el
+   fundido. */
+@media(prefers-reduced-motion:no-preference){
+  .offer__detail{animation:detalle-entra var(--motion-enter) var(--ease-out)}
+  @keyframes detalle-entra{from{opacity:0;transform:translateY(-4px)}}
+}
+@media(prefers-reduced-motion:reduce){
+  .offer__detail{animation:fundido var(--motion-enter) var(--motion-ease)}
+}
 
 /* ── Firma ─────────────────────────────────────────────────────────────
    Pie del documento, fuera de `main`: aparece en la portada y en el 404 porque
@@ -666,8 +793,8 @@ h3{font-size:16px;margin-bottom:6px}
    el bloque desborda su tarjeta a 320 px. */
 .history>*{min-width:0}
 /* Un solo sitio decide el color de cada serie, igual que `[data-key]` en la
-   tarjeta: la lectura (`text-serie`) y su grupo del SVG heredan `--serie`. Los
-   textos del bloque viven en `ui/history/HistoryChart.jsx`. */
+   tarjeta: la lectura (`text-serie`), su grupo del SVG y su degradado heredan
+   `--serie`. Los textos del bloque viven en `ui/history/HistoryChart.jsx`. */
 [data-serie="regular"]{--serie:var(--product-regular-strong)}
 [data-serie="premium"]{--serie:var(--product-premium-strong)}
 .history__svg{width:100%;height:auto;display:block;margin-top:var(--s1);touch-action:pan-y;overflow:visible}

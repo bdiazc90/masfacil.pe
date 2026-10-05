@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ecf0e9">
+  <!-- El fondo de cada tema en hex (`--background` de styles.css): lo elige
+       web/theme-boot.js antes de pintar y ui/theme.js al cambiar de tema. -->
+  <meta name="theme-color" content="#f1f3f3" data-light="#f1f3f3" data-dark="#161b1d">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="Compara precio y cercanía de gasolina, diésel, GLP y GNV en Lima provincia.">
   <title>masfacil.pe</title>
@@ -13,6 +15,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="./tailwind.css">
   <link rel="stylesheet" href="./styles.css">
+  <!-- Clásico y bloqueante: fija el tema y `theme-color` antes del primer
+       pintado (web/theme-boot.js). -->
+  <script src="/theme-boot.js"></script>
 </head>
 <body>
   <div class="glow" aria-hidden="true"><i></i><i></i><i></i></div>

@@ -18,11 +18,14 @@ import { cargarHistorial } from './cargar-historial.js';
 const CARGADOS = new Set(['ready', 'stale', 'saved', 'demo']);
 const almacen = () => { try { return globalThis.localStorage ?? null; } catch { return null; } };
 
-/** Lleva la vista y el foco al bloque: es lo que hace «Ver historial» y la ruta del historial. */
+/**
+ * Lleva la vista y el foco al bloque: es lo que hace «Ver historial» y la ruta
+ * del historial. Con «reducir movimiento» salta sin deslizarse.
+ */
 export function enfocarHistorial() {
   const bloque = document.getElementById('history-chart');
   if (!bloque) return;
-  bloque.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  bloque.scrollIntoView?.({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   (bloque.querySelector('.history__svg') ?? document.getElementById('history-title') ?? bloque).focus?.({ preventScroll: true });
 }
 
@@ -65,7 +68,9 @@ function Plano({ marco, seleccion, uid, onElegir, onTecla }) {
       <svg className="history__svg" viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" role="group" tabIndex={0} aria-label={vista.ariaLabel} onPointerDown={alApuntar} onKeyDown={onTecla}>
         <defs>
           {vista.gradientes.map((gradiente) => (
-            <linearGradient key={gradiente.key} id={`${uid}-fill-${gradiente.key}`} x1="0" y1={gradiente.y1} x2="0" y2={gradiente.y2} gradientUnits="userSpaceOnUse"><stop className="history__fill-alto" offset="0" /><stop className="history__fill-medio" offset=".55" /><stop className="history__fill-bajo" offset="1" /></linearGradient>
+            // `data-serie` en el degradado: está en `<defs>`, fuera del grupo de su
+            // serie, y sin él sus paradas no heredan `--serie` y salen grises.
+            <linearGradient key={gradiente.key} id={`${uid}-fill-${gradiente.key}`} data-serie={gradiente.key} x1="0" y1={gradiente.y1} x2="0" y2={gradiente.y2} gradientUnits="userSpaceOnUse"><stop className="history__fill-alto" offset="0" /><stop className="history__fill-medio" offset=".55" /><stop className="history__fill-bajo" offset="1" /></linearGradient>
           ))}
         </defs>
         {vista.ticks.map((tick) => (

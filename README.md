@@ -63,7 +63,10 @@ configuración y el lockfile actuales.
 - **Colores, temas, vidrio y movimiento**: los tokens al principio de
   `ui/styles.css`, claro en `:root` y oscuro en `:root[data-theme="dark"]`. Son la
   única fuente: Tailwind los usa por alias (`ui/tailwind.css`) y
-  `node scripts/contrast.mjs` los mide; al tocar un color, corre la sonda.
+  `node scripts/contrast.mjs` los mide; al tocar un color, corre la sonda. Las
+  reglas del movimiento están en DESIGN.md §6. El tema antes del primer pintado
+  lo fija `web/theme-boot.js`; si cambia `--background`, cambia también el hex
+  del `theme-color` de `ui/index.html` y `ui/404.html` (un test lo exige).
 - **Vidrio, halos de marca, chips, estados de la cifra, card de controles, radio,
   selectores y SVG del histórico**: CSS de componente en `ui/styles.css`, porque
   mezclan colores medidos, usan pseudo-elementos o tienen estados que una
@@ -73,7 +76,9 @@ configuración y el lockfile actuales.
   pintan lo que deciden.
 - **Clases completas siempre**: una variante sale de un mapa con los nombres
   enteros (por ejemplo `CELDA_PRECIO` en `ui/results/OfferCard.jsx`), nunca de
-  `bg-${algo}`. Tailwind solo lee `ui/`.
+  `bg-${algo}`. Tailwind solo lee `ui/`, pero lo lee entero: una palabra suelta
+  que coincide con una utilidad (`transform`, `invisible`), aunque esté en un
+  comentario, la emite.
 
 Navegadores objetivo: Chrome/Edge 111, Safari/iOS 16.4 y Firefox 128 (de Firefox
 121 a 127 se usa, sin garantía visual).

@@ -8,15 +8,21 @@
 // lista: el detalle abierto de cada tarjeta y adónde va el foco al paginar.
 //
 // Los cinco nodos existen siempre y conmutan `hidden`, como antes: el recuento es
-// una región viva y tiene que estar montado para anunciar.
+// una región viva y tiene que estar montado para anunciar. Las tarjetas que
+// llegan entran con `useEntradaTarjetas`.
 
 import { useLayoutEffect, useRef } from 'react';
 import { safeGoogleMapsDirectionsUrl } from '../../web/lib/directions.js';
 import { resultsCopy } from '../offer-view.js';
+import { EstadoIcono } from '../screens/EstadoIcono.jsx';
+import { useEntradaTarjetas } from './entrada.js';
 import { OfferCard } from './OfferCard.jsx';
 
 export function Results({ view = null, viewKey = null, products, priceUnit, withDistance = false, attribution = null, sourceUrl = null, onLoadMore = null }) {
   const lista = useRef(null);
+  const items = view?.items ?? [];
+  const claves = items.map((offer) => `${viewKey}:${offer.establishment_id}`);
+  useEntradaTarjetas(lista, claves);
   // Tras «Ver más», el botón puede desaparecer y el foco caería en <body>: pasa a
   // la primera tarjeta nueva, que es justo lo que se acaba de pedir.
   const focoPendiente = useRef(null);
@@ -27,7 +33,6 @@ export function Results({ view = null, viewKey = null, products, priceUnit, with
     destino?.focus();
   });
   const copy = resultsCopy(view, viewKey);
-  const items = view?.items ?? [];
   const opciones = (offer, index) => ({ withDistance, directionsUrl: safeGoogleMapsDirectionsUrl(offer), tag: view.tags[index], activeProduct: view.activeProduct, products, priceUnit });
   const detalle = { attribution, products, priceUnit };
   return (
@@ -40,9 +45,10 @@ export function Results({ view = null, viewKey = null, products, priceUnit, with
         <a id="official-source" className="button button--primary" href={sourceUrl ?? undefined} target="_blank" rel="noopener noreferrer">Ver en la fuente oficial</a>
       </section>
       <ol id="offers" className="m-0 mt-s4 grid list-none gap-s3 p-0" ref={lista} hidden={items.length === 0}>
-        {items.map((offer, index) => <OfferCard key={`${viewKey}:${offer.establishment_id}`} offer={offer} options={opciones(offer, index)} detailOptions={detalle} />)}
+        {items.map((offer, index) => <OfferCard key={claves[index]} offer={offer} options={opciones(offer, index)} detailOptions={detalle} />)}
       </ol>
       <section id="radius-empty" className="plate mt-s4" hidden={!view?.radiusEmpty}>
+        <EstadoIcono estado="radius-empty" className="mb-s3" />
         <h2 id="radius-empty-title" className="mb-s3">{copy.radiusEmpty.title}</h2>
         <p id="radius-empty-text" className="lede">{copy.radiusEmpty.text}</p>
       </section>

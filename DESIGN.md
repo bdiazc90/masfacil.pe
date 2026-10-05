@@ -127,7 +127,11 @@ que el producto no miente: se diseñan con el mismo cuidado que el camino feliz.
 **Tokens.** La fuente de verdad son las custom properties de `ui/styles.css`: el tema
 claro en `:root`, el oscuro en `:root[data-theme="dark"]`. `ui/theme.js` fija siempre
 `light` o `dark` (la opción «sistema» se resuelve ahí), así que el CSS nunca depende de
-`prefers-color-scheme`.
+`prefers-color-scheme`. Antes del primer pintado lo fija `web/theme-boot.js`, un script
+clásico en el `<head>` de la portada y de la 404 que repite la misma regla: el tema oscuro
+nunca arranca en claro. La barra del navegador (`theme-color`) sigue al tema; su color
+es `--background` en hex, escrito en el propio `<meta>` (`data-light`, `data-dark`)
+porque se pinta antes de que llegue la hoja, y un test exige que coincidan.
 
 **Qué conserva un nombre y qué se escribe directo.** Un nombre no es gratis: cada uno es
 una cadena más que hay que seguir para saber de qué color es algo. Se conserva cuando
@@ -136,7 +140,8 @@ gana algo real:
 - **cambia de verdad con el tema** — todos los colores de la tabla de abajo;
 - **es contrato con JavaScript** — `--expand-at`, que `useControlsCard.js` lee de la raíz
   con `parseFloat` y por eso conserva su unidad px, y `--controls-slot-h`, que ese mismo
-  módulo escribe;
+  módulo escribe; y la duración, el paso y la curva de la entrada de tarjetas, que lee
+  `ui/results/entrada.js`;
 - **lo mide `scripts/contrast.mjs`** — si el CSS y su comprobación comparten un valor,
   ese valor tiene nombre;
 - **se reutiliza entre reglas** — la escala de espaciado, `--product`, `--serie`,
@@ -158,7 +163,7 @@ matiz y croma por escrito.
 | `--background` | papel | `oklch(96.3% 0.002 197.1)` | `oklch(21.8% 0.008 223.9)` |
 | `--foreground` | tinta: el dato que decide | `oklch(30% .01 130)` | `oklch(78% .01 130)` |
 | `--muted-foreground` | dato secundario | `oklch(46% .01 130)` | `oklch(76% .01 130)` |
-| `--card` → `--card-2` | superficies de vidrio | L 98 % → 90 % | L 30 % → 23 % |
+| `--card` → `--card-2` | superficies de vidrio; en claro, más blancas que el papel para separarse de él | L 99 % → 92 % | L 30 % → 23 % |
 | `--border` → `--border-2` | canto del vidrio | L 40 % → 30 % | L 62 % → 85 % |
 | `--primary` / `--primary-foreground` | la acción, una vez por pantalla | `#074b3f` / `#ffffff` | `#32b988` / `#052611` |
 | `--accent` | enlaces, etiquetas, tag de tarjeta | `#17615d` | `#63d0c9` |
@@ -172,10 +177,11 @@ matiz y croma por escrito.
 | `--halo-<marca>` | halo de la marca del grifo, un token por marca registrada (Primax, Repsol, AVA, Petroperú, Pecsa, Energigas, Terpel) | tintes claros: `#f2c2a6` `#899ccd` `#e3c2eb` `#ffbbbb` `#f5b8bf` `#c9e6b0` `#ffd1a8` | tintes oscuros: `#171a52` `#5a2a0c` `#3a1244` `#0d3b29` `#4a0b14` `#173d11` `#4f1a05` |
 | `--brand-halo-alpha` | cuánto pesa el halo de marca | .38 | .38 |
 | `--chart-fill-alpha` | tope del degradado de área del histórico | .28 | .18 |
-| `--glow-1` `--glow-2` `--glow-3` | las tres manchas del fondo | `oklch(95.3% 0.051 180.801)` `oklch(95.1% 0.026 236.824)` `oklch(95.6% 0.045 203.388)` | `#815a48` `#585b48` `#8d6c5e` |
+| `--glow-1` `--glow-2` `--glow-3` | las tres manchas del fondo; en claro, con más croma y la misma luz | `oklch(95.3% 0.064 180.801)` `oklch(95.1% 0.034 236.824)` `oklch(95.6% 0.056 203.388)` | `#815a48` `#585b48` `#8d6c5e` |
 | `--glow-alpha` / `--glow-blur` | intensidad y difusión del glow | .6 / 80 px | .6 / 80 px |
-| `--glass-blur` / `--glass-saturate` | vidrio: desenfoque y cuánto glow deja pasar | 30 px / 35 % | 30 px / 35 % |
-| `--motion-feedback` / `--motion-panel` / `--motion-ease` | movimiento, solo con `prefers-reduced-motion: no-preference`: un control que cambia de estado; el colapso del card de controles; la curva | .15 s / 200 ms / `ease` | igual |
+| `--glass-blur` / `--glass-blur-small` / `--glass-saturate` | vidrio: desenfoque de lo grande y de lo chico, y cuánto glow deja pasar | 30 px / 16 px / 35 % | igual |
+| `--glass-shadow` | la sombra de lo grande (tarjetas, plates): un contacto nítido y una caída larga | tinta al 6 % y 24 % | negro al 28 % y 60 % |
+| `--motion-*` / `--ease-out` / `--motion-ease` | movimiento (ver «Movimiento»): pulsar, entrar el menú o el detalle, el panel, las tarjetas y su paso, el giro y el latido de la carga; la curva de entradas y presión, y la de los cambios de color | 160 ms · 200 ms · 200 ms · 300 ms · 50 ms · 800 ms · 1.2 s / `cubic-bezier(.23, 1, .32, 1)` / `ease` | igual |
 | `--logo-halo` | contorno del logo para que el aro no se funda con el fondo | transparente | blanco al 45 % |
 
 Compartidos: `--font` (Roboto → stack del sistema), la escala de espaciado
@@ -215,6 +221,24 @@ solo de una diferencia de fondo o de una sombra**: el elemento activo de un swit
 relleno, color de texto y peso, y dos de esas tres son independientes del fondo. El card
 de controles, cuando va fijo, se rellena al 90 % y lleva sombra: ahí sí hay que separarlo
 de la lista que pasa por debajo.
+
+**Jerarquía del vidrio** (G5, con la skill `apple-design`). Lo grande —tarjetas y plates—
+es más grueso: desenfoque pleno y `--glass-shadow`; lo chico —chips, selectores sueltos—
+usa `--glass-blur-small`. **Nunca vidrio sobre vidrio**: dentro de un plate, los
+selectores y el tema no llevan desenfoque propio. Con «Aumentar contraste»
+(`prefers-contrast: more`) el vidrio se vuelve opaco, sin desenfoque y con borde real.
+
+**Movimiento** (G5, con las skills `animate` y `review-animations` de Emil Kowalski). Se
+anima solo lo que tiene un motivo —respuesta, de dónde viene algo, evitar un salto— y solo
+`opacity` y `transform` (el alto del panel de controles es la excepción heredada). Las
+entradas y la presión usan `--ease-out`; los cambios de color, `ease`; nunca `ease-in`,
+`transition: all` ni `scale(0)`, y nada de más de 300 ms salvo el giro de la carga, que es
+lo único en bucle. Al pulsar, lo que tiene forma de botón se hunde al 97 % y lo que es
+texto o fila se atenúa. El menú entra desde su botón y el detalle con un fundido; los dos
+se cierran al instante. Las tarjetas nuevas de una lista suben 8 px y aparecen, con 50 ms
+entre una y otra hasta la sexta; reordenar no anima. Con `prefers-reduced-motion: reduce`
+el movimiento es menos y más suave, no cero: ni desplazamientos, ni escalas, ni scroll
+suave; quedan fundidos de opacidad y color. El cambio de tema no se anima.
 
 **Fondo.** Papel liso pintado por `html` y tres manchas difusas (`.glow`) en `z-index:-1`:
 verdeagua y celeste sobre papel en claro, terracota sobre carbón en oscuro. Sin velo encima y sin
@@ -334,7 +358,11 @@ Piso no negociable, verificado y no asumido.
   una lectura equivalente para tecnologías de asistencia: día, media y población de cada
   fecha, sin una parada de teclado por punto. Un nombre accesible o una instrucción para
   lector no son frases interpretativas visibles.
-- `prefers-reduced-motion` en opt-in, no opt-out; `forced-colors` con bordes visibles.
+- El movimiento que desplaza o escala solo existe con `prefers-reduced-motion:
+  no-preference`; con `reduce` quedan fundidos de opacidad y color (§6, «Movimiento»).
+  `forced-colors` con bordes visibles; `prefers-contrast: more` con vidrio opaco.
+- En el teléfono, un control responde con su `:active` y no con el destello gris de iOS,
+  y mantenerlo pulsado no selecciona su texto (el contenido sí se selecciona).
 - Sin scroll horizontal a 320 px. Tema claro, oscuro y del sistema.
 
 ## 9 · Microcopy
