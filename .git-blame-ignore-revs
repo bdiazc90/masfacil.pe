@@ -1,0 +1,3 @@
+# Formateo mecánico con Biome («style: formatear con biome»): git blame lo salta.
+# GitHub lo lee solo; en local: git config blame.ignoreRevsFile .git-blame-ignore-revs
+e4b4933edcd44ce20003ae2cfacdd175784eeb6a

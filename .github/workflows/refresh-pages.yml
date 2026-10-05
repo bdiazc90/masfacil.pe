@@ -76,6 +76,7 @@ jobs:
           run_install: false
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: npm test
+      - run: npm run lint
 
   prepare:
     needs: verify
