@@ -27,6 +27,8 @@ pnpm install           # versiones exactas del lockfile
 npm run build          # compila ui/ hacia web/ y deriva la precache
 npm run serve          # compila y sirve lo publicable en http://127.0.0.1:4173
 npm run dev            # Vite con recarga en caliente en http://127.0.0.1:5173
+npm test               # pruebas puntuales, no una suite; CI las corre en cada push
+node scripts/contrast.mjs   # mide el contraste de los tokens de ui/styles.css
 ```
 
 `npm run dev` es para editar —también para afinar un token o una clase y verlo
@@ -147,11 +149,18 @@ Diagnóstico. `npm run history:observe` imprime una línea JSON con `observation
 
 El archivo es inmutable **por código**, no por el proveedor: el bucket no versiona ni tiene object-lock, y el almacén no tiene `delete`. Repetir los mismos bytes no escribe; encontrar bytes distintos bajo la misma clave es un error que se informa, nunca una sobrescritura.
 
-El workflow `.github/workflows/refresh-pages.yml` tiene tres jobs: `verify` (auditoría), `prepare` (resuelve la ruta y prepara el sitio, sin hacer cola: un cambio de interfaz no espera a que termine un refresco de datos) y `deploy` (serializado, dura segundos: revalida contra lo publicado y contra la punta de `main` —ninguna ruta retrocede código ni datos— y sube). Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
+El workflow `.github/workflows/refresh-pages.yml` tiene tres jobs: `verify` (auditoría y `npm test`), `prepare` (resuelve la ruta y prepara el sitio, sin hacer cola: un cambio de interfaz no espera a que termine un refresco de datos) y `deploy` (serializado, dura segundos: revalida contra lo publicado y contra la punta de `main` —ninguna ruta retrocede código ni datos— y sube). Secretos de Cloudflare, seed, raws y cachés nunca se versionan.
 
 ## Identidad comercial
 
 El bundle público lleva `{brand, public_site_name}` unido a `establishment_id`, nunca el expediente. La identidad es opcional para publicar: si el catálogo o su auditoría fallan, se retira la afirmación sin respaldo y **los precios se publican igual**, con el marcador neutral donde corresponda. La corrida lo dice con conteos y motivos.
+
+```bash
+npm run brand:directory -- fetch <marca>   # descarga y normaliza el padrón oficial de la cadena
+npm run brand:directory -- match           # acredita bandera y escribe brand-evidence.json
+npm run brand:sample                       # muestra por estrato para revisar letreros a ojo
+npm run brand:logo -- <slug> <rol> <archivo.svg> <referencia> <AAAA-MM-DD>   # instala un SVG saneado
+```
 
 Detalle de fuentes, permisos y degradación: [docs/datos.md](docs/datos.md).
 

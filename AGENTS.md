@@ -112,45 +112,26 @@ normal. Lo que no se termina se guarda en su rama (como `wip/ajeno`), nunca sin
 commitear en el árbol de `main`. Nada de staging global (`git add -A`) ni
 limpiezas destructivas.
 
-## Comandos
+## Release, una vez autorizado
 
-```bash
-npm run serve
-npm run project
-npm run refresh
-npm run publish
-npm run rollback
-npm run audit
-npm run verify:web
-npm run dump:establishments
-npm run brand:directory -- fetch <marca>
-npm run brand:directory -- match
-npm run brand:sample
-npm run brand:logo -- <slug> <rol> <archivo.svg> <referencia> <AAAA-MM-DD>
-npm run history:observe      # requiere `pnpm install`: firma peticiones S3
-npm run history:summary
-npm test                     # comprobaciones puntuales, no una suite
-node scripts/contrast.mjs
-npm run build                # compila ui/ hacia web/ y deriva la precache
-npm run dev                  # Vite con recarga en caliente; sin service worker
-```
+- Quien lo ejecuta realiza solo las operaciones deterministas aprobadas. No rediseña, no corrige código ni amplía el alcance durante el release.
+- Comprueba que el diff sigue siendo el autorizado e incorpora solo esos archivos. Un cambio ajeno o nuevo se revisa; no se ignora ni se incluye por comodidad.
+- Usa las credenciales configuradas para el destino aprobado. Credenciales nuevas, cambios de permisos u operaciones destructivas requieren autorización específica. Nunca imprime secretos.
+- Comprueba que la ejecución terminó y que producción sirve lo esperado. Una corrida verde sin deploy no es un release. Si falla, informa la causa y conserva el último deployment válido.
+- El cron de actualización de datos ya autorizado sigue automático: no se pide aprobación por cada reporte nuevo de la fuente.
 
-## Mapa
+## Comandos y mapa
 
-```text
-ui/          fuentes de la interfaz, compiladas con Vite y Tailwind
-web/         lo publicado: interfaz compilada, datos, iconos, worker y reglas compartidas
-pipeline/    proyección privada a bundle público y build de la interfaz
-app/         contratos, validación de runtime, política de ruta y catálogo privado
-scripts/     operación, publicación y rollback
-docs/        fuentes, decisiones y roadmap
-```
+Viven en `README.md` («Uso local», «Operación», «Histórico de precios»,
+«Identidad comercial» y «Proyecto»); no se repiten aquí.
 
 ---
 
 # Parte 2 · Rol del Líder
 
-Solo para el Líder (ChatGPT). El Builder no ejecuta esta parte.
+Solo para el Líder (ChatGPT). El Builder no ejecuta esta parte. El Líder entra
+cuando Bruno lo pide o cuando el cambio toca datos publicados, privacidad o
+integridad; si no, Bruno autoriza directamente lo que entrega el Builder.
 
 - Usa grilling solo para decisiones realmente pendientes: **máximo cinco preguntas por cambio, no una cuota de cinco**. Busca los hechos por su cuenta; no pide a Bruno información que pueda inspeccionar. No reabre permisos ni decisiones ya confirmadas. Si faltase una decisión indispensable al alcanzar el límite, delimita lo pendiente; no inventa autorización.
 - Crea un SPEC técnico proporcional al cambio y explica el resultado a Bruno en lenguaje ultra sencillo. El SPEC es el único artefacto de encargo: no se encadenan documentos de discovery, diseño, planning, aceptación y handoff.
@@ -159,11 +140,3 @@ Solo para el Líder (ChatGPT). El Builder no ejecuta esta parte.
 - Emite `GO`, `FIX` o `KILL`, explicando en sencillo los problemas reales, cuándo ocurrirían y la corrección concreta. Distingue bloqueos de mejoras opcionales.
 - Con `FIX`, devuelve correcciones al Builder y reaudita lo afectado. No abre obligatoriamente otra hipótesis, SPEC, calibración ni ciclo completo.
 - Con `GO`, pregunta **una vez** si Bruno autoriza commit, push y deploy del alcance auditado. Conformidad con un plan no es permiso para publicar.
-
-## Ejecución del release, ya autorizado
-
-- Una sonda o ejecutor económico realiza las operaciones deterministas aprobadas. No rediseña, no corrige código ni amplía el alcance durante el release.
-- Comprueba que el diff sigue siendo el auditado e incorpora solo archivos autorizados. Un cambio ajeno o nuevo se revisa; no se ignora ni se incluye por comodidad.
-- Usa las credenciales configuradas para el destino aprobado. Credenciales nuevas, cambios de permisos u operaciones destructivas requieren autorización específica. Nunca imprime secretos.
-- Comprueba que la ejecución terminó y que producción sirve lo esperado. Una corrida verde sin deploy no es un release. Si falla, informa la causa y conserva el último deployment válido.
-- El cron de actualización de datos ya autorizado sigue automático: no se pide aprobación por cada reporte nuevo de la fuente.
