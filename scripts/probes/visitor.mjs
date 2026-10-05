@@ -5,11 +5,15 @@
 //
 //   node scripts/probes/visitor.mjs [--origin https://masfacil.pe] [--shell masfacil-shell-…]
 //
-// Sin `--shell`, exige el que anuncia `/sw.js` del origen. Sale con 1 si algo falla.
+// Sin `--shell`, exige el que anuncia `/sw.js` del origen. Con `--shell`, antes espera
+// hasta 5 min a que el origen lo sirva (un deploy recién subido tarda en propagarse).
+// Sale con 1 si algo falla.
 import { MIRAFLORES, argumentos, chrome, dormir, registro } from './lib.mjs';
 
 const { origin: O = 'https://masfacil.pe', shell: ESPERADO } = argumentos();
-const SHELL = ESPERADO ?? /masfacil-shell-[a-z0-9]+/.exec(await (await fetch(`${O}/sw.js`, { cache: 'no-store' })).text())?.[0];
+const servido = async () => /masfacil-shell-[a-z0-9]+/.exec(await (await fetch(`${O}/sw.js?sonda=${Date.now()}`, { cache: 'no-store' })).text())?.[0] ?? null;
+if (ESPERADO) { const fin = Date.now() + 5 * 60_000; while (Date.now() < fin && (await servido().catch(() => null)) !== ESPERADO) await dormir(10_000); }
+const SHELL = ESPERADO ?? await servido();
 const V = { gasolina: 'Gasolina', diesel: 'Diésel', glp: 'GLP', gnv: 'GNV' };
 const { anotar, ok } = registro();
 const c = await chrome();

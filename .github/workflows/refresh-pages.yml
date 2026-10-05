@@ -272,3 +272,9 @@ jobs:
           PREFLIGHT_REASON: ${{ steps.preflight.outputs.preflight_reason }}
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: node scripts/publication-summary.mjs
+      # Un visitante nuevo en producción, con el Chrome del runner: las cuatro
+      # vistas, GPS, distrito, worker y CSP. Si falla, la corrida queda en rojo
+      # para avisar; no revierte: el rollback se decide aparte.
+      - name: Visitante nuevo en producción
+        if: steps.upload.outcome == 'success'
+        run: node scripts/probes/visitor.mjs --origin "$PUBLIC_ORIGIN" --shell "$(grep -o 'masfacil-shell-[a-z0-9]*' web/sw.js | head -1)"
