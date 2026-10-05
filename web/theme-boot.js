@@ -1,4 +1,4 @@
-// Tema y theme-color antes del primer pintado (SPEC-UI-REACT §8 bis): script
+// Tema y theme-color antes del primer pintado (docs/SPEC-ui-react.md §8 bis): script
 // clásico en el <head> de la portada y la 404. Repite la regla de applyTheme
 // (ui/theme.js) con la misma clave; lo ata test/theme-boot.test.mjs.
 (() => {

@@ -1,5 +1,5 @@
 // Las tarjetas que llegan a la lista entran: suben 8 px y aparecen, escalonadas
-// hasta la sexta (SPEC-UI-REACT §8 bis). Llegan con una lista nueva —abrir
+// hasta la sexta (docs/SPEC-ui-react.md §8 bis). Llegan con una lista nueva —abrir
 // resultados, cambiar de combustible— o al final de la que había —«Ver más», un
 // radio que suma grifos—; las que ya estaban no se mueven. Reordenar no anima:
 // si las que siguen cambian de orden o una nueva se intercala entre ellas

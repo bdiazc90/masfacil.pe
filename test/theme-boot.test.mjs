@@ -1,4 +1,4 @@
-// El tema antes del primer pintado (SPEC-UI-REACT §8 bis): `web/theme-boot.js`
+// El tema antes del primer pintado (docs/SPEC-ui-react.md §8 bis): `web/theme-boot.js`
 // fija `data-theme` y `theme-color` en el <head>, y repite a propósito la regla
 // de `applyTheme` (`ui/theme.js`). Estas pruebas atan las dos copias —clave,
 // regla y color de la barra— para que no se separen.

@@ -1,5 +1,5 @@
 // El icono de un estado de la lista: cargando, error, distrito sin grifos o
-// radio vacío (SPEC-UI-REACT §8 bis). Es decoración: `aria-hidden`, porque el
+// radio vacío (docs/SPEC-ui-react.md §8 bis). Es decoración: `aria-hidden`, porque el
 // texto de al lado ya dice lo mismo y es el que se anuncia.
 
 const ICONOS = Object.freeze({

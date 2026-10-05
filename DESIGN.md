@@ -407,7 +407,7 @@ un solo uso se escribe junto a su propiedad, aquí y en cualquier stack futuro. 
 se exige de una utilidad de clases es que los colores y el espaciado sigan saliendo de
 esta paleta y de esta escala, no de una tabla paralela.
 
-Tailwind v4 se adoptó con la migración a React (`SPEC-UI-REACT.md`, gate 4), con estas
+Tailwind v4 se adoptó con la migración a React (`docs/SPEC-ui-react.md`, gate 4), con estas
 reglas: sin Preflight —el reset es el propio—, sin tema por defecto, alias `inline` de los
 tokens y nada más; `ui/styles.css` no lleva directivas, así que llega tal cual y lo que mide
 la sonda de contraste es lo que se sirve; clases completas siempre, y una variante sale de

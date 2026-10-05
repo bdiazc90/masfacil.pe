@@ -93,7 +93,7 @@
 
   /* Vidrio: desenfoque y cuánto glow deja pasar; el desenfoque de las manchas.
      Lo grande (tarjetas, plates) es más grueso que lo chico (chips, selectores
-     sueltos): más desenfoque y sombra (SPEC-UI-REACT §8 bis, `apple-design`). */
+     sueltos): más desenfoque y sombra (docs/SPEC-ui-react.md §8 bis, `apple-design`). */
   --glass-blur:30px;
   --glass-blur-small:16px;
   --glass-saturate:35%;
@@ -101,7 +101,7 @@
   /* La sombra de lo grande: un contacto nítido y una caída larga y suave. */
   --glass-shadow:0 1px 2px oklch(25% 0.02 230 / .06),0 12px 28px -14px oklch(25% 0.02 230 / .24);
 
-  /* Movimiento (SPEC-UI-REACT §8 bis, valores de la skill `animate` de Emil
+  /* Movimiento (docs/SPEC-ui-react.md §8 bis, valores de la skill `animate` de Emil
      Kowalski). Con `prefers-reduced-motion: reduce` no hay desplazamientos,
      escalas ni giros: quedan los fundidos de color y de opacidad.
      `--ease-out`, `--motion-ease`, `--motion-cards`, `--motion-stagger` y
