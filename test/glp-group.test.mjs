@@ -153,6 +153,11 @@ const glpFloja = () => candidata('glp', 'glp-floja', { refreshState: { snapshot_
 const puntero = (id, fuente) => ({ ok: true, snapshot_id: id, missing: [], pointer: { snapshot_id: id, source_id: fuente } });
 const ausente = (motivo) => ({ ok: false, snapshot_id: null, missing: [motivo] });
 
+// La preparación corre sobre una raíz temporal vacía: lo publicado lo dicen las
+// dependencias inyectadas, no los archivos que haya en el `web/` del repositorio.
+// Sin esto, un `refresh-state.json` real hace que `production` deje de ser null.
+const preparar = (entrada) => prepareRelease({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'masfacil-glp-release-')), ...entrada });
+
 function deps({ publicados = { gasolina: { snapshot_id: 'S1' }, diesel: { snapshot_id: 'S1' } }, propios = { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current') }, baseDeFuente = ausente('la fuente glp-current todavía no tiene snapshot aprobado'), compuestas = {}, refresco = { status: 'unchanged' }, escritas = [], adoptados = [], planes = [] } = {}) {
   return {
     groups: [gasolina, diesel, glp],
@@ -176,7 +181,7 @@ test('primera activación sobre active-glp.json: se juzga contra la base auditad
   const escritas = [];
   const adoptados = [];
   const planes = [];
-  const r = await prepareRelease({ route: 'project', deps: deps({ propios: { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, compuestas: { glp: glpAuditada() }, escritas, adoptados, planes }) });
+  const r = await preparar({ route: 'project', deps: deps({ propios: { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, compuestas: { glp: glpAuditada() }, escritas, adoptados, planes }) });
   assert.deepEqual([r.ok, r.decision.deploy], [true, true]);
   assert.deepEqual(escritas.sort(), ['diesel-nueva', 'gasolina-nueva', 'glp-primera']);
   assert.deepEqual(adoptados, [], 'con pointer propio no hay nada que adoptar');
@@ -188,7 +193,7 @@ test('primera activación sobre active-glp.json: se juzga contra la base auditad
 
 test('primera activación sobre active-glp.json que no cumple la base auditada: se detiene la entrega', async () => {
   const adoptados = [];
-  const r = await prepareRelease({ route: 'project', deps: deps({ propios: { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, compuestas: { glp: glpFloja() }, adoptados }) });
+  const r = await preparar({ route: 'project', deps: deps({ propios: { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, compuestas: { glp: glpFloja() }, adoptados }) });
   assert.deepEqual([r.ok, r.decision.action, r.decision.deploy], [false, 'fail_closed', false]);
   assert.match(r.decision.reason, /primera activación de glp rechazada: glp: pierde más de 2 distritos/);
   assert.deepEqual(adoptados, []);
@@ -198,7 +203,7 @@ test('sin active-glp.json pero con source-glp-current.json utilizable, activa de
   const escritas = [];
   const adoptados = [];
   const planes = [];
-  const r = await prepareRelease({ route: 'project', deps: deps({ baseDeFuente: puntero('G0', 'glp-current'), compuestas: { glp: glpAuditada() }, escritas, adoptados, planes }) });
+  const r = await preparar({ route: 'project', deps: deps({ baseDeFuente: puntero('G0', 'glp-current'), compuestas: { glp: glpAuditada() }, escritas, adoptados, planes }) });
   assert.deepEqual([r.ok, r.decision.deploy], [true, true]);
   assert.ok(escritas.includes('glp-primera'));
   assert.deepEqual(adoptados, ['glp:G0:glp-current']);
@@ -209,7 +214,7 @@ test('sin ningún snapshot de GLP utilizable, la primera activación bloquea sin
   const escritas = [];
   const adoptados = [];
   const planes = [];
-  const r = await prepareRelease({ route: 'project', deps: deps({ baseDeFuente: ausente('el snapshot G0 es de liquid-current, no de glp-current'), escritas, adoptados, planes }) });
+  const r = await preparar({ route: 'project', deps: deps({ baseDeFuente: ausente('el snapshot G0 es de liquid-current, no de glp-current'), escritas, adoptados, planes }) });
   assert.deepEqual([r.ok, r.decision.action, r.decision.deploy], [false, 'fail_closed', false]);
   assert.equal(r.informe.groups.glp.outcome, 'first_activation_failed');
   assert.match(r.informe.groups.glp.error, /sin snapshot privado utilizable: el snapshot G0 es de liquid-current/);
@@ -219,7 +224,7 @@ test('sin ningún snapshot de GLP utilizable, la primera activación bloquea sin
 
 test('primera activación que el refresco de esta corrida rechazó: se detiene la entrega', async () => {
   const refresco = { status: 'unchanged', sources: { 'liquid-current': { status: 'unchanged' }, 'glp-current': { status: 'needs_review', groups: { glp: { status: 'needs_review', reasons: ['glp: caída de ofertas frescas superior a 20%'] } } } } };
-  const r = await prepareRelease({ route: 'data', deps: deps({ propios: { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, refresco, compuestas: { glp: glpAuditada() } }) });
+  const r = await preparar({ route: 'data', deps: deps({ propios: { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, refresco, compuestas: { glp: glpAuditada() } }) });
   assert.deepEqual([r.ok, r.decision.action], [false, 'fail_closed']);
   assert.match(r.decision.reason, /primera activación de glp rechazada.*caída de ofertas frescas/);
 });
@@ -229,7 +234,7 @@ const propiosTres = { gasolina: puntero('S1', 'liquid-current'), diesel: puntero
 
 test('ya publicado, un fallo de GLP no impide publicar Gasolina y Diésel, y queda dicho', async () => {
   const escritas = [];
-  const r = await prepareRelease({ route: 'data', deps: deps({ publicados: publicadosTres, propios: propiosTres, compuestas: { glp: { error: 'raw de GLP ilegible' } }, escritas }) });
+  const r = await preparar({ route: 'data', deps: deps({ publicados: publicadosTres, propios: propiosTres, compuestas: { glp: { error: 'raw de GLP ilegible' } }, escritas }) });
   assert.deepEqual([r.ok, r.decision.deploy], [true, true]);
   assert.deepEqual(escritas.sort(), ['diesel-nueva', 'gasolina-nueva']);
   assert.equal(r.informe.groups.glp.outcome, 'failed');
@@ -238,7 +243,7 @@ test('ya publicado, un fallo de GLP no impide publicar Gasolina y Diésel, y que
 
 test('ya publicado, un fallo de los líquidos no impide publicar GLP', async () => {
   const escritas = [];
-  const r = await prepareRelease({ route: 'data', deps: deps({ publicados: publicadosTres, propios: propiosTres, compuestas: { gasolina: { error: 'contrato gasolina inválido' }, diesel: { error: 'contrato diesel inválido' } }, escritas }) });
+  const r = await preparar({ route: 'data', deps: deps({ publicados: publicadosTres, propios: propiosTres, compuestas: { gasolina: { error: 'contrato gasolina inválido' }, diesel: { error: 'contrato diesel inválido' } }, escritas }) });
   assert.deepEqual([r.ok, r.decision.deploy], [true, true]);
   assert.deepEqual(escritas, ['glp-nueva']);
   assert.deepEqual([r.informe.groups.gasolina.outcome, r.informe.groups.diesel.outcome], ['failed', 'failed']);

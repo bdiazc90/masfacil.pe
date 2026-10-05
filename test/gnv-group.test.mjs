@@ -127,6 +127,11 @@ const candidata = (grupo, revision, extra = {}) => ({ group: grupo, manifest: { 
 const gnvAuditada = () => candidata('gnv', 'gnv-primera', { refreshState: { snapshot_id: 'S1', source_max_reported_at: auditada.source_max_reported_at, products: productosAuditados() } });
 const puntero = (id, fuente) => ({ ok: true, snapshot_id: id, missing: [], pointer: { snapshot_id: id, source_id: fuente } });
 
+// La preparación corre sobre una raíz temporal vacía: lo publicado lo dicen las
+// dependencias inyectadas, no los archivos que haya en el `web/` del repositorio.
+// Sin esto, un `refresh-state.json` real hace que `production` deje de ser null.
+const preparar = (entrada) => prepareRelease({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'masfacil-gnv-release-')), ...entrada });
+
 function deps({ publicados = { gasolina: { snapshot_id: 'S1' }, diesel: { snapshot_id: 'S1' }, glp: { snapshot_id: 'G1' } }, propios = { gasolina: puntero('S1', 'liquid-current'), diesel: puntero('S1', 'liquid-current'), glp: puntero('G1', 'glp-current') }, compuestas = {}, escritas = [], adoptados = [], planes = [] } = {}) {
   return {
     groups: [gasolina, diesel, glp, gnv],
@@ -149,7 +154,7 @@ test('la primera activación de GNV se compone con los líquidos sobre el snapsh
   const escritas = [];
   const adoptados = [];
   const planes = [];
-  const r = await prepareRelease({ route: 'project', deps: deps({ compuestas: { gnv: gnvAuditada() }, escritas, adoptados, planes }) });
+  const r = await preparar({ route: 'project', deps: deps({ compuestas: { gnv: gnvAuditada() }, escritas, adoptados, planes }) });
   assert.deepEqual([r.ok, r.decision.deploy], [true, true]);
   assert.ok(escritas.includes('gnv-primera'));
   assert.deepEqual(adoptados, ['gnv:S1:liquid-current']);
@@ -162,7 +167,7 @@ test('la primera activación de GNV se compone con los líquidos sobre el snapsh
 test('una primera activación de GNV que no cumple su base detiene toda la entrega', async () => {
   const adoptados = [];
   const floja = candidata('gnv', 'gnv-floja', { refreshState: { snapshot_id: 'S1', source_max_reported_at: auditada.source_max_reported_at, products: { gnv: producto(238, 212, 89, 244, 33) } } });
-  const r = await prepareRelease({ route: 'project', deps: deps({ compuestas: { gnv: floja }, adoptados }) });
+  const r = await preparar({ route: 'project', deps: deps({ compuestas: { gnv: floja }, adoptados }) });
   assert.deepEqual([r.ok, r.decision.action, r.decision.deploy], [false, 'fail_closed', false]);
   assert.match(r.decision.reason, /primera activación de gnv rechazada: gnv: pierde más de 2 distritos/);
   assert.deepEqual(adoptados, []);
@@ -173,11 +178,11 @@ const propiosCuatro = { gasolina: puntero('S1', 'liquid-current'), diesel: punte
 
 test('ya publicado, un fallo de GNV no impide publicar los demás, y al revés', async () => {
   const escritas = [];
-  const r = await prepareRelease({ route: 'data', deps: deps({ publicados: publicadosCuatro, propios: propiosCuatro, compuestas: { gnv: { error: 'contrato gnv inválido' } }, escritas }) });
+  const r = await preparar({ route: 'data', deps: deps({ publicados: publicadosCuatro, propios: propiosCuatro, compuestas: { gnv: { error: 'contrato gnv inválido' } }, escritas }) });
   assert.deepEqual([r.ok, r.decision.deploy], [true, true]);
   assert.deepEqual(escritas.sort(), ['diesel-nueva', 'gasolina-nueva', 'glp-nueva']);
   assert.match(r.decision.reason, /gnv conserva su versión publicada: contrato gnv inválido/);
   const otras = [];
-  const inversa = await prepareRelease({ route: 'data', deps: deps({ publicados: publicadosCuatro, propios: propiosCuatro, compuestas: { gasolina: { error: 'x' }, diesel: { error: 'y' }, glp: { error: 'z' } }, escritas: otras }) });
+  const inversa = await preparar({ route: 'data', deps: deps({ publicados: publicadosCuatro, propios: propiosCuatro, compuestas: { gasolina: { error: 'x' }, diesel: { error: 'y' }, glp: { error: 'z' } }, escritas: otras }) });
   assert.deepEqual([inversa.ok, inversa.decision.deploy, otras], [true, true, ['gnv-nueva']]);
 });
